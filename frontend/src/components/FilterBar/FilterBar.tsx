@@ -4,11 +4,9 @@ import type { ScreenRequest } from '../../types/filter'
 import { DEFAULT_SCREEN_REQUEST } from '../../types/filter'
 import { DbUpdateButton } from './DbUpdateButton'
 import { MarketCapFilter } from './MarketCapFilter'
-import { MarketFilter } from './MarketFilter'
 import { PatternBuilder } from './PatternBuilder'
 import { RSFilter } from './RSFilter'
 import { ReturnFilter } from './ReturnFilter'
-import { SectorFilter } from './SectorFilter'
 
 export function FilterBar(): React.ReactElement {
   const { applyFilters } = useScreen()
@@ -50,16 +48,6 @@ export function FilterBar(): React.ReactElement {
         <RSFilter
           value={local.rs_min}
           onChange={(v) => update('rs_min', v)}
-        />
-
-        <MarketFilter
-          markets={local.markets}
-          onChange={(m) => update('markets', m)}
-        />
-
-        <SectorFilter
-          selected={local.sectors}
-          onChange={(s) => update('sectors', s)}
         />
 
         <div className="filter-actions">

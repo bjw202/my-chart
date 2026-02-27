@@ -103,22 +103,25 @@ class TestBuildWhere:
         assert 2.0 in params
 
     def test_chg_1w_filter(self):
+        # DB stores chg_1w as decimal (0.015 = 1.5%), UI sends percentage (1.5)
         req = ScreenRequest(chg_1w_min=1.5)
         where, params = _build_where(req)
         assert "chg_1w >= ?" in where
-        assert 1.5 in params
+        assert 0.015 in params
 
     def test_chg_1m_filter(self):
+        # DB stores chg_1m as decimal (0.05 = 5%), UI sends percentage (5.0)
         req = ScreenRequest(chg_1m_min=5.0)
         where, params = _build_where(req)
         assert "chg_1m >= ?" in where
-        assert 5.0 in params
+        assert 0.05 in params
 
     def test_chg_3m_filter(self):
+        # DB stores chg_3m as decimal (0.10 = 10%), UI sends percentage (10.0)
         req = ScreenRequest(chg_3m_min=10.0)
         where, params = _build_where(req)
         assert "chg_3m >= ?" in where
-        assert 10.0 in params
+        assert 0.10 in params
 
     def test_rs_filter(self):
         req = ScreenRequest(rs_min=70.0)

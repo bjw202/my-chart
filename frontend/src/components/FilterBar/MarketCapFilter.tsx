@@ -8,6 +8,8 @@ interface MarketCapFilterProps {
 const PRESETS: { label: string; value: number | null }[] = [
   { label: '전체', value: null },
   { label: '1000억+', value: 1000 },
+  { label: '2000억+', value: 2000 },
+  { label: '3000억+', value: 3000 },
   { label: '5000억+', value: 5000 },
   { label: '1조+', value: 10000 },
 ]

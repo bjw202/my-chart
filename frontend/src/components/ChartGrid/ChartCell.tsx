@@ -36,6 +36,9 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
         background: { color: '#1a1a2e' },
         textColor: '#9ca3af',
       },
+      localization: {
+        priceFormatter: (price: number) => Math.round(price).toLocaleString('ko-KR'),
+      },
       grid: {
         vertLines: { color: '#2d2d44' },
         horzLines: { color: '#2d2d44' },
@@ -43,6 +46,7 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
       timeScale: {
         borderColor: '#374151',
         timeVisible: false,
+        rightOffset: 5,
       },
       rightPriceScale: {
         borderColor: '#374151',

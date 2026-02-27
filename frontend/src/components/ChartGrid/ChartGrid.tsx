@@ -27,6 +27,7 @@ export function ChartGrid(): React.ReactElement {
   }
 
   const cols = gridSize === 4 ? 2 : 3
+  const rows = gridSize === 4 ? 2 : 3
 
   if (flatStocks.length === 0) {
     return (
@@ -56,7 +57,10 @@ export function ChartGrid(): React.ReactElement {
 
       <div
         className="chart-grid-cells"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+        }}
       >
         {visibleStocks.map((stock, slotIndex) => {
           const stockIndex = currentPage * gridSize + slotIndex

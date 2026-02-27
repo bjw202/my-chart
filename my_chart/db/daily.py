@@ -14,6 +14,10 @@ import logging
 import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from my_chart.config import DEFAULT_DB_DAILY
 from my_chart.price import price_naver
@@ -74,6 +78,18 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _sanitize_ohlc(price: pd.DataFrame) -> pd.DataFrame:
+    """Replace zero OHLC values with the nearest non-zero OHLC value in the same row.
+
+    Handles trading halts and API fetch errors where one or more price fields is 0.
+    Rows where all four OHLC values are 0 are dropped entirely.
+    """
+    ohlc_cols = ["Open", "High", "Low", "Close"]
+    price[ohlc_cols] = price[ohlc_cols].replace(0, float("nan"))
+    price[ohlc_cols] = price[ohlc_cols].bfill(axis=1).ffill(axis=1)
+    return price.dropna(subset=["Close"])
+
+
 # @MX:WARN: [AUTO] ThreadPoolExecutor worker with blocking time.sleep(0.1)
 # @MX:REASON: Sleep throttles Naver API rate (~100 req/min) but wastes worker thread time
 def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
@@ -81,6 +97,11 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
     try:
         price = price_naver(company, start, freq="day")
         if price is None or price.empty:
+            return company, []
+
+        price = _sanitize_ohlc(price)
+        if price.empty:
+            logger.warning("All OHLC rows were zero for %s, skipping", company)
             return company, []
 
         price["Change(%)"] = price["Close"].pct_change() * 100
@@ -112,7 +133,7 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
         for index, row in price.iterrows():
             rows.append((
                 company,
-                index.strftime("%Y-%m-%d"),
+                index.strftime("%Y-%m-%d"),  # type: ignore[union-attr]
                 float(row["Open"]),
                 float(row["High"]),
                 float(row["Low"]),

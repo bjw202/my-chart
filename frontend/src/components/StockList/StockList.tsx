@@ -21,6 +21,22 @@ export function StockList(): React.ReactElement {
   const { results } = useScreen()
   const { selectedIndex } = useNavigation()
   const [collapsedSectors, setCollapsedSectors] = useState<Set<string>>(new Set())
+  const [listHeight, setListHeight] = useState(600)
+  const observerRef = useRef<ResizeObserver | null>(null)
+
+  // Callback ref: fires when the div mounts/unmounts, including after empty→populated transition
+  const bodyRefCallback = useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect()
+    observerRef.current = null
+    if (!node) return
+    const observer = new ResizeObserver((entries) => {
+      setListHeight(entries[0].contentRect.height)
+    })
+    observer.observe(node)
+    observerRef.current = observer
+  }, [])
+
+  useEffect(() => () => { observerRef.current?.disconnect() }, [])
 
   const listRef = useRef<VariableSizeList | null>(null)
   const { onStockSelect } = useScrollSync(listRef)
@@ -123,10 +139,10 @@ export function StockList(): React.ReactElement {
         <span>종목</span>
         <span>등락률 / RS</span>
       </div>
-      <div className="stock-list-body">
+      <div ref={bodyRefCallback} className="stock-list-body">
         <VariableSizeList
           ref={listRef}
-          height={600}
+          height={listHeight}
           itemCount={flatItems.length}
           itemSize={getItemSize}
           width="100%"

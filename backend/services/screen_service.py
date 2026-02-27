@@ -57,17 +57,19 @@ def _build_where(req: ScreenRequest) -> tuple[str, list[object]]:
         conditions.append("change_1d >= ?")
         params.append(req.chg_1d_min)
 
+    # chg_1w/1m/3m are stored as decimals (0.30 = 30%) from pct_change(),
+    # while the UI sends percentage values (30 = 30%), so divide by 100.
     if req.chg_1w_min is not None:
         conditions.append("chg_1w >= ?")
-        params.append(req.chg_1w_min)
+        params.append(req.chg_1w_min / 100)
 
     if req.chg_1m_min is not None:
         conditions.append("chg_1m >= ?")
-        params.append(req.chg_1m_min)
+        params.append(req.chg_1m_min / 100)
 
     if req.chg_3m_min is not None:
         conditions.append("chg_3m >= ?")
-        params.append(req.chg_3m_min)
+        params.append(req.chg_3m_min / 100)
 
     if req.rs_min is not None:
         conditions.append("rs_12m >= ?")
@@ -108,11 +110,11 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
     """
     where_sql, params = _build_where(req)
     query = f"""
-        SELECT code, name, market, market_cap, sector_major,
+        SELECT code, name, market, market_cap, sector_major, sector_minor,
                close, change_1d, rs_12m, ema10, ema20, sma50, sma100, sma200
         FROM stock_meta
         WHERE {where_sql}
-        ORDER BY sector_major, market_cap DESC
+        ORDER BY sector_major, sector_minor, market_cap DESC
     """
 
     conn = get_db_conn(daily_db_path)
@@ -121,16 +123,17 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
     finally:
         conn.close()
 
-    # Group by sector_major
+    # Group by "sector_major > sector_minor"
     sector_map: dict[str, list[StockItem]] = defaultdict(list)
     for row in rows:
-        code, name, market, market_cap, sector_major, close, chg1d, rs12m, e10, e20, s50, s100, s200 = row
+        code, name, market, market_cap, sector_major, sector_minor, close, chg1d, rs12m, e10, e20, s50, s100, s200 = row
         item = StockItem(
             code=code,
             name=name,
             market=market or "",
             market_cap=market_cap,
             sector_major=sector_major,
+            sector_minor=sector_minor,
             close=close,
             change_1d=chg1d,
             rs_12m=rs12m,
@@ -140,7 +143,9 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
             sma100=s100,
             sma200=s200,
         )
-        bucket = sector_major or "기타"
+        major = sector_major or "기타"
+        minor = sector_minor or ""
+        bucket = f"{major} > {minor}" if minor else major
         sector_map[bucket].append(item)
 
     sectors: list[SectorGroup] = [
