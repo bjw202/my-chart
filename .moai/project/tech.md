@@ -1,328 +1,269 @@
-# my_chart Technical Documentation
+# KR Stock Screener Technical Documentation
 
 ## Technology Stack Overview
 
-### Data Processing & Manipulation
+### Backend (Python)
 
-- **pandas** - DataFrame-based data manipulation, groupby operations, time series resampling, and data alignment. Core dependency for all data transformations and analysis calculations.
-- **numpy** - Vectorized numerical computations for technical indicator calculations. Used for fast array operations avoiding Python loops.
-- **requests** - HTTP client library for fetching data from Naver Finance API. Handles request sessions, timeouts, and error recovery.
+- **Python 3.11+** - Runtime for backend API and existing data library
+- **FastAPI** - Async web framework for REST API endpoints
+- **uvicorn** - ASGI server for running FastAPI application
+- **my_chart package** - Existing data acquisition, indicators, screening, DB modules
+- **pydantic** - Request/response validation via FastAPI integration
 
-### Visualization & Charting
+### Frontend (TypeScript)
 
-- **matplotlib** - Low-level plotting library used internally by mplfinance. Provides coordinate systems and rendering configuration.
-- **mplfinance** - Professional candlestick chart generation with OHLC visualization, technical overlay support, and volume bar integration.
-- **pillow** - Image processing for chart post-processing, cropping, and format conversion to PNG/SVG.
+- **React 18+** - UI component library
+- **Vite** - Build tool and dev server with HMR
+- **TypeScript** - Type-safe frontend development
+- **TradingView Lightweight Charts** - Open-source financial charting library (npm: `lightweight-charts`)
+- **react-window** - Virtualized list rendering for stock list performance
 
-### Data Storage & Persistence
+### Database
 
-- **sqlite3** - Built-in Python relational database for storing historical prices and RS scores. No external database server required, enabling easy version control and backup.
-- **openpyxl** - Excel file generation and reading with DataFrame conversion support for Excel-based reporting.
-- **xlrd** - Legacy Excel file reading for compatibility with older .xls files.
-- **xlsxwriter** - Optimized Excel generation with formatting support for professional-looking reports.
+- **SQLite** - Embedded relational database (existing schema, no migration needed)
+- **sqlite3** - Python built-in driver for database operations
 
-### Korean Market Data Sources
+### Data Sources (used during DB update only)
 
-- **pykrx** - Korean exchange API providing access to KOSPI, KOSDAQ, KONEX market data and company metadata. Used for stock listing and market cap information.
-- **Naver Finance API** - Historical price data scraping for Korean stocks via requests library. Primary data source for individual stock OHLC data.
+- **Naver Finance API** - Historical OHLCV data via HTTP scraping
+- **pykrx** - Korean exchange API for stock metadata and market cap data
 
-### Office Document Generation
+### Existing Python Dependencies (my_chart package)
 
-- **python-pptx** - Programmatic PowerPoint presentation creation with shape insertion, image embedding, and table generation for professional report export.
-- **lxml** - XML processing library used by python-pptx for PPTX file structure manipulation.
+- **pandas** (>= 1.3.0) - DataFrame operations for all data processing
+- **numpy** (>= 1.21.0) - Vectorized numerical computation for indicators
+- **requests** (>= 2.26.0) - HTTP client for Naver Finance API
+- **mplfinance** (>= 0.12.9) - Chart generation (used in existing library, not in web service)
+- **matplotlib** (>= 3.4.0) - Underlying chart engine (existing library dependency)
+- **openpyxl** (>= 3.6.0) - Excel file handling for sectormap
+- **pykrx** (>= 1.0.30) - Korean stock exchange API
+
+### New Backend Dependencies
+
+- **fastapi** - Web framework
+- **uvicorn** - ASGI server
+- **sse-starlette** - Server-Sent Events for DB update progress streaming
+- **pydantic** - Data validation (bundled with FastAPI)
+
+### New Frontend Dependencies
+
+- **react**, **react-dom** - UI framework
+- **typescript** - Language
+- **lightweight-charts** - TradingView chart library
+- **react-window** - Virtualized rendering
+- **axios** or **fetch** - HTTP client for API calls
 
 ## Platform Requirements
 
-### Python Version
-- Minimum Python 3.8+
-- Tested on Python 3.9, 3.10, 3.11, 3.12, 3.13
-- Type hints require Python 3.5+ (used throughout codebase)
+### Python Environment
 
-### System Font Configuration
+- Python 3.11+ (recommended: 3.13)
+- Virtual environment (venv or conda)
+- pip for package management
 
-**macOS:** Requires AppleGothic font for Korean text rendering in charts. Automatically detected and configured at startup.
+### Node.js Environment
 
-**Windows:** Requires Malgun Gothic font (included in Windows 7+) for Korean text rendering. Automatically detected and configured at startup.
+- Node.js 20 LTS+
+- npm or pnpm for package management
+- Vite for build tooling
 
-**Linux:** Requires system font supporting Korean Unicode ranges. Falls back to generic sans-serif if language-specific font unavailable.
+### Operating System
 
-The system uses automatic platform detection in config.py to select appropriate fonts without user configuration.
-
-### Operating System Compatibility
-
-- macOS 10.13+ (High Sierra and later)
-- Windows 7+ (with appropriate fonts)
-- Linux distributions with Python 3.8+
+- macOS (primary development target)
+- Windows, Linux (compatible)
 
 ## Database Architecture
 
-### Weekly Price Database (weekly_price.db)
+### Existing Schema (No Changes Required)
 
-SQLite database storing weekly OHLCV data for historical analysis.
+**weekly_price.db:**
+- Per-stock tables with columns: Date, Open, High, Low, Close, Volume, MA50, MA150, MA200, CHG_1W, CHG_1M, CHG_3M, CHG_6M, CHG_12M
+- Composite index on (stock_code, date)
 
-**Schema:**
-- stock_code (TEXT PRIMARY KEY) - 6-digit Korean stock code
-- date (DATE) - Trading date indexed for range queries
-- open (REAL) - Opening price
-- high (REAL) - Highest price of the day
-- low (REAL) - Lowest price of the day
-- close (REAL) - Closing price
-- volume (INTEGER) - Trading volume
+**weekly_rs.db:**
+- RS scores per stock per date
+- RS = (Stock return / KOSPI return) * 100
 
-**Index:** (stock_code, date) composite index for efficient historical queries
+**daily_price.db:**
+- Per-stock tables with columns: Date, Open, High, Low, Close, Volume, EMA10, EMA20, SMA50, SMA200, volume indicators, range indicators
 
-**Update Frequency:** Weekly, typically updated every Friday after market close
+### Schema Enhancement: Market Cap Storage
 
-**Data Retention:** Historical data from inception date of stock listing
+**New requirement:** Store market cap data in DB during update cycle.
 
-### Weekly RS Database (weekly_rs.db)
+**Approach:** Add market_cap column to existing stock metadata or create a separate `stock_meta` table:
+```
+stock_meta:
+  stock_code (TEXT, PRIMARY KEY)
+  market_cap (INTEGER)    -- 시가총액 in KRW
+  last_updated (DATE)
+```
 
-SQLite database storing Relative Strength scores comparing individual stocks to KOSPI index.
+**Rationale:** Currently market cap is fetched via `pykrx.stock.get_market_cap()` at runtime. Storing it during DB update enables pure SQL filtering without runtime API calls.
 
-**Schema:**
-- stock_code (TEXT PRIMARY KEY)
-- date (DATE) - Calculation date
-- rs_score (REAL) - Relative Strength percentage (0-200)
+## Data Strategy: DB vs pykrx
 
-**Calculation Method:** RS = (Stock 12-month return / KOSPI 12-month return) * 100
+### Current State
 
-**Update Frequency:** Weekly alignment with price updates
+| Data | Source | Storage |
+|------|--------|---------|
+| OHLCV (weekly) | Naver Finance | weekly_price.db |
+| OHLCV (daily) | Naver Finance | daily_price.db |
+| MA/EMA/SMA | Computed from OHLCV | Stored in DB |
+| Period returns | Computed from OHLCV | Stored in DB |
+| RS scores | Computed vs KOSPI | weekly_rs.db |
+| Market cap | pykrx API (runtime) | NOT stored |
+| Stock metadata | pykrx + sectormap.xlsx | Runtime cache |
 
-### Daily Price Database (daily_price.db)
+### Target State (Web Service)
 
-SQLite database for recent daily trading data with shorter retention period.
+| Data | Source | Storage | API Usage |
+|------|--------|---------|-----------|
+| OHLCV | Naver Finance | DB | `/api/chart/{code}` |
+| Technical indicators | Computed | DB | `/api/screen` filters |
+| RS scores | Computed | DB | `/api/screen` RS filter |
+| Market cap | pykrx (batch) | DB | `/api/screen` market cap filter |
+| Sector info | sectormap.xlsx | Runtime cache | `/api/sectors` |
 
-**Schema:** Same as weekly database with daily granularity
+### Key Decision: DB Update Includes Market Cap
 
-**Data Retention:** 2-3 years of daily data to manage database size
-
-**Update Frequency:** Daily after market close
+During `/api/db/update`:
+1. Fetch all stock OHLCV data (existing flow)
+2. Fetch market cap via `pykrx.stock.get_market_cap(date)` (new)
+3. Store market cap in `stock_meta` table (new)
+4. All subsequent filtering uses SQL queries only (fast)
 
 ## Development Environment Setup
 
-### Installation Methods
-
-**pip Installation (Recommended):**
-```
-pip install my-chart
-```
-
-**Development Installation:**
-```
-pip install -e ".[dev]"
-```
-
-**From Source:**
-```
-git clone https://github.com/user/my_chart.git
-cd my_chart
-pip install -e .
-```
-
-### Dependencies File (requirements.txt)
-
-Core dependencies:
-- pandas>=1.3.0
-- numpy>=1.21.0
-- requests>=2.26.0
-- matplotlib>=3.4.0
-- mplfinance>=0.12.9
-- pillow>=8.3.0
-- openpyxl>=3.6.0
-- xlrd>=2.0.0
-- xlsxwriter>=3.0.0
-- pykrx>=1.0.30
-- python-pptx>=0.6.21
-- lxml>=4.6.3
-
-Development dependencies:
-- pytest>=7.0.0
-- pytest-cov>=3.0.0
-- black>=22.0.0
-- flake8>=4.0.0
-- mypy>=0.900
-
-### Virtual Environment Setup
+### Backend Setup
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # macOS/Linux
-# or
-venv\Scripts\activate  # Windows
-pip install -r requirements.txt
+# Clone and enter project
+cd kr-stock-screener
+
+# Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install existing package + new dependencies
+pip install -e .
+pip install fastapi uvicorn sse-starlette
+
+# Run backend
+uvicorn backend.main:app --reload --port 8000
 ```
+
+### Frontend Setup
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Run dev server (proxied to backend)
+npm run dev
+```
+
+### Full Stack Development
+
+- Backend: `http://localhost:8000` (FastAPI + Swagger docs at `/docs`)
+- Frontend: `http://localhost:5173` (Vite dev server with API proxy to :8000)
 
 ## Architectural Decisions
 
-### 1. Lazy Loading Pattern for Registry
+### 1. Reuse my_chart Package as Backend Core
 
-**Decision:** Stock registry uses global singleton pattern with lazy initialization
+**Decision:** Import existing `my_chart` modules directly into FastAPI services instead of rewriting
 
-**Rationale:** pykrx API calls are expensive (network I/O, data parsing). Deferring these calls until first data access reduces startup latency from 3-5 seconds to <100ms. Subsequent accesses hit in-memory cache.
+**Rationale:** The existing library has 40+ battle-tested functions for data acquisition, indicator calculation, and screening. Rewriting would introduce bugs and delay. Service layer bridges DataFrame outputs to JSON responses.
 
-**Trade-offs:** Initial access has higher latency but subsequent accesses are instant. Thread-safety managed through Python GIL for single-threaded REPL usage.
+**Trade-offs:** Some functions (e.g., mmt_companies) make synchronous API calls during screening. For the web service, pre-computed DB data should be preferred over runtime API calls.
 
-### 2. SQLite for Data Persistence
+### 2. SQL-Based Filtering Over Runtime Computation
 
-**Decision:** Use SQLite instead of cloud database or CSV files
+**Decision:** Pre-compute all filterable values during DB update and store as indexed columns
 
-**Rationale:** SQLite provides ACID transactions, efficient range queries, and low operational complexity. Database files can be version-controlled, backed up, and reproduced. No external database infrastructure required.
+**Rationale:** With ~2,570 stocks, runtime computation of indicators and returns for each filter request would take 30-60 seconds. SQL WHERE clauses on indexed columns return in <100ms.
 
-**Trade-offs:** Single-process write model (adequate for weekly batch updates). Database file grows with historical data retention.
+**Trade-offs:** Data freshness depends on last DB update. Acceptable for end-of-day analysis use case.
 
-### 3. Modular Pipeline Architecture
+### 3. TradingView Lightweight Charts Over mplfinance
 
-**Decision:** Separate data acquisition, processing, analysis, and export into distinct modules
+**Decision:** Use TradingView Lightweight Charts (npm) for frontend chart rendering instead of generating PNG charts with mplfinance
 
-**Rationale:** Clean separation of concerns enables independent testing, flexible composition, and reduced dependencies between layers. Users can chain functions matching their analysis workflow.
+**Rationale:** Interactive browser-native charts with pan/zoom, tooltips, and crosshair. No server-side image generation overhead. Standard financial charting library with excellent documentation. Chart data transferred as JSON arrays, not image files.
 
-**Trade-offs:** More files and imports but increased flexibility and testability.
+**Trade-offs:** Requires TypeScript frontend integration. Cannot reuse existing mplfinance charting code (but chart generation was the output layer, not business logic).
 
-### 4. Pandas DataFrame for Data Structure
+### 4. SSE for DB Update Progress
 
-**Decision:** Use pandas DataFrames throughout for consistency
+**Decision:** Use Server-Sent Events (SSE) for real-time DB update progress instead of polling
 
-**Rationale:** DataFrames provide familiar tabular interface, built-in time series features, SQL-like operations, and seamless integration with visualization libraries. Standard in Python data science ecosystem.
+**Rationale:** DB update takes 5-30 minutes. SSE provides server-push updates without client polling overhead. FastAPI supports SSE via `sse-starlette`. One-directional (server -> client) is sufficient for progress reporting.
 
-**Trade-offs:** Memory overhead compared to numpy arrays, but acceptable for stock market datasets (typically <10,000 rows per stock).
+**Trade-offs:** SSE is simpler than WebSocket but one-directional. Sufficient since client only needs to receive progress, not send messages during update.
 
-### 5. Pure Functions for Data Transformation
+### 5. SQLite Retained (No PostgreSQL Migration)
 
-**Decision:** Technical indicators implemented as pure functions returning new DataFrames
+**Decision:** Keep SQLite as the database engine
 
-**Rationale:** Pure functions enable function composition, reduce side effects, simplify testing, and support caching. Functional style aligns with pandas operations.
+**Rationale:** Local-only application with single-user access. SQLite provides adequate read performance for filtering queries. No concurrent write requirement (DB update runs as exclusive batch). Zero operational complexity.
 
-**Trade-offs:** Higher memory usage from intermediate DataFrames but offset by reduced bugs and improved maintainability.
+**Trade-offs:** Single-writer limitation acceptable for batch update pattern. No connection pooling needed.
 
-## Performance Characteristics
+## Performance Considerations
 
-### Data Fetching
+| Area | Strategy |
+|------|----------|
+| Chart rendering | Viewport-only chart instantiation, `chart.remove()` on scroll-out |
+| Chart data | Lazy-load per-stock data on pagination/scroll |
+| Stock list | react-window virtualized rendering |
+| DB query | SQL WHERE on indexed columns, <100ms response |
+| DB update | FastAPI BackgroundTask, SSE progress push |
+| Frontend bundle | Vite code splitting, lazy component loading |
 
-- Single stock daily data (5-10 years): 200-500ms
-- Batch fetch 100 stocks: 30-60 seconds with network parallelization
-- API rate limiting: Naver Finance imposes 100 requests/minute limit
+## Thread Safety
 
-### Database Operations
+### Known Issue: registry.py Global State
 
-- Weekly price data insert (1000 stocks): 1-2 seconds
-- Range query (1 year historical): <100ms
-- Batch indicator calculation (1000 stocks): 2-5 seconds
+The existing `registry.py` uses a global singleton pattern with lazy initialization. In a multi-threaded FastAPI environment:
 
-### Chart Generation
+- **Read operations** (_code, _name, _market, _sector): Thread-safe after initialization (immutable cache)
+- **Initialization**: Potential race condition on first access from concurrent requests
+- **Mitigation**: Initialize registry during FastAPI startup (`lifespan` event) before accepting requests
 
-- Single stock candlestick chart: 500ms-1s
-- Chart with multiple indicators: 1-2 seconds
-- Batch chart generation (100 stocks): 2-5 minutes with parallelization
+### SQLite Concurrent Access
 
-### Memory Usage
-
-- Weekly price database (10 years, 1000 stocks): 500MB-1GB
-- Loaded DataFrame (100 stocks, 10 years data): 50-100MB
-- Chart generation peak memory: 200-300MB
+- **Reads**: Thread-safe with `check_same_thread=False`
+- **Writes**: Single-writer model, DB update runs as exclusive background task
+- **Mitigation**: Use WAL mode for concurrent reads during writes
 
 ## Error Handling & Recovery
 
-### API Failures
+### API Failures During DB Update
 
-- **Network Timeout:** Automatic retry with exponential backoff (max 3 attempts)
-- **Invalid Stock Code:** Validation against registry before API call
-- **Data Gaps:** Interpolation using adjacent valid prices
+- Retry with exponential backoff (existing my_chart behavior)
+- SSE reports failed stocks to frontend
+- Partial update is valid (successfully updated stocks are persisted)
 
-### Database Issues
+### Frontend Error States
 
-- **Constraint Violations:** Transaction rollback and error logging
-- **Corrupted Database:** Automatic schema validation and migration
-- **Lock Timeouts:** Automatic retry with connection reset
-
-### Chart Generation
-
-- **Font Not Found:** Graceful fallback to system default
-- **Memory Exhausted:** Batch processing with memory management
-- **Invalid Data:** Filtering of NaN/Inf values with warning
-
-## Security Considerations
-
-### Data Privacy
-
-- No sensitive user data stored in database
-- API credentials managed via environment variables
-- Database files contain only public market data
-
-### API Usage
-
-- Naver Finance scraping respects robots.txt and rate limits
-- Automatic throttling to prevent overload
-- User-Agent header properly configured
-
-### File Handling
-
-- Temporary files cleaned up automatically after export
-- PPTX files generated with standard security settings
-- No embedded scripts or active content
-
-## Version Management
-
-### Release Strategy
-
-- Semantic versioning (MAJOR.MINOR.PATCH)
-- MAJOR: Breaking API changes
-- MINOR: New features, backward compatible
-- PATCH: Bug fixes and maintenance
-
-### Backward Compatibility
-
-- Function signatures stable within MAJOR version
-- Deprecated functions have 2-version transition period
-- Database schema migrations handled automatically
+- Network error: Show retry button with last known state
+- Empty results: Show "No stocks match filters" message
+- Chart load failure: Show placeholder with stock info
 
 ## Testing Infrastructure
 
 ### Current State
 
-- No automated test suite (0% coverage)
-- Manual testing via Jupyter notebooks
-- Example scripts in examples directory
+- No automated tests (0% coverage)
+- Manual testing via Jupyter notebooks for my_chart package
 
-### Recommended Approach
+### Target Approach
 
-- pytest-based unit tests with 85%+ coverage target
-- Integration tests for API and database operations
-- Mock external dependencies (Naver Finance, pykrx)
-- CI/CD pipeline via GitHub Actions for automated testing
-
-## Dependencies Graph
-
-```
-my_chart
-├── pandas (data processing)
-│   └── numpy (array operations)
-├── requests (API calls)
-├── matplotlib (visualization base)
-│   └── numpy
-├── mplfinance (candlestick charts)
-│   └── matplotlib
-├── pillow (image processing)
-├── sqlite3 (built-in)
-├── openpyxl, xlrd, xlsxwriter (Excel)
-├── pykrx (Korean market data)
-│   └── requests
-├── python-pptx (PowerPoint)
-│   └── lxml (XML processing)
-└── lxml
-```
-
-## Notable Limitations
-
-1. **No async/await:** Synchronous I/O blocks on Naver Finance API calls
-2. **No caching layer:** Every data fetch hits the API (respects rate limits)
-3. **Limited error messages:** Some exceptions lack context for debugging
-4. **Single-process writes:** Database updates require exclusive write lock
-5. **No authentication:** Public API usage with no credentials or OAuth support
-
-## Recommended Improvements
-
-1. Implement async I/O for parallel API calls
-2. Add in-memory caching layer for frequently accessed data
-3. Enhance error messages with debugging context
-4. Add connection pooling for database operations
-5. Implement comprehensive test suite with CI/CD
+- **Backend:** pytest for API endpoint integration tests, mock my_chart functions
+- **Frontend:** Vitest for component unit tests
+- **E2E:** Playwright for full-stack user flow testing
+- **Development mode:** DDD (Domain-Driven Development) per quality.yaml

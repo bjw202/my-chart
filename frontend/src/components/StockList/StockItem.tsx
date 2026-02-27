@@ -1,0 +1,54 @@
+import React from 'react'
+import type { CSSProperties } from 'react'
+import type { StockItem as StockItemData } from '../../types/stock'
+
+interface StockItemProps {
+  stock: StockItemData
+  isSelected: boolean
+  style: CSSProperties
+  onClick: () => void
+}
+
+// Display NULL values as "-"
+function fmt(v: number | null, decimals = 2, suffix = ''): string {
+  if (v === null || v === undefined) return '-'
+  return `${v.toFixed(decimals)}${suffix}`
+}
+
+function fmtChange(v: number | null): { text: string; className: string } {
+  if (v === null || v === undefined) return { text: '-', className: '' }
+  const text = `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+  const className = v >= 0 ? 'positive' : 'negative'
+  return { text, className }
+}
+
+export function StockItemRow({ stock, isSelected, style, onClick }: StockItemProps): React.ReactElement {
+  const change = fmtChange(stock.change_1d)
+  const marketCapDisplay = stock.market_cap === null
+    ? '-'
+    : stock.market_cap >= 10000
+      ? `${Math.floor(stock.market_cap / 10000)}조 ${stock.market_cap % 10000}억`
+      : `${stock.market_cap}억`
+
+  return (
+    <div
+      className={`stock-item${isSelected ? ' stock-item--selected' : ''}`}
+      style={style}
+      onClick={onClick}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+    >
+      <div className="stock-item-main">
+        <span className="stock-item-name">{stock.name}</span>
+        <span className="stock-item-code">{stock.code}</span>
+      </div>
+      <div className="stock-item-meta">
+        <span className={`stock-item-change ${change.className}`}>{change.text}</span>
+        <span className="stock-item-rs">RS {fmt(stock.rs_12m, 0)}</span>
+        <span className="stock-item-cap">{marketCapDisplay}</span>
+      </div>
+    </div>
+  )
+}

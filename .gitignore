@@ -197,6 +197,12 @@ dist-ssr/
 .firebase/
 
 # ===========================================
+# Auto Memory (user-specific, not tracked)
+# ===========================================
+memory/
+.claude/agent-memory/
+
+# ===========================================
 # Project-Specific
 # ===========================================
 # Generated output files (charts, PPTX, DB)

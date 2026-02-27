@@ -1,6 +1,8 @@
 """Stock and sector registry with lazy loading.
 
-Primary data source: sectormap.xlsx (2,500+ stocks with Code, Name, Market, sector info).
+Primary data source: sectormap_original.xlsx (2,500+ stocks with sector and financial info).
+Row 9 is the header row (skiprows=8 skips notes and merged headers).
+Columns '종목\n코드', '종목명', '시장' are renamed to Code, Name, Market on load.
 pykrx is used only for market cap queries where needed.
 """
 
@@ -20,27 +22,33 @@ _df_stock: pd.DataFrame | None = None
 _df_sector: pd.DataFrame | None = None
 
 
+def _load_sectormap() -> pd.DataFrame:
+    """Load sectormap_original.xlsx, skipping 8 comment/header rows, and normalize column names."""
+    df = pd.read_excel(str(SECTORMAP_PATH), skiprows=8)
+    df.rename(columns={"종목\n코드": "Code", "종목명": "Name", "시장": "Market"}, inplace=True)
+    df["Code"] = df["Code"].astype(str).str.zfill(6)
+    return df
+
+
 def get_stock_registry() -> pd.DataFrame:
-    """Lazily load stock registry from sectormap.xlsx.
+    """Lazily load stock registry from sectormap_original.xlsx.
 
     Returns DataFrame with columns: Code, Name, Market.
     Code is zero-padded to 6 digits.
     """
     global _df_stock
     if _df_stock is None:
-        df = pd.read_excel(str(SECTORMAP_PATH))
-        df["Code"] = df["Code"].astype(str).str.zfill(6)
+        df = _load_sectormap()
         _df_stock = df[["Code", "Name", "Market"]].copy()
         logger.info("Stock registry loaded: %d stocks", len(_df_stock))
     return _df_stock
 
 
 def get_sector_registry() -> pd.DataFrame:
-    """Lazily load full sector registry from sectormap.xlsx."""
+    """Lazily load full sector registry from sectormap_original.xlsx."""
     global _df_sector
     if _df_sector is None:
-        _df_sector = pd.read_excel(str(SECTORMAP_PATH))
-        _df_sector["Code"] = _df_sector["Code"].astype(str).str.zfill(6)
+        _df_sector = _load_sectormap()
         _df_sector.sort_values(by="산업명(대)", ascending=True, inplace=True)
     return _df_sector
 

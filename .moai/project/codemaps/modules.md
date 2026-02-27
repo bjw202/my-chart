@@ -1,382 +1,202 @@
-# my_chart Module Reference
+# KR Stock Screener Module Reference
 
-## Price Module (price.py)
+## Backend Modules (New)
 
-**Responsibility:** Fetch historical stock price data from Naver Finance API and provide data cleaning utilities.
+### backend/main.py - FastAPI Application Entry Point
 
-### Public Functions
+**Responsibility:** Initialize FastAPI app, configure CORS, mount routers, handle startup/shutdown lifecycle.
 
-**`price_naver(code: str, start_date: str | datetime, end_date: str | datetime) -> DataFrame`**
-- Fetches historical OHLCV data for specified stock code and date range
-- Parameters: stock_code (string or integer), start_date, end_date
-- Returns: DataFrame indexed by date with Open, High, Low, Close, Volume columns
-- Raises: ValueError if code invalid, requests.RequestException if API fails
-- Automatic retry with exponential backoff on network failures
+- Creates FastAPI app with CORS middleware (localhost origins)
+- Mounts routers: chart, screen, db, sectors under `/api` prefix
+- Lifespan event: pre-initializes registry singleton to avoid first-request delay
+- Serves frontend static files in production mode
 
-**`price_naver_rs(code: str, start_date: str, end_date: str, base_code: str = "KOSPI") -> DataFrame`**
-- Fetches price data and calculates Relative Strength vs base index (default KOSPI)
-- Returns: DataFrame with additional RS column (0-200 scale)
-- RS 100 means stock tracked index perfectly, >100 outperformed, <100 underperformed
+### backend/routers/ - API Route Handlers
 
-**`fix_zero_ohlc(df: DataFrame) -> DataFrame`**
-- Handles zero/invalid OHLC values sometimes returned by API
-- Interpolates using adjacent valid prices
-- Returns cleaned DataFrame
+**chart.py**
+- `GET /api/chart/{code}` - Returns OHLCV + MA time series for a single stock
+- Query params: start_date, end_date (optional, defaults to 1 year)
+- Response: Array of candlestick data points in TradingView format
 
-### Implementation Details
+**screen.py**
+- `POST /api/screen` - Accepts filter criteria, returns filtered stock list
+- Request body: FilterCondition (market_cap, returns, patterns, rs, sectors)
+- Response: Sector-grouped stock list with metadata
 
-Uses requests library with session management for connection pooling. Implements HTML parsing to extract data from Naver Finance web pages. Handles Korean text encoding and date format conversions automatically. Respects Naver Finance rate limits (100 requests/minute).
+**db.py**
+- `POST /api/db/update` - Starts background DB update task
+- `GET /api/db/status` - SSE stream of update progress
+- `GET /api/db/last-updated` - Returns last DB update timestamp
 
-### Dependencies
+**sectors.py**
+- `GET /api/sectors` - Returns list of available sectors for filter dropdown
 
-- requests: HTTP client
-- pandas: Data structure and manipulation
-- re: Regular expression parsing
+### backend/services/ - Business Logic Bridge
 
----
+**chart_service.py**
+- Bridges `my_chart.db.queries.get_db_data()` → TradingView chart format
+- Converts DataFrame columns to `{time, open, high, low, close, volume}` array
+- Includes MA overlay data series
 
-## Indicators Module (indicators.py)
+**screen_service.py**
+- Converts filter criteria JSON to SQL WHERE clauses
+- Executes optimized queries against SQLite indexed columns
+- Joins results with sector metadata from registry
+- Returns sector-grouped, market-cap-sorted stock list
 
-**Responsibility:** Calculate technical indicators and add them as new columns to price DataFrames.
+**db_service.py**
+- Orchestrates DB update using existing my_chart functions
+- Runs `generate_price_db()`, `price_daily_db()`, and market cap fetch
+- Streams progress via SSE callback
 
-### Public Classes/Functions
+**sector_service.py**
+- Loads sector data from `get_stock_registry()` and `sectormap_original.xlsx`
+- Caches sector list for fast repeated access
 
-**`RSI(df: DataFrame, period: int = 14) -> DataFrame`**
-- Relative Strength Index (0-100 scale)
-- Momentum oscillator measuring overbought/oversold conditions
-- Returns: df with added RSI column
-- period: default 14 days
+### backend/schemas/ - Pydantic Models
 
-**`MACD(df: DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> DataFrame`**
-- Moving Average Convergence Divergence
-- Returns: df with MACD, MACD_signal, and MACD_diff columns
-- MACD_diff = MACD - Signal line (crossover signals)
-
-**`Stochastic(df: DataFrame, period: int = 14, smooth_k: int = 3, smooth_d: int = 3) -> DataFrame`**
-- Stochastic oscillator measuring momentum
-- Returns: df with %K and %D columns
-- Values 0-100, <20 oversold, >80 overbought
-
-**`BolingerBand(df: DataFrame, period: int = 20, std_dev: int = 2) -> DataFrame`**
-- Bollinger Bands for volatility measurement
-- Returns: df with upper_band, middle_band, lower_band columns
-- Middle band is 20-day moving average, upper/lower are +/- 2 standard deviations
-
-**`ImpulseMACD(df: DataFrame) -> DataFrame`**
-- Specialized MACD variant for momentum confirmation
-- Returns: df with impulse_macd column
-- Combines price, MACD, and rate of change
-
-**`add_moving_averages(df: DataFrame, periods: list[int] = [20, 50, 200]) -> DataFrame`**
-- Adds simple moving averages for multiple periods
-- Returns: df with SMA_20, SMA_50, SMA_200 columns
-- Default periods: 20-day, 50-day, 200-day
-
-### Usage Pattern
-
-```python
-df = price_naver("005930", "2020-01-01", "2024-01-01")
-df = RSI(df, period=14)
-df = MACD(df)
-df = add_moving_averages(df, [20, 50, 200])
-# df now has columns: Open, High, Low, Close, Volume, RSI, MACD, MACD_signal, MACD_diff, SMA_20, SMA_50, SMA_200
-```
-
-### Implementation Details
-
-All indicators implemented as pure functions returning new DataFrames. Uses pandas rolling windows and expanding operations for efficient calculation. Handles NaN values gracefully (first N rows have NaN for indicators with lookback periods). NumPy used for fast mathematical operations.
+**chart.py** - `ChartDataPoint`, `ChartDataResponse`, `MAOverlay`
+**screen.py** - `ScreenRequest`, `FilterCondition`, `PatternCondition`, `ScreenResponse`, `StockItem`, `SectorGroup`
+**db.py** - `UpdateStatus`, `LastUpdated`
 
 ---
 
-## Registry Module (registry.py)
+## Existing my_chart Modules (Backend Core)
 
-**Responsibility:** Provide lazy-loaded lookup functions for stock metadata without startup delay.
+### Price Module (my_chart/price.py)
 
-### Public Functions
+**Web Service Role:** Data source for `/api/chart/{code}` and DB update process.
 
-**`_code(name: str) -> str | None`**
-- Returns 6-digit Korean stock code for given stock name
-- Example: _code("삼성전자") returns "005930"
-- Returns None if name not found
+**Key Functions:**
+- `price_naver(code, start_date, end_date) -> DataFrame` - Fetch OHLCV from Naver Finance
+- `price_naver_rs(code, start_date, end_date) -> DataFrame` - Fetch with RS calculation
+- `fix_zero_ohlc(df) -> DataFrame` - Clean invalid OHLC values
 
-**`_name(code: str) -> str | None`**
-- Returns Korean stock name for given code
-- Example: _name("005930") returns "삼성전자"
-- Returns None if code not found
+### Indicators Module (my_chart/indicators.py)
 
-**`_market(code: str) -> str | None`**
-- Returns market type for stock code
-- Returns: "KOSPI", "KOSDAQ", or "KONEX"
-- Returns None if code not found
+**Web Service Role:** Pre-compute technical indicators during DB update for SQL-based filtering.
 
-**`_sector(code: str) -> str | None`**
-- Returns sector classification for stock
-- Example: _sector("005930") returns "전기전자"
-- Returns None if code not found
+**Key Functions:**
+- `RSI(df, period=14) -> DataFrame`
+- `MACD(df, fast=12, slow=26, signal=9) -> DataFrame`
+- `Stochastic(df, period=14) -> DataFrame`
+- `BolingerBand(df, period=20, std_dev=2) -> DataFrame`
+- `add_moving_averages(df, periods=[20,50,200]) -> DataFrame`
 
-### Usage Pattern
+### Registry Module (my_chart/registry.py)
 
-```python
-code = _code("삼성전자")  # "005930"
-name = _name("005930")  # "삼성전자"
-market = _market("005930")  # "KOSPI"
-sector = _sector("005930")  # "전기전자"
-```
+**Web Service Role:** Stock metadata for `/api/sectors` and stock list display.
 
-### Implementation Details
+**Key Functions:**
+- `_code(name) -> str` - Stock name to code lookup
+- `_name(code) -> str` - Stock code to name lookup
+- `_market(code) -> str` - Get market type (KOSPI/KOSDAQ)
+- `_sector(code) -> str` - Get sector classification
+- `get_stock_registry() -> DataFrame` - Full registry with sector info
+- `add_sector_info(df) -> DataFrame` - Add sector columns to stock list
 
-Uses lazy singleton pattern with global cache. First call to any _code/name/market/sector function triggers pykrx API initialization (expensive, 3-5 seconds). Subsequent calls return cached values instantly. Thread-safe via Python GIL for single-threaded REPL usage.
+### Database Module (my_chart/db/)
 
-### Dependencies
+**Web Service Role:** Primary data persistence and query layer.
 
-- pykrx: Korean stock exchange API
+**db/weekly.py:**
+- `generate_price_db(start_date=None) -> None` - Build/update weekly price DB
+- `generate_rs_db(base_code="KOSPI") -> None` - Build/update RS score DB
 
----
+**db/daily.py:**
+- `price_daily_db(code, start_date, end_date) -> DataFrame` - Daily data access
 
-## Database Module (db/)
+**db/queries.py:**
+- `get_db_data(code, start_date, end_date, db_name) -> DataFrame` - Query historical data
+- `get_nearest_date(code, target_date, db_name) -> datetime` - Find nearest trading date
+- `get_query(sql, db_name) -> DataFrame` - Execute custom SQL
+- `load_price_with_rs(code, start_date, end_date) -> DataFrame` - Price + RS combined query
 
-**Responsibility:** Manage SQLite databases for price history and RS scores with efficient query interfaces.
+### Screening Module (my_chart/screening/)
 
-### db/weekly.py - Database Generation
+**Web Service Role:** Filter logic for `/api/screen` endpoint.
 
-**`generate_price_db(start_date: str = None) -> None`**
-- Creates/updates weekly_price.db with OHLCV data for all stocks
-- Downloads historical data via price_naver() for each stock
-- Resamples daily data to weekly for storage efficiency
-- Upserts into SQLite (skips existing weeks)
-- start_date: optional resume point for partial rebuilds
+**screening/momentum.py:**
+- `mmt_companies(min_12m, min_6m, min_3m) -> list[str]` - Momentum screening
+- `mmt_filtering(codes, min_return) -> list[str]` - Filter by return threshold
 
-**`generate_rs_db(base_code: str = "KOSPI") -> None`**
-- Creates/updates weekly_rs.db with Relative Strength scores
-- Calculates RS for each stock vs base index (default KOSPI)
-- RS = (Stock Return / Base Return) * 100
-- Stores weekly RS values for trend analysis
+**screening/daily_filters.py:**
+- `daily_filtering(code) -> bool` - Apply daily filter criteria
+- `daily_filtering_2(code, params) -> bool` - Custom parameter filtering
+- `filter_1(code) -> bool`, `filter_2(code) -> bool` - Individual filter components
 
-### db/queries.py - Query Interface
+**screening/high_stocks.py:**
+- `get_high_stocks(threshold_percent) -> list[str]` - 52-week high detection
 
-**`get_db_data(code: str, start_date: str, end_date: str, db_name: str = "weekly") -> DataFrame`**
-- Retrieves price data from specified database
-- Returns: DataFrame indexed by date with OHLCV columns
-- Handles date range queries efficiently with SQL WHERE
+### Charting Module (my_chart/charting/) - NOT Used in Web Service
 
-**`get_nearest_date(code: str, target_date: str, db_name: str = "weekly") -> datetime`**
-- Finds nearest available trading date in database
-- Useful for handling weekends and holidays
-- Returns: closest date to target_date with available data
+Existing charting with mplfinance is NOT used in the web service. TradingView Lightweight Charts replaces this functionality in the frontend.
 
-**`get_query(sql: str, db_name: str = "weekly") -> DataFrame`**
-- Executes custom SQL query against database
-- Returns: result as DataFrame
-- Advanced queries for custom analysis
+### Export Module (my_chart/export/) - NOT Used in Web Service
 
-### db/daily.py - Daily Database
-
-**`price_daily_db(code: str, start_date: str, end_date: str) -> DataFrame`**
-- Retrieves daily data from daily_price.db
-- Used for recent trading analysis
-- Same interface as get_db_data() but for daily granularity
-
-### Database Schema
-
-**weekly_price table:**
-```
-stock_code (TEXT, PRIMARY KEY)
-date (DATE, PRIMARY KEY)
-open (REAL)
-high (REAL)
-low (REAL)
-close (REAL)
-volume (INTEGER)
-PRIMARY KEY (stock_code, date)
-```
-
-**weekly_rs table:**
-```
-stock_code (TEXT, PRIMARY KEY)
-date (DATE, PRIMARY KEY)
-rs_score (REAL)
-PRIMARY KEY (stock_code, date)
-```
+PPTX and TradingView text export are NOT used in the web service.
 
 ---
 
-## Screening Module (screening/)
+## Frontend Modules (New)
 
-**Responsibility:** Identify stocks meeting specific criteria for trading opportunities.
+### Components
 
-### screening/momentum.py
+**FilterBar/** - Top filter area with all filter controls
+- `FilterBar.tsx` - Container with filter state management
+- `MarketCapFilter.tsx` - Market cap range dropdown
+- `ReturnFilter.tsx` - Period return threshold inputs
+- `PatternBuilder.tsx` - Technical pattern condition builder UI
+- `RSFilter.tsx` - RS score threshold input
+- `SectorFilter.tsx` - Multi-select sector/theme dropdown
+- `DbUpdateButton.tsx` - DB update trigger with progress indicator
 
-**`mmt_companies(min_12m: float = 0, min_6m: float = 0, min_3m: float = 0, min_monthly: float = None) -> list[str]`**
-- Screens stocks by momentum (price return) over different timeframes
-- Parameters: minimum return thresholds (percentage)
-- Returns: sorted list of qualifying stock codes
-- Example: mmt_companies(min_12m=50) finds stocks up 50%+ in 12 months
+**ChartGrid/** - Center chart area with TradingView instances
+- `ChartGrid.tsx` - Grid layout manager (2x2 / 3x3 toggle)
+- `ChartCell.tsx` - Single TradingView Lightweight Chart wrapper
+- `ChartPagination.tsx` - Page navigation controls
+- `useChartGrid.ts` - Grid state and lifecycle management hook
 
-**`mmt_filtering(codes: list[str], min_return: float) -> list[str]`**
-- Filters existing code list by minimum return threshold
-- Accepts pre-screened codes and applies additional filter
-- Returns: subset of codes meeting return threshold
+**StockList/** - Right sidebar virtualized stock list
+- `StockList.tsx` - react-window virtualized container
+- `SectorGroup.tsx` - Collapsible sector header with stock items
+- `StockItem.tsx` - Individual stock row (name, code, change%, RS)
+- `useStockNavigation.ts` - Keyboard arrow navigation hook
 
-### screening/daily_filters.py
+**StatusBar/** - Bottom status bar
+- `StatusBar.tsx` - Filter result count + last DB update timestamp
 
-**`daily_filtering(code: str) -> bool`**
-- Applies default daily filter criteria for short-term trading
-- Checks: volume surge, volatility, price movement
-- Returns: True if stock passes all filters
+### Hooks
 
-**`daily_filtering_2(code: str, params: dict) -> bool`**
-- Alternative filtering with custom parameters
-- params: dictionary of threshold overrides
-- Returns: filtering result with custom criteria
+- `useScrollSync.ts` - Bidirectional ChartGrid <-> StockList scroll synchronization
+- `useScreenResults.ts` - Filter state management + API call orchestration
+- `useDbUpdate.ts` - SSE connection for DB update progress tracking
 
-**`daily_filtering_3(code: str) -> bool`**
-- Another daily filter variant with different logic
-- Useful for testing multiple filter strategies
+### API Client
 
-**`filter_1(code: str) -> bool`**
-- Individual filter components for volume surge
-- Returns: True if volume exceeds threshold
-
-**`filter_2(code: str) -> bool`**
-- Individual filter for price volatility
-- Returns: True if volatility meets criteria
-
-**`filter_etc(code: str) -> bool`**
-- Individual filter for miscellaneous criteria
-- Returns: True if additional conditions met
-
-### screening/high_stocks.py
-
-**`get_high_stocks(threshold_percent: float = 5.0) -> list[str]`**
-- Finds stocks reaching 52-week highs
-- Parameters: percentage threshold for "near high" definition
-- Returns: sorted list of high-performing stock codes
-
-**`투자과열예상종목() -> list[str]`**
-- Korean function name: "Anticipated overheated investment stocks"
-- Detects potential market froth and overheating
-- Returns: stocks showing warning signs of overvaluation
-
----
-
-## Charting Module (charting/)
-
-**Responsibility:** Generate professional candlestick charts with technical indicator overlays.
-
-### charting/single.py
-
-**`plot_chart(code: str, start_date: str = None, end_date: str = None, indicators: list = None, show: bool = True) -> str`**
-- Generates candlestick chart for single stock
-- Parameters: stock code, date range, optional indicators, display flag
-- Returns: file path to saved PNG
-- Automatic indicator calculation if not provided
-
-**`rs_history(code: str, start_date: str, end_date: str) -> str`**
-- Plots Relative Strength score over time
-- Returns: file path to RS line chart PNG
-
-**`plot_mdd(code: str, start_date: str, end_date: str) -> str`**
-- Plots Maximum Drawdown analysis
-- Shows underwater plot of peak-to-trough decline
-- Returns: file path to MDD chart PNG
-
-### charting/bulk.py
-
-**`plot_all_companies(codes: list[str], start_date: str, end_date: str, output_dir: str = "output") -> list[str]`**
-- Batch generates charts for multiple stocks
-- Parallelizes chart generation for speed
-- Returns: list of file paths for all generated charts
-
-**`plot_companies(codes: list[str], start_date: str, end_date: str, specific_codes: list = None) -> list[str]`**
-- Selective chart generation from code list
-- specific_codes: optional subset to chart
-- Returns: file paths for generated charts
-
-**`plot_all_companies_rs_history(codes: list[str], start_date: str, end_date: str) -> list[str]`**
-- Batch generates RS charts for comparison
-- Returns: file paths for RS history charts
-
-**`excel_companies(codes: list[str], output_file: str = "analysis.xlsx") -> str`**
-- Generates Excel workbook with stock data and charts
-- Multiple sheets (one per stock) with embedded images
-- Returns: file path to generated XLSX
-
-### charting/styles.py
-
-**`apply_chart_style(chart, style_name: str = "default") -> None`**
-- Internal function setting chart colors and fonts
-- Handles platform-specific font selection (AppleGothic vs Malgun Gothic)
-- Supports custom style templates
-
----
-
-## Analysis Module (analysis/)
-
-**Responsibility:** Provide market-level analysis and report generation.
-
-### analysis/market.py
-
-**`analyze_by_market_cap(codes: list[str] = None) -> DataFrame`**
-- Analyzes stocks grouped by market capitalization
-- Calculates statistics per market cap segment
-- Returns: DataFrame with segment-level metrics
-
-### analysis/reports.py
-
-**`generate_analyst_report(codes: list[str], date_range: tuple) -> str`**
-- Generates analyst-style market report
-- Includes top performers, sector analysis, trends
-- Returns: formatted report text or HTML file path
-
----
-
-## Export Module (export/)
-
-**Responsibility:** Convert analysis results to external formats for distribution.
-
-### export/pptx_builder.py
-
-**`generate_pptx(charts: list[str], title: str, output_file: str) -> str`**
-- Creates PowerPoint presentation from chart files
-- Auto-generates title slide, chart slides, summary slide
-- Embeds images and formats professionally
-- Returns: file path to generated PPTX
-
-### export/tradingview.py
-
-**`tradingview(codes: list[str]) -> str`**
-- Exports stock codes in TradingView watchlist format
-- Returns: TradingView-compatible text for import
-
-**`company_list_tradingview(codes: list[str], output_file: str = "watchlist.txt") -> str`**
-- Batch version writing to file
-- Returns: file path to generated watchlist
-
-**`company_to_tradingview_text(code: str) -> str`**
-- Single stock conversion to TradingView symbol format
-- Handles market-specific prefix (KS for KOSPI, KQ for KOSDAQ)
-
-**`ticker_to_tradingview(code: str) -> str`**
-- Converts Korean stock code to TradingView ticker
-- Example: "005930" → "KS005930"
-
-**`sector_stocks(sector: str) -> list[str]`**
-- Returns all stock codes in specified sector
-- Example: sector_stocks("전기전자") → ["005930", "000880", ...]
+- `client.ts` - Base HTTP client with error handling
+- `chart.ts` - `fetchChartData(code, start?, end?)` API function
+- `screen.ts` - `screenStocks(filters)` API function
+- `db.ts` - `startDbUpdate()`, `subscribeDbStatus()` API functions
+- `sectors.ts` - `fetchSectors()` API function
 
 ---
 
 ## Summary Table
 
-| Module | Responsibility | Key Functions | Public API |
-|--------|-----------------|---------------|-----------|
-| price | Data fetching | price_naver, price_naver_rs | 3 functions |
-| indicators | Technical indicators | RSI, MACD, Stochastic, Bollinger | 6 classes |
-| registry | Stock metadata | _code, _name, _market, _sector | 4 functions |
-| db | Data persistence | generate_price_db, get_db_data | 6 functions |
-| screening | Stock selection | mmt_companies, daily_filtering | 7+ functions |
-| charting | Visualization | plot_chart, plot_all_companies | 7 functions |
-| analysis | Market analysis | analyze_by_market_cap | 2 functions |
-| export | Format conversion | tradingview, generate_pptx | 5 functions |
-
-Total Public API: **40+ functions exported from my_chart.__all__**
+| Layer | Module | Responsibility | Status |
+|-------|--------|----------------|--------|
+| Frontend | FilterBar | Filter UI controls | New |
+| Frontend | ChartGrid | TradingView chart grid | New |
+| Frontend | StockList | Sector-grouped stock list | New |
+| Frontend | StatusBar | Status display | New |
+| Backend | routers/ | API endpoint handlers | New |
+| Backend | services/ | my_chart bridge layer | New |
+| Backend | schemas/ | Request/response models | New |
+| Core | price.py | Naver Finance data fetch | Existing |
+| Core | indicators.py | Technical indicator calc | Existing |
+| Core | registry.py | Stock metadata lookup | Existing |
+| Core | db/ | SQLite persistence/query | Existing |
+| Core | screening/ | Stock filter logic | Existing |
+| Core | charting/ | mplfinance charts | Existing (unused in web) |
+| Core | export/ | PPTX/TradingView export | Existing (unused in web) |

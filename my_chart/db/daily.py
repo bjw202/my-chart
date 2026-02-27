@@ -28,7 +28,7 @@ _DAILY_COLS = (
     "Name", "Date", "Open", "High", "Low", "Close",
     "Change", "High52W",
     "Volume", "Volume20MA", "VolumeWon",
-    "EMA10", "EMA20", "SMA21", "SMA50", "EMA65", "SMA200",
+    "EMA10", "EMA20", "SMA21", "SMA50", "EMA65", "SMA100", "SMA200",
     "DailyRange", "HLC",
     "FromEMA10", "FromEMA20", "FromSMA50", "FromSMA200",
     "Range", "ADR20",
@@ -53,7 +53,7 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
             Open REAL, High REAL, Low REAL, Close REAL,
             Change REAL, High52W REAL,
             Volume REAL, Volume20MA REAL, VolumeWon REAL,
-            EMA10 REAL, EMA20 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA200 REAL,
+            EMA10 REAL, EMA20 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA200 REAL,
             DailyRange REAL, HLC REAL,
             FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
             Range REAL, ADR20 REAL,
@@ -66,6 +66,11 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_daily_date ON stock_prices(Date)"
     )
+    # Migrate existing tables that lack SMA100 column
+    try:
+        conn.execute("ALTER TABLE stock_prices ADD COLUMN SMA100 REAL")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.commit()
 
 
@@ -85,6 +90,7 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
         price["SMA21"] = price["Close"].rolling(window=21).mean()
         price["SMA50"] = price["Close"].rolling(window=50).mean()
         price["EMA65"] = price["Close"].ewm(span=65).mean()
+        price["SMA100"] = price["Close"].rolling(window=100).mean()
         price["SMA200"] = price["Close"].rolling(window=200).mean()
         price["DailyRange(%)"] = (
             (price["High"] - price["Low"]) / (price["High"] + price["Low"]) * 100
@@ -121,6 +127,7 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
                 float(row["SMA21"]),
                 float(row["SMA50"]),
                 float(row["EMA65"]),
+                float(row["SMA100"]),
                 float(row["SMA200"]),
                 float(row["DailyRange(%)"]),
                 float(row["HLC"]),

@@ -1,612 +1,272 @@
-# my_chart Data Flow Reference
+# KR Stock Screener Data Flow Reference
 
 ## Core Data Flows
 
-### Flow 1: Price Data Acquisition
+### Flow 1: Stock Screening (POST /api/screen)
 
-**Entry Point:** `price_naver(code, start_date, end_date)`
+**Entry Point:** User applies filters in FilterBar
 
 ```
-User Request (code, dates)
-        ↓
-Registry Validation (_code checks if code is valid)
-        ↓
-Naver Finance API Call via requests
-        ↓
-HTML Parsing (extract OHLCV from response)
-        ↓
-DataFrame Conversion (index by date, columns OHLCV)
-        ↓
-Optional: fix_zero_ohlc() cleans invalid values
-        ↓
-Return DataFrame to User
+Frontend FilterBar
+    ↓ (user sets filters)
+useScreenResults hook → POST /api/screen
+    ↓ (JSON: FilterCondition)
+backend/routers/screen.py
+    ↓ (validated ScreenRequest)
+backend/services/screen_service.py
+    ↓ build_where_clause()
+SQL Query:
+    SELECT stock_code, name, market, sector, market_cap,
+           chg_1d, chg_1w, chg_1m, chg_3m, rs_score, ...
+    FROM stock_data
+    WHERE market_cap > ?
+      AND chg_3m > ?
+      AND rs_score > ?
+      AND market IN (?, ?)
+    ORDER BY sector, market_cap DESC
+    ↓ (<100ms, indexed query)
+DataFrame result
+    ↓ (group by sector)
+ScreenResponse: SectorGroup[] with StockItem[]
+    ↓ (JSON)
+Frontend renders StockList + triggers ChartGrid
 ```
 
-**Time Complexity:** Network latency + parsing (~200-500ms per stock)
+**Time Complexity:** <100ms (SQL indexed query)
 
-**Error Handling:** 3x retry with exponential backoff if API fails
-
-**Caching:** No automatic caching (recommend manual export to SQLite)
-
-**Example:**
-```python
-from my_chart import price_naver
-df = price_naver("005930", "2020-01-01", "2024-01-01")
-# API call → ~500ms → Returns 1000+ rows of OHLCV
-```
+**Key Characteristic:** No runtime API calls. All data pre-computed in DB.
 
 ---
 
-### Flow 2: Technical Indicator Calculation
+### Flow 2: Chart Data (GET /api/chart/{code})
 
-**Entry Point:** `RSI(df)`, `MACD(df)`, `Stochastic(df)`, etc.
+**Entry Point:** ChartGrid needs data for visible stock
 
 ```
-DataFrame Input (indexed date, OHLCV columns)
-        ↓
-Copy DataFrame (preserve original)
-        ↓
-Calculate Indicator Values (rolling windows, EMA, etc.)
-        ↓
-Add New Columns to DataFrame
-        ↓
-Handle NaN for initial period (lookback requirement)
-        ↓
-Return Enhanced DataFrame
+ChartGrid/ChartCell mounts
+    ↓ (stock code from current page)
+GET /api/chart/{code}?start=2023-01-01&end=2024-01-01
+    ↓
+backend/routers/chart.py
+    ↓
+backend/services/chart_service.py
+    ↓
+my_chart.db.queries.get_db_data(code, start, end)
+    ↓ (SQLite query, <100ms)
+DataFrame: Date, Open, High, Low, Close, Volume, SMA10, SMA20, SMA50, SMA200
+    ↓ (convert to TradingView format)
+Response: {
+    candles: [{time, open, high, low, close}],
+    volume: [{time, value}],
+    ma: {sma10: [{time, value}], sma20: [...], ...}
+}
+    ↓ (JSON)
+ChartCell creates TradingView chart instance
+    ↓
+chart.addCandlestickSeries().setData(candles)
+chart.addHistogramSeries().setData(volume)
+chart.addLineSeries().setData(ma.sma10)  // per MA period
 ```
 
-**Key Characteristics:**
-- Pure functions (no side effects)
-- Return new DataFrame (original unchanged)
-- Composable (chain multiple indicators)
-- Vectorized NumPy operations (fast)
+**Time Complexity:** <200ms (DB query + serialization)
 
-**Example Composition:**
-```python
-from my_chart import price_naver, RSI, MACD, add_moving_averages
-
-df = price_naver("005930", "2020-01-01", "2024-01-01")
-df = RSI(df)                                  # Add RSI column
-df = MACD(df)                                 # Add MACD columns
-df = add_moving_averages(df, [20, 50, 200])  # Add SMA columns
-# Final df has: OHLCV, RSI, MACD, MACD_signal, MACD_diff, SMA_20/50/200
-```
-
-**Performance:** 2-5 seconds for 1000+ row DataFrame
+**Memory Note:** ChartCell creates chart on mount, calls `chart.remove()` on unmount to free memory.
 
 ---
 
-### Flow 3: Stock Screening Pipeline
+### Flow 3: DB Update (POST /api/db/update + SSE)
 
-**Entry Point:** `mmt_companies(min_12m=0, min_6m=0, min_3m=0)`
+**Entry Point:** User clicks [DB Update] button
 
 ```
-Define Filter Criteria
-        ↓
-Get All Stock Codes from Registry (_code for all stocks)
-        ↓
-For Each Stock Code:
-    Fetch Price Data (price_naver)
-            ↓
-    Calculate Period Returns (12m, 6m, 3m)
-            ↓
-    Compare to Thresholds
-            ↓
-    If passes: add to results list
-        ↓
-Sort Results by Return (highest first)
-        ↓
-Return Sorted Code List
+Frontend DbUpdateButton click
+    ↓
+POST /api/db/update
+    ↓
+backend/routers/db.py → create BackgroundTask
+    ↓ (returns 202 Accepted immediately)
+Frontend subscribes: GET /api/db/status (SSE)
+    ↓
+BackgroundTask runs db_service.run_full_update():
+    ↓
+    Step 1: Weekly price update
+        my_chart.db.weekly.generate_price_db()
+        → For each stock (~2,570):
+            price_naver(code) → OHLCV DataFrame
+            Calculate MA, period returns
+            INSERT/UPDATE into weekly_price.db
+        → SSE push: {"phase": "weekly", "progress": 45, "current": "삼성전자"}
+    ↓
+    Step 2: Daily price update
+        my_chart.db.daily.price_daily_db()
+        → Similar per-stock process for daily data
+        → SSE push: {"phase": "daily", "progress": 72}
+    ↓
+    Step 3: RS score update
+        my_chart.db.weekly.generate_rs_db()
+        → Calculate RS vs KOSPI for all stocks
+        → SSE push: {"phase": "rs", "progress": 85}
+    ↓
+    Step 4: Market cap update (new)
+        pykrx.stock.get_market_cap(date)
+        → Fetch market cap for all stocks
+        → INSERT/UPDATE into stock_meta table
+        → SSE push: {"phase": "market_cap", "progress": 95}
+    ↓
+    Step 5: Complete
+        → SSE push: {"phase": "complete", "progress": 100}
+        → Frontend dismisses progress bar
+        → Frontend auto-refreshes current filter results
 ```
 
-**Time Complexity:** O(n * stock_count) where n = network latency per stock
+**Time Complexity:** 5-30 minutes (network-bound, ~2,570 stocks)
 
-**Optimization:** Parallel API calls would reduce total time from 30-60s to 5-10s
-
-**Fallback:** Use database results if available (get_db_data)
-
-**Example:**
-```python
-from my_chart import mmt_companies
-
-# Screen 3000+ stocks for those up 50%+ in past year
-strong = mmt_companies(min_12m=50)
-# ~30-60 seconds for full market scan
-# Returns ~100-200 qualifying codes
-```
+**Error Handling:** Failed stocks logged and skipped. Partial update is valid.
 
 ---
 
-### Flow 4: Daily Filtering
+### Flow 4: Sector List (GET /api/sectors)
 
-**Entry Point:** `daily_filtering(code)`, `filter_1(code)`, `filter_2(code)`
+**Entry Point:** FilterBar SectorFilter dropdown initialization
 
 ```
-Get Latest Price Data
-        ↓
-Extract Today's Data
-        ↓
-Apply Filter Logic:
-    - Volume surge check
-    - Price movement check
-    - Volatility check
-    - Other criteria
-        ↓
-If All Checks Pass: Return True
-Else: Return False
+Frontend SectorFilter mounts
+    ↓
+GET /api/sectors
+    ↓
+backend/routers/sectors.py
+    ↓
+backend/services/sector_service.py
+    ↓ (cached after first call)
+my_chart.registry.get_stock_registry()
+    → Load from pykrx + sectormap_original.xlsx
+    → Group by 산업명(대) + 산업명(중)
+    ↓
+Response: [{name: "반도체", count: 45}, {name: "배터리", count: 23}, ...]
+    ↓
+Frontend renders multi-select dropdown
 ```
 
-**Filter Components:**
-- filter_1(): Volume comparison vs moving average
-- filter_2(): Price movement threshold
-- filter_etc(): Additional criteria
-- daily_filtering(): Combination of above
-
-**Example:**
-```python
-from my_chart import mmt_companies, daily_filtering
-
-candidates = mmt_companies(min_12m=50)  # 150 candidates
-today_picks = [c for c in candidates if daily_filtering(c)]
-# ~30-50% pass daily filters
-# Result: 50-75 stocks with today's trading signals
-```
+**Time Complexity:** First call: 3-5 seconds (pykrx init). Subsequent: <10ms (cached).
 
 ---
 
-### Flow 5: Charting Pipeline
+### Flow 5: Scroll Synchronization
 
-**Entry Point:** `plot_chart(code, start_date, end_date, indicators=[])`
+**Entry Point:** User interaction with StockList or ChartGrid
 
 ```
-If indicators list provided:
-    Fetch Price Data (price_naver)
-            ↓
-    Calculate Indicators (RSI, MACD, etc.)
-            ↓
-Else:
-    Use provided DataFrame or fetch default data
+Case A: StockList click/keyboard
+    StockItem.onClick(code) or ↑↓ key
         ↓
-Format Data for mplfinance
-    - Index as date
-    - OHLC columns
-    - Volume as separate series
+    useStockNavigation → setActiveStock(code)
         ↓
-Create Candlestick Chart (mplfinance)
-    - Each candle represents OHLC
-    - Volume bars below
+    useScrollSync detects activeStock change
         ↓
-Overlay Technical Indicators
-    - Lines for RSI, MACD, moving averages
-    - Bands for Bollinger
+    Calculate target page: Math.floor(stockIndex / gridSize)
         ↓
-Apply Styling (config.py fonts and colors)
+    ChartGrid.setCurrentPage(targetPage)
         ↓
-Save PNG File
+    ChartGrid loads charts for new page
+    Active stock highlighted in first grid position
+
+Case B: ChartGrid pagination
+    ChartPagination.onClick(pageN)
         ↓
-Display in Jupyter (if show=True)
+    ChartGrid.setCurrentPage(pageN)
         ↓
-Return File Path
+    useScrollSync detects page change
+        ↓
+    Calculate first stock of page: pageN * gridSize
+        ↓
+    StockList.scrollTo(firstStockIndex)
+        ↓
+    StockList scrolls to corresponding position
 ```
 
-**Chart Components:**
-- Candlestick: Open, High, Low, Close per day
-- Volume: Bar chart below candlestick
-- Indicators: Overlaid lines or separate subplots
-- Grid: Reference lines for analysis
-- Legend: Indicator labels
-
-**Example:**
-```python
-from my_chart import plot_chart, RSI, MACD
-
-file_path = plot_chart(
-    "005930",
-    "2023-01-01",
-    "2024-01-01",
-    indicators=[RSI, MACD],
-    show=True
-)
-# ~1-2 seconds for generation and display
-# Returns: /output/005930_*.png
-```
-
-**Batch Processing:**
-```python
-from my_chart import plot_all_companies
-
-files = plot_all_companies(["005930", "000660", "005380"], "2023-01-01", "2024-01-01")
-# ~3-5 minutes for 100 stocks (parallelized)
-# Returns list of 100 PNG file paths
-```
+**No API calls:** Pure frontend state synchronization.
 
 ---
 
-### Flow 6: Database Storage Pipeline
-
-**Entry Point:** `generate_price_db()`, `generate_rs_db()`
+## Request Lifecycle: Complete User Workflow
 
 ```
-Generate Price Database (generate_price_db):
-    Get All Stock Codes
-            ↓
-    For Each Code:
-        Fetch Historical Data (price_naver or API)
-                ↓
-        Resample Daily → Weekly
-                ↓
-        Insert into SQLite (weekly_price.db)
-        ↓
-    Total: 3000+ stocks × 10+ years ≈ 30-120 minutes
+1. App loads
+   └→ GET /api/sectors → populate SectorFilter dropdown
+   └→ GET /api/db/last-updated → show in StatusBar
 
-Generate RS Database (generate_rs_db):
-    Get Base Index Data (KOSPI)
-            ↓
-    For Each Stock:
-        Calculate RS Score
-                ↓
-        Insert into SQLite (weekly_rs.db)
-        ↓
-    Total: ~30 minutes for full market
+2. User sets filters and clicks Apply
+   └→ POST /api/screen {market_cap: ">1T", chg_3m: ">10%", rs: ">80"}
+   └→ Response: 127 stocks in 15 sector groups
+   └→ StockList renders sector-grouped results
+   └→ ChartGrid loads first page (9 charts)
+       └→ 9x parallel GET /api/chart/{code}
+
+3. User scrolls through stocks (keyboard ↓)
+   └→ StockList highlights next stock
+   └→ Scroll sync: ChartGrid advances page when needed
+   └→ New page: old charts removed, new charts loaded
+       └→ Up to 9x GET /api/chart/{code}
+
+4. User clicks [DB Update] (if data stale)
+   └→ POST /api/db/update → 202 Accepted
+   └→ GET /api/db/status (SSE) → progress bar
+   └→ ... 5-30 minutes ...
+   └→ SSE: {"phase": "complete"} → auto-refresh filters
 ```
-
-**Database Schema:**
-```
-weekly_price table:
-├── stock_code (TEXT, PK)
-├── date (DATE, PK)
-├── open, high, low, close (REAL)
-└── volume (INTEGER)
-
-Index: (stock_code, date)
-Rows: ~3000 stocks × 500 weeks = 1.5M rows
-Size: ~500MB
-
-weekly_rs table:
-├── stock_code (TEXT, PK)
-├── date (DATE, PK)
-└── rs_score (REAL)
-
-Rows: ~1.5M
-Size: ~150MB
-```
-
-**Incremental Updates:**
-```python
-from my_chart import generate_price_db
-
-# Initial generation (takes 1-2 hours)
-# generate_price_db()
-
-# Weekly incremental update (takes 5-10 minutes)
-generate_price_db(start_date="2024-01-01")
-```
-
----
-
-### Flow 7: Query from Database
-
-**Entry Point:** `get_db_data(code, start_date, end_date)`
-
-```
-Connect to SQLite (weekly_price.db or daily_price.db)
-        ↓
-Build SQL Query:
-    SELECT * FROM prices
-    WHERE stock_code = ?
-    AND date BETWEEN ? AND ?
-    ORDER BY date
-        ↓
-Execute Query (indexed on (stock_code, date))
-        ↓
-Fetch Results as Cursor
-        ↓
-Convert to pandas DataFrame
-        ↓
-Return to User
-```
-
-**Performance:**
-- <100ms for single stock year of data
-- Indexed query lookup = O(log n)
-- No network latency (local database)
-
-**Example:**
-```python
-from my_chart import get_db_data, RSI, MACD
-
-# Fetch from database (fast)
-df = get_db_data("005930", "2023-01-01", "2024-01-01")
-
-# Calculate indicators
-df = RSI(df)
-df = MACD(df)
-
-# Total time: <200ms (vs 500ms+ for API fetch)
-```
-
----
-
-### Flow 8: Export to PPTX
-
-**Entry Point:** `plot_all_companies()` with PPTX export or manual generation
-
-```
-For Each Stock Code:
-    Generate Candlestick Chart (plot_chart)
-            ↓
-    Save PNG File
-            ↓
-        ↓
-Create PPTX Document Structure
-    - Title Slide
-    - Table of Contents
-        ↓
-For Each PNG Chart:
-    Insert Image into Slide
-            ↓
-    Add Title and Metadata
-        ↓
-Create Summary Slide
-    - Performance statistics
-    - Top/bottom performers
-        ↓
-Write PPTX File
-        ↓
-Return File Path
-```
-
-**Output Format:** PowerPoint (.pptx) suitable for distribution to non-technical users
-
-**Example:**
-```python
-from my_chart import plot_all_companies, mmt_companies
-
-candidates = mmt_companies(min_12m=50)[:20]
-files = plot_all_companies(candidates, "2023-01-01", "2024-01-01", output_dir="reports")
-# Generates 20 PNG charts + PPTX presentation
-```
-
----
-
-### Flow 9: Export to TradingView
-
-**Entry Point:** `tradingview(codes_list)`
-
-```
-For Each Stock Code:
-    Get Stock Metadata (registry._market)
-            ↓
-    Determine Market Prefix:
-        KOSPI → "KS" prefix
-        KOSDAQ → "KQ" prefix
-        KONEX → "KN" prefix
-            ↓
-    Format as TradingView Symbol:
-        "KS" + code
-            ↓
-Concatenate All Symbols
-        ↓
-Output Comma-Separated List
-        ↓
-Return String for Copy-Paste to TradingView
-```
-
-**Output Format:** String suitable for TradingView watchlist import
-
-**Example:**
-```python
-from my_chart import tradingview, mmt_companies
-
-candidates = mmt_companies(min_12m=50)[:10]
-tv_string = tradingview(candidates)
-print(tv_string)
-# Output: "KS005930,KS000660,KS005380,KS051910,KS035420,..."
-
-# Copy-paste this into TradingView → Create Watchlist
-```
-
----
-
-## Request Lifecycle Examples
-
-### Example 1: Momentum Screen → Analysis → Export
-
-```
-User: mmt_companies(min_12m=50)
-
-Step 1: Retrieve all stock codes from registry
-Step 2: For each code (3000+ stocks):
-    - price_naver(code, "2023-01-01", "2024-01-01")  [API call ~200ms]
-    - Calculate 12-month return
-    - Compare to threshold (50%)
-Step 3: Sort results
-Step 4: Return to user [~30-60 seconds total]
-Returns: ["005930", "000660", "005380", ...] (150 codes)
-
-User: daily_filtering(candidates[0])
-
-Step 1: price_naver("005930", today-1, today) [API call]
-Step 2: Extract latest price and volume
-Step 3: Apply volume/volatility checks
-Step 4: Return bool [~500ms]
-Returns: True/False
-
-User: plot_chart("005930", "2023-01-01", "2024-01-01", indicators=[RSI, MACD])
-
-Step 1: price_naver("005930", ...) [API call ~200ms]
-Step 2: RSI(df) → calculate RSI column
-Step 3: MACD(df) → calculate MACD columns
-Step 4: mplfinance candlestick chart
-Step 5: Overlay indicators
-Step 6: Save PNG [~1-2 seconds]
-Returns: "/output/005930_20230101_20240101.png"
-
-User: tradingview([selected_candidates])
-
-Step 1: For each code, get market type
-Step 2: Add market prefix (KS/KQ/KN)
-Step 3: Join with commas
-Step 4: Return string [<100ms]
-Returns: "KS005930,KS000660,..."
-```
-
-Total Flow Time: ~2-3 minutes from screening to TradingView export
-
----
-
-### Example 2: Database-Driven Analysis
-
-```
-First Run: generate_price_db()
-    - Downloads 10 years × 3000 stocks
-    - Generates weekly_price.db (~500MB)
-    - Time: 1-2 hours
-    - One-time cost
-
-Subsequent Runs: generate_price_db(start_date="2024-01-01")
-    - Updates only recent weeks
-    - Time: 5-10 minutes weekly
-
-Analysis:
-    df = get_db_data("005930", "2020-01-01", "2024-01-01")  [<100ms]
-    df = RSI(df)
-    df = MACD(df)
-    df = add_moving_averages(df)
-    # Total time: <200ms
-    # No network calls, purely local computation
-
-Screening:
-    # Option 1: API-based (slow but real-time)
-    results = mmt_companies(min_12m=50)  [30-60 seconds]
-
-    # Option 2: Database-based (fast but weekly stale)
-    df = get_db_data("005930", "2023-01-01", "2024-01-01")
-    return_12m = (df["Close"].iloc[-1] / df["Close"].iloc[0] - 1) * 100
-    # Compare across all stocks: <1 second
-```
-
-Database approach saves 60-120 seconds per analysis cycle
-
----
 
 ## Performance Characteristics
 
-### API Latency
-- Single stock fetch: ~200-500ms
-- 100 stock batch: 30-60 seconds (serialized), 5-10 seconds (parallelized)
-- Network limited: Naver Finance rate limit 100 requests/minute
+### API Response Times
 
-### Computation Time
-- Indicator calculation: <100ms per stock
-- Database query: <100ms for any date range
-- Chart generation: 500ms-1s per stock, 2-5 minutes for 100 stocks
+| Endpoint | Expected Latency | Bottleneck |
+|----------|-----------------|------------|
+| POST /api/screen | <100ms | SQL indexed query |
+| GET /api/chart/{code} | <200ms | SQLite read + JSON serialization |
+| GET /api/sectors | <10ms (cached) | First call: 3-5s (pykrx init) |
+| GET /api/db/last-updated | <10ms | File metadata check |
+| POST /api/db/update | 5-30 min (bg) | Network I/O to Naver/pykrx |
+
+### Frontend Rendering
+
+| Operation | Expected Time |
+|-----------|--------------|
+| StockList render (2,570 items) | <50ms (react-window virtualized) |
+| ChartGrid page (9 charts) | <500ms (parallel data fetch + render) |
+| Filter apply + re-render | <200ms (API + DOM update) |
+| Scroll sync navigation | <16ms (single frame, no API) |
 
 ### Memory Usage
-- DataFrame (1 stock, 10 years): ~1-2MB
-- 100 stocks in memory: 100-200MB
-- Chart generation peak: +200-300MB per batch
 
-### Database Operations
-- Weekly_price.db (3000 stocks, 10 years): ~500MB
-- Index lookup: O(log n) ≈ <1ms
-- Range query (1 year): <100ms
-
----
-
-## Data Flow Optimization
-
-### Recommendation: Cache Results
-
-```python
-from my_chart import mmt_companies, get_db_data
-
-# First run: API-based (slow)
-strong = mmt_companies(min_12m=50)  # 30-60 seconds
-# Save to file
-with open("strong_stocks.txt", "w") as f:
-    f.write(",".join(strong))
-
-# Subsequent runs: Load from file (fast)
-with open("strong_stocks.txt") as f:
-    strong = f.read().split(",")
-
-# Update weekly
-# generate_price_db(start_date="2024-01-01")
-```
-
-### Recommendation: Use Database for Historical Analysis
-
-```python
-from my_chart import generate_price_db, get_db_data
-
-# One-time setup
-generate_price_db()
-
-# All subsequent analysis: fast
-for code in ["005930", "000660", "005380"]:
-    df = get_db_data(code, "2020-01-01", "2024-01-01")
-    # Process with indicators
-    # Total: <1 second instead of 30+ seconds API calls
-```
-
-### Recommendation: Parallel Chart Generation
-
-```python
-from my_chart import plot_all_companies
-
-# Batch generation is parallelized
-files = plot_all_companies(top_50_stocks, "2023-01-01", "2024-01-01")
-# 50 charts in 2-5 minutes (vs 25-50 minutes sequential)
-```
-
----
+| Component | Approximate Memory |
+|-----------|-------------------|
+| 9 TradingView chart instances | ~50-100MB |
+| StockList (virtualized, 2,570 items) | ~5MB |
+| Backend process (FastAPI + my_chart) | ~200-500MB |
+| SQLite databases (3 files) | ~700MB disk |
 
 ## Error Handling in Data Flows
 
-### API Error Recovery
+### Screen API Errors
 
 ```
-price_naver() fails:
-    ↓
-Retry with exponential backoff (3x attempts)
-    ↓
-If all retries fail:
-    ↓
-Raise RequestException
-    ↓
-User should fallback to get_db_data()
+Invalid filter → Pydantic validation error → 422 response
+Empty results → 200 with empty list → Frontend shows "No results"
+DB not found → 500 with message → Frontend shows "Run DB Update first"
 ```
 
-### Data Quality Issues
+### Chart API Errors
 
 ```
-fix_zero_ohlc(df):
-    - Detects zero/invalid OHLC
-    - Interpolates using adjacent values
-    - Returns cleaned DataFrame
+Invalid code → 404 → ChartCell shows placeholder
+No data for date range → 200 with empty array → ChartCell shows "No data"
+DB read error → 500 → ChartCell shows error state with retry
 ```
 
-### Database Integrity
+### DB Update Errors
 
 ```
-generate_price_db():
-    - Validates schema before insert
-    - Transaction rollback on error
-    - Automatic migration on schema change
+Network timeout → Retry 3x per stock → Skip on failure
+pykrx API down → Skip market cap phase → Partial update
+SSE disconnect → Frontend auto-reconnects → Resume progress
 ```
-
----
-
-## Summary: Most Common Data Flow
-
-1. User loads Jupyter notebook
-2. `mmt_companies()` → screening (30-60 seconds)
-3. `daily_filtering()` → today's candidates (100ms per code)
-4. `price_naver()` + indicators → analysis (<1 second)
-5. `plot_chart()` → visualization (1-2 seconds)
-6. `tradingview()` → export (<100ms)
-
-**Total: ~1-2 minutes for complete analysis cycle**
-
-With database caching, can reduce to <1 minute after initial setup

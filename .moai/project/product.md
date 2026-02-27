@@ -1,85 +1,104 @@
-# my_chart Product Documentation
+# KR Stock Screener Product Documentation
 
 ## Project Overview
 
-**Project Name:** my_chart
+**Project Name:** KR Stock Screener
 
-**Tagline:** Korean stock market analysis and visualization toolkit for Jupyter notebooks and REPL environments
+**Tagline:** Web-based Korean stock screening tool with real-time chart grid and advanced technical filters
 
-**Description:** my_chart is a comprehensive Python library that fetches historical stock price data from the Korean market via Naver Finance API, calculates advanced technical indicators, generates professional candlestick charts with mplfinance, screens stocks based on momentum and daily filters, and exports analysis results to PPTX presentations and TradingView format. Designed for individual investors and quantitative analysts working with Korean stocks (KOSPI, KOSDAQ, KONEX markets).
+**Description:** KR Stock Screener is a local-only web application that provides comprehensive screening of KOSPI/KOSDAQ stocks (~2,570 listings). Built on the existing `my_chart` Python library for data acquisition and technical analysis, it adds a FastAPI backend and React frontend with TradingView Lightweight Charts for interactive visualization. Users can apply complex filter combinations (market cap, period returns, technical patterns, RS scores, sectors), view results in a sector-grouped stock list, and scan through candlestick chart grids with synchronized scrolling.
 
 ## Core Features
 
-1. **Market Data Integration** - Fetch historical OHLC (Open, High, Low, Close) data from Naver Finance API with automatic handling of Korean market hours and holidays
+1. **Filter System** - Complex multi-condition screening with market cap ranges, period-based return thresholds (1D/1W/1M/3M), technical pattern builder (price vs MA comparisons with AND/OR logic), RS score filters, market selection (KOSPI/KOSDAQ), and sector/theme multi-select
 
-2. **Technical Indicators** - Calculate MACD, RSI, Stochastic, Bollinger Bands, ImpulseMACD, and moving averages with optimized implementations for large datasets
+2. **Chart Grid** - TradingView Lightweight Charts displayed in 2x2 or 3x3 grid layout with daily candlestick, moving averages (10/20/50/100/200), and volume bars. Memory-optimized with viewport-only rendering and chart instance destruction on scroll-out
 
-3. **Candlestick Charting** - Generate professional candlestick charts with mplfinance integration, supporting single and multi-stock visualizations with technical overlay indicators
+3. **Stock List** - Right sidebar showing filtered stocks grouped by sector (sectormap `산업명(대)` + `산업명(중)`), sorted by market cap within groups, with collapse/expand headers, keyboard navigation, and display of stock name, code, daily change, and RS score
 
-4. **Stock Screening** - Momentum-based screening (12-month, 6-month, 3-month returns), daily filter screening (volume, price movement, volatility), and overheated stock detection
+4. **Scroll Sync** - Bidirectional synchronization between stock list and chart grid. Clicking a stock navigates to its chart page, keyboard arrows auto-advance chart pages, and chart page changes scroll the stock list
 
-5. **Database Management** - SQLite-based persistent storage for weekly price data and Relative Strength (RS) scores, with efficient query interfaces and incremental updates
+5. **DB Update** - One-click batch update of all stock data (daily/weekly OHLCV + moving averages + RS scores + market cap) via background task with progress bar and SSE-based status push. Recommended frequency: once daily after market close
 
-6. **PPTX Export** - Generate professional PowerPoint presentations containing stock charts, analysis tables, and performance reports for client delivery
-
-7. **TradingView Integration** - Export screened stocks in TradingView-compatible format for further analysis and charting in external platforms
-
-8. **Market Cap Analysis** - Analyze stocks by market capitalization segments and generate analyst-style reports with comparative metrics
-
-9. **Relative Strength Calculation** - Calculate RS scores comparing individual stocks to KOSPI index for relative performance measurement
+6. **Technical Pattern Builder** - Condition builder UI for constructing custom technical patterns: `[Indicator A] [Operator] [Indicator B or Constant] [x Multiplier]`. Supports price, MA(10/20/50/100/200) as indicators with >, <, >=, <=, and proximity(%) operators. Up to 3 patterns combinable with AND/OR
 
 ## Target Users
 
-- Korean stock market investors using Jupyter notebooks for analysis
-- Quantitative analysts building systematic screening strategies
-- Portfolio managers requiring technical analysis and reporting tools
-- Financial advisors needing professional chart generation for client presentations
-- Retail traders analyzing KOSPI, KOSDAQ, and KONEX stocks
+- Korean stock market investors running a local screening tool on their machine
+- Individual traders who want fast visual scanning of filtered stocks with chart grids
+- Technical analysis practitioners applying custom MA and RS-based screening criteria
 
 ## Key Use Cases
 
-**Momentum Screening:** Identify stocks with strong 12-month, 6-month, or 3-month performance trends using `mmt_companies()` function
+**Daily Screening Workflow:** Launch app -> Update DB (if stale) -> Set filter criteria -> Browse sector-grouped results -> Scan charts via keyboard/scroll -> Identify trading candidates
 
-**Daily Trading Signals:** Apply daily filter screens for volume surges, price movements, and volatility patterns to find intraday trading opportunities
+**Technical Pattern Screening:** Build custom conditions (e.g., "Close <= 10-day MA x 1.05 AND 10/20/50 MA convergence <= 5%") to find stocks matching specific technical setups
 
-**Chart Generation:** Create publication-ready candlestick charts with technical indicators overlays for individual stock analysis
+**Sector Analysis:** Filter by specific sectors/themes, view all stocks in a sector with their charts side-by-side for relative comparison
 
-**Portfolio Performance Reports:** Generate PPTX presentations containing multiple stock charts and performance metrics for stakeholder communication
-
-**Market Segment Analysis:** Analyze stocks grouped by market cap categories using `analyze_by_market_cap()` for market structure insights
-
-**TradingView Export:** Export screening results directly to TradingView notation for collaborative analysis and multi-timeframe studies
-
-**Systematic Backtesting:** Use screened stock lists and historical data for systematic strategy backtesting and validation
+**RS-Based Screening:** Filter stocks by Relative Strength score (e.g., RS >= 80) to identify outperformers vs KOSPI index
 
 ## Technology Stack
 
-**Core Libraries:** pandas (data manipulation), numpy (numerical computing), requests (HTTP client for data fetching)
+**Backend:** Python 3.11+, FastAPI, uvicorn, existing my_chart package (data acquisition, indicators, screening, DB management)
 
-**Visualization:** matplotlib (low-level plotting), mplfinance (candlestick charts), pillow (image processing)
+**Frontend:** React (Vite), TypeScript, TradingView Lightweight Charts, react-window (virtualized lists)
 
-**Data Storage:** sqlite3 (relational database), openpyxl (Excel generation), xlrd (Excel reading), xlsxwriter (Excel writing)
+**Database:** SQLite (existing weekly_price.db, weekly_rs.db, daily_price.db schema)
 
-**Korean Market Data:** pykrx (Korean exchange API), Naver Finance (web scraping for historical prices)
+**Deployment:** Local-only (localhost), no cloud infrastructure
 
-**Office Documents:** python-pptx (PowerPoint generation), lxml (XML processing)
+## Data Strategy
+
+### DB-First Approach
+
+All filtering and screening operates on pre-computed data stored in SQLite, ensuring fast query response times. The DB update process (triggered by user) fetches data from external sources (Naver Finance, pykrx) and persists:
+
+- **Weekly DB:** OHLCV, MA50/150/200, period returns (CHG_1W~12M), RS scores
+- **Daily DB:** OHLCV, EMA/SMA(10/20/50/200), volume indicators, range indicators
+- **Market Cap:** Fetched via pykrx during DB update and stored for SQL-based filtering
+
+### Data Freshness
+
+Data reflects the last DB update timestamp. Intended for end-of-day analysis (장 마감 후 1일 1회 업데이트).
+
+## Reusable Existing Code
+
+The following `my_chart` package functions serve as the backend data layer:
+
+| Function | Module | Web Service Role |
+|----------|--------|-----------------|
+| `price_naver()` | price.py | `/api/chart/{code}` data source |
+| `get_stock_registry()` | registry.py | `/api/sectors`, stock metadata |
+| `add_sector_info()` | registry.py | Stock list sector grouping |
+| `mmt_companies()` | screening/momentum.py | `/api/screen` momentum filter |
+| `daily_filtering()` | screening/daily_filters.py | `/api/screen` daily filter |
+| `generate_price_db()` | db/weekly.py | `/api/db/update` batch job |
+| `price_daily_db()` | db/daily.py | `/api/db/update` daily batch |
+| `load_price_with_rs()` | db/queries.py | Filtering data source |
+| `MACD/RSI/BB` | indicators.py | Technical indicator calculation |
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/db/update` | Start DB update (async background task) |
+| GET | `/api/db/status` | Query update progress (SSE) |
+| GET | `/api/db/last-updated` | Last update timestamp |
+| POST | `/api/screen` | Apply filter conditions, return filtered stock list |
+| GET | `/api/chart/{code}` | Stock chart data (OHLCV + MA) |
+| GET | `/api/sectors` | Sector list for filter dropdown |
 
 ## Market Coverage
 
-- **KOSPI:** Korea Composite Stock Price Index (Korean large-cap stocks)
-- **KOSDAQ:** Korean Securities Dealers Automated Quotations (Korean mid-cap and small-cap stocks)
-- **KONEX:** Korea New Exchange (Korean emerging market stocks)
-
-Data includes historical daily prices (open, high, low, close, volume) with automatic Korean market holiday handling and business day calculations.
-
-## Installation & Quick Start
-
-The package integrates seamlessly with Jupyter notebooks and IPython REPL environments. Standard installation via pip with required dependencies for data processing, visualization, and office document generation. Supports Python 3.8+ with macOS (AppleGothic font) and Windows (Malgun Gothic font) system font detection for chart readability.
+- **KOSPI:** Korea Composite Stock Price Index (~800 stocks)
+- **KOSDAQ:** Korean Securities Dealers Automated Quotations (~1,700 stocks)
+- Total: ~2,570 stocks with daily/weekly OHLCV and technical indicators
 
 ## Quality Standards
 
-- Modular architecture with clear separation of concerns
-- Pure functions for data transformation enabling composition
-- Lazy-loaded registry patterns minimizing startup time
-- SQLite database for reproducible analysis and version control
-- Comprehensive error handling for API failures and data inconsistencies
+- Modular architecture separating API layer from existing data library
+- Pure SQL-based filtering for performance (no runtime API calls during screening)
+- Memory-optimized chart rendering with viewport virtualization
+- Keyboard-accessible navigation for efficient stock scanning
+- Parameterized SQL queries preventing injection
