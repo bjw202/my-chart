@@ -69,6 +69,8 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+# @MX:WARN: [AUTO] ThreadPoolExecutor worker with blocking time.sleep(0.1)
+# @MX:REASON: Sleep throttles Naver API rate (~100 req/min) but wastes worker thread time
 def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
     """Fetch daily data for one stock and calculate indicators (thread-safe)."""
     try:
@@ -88,6 +90,7 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
             (price["High"] - price["Low"]) / (price["High"] + price["Low"]) * 100
         )
         price["HLC"] = (price["High"] + price["Low"] + price["Close"]) / 3
+        # @MX:NOTE: [AUTO] Convert volume to 억원 (100M KRW) units for readability
         price["VolumeWon"] = price["HLC"] * price["Volume"] / 1_0000_0000
         price["High_52w"] = price["High"].rolling(window=252).max()
         price["FromEMA10(%)"] = (price["Close"] - price["EMA10"]) / price["EMA10"] * 100

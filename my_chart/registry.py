@@ -14,7 +14,8 @@ from my_chart.config import REFERENCE_STOCK, SECTORMAP_PATH
 
 logger = logging.getLogger(__name__)
 
-# Lazy-loaded singletons
+# @MX:WARN: [AUTO] Global mutable state - lazy-loaded singletons shared across all callers
+# @MX:REASON: Not thread-safe for concurrent initialization; DataFrame references could be mutated by callers
 _df_stock: pd.DataFrame | None = None
 _df_sector: pd.DataFrame | None = None
 
@@ -44,6 +45,8 @@ def get_sector_registry() -> pd.DataFrame:
     return _df_sector
 
 
+# @MX:ANCHOR: [AUTO] Stock name to code lookup - fan_in=9, used by price, charting, db, screening, export
+# @MX:REASON: Core mapping function; returns sentinel "NoCode" on failure instead of raising
 def _code(x: str) -> str:
     """Get stock code from name."""
     df = get_stock_registry()
@@ -80,6 +83,8 @@ def _market(x: str) -> str:
         return "NonMarket"
 
 
+# @MX:ANCHOR: [AUTO] Stock sector lookup - fan_in=5, used by queries, momentum, bulk charting, tradingview
+# @MX:REASON: Returns (dict, str) tuple; callers must check summary string "NoData" not the dict
 def _sector(x: str) -> tuple[dict, str]:
     """Get sector info for a stock name."""
     df = get_sector_registry()
@@ -101,6 +106,8 @@ def _sector(x: str) -> tuple[dict, str]:
         return sector_dict, "NoData"
 
 
+# @MX:ANCHOR: [AUTO] DataFrame sector enrichment - fan_in=4, used by queries, momentum, bulk, tradingview
+# @MX:REASON: Mutates input DataFrame in-place (adds 3 columns); callers expect Name-indexed DataFrame
 def add_sector_info(df: pd.DataFrame) -> pd.DataFrame:
     """Add sector columns to a DataFrame indexed by company name."""
     산업명대 = []

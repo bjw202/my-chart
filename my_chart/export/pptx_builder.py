@@ -11,6 +11,8 @@ from pptx.util import Cm, Pt
 from my_chart.config import PPTX_HEIGHT, PPTX_WIDTH
 
 
+# @MX:ANCHOR: [AUTO] PPTX factory - fan_in=3, used by queries, momentum, market analysis
+# @MX:REASON: All PPTX exports start here; changing dimensions affects every generated report
 def create_widescreen_pptx() -> Presentation:
     """Create a 16:9 widescreen PPTX presentation."""
     prs = Presentation()

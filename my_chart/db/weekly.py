@@ -106,6 +106,8 @@ def _df_to_rows(name: str, df: pd.DataFrame) -> list[tuple]:
     return rows
 
 
+# @MX:WARN: [AUTO] ThreadPoolExecutor worker with blocking time.sleep(0.1)
+# @MX:REASON: Sleep throttles Naver API rate (~100 req/min) but wastes worker thread time
 def _fetch_one_stock(
     company: str, benchmark: pd.DataFrame, start: str
 ) -> tuple[str, list[tuple]]:
@@ -247,6 +249,8 @@ def generate_rs_db(db_name: str = DEFAULT_DB_WEEKLY) -> None:
         rank_9m = df["RS_9M"].rank(pct=True) * 100
         rank_12m = df["RS_12M"].rank(pct=True) * 100
 
+        # @MX:NOTE: [AUTO] RS composite weighting: recent periods weighted higher (1.0, 0.8, 0.6, 0.4, 0.2)
+        # Emphasizes recent momentum while incorporating long-term trend strength
         df["RS_12"] = (
             rank_1m + 0.8 * rank_3m + 0.6 * rank_6m
             + 0.4 * rank_9m + 0.2 * rank_12m

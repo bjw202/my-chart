@@ -42,7 +42,9 @@ def _generate_ndarray(x: float) -> np.ndarray:
     return arr
 
 
-# Query filters per RS period
+# @MX:NOTE: [AUTO] Momentum screening filters by RS period
+# 0.75*MAX52 = within 25% of 52-week high; 1.3*min52 = at least 30% above 52-week low
+# 12M: basic momentum; 6M: adds MA trend alignment; 3M: relaxed (no MA filter)
 _QUERY_FILTERS: dict[str, list[str]] = {
     "12M": [
         f"Close > {MIN_CLOSE_PRICE} & Volume50MA > 100000",

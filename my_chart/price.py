@@ -15,7 +15,8 @@ from my_chart.registry import _code
 
 logger = logging.getLogger(__name__)
 
-# Shared session with retry logic and connection pooling
+# @MX:WARN: [AUTO] Global mutable state - shared HTTP session singleton
+# @MX:REASON: Thread-safe for requests but global state complicates testing and lifecycle management
 _session: requests.Session | None = None
 
 
@@ -49,6 +50,8 @@ def fix_zero_ohlc(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# @MX:ANCHOR: [AUTO] Core price data fetcher - fan_in=11, every module depends on this
+# @MX:REASON: Single entry point for all OHLCV data; API format changes here break entire system
 def price_naver(
     comp_name: str, start: str, end: str | None = None, freq: str = "day"
 ) -> pd.DataFrame:
@@ -127,7 +130,8 @@ def price_naver_rs(
     price["Date"] = pd.to_datetime(price["Date"])
     price.set_index("Date", inplace=True)
 
-    # Moving averages (weekly: 10w=~50d, 30w=~150d, 40w=~200d)
+    # @MX:NOTE: [AUTO] Weekly rolling windows: 10w≈50 trading days, 30w≈150d, 40w≈200d
+    # Column names (MA50, MA150, MA200) reflect trading-day equivalents, not the window size
     price["Volume MA50"] = price["Volume"].rolling(window=10).mean()
     price["MA50"] = price["Close"].rolling(window=10).mean()
     price["MA150"] = price["Close"].rolling(window=30).mean()
