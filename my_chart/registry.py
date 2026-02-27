@@ -55,7 +55,7 @@ def _code(x: str) -> str:
         if not filtered.empty:
             return filtered["Code"].values[0]
         return "NoCode"
-    except Exception:
+    except (KeyError, IndexError):
         return "NoCode"
 
 
@@ -67,7 +67,7 @@ def _name(x: str) -> str:
         if not filtered.empty:
             return filtered["Name"].values[0]
         return "NonName"
-    except Exception:
+    except (KeyError, IndexError):
         return "NonName"
 
 
@@ -79,7 +79,7 @@ def _market(x: str) -> str:
         if not filtered.empty:
             return filtered["Market"].values[0]
         return "NonMarket"
-    except Exception:
+    except (KeyError, IndexError):
         return "NonMarket"
 
 
@@ -94,7 +94,7 @@ def _sector(x: str) -> tuple[dict, str]:
         data_dict = sector.to_dict(orient="records")[0]
         summary_txt = f"{data_dict['산업명(대)']}> {data_dict['산업명(중)']}> {data_dict['주요제품']}"
         return data_dict, summary_txt
-    except Exception:
+    except (KeyError, IndexError):
         sector_dict = {
             "Code": "None",
             "Name": "None",
@@ -153,8 +153,8 @@ def get_companies_by_market_cap(market_cap: float) -> pd.DataFrame:
             if name != "NonName":
                 companies.append(name)
                 market_caps.append(mc_filter.loc[ticker]["시가총액"])
-        except Exception:
-            pass
+        except (KeyError, IndexError):
+            logger.debug("Skipping ticker %s", ticker)
 
     result = pd.DataFrame(companies, columns=["Name"])
     result.set_index("Name", inplace=True)

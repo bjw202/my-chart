@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import os
 import sqlite3
 
@@ -36,6 +37,8 @@ from my_chart.registry import (
     add_sector_info,
     get_stock_registry,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _generate_ndarray(x: float) -> np.ndarray:
@@ -73,7 +76,7 @@ def plot_all_companies(
                 if name != "NonName":
                     companies.append(name)
                     시가총액.append(mc_filter.loc[ticker]["시가총액"])
-            except Exception:
+            except (KeyError, IndexError):
                 pass
 
     df = pd.DataFrame(companies, columns=["Name"])
@@ -94,7 +97,7 @@ def plot_all_companies(
         try:
             ticker = _code(name)
             시가총액.append(int(mc.loc[ticker, "시가총액"] / 1_0000_0000))
-        except Exception:
+        except (KeyError, IndexError):
             시가총액.append(0)
 
     s = get_korean_market_style()
@@ -205,8 +208,8 @@ def plot_all_companies(
             plt.savefig(filename, bbox_inches="tight", pad_inches=0.2)
             plt.close("all")
             pic_files.append(filename + ".png")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Skipping %s: %s", comp_name, e)
 
     plt.ion()
 
@@ -256,7 +259,7 @@ def plot_all_companies_rs_history(
                 if name != "NonName":
                     companies.append(name)
                     시가총액.append(mc_filter.loc[ticker]["시가총액"])
-            except Exception:
+            except (KeyError, IndexError):
                 pass
 
     df = pd.DataFrame(companies, columns=["Name"])
@@ -277,122 +280,124 @@ def plot_all_companies_rs_history(
         try:
             ticker = _code(name)
             시가총액.append(int(mc.loc[ticker, "시가총액"] / 1_0000_0000))
-        except Exception:
+        except (KeyError, IndexError):
             시가총액.append(0)
 
     # Get date range from reference stock
-    conn = sqlite3.connect(f"{db_name}.db")
-    df_ref = pd.read_sql_query(
-        f"SELECT Date, Open, High, Low, Close, Volume, RS_Line "
-        f"FROM stock_prices WHERE Name = '{REFERENCE_STOCK}' AND Date >= '{start}'",
-        conn,
-    )
-    df_ref.set_index("Date", inplace=True)
-    df_ref.index = pd.to_datetime(df_ref.index, format="%Y-%m-%d")
+    with sqlite3.connect(f"{db_name}.db") as conn:
+        df_ref = pd.read_sql_query(
+            "SELECT Date, Open, High, Low, Close, Volume, RS_Line "
+            "FROM stock_prices WHERE Name = ? AND Date >= ?",
+            conn,
+            params=[REFERENCE_STOCK, start],
+        )
+        df_ref.set_index("Date", inplace=True)
+        df_ref.index = pd.to_datetime(df_ref.index, format="%Y-%m-%d")
 
-    start_str = datetime.datetime.strftime(df_ref.index[0], "%Y%m%d")
-    end_str = datetime.datetime.strftime(df_ref.index[-1], "%Y%m%d")
-    BM = price_naver("KOSPI", start_str, end=end_str, freq="week")
+        start_str = datetime.datetime.strftime(df_ref.index[0], "%Y%m%d")
+        end_str = datetime.datetime.strftime(df_ref.index[-1], "%Y%m%d")
+        BM = price_naver("KOSPI", start_str, end=end_str, freq="week")
 
-    s = get_korean_market_style()
-    pic_files = []
-    ticker_codes = []
+        s = get_korean_market_style()
+        pic_files = []
+        ticker_codes = []
 
-    for i, comp_name in enumerate(companies):
-        try:
-            plt.ioff()
-            plt.close()
+        for i, comp_name in enumerate(companies):
+            try:
+                plt.ioff()
+                plt.close()
 
-            df_comp = pd.read_sql_query(
-                f"SELECT Date, Open, High, Low, Close, Volume "
-                f"FROM stock_prices WHERE Name = '{comp_name}' AND Date >= '{start}'",
-                conn,
-            )
-            df_comp.set_index("Date", inplace=True)
-            df_comp.index = pd.to_datetime(df_comp.index, format="%Y-%m-%d")
+                df_comp = pd.read_sql_query(
+                    "SELECT Date, Open, High, Low, Close, Volume "
+                    "FROM stock_prices WHERE Name = ? AND Date >= ?",
+                    conn,
+                    params=[comp_name, start],
+                )
+                df_comp.set_index("Date", inplace=True)
+                df_comp.index = pd.to_datetime(df_comp.index, format="%Y-%m-%d")
 
-            df_comp_rs = pd.read_sql_query(
-                f"SELECT * FROM relative_strength "
-                f"WHERE Name = '{comp_name}' AND Date >= '{start}'",
-                conn,
-            )
-            df_comp_rs.set_index("Date", inplace=True)
-            df_comp_rs.index = pd.to_datetime(df_comp_rs.index, format="%Y-%m-%d")
+                df_comp_rs = pd.read_sql_query(
+                    "SELECT * FROM relative_strength "
+                    "WHERE Name = ? AND Date >= ?",
+                    conn,
+                    params=[comp_name, start],
+                )
+                df_comp_rs.set_index("Date", inplace=True)
+                df_comp_rs.index = pd.to_datetime(df_comp_rs.index, format="%Y-%m-%d")
 
-            df_comp = pd.concat(
-                [df_comp, df_comp_rs[["RS_12M_Rating", "RS_6M_Rating"]]], axis=1
-            )
+                df_comp = pd.concat(
+                    [df_comp, df_comp_rs[["RS_12M_Rating", "RS_6M_Rating"]]], axis=1
+                )
 
-            df_comp = fix_zero_ohlc(df_comp)
+                df_comp = fix_zero_ohlc(df_comp)
 
-            last_days = df_comp[-25:]
-            max_close_date = last_days["Close"].idxmax().strftime("%Y-%m-%d")
-            min_close_date = last_days["Close"].idxmin().strftime("%Y-%m-%d")
-            max_close_price = df_comp["Close"][max_close_date]
-            min_close_price = df_comp["Close"][min_close_date]
+                last_days = df_comp[-25:]
+                max_close_date = last_days["Close"].idxmax().strftime("%Y-%m-%d")
+                min_close_date = last_days["Close"].idxmin().strftime("%Y-%m-%d")
+                max_close_price = df_comp["Close"][max_close_date]
+                min_close_price = df_comp["Close"][min_close_date]
 
-            _today = df_comp.index[-1].strftime("%Y-%m-%d")
-            _price = df_comp["Close"][_today]
+                _today = df_comp.index[-1].strftime("%Y-%m-%d")
+                _price = df_comp["Close"][_today]
 
-            seq_of_points = [
-                [(max_close_date, max_close_price), (_today, _price)],
-                [(min_close_date, min_close_price), (_today, _price)],
-            ]
+                seq_of_points = [
+                    [(max_close_date, max_close_price), (_today, _price)],
+                    [(min_close_date, min_close_price), (_today, _price)],
+                ]
 
-            up = 100 * (_price - min_close_price) / min_close_price
-            down = 100 * (_price - max_close_price) / max_close_price
+                up = 100 * (_price - min_close_price) / min_close_price
+                down = 100 * (_price - max_close_price) / max_close_price
 
-            plots = [
-                mpf.make_addplot(
-                    df_comp["RS_12M_Rating"],
-                    color="limegreen",
-                    width=1,
-                    panel=2,
-                    secondary_y=False,
-                    ylabel="RS_Rating",
-                    ylim=(0, 100),
-                ),
-                mpf.make_addplot(
-                    df_comp["RS_6M_Rating"],
-                    color="blueviolet",
-                    width=1,
-                    panel=2,
-                    secondary_y=True,
-                ),
-            ]
+                plots = [
+                    mpf.make_addplot(
+                        df_comp["RS_12M_Rating"],
+                        color="limegreen",
+                        width=1,
+                        panel=2,
+                        secondary_y=False,
+                        ylabel="RS_Rating",
+                        ylim=(0, 100),
+                    ),
+                    mpf.make_addplot(
+                        df_comp["RS_6M_Rating"],
+                        color="blueviolet",
+                        width=1,
+                        panel=2,
+                        secondary_y=True,
+                    ),
+                ]
 
-            fig, ax = mpf.plot(
-                df_comp,
-                title=comp_name,
-                type="candle",
-                volume=True,
-                mav=(4, 10, 40),
-                style=s,
-                figsize=(16, 9),
-                alines=dict(alines=seq_of_points, colors=["b", "r"], alpha=0.3),
-                addplot=plots,
-                returnfig=True,
-                panel_ratios=(6, 1, 2),
-                scale_width_adjustment=dict(candle=1.3),
-            )
+                fig, ax = mpf.plot(
+                    df_comp,
+                    title=comp_name,
+                    type="candle",
+                    volume=True,
+                    mav=(4, 10, 40),
+                    style=s,
+                    figsize=(16, 9),
+                    alines=dict(alines=seq_of_points, colors=["b", "r"], alpha=0.3),
+                    addplot=plots,
+                    returnfig=True,
+                    panel_ratios=(6, 1, 2),
+                    scale_width_adjustment=dict(candle=1.3),
+                )
 
-            jo, uk = 시가총액[i] // 10000, 시가총액[i] % 10000
-            sichong = f"{uk} 억" if jo == 0 else f"{jo}조 {uk}억"
-            fig.suptitle(
-                comp_name + f"\n({sichong}원)", fontsize=21, fontfamily=FONT_NAME
-            )
+                jo, uk = 시가총액[i] // 10000, 시가총액[i] % 10000
+                sichong = f"{uk} 억" if jo == 0 else f"{jo}조 {uk}억"
+                fig.suptitle(
+                    comp_name + f"\n({sichong}원)", fontsize=21, fontfamily=FONT_NAME
+                )
 
-            filename = f"./.cache/rs{i + 1}"
-            ticker_codes.append(_code(comp_name))
-            plt.savefig(filename, bbox_inches="tight", pad_inches=0.2)
-            plt.close("all")
-            pic_files.append(filename + ".png")
+                filename = f"./.cache/rs{i + 1}"
+                ticker_codes.append(_code(comp_name))
+                plt.savefig(filename, bbox_inches="tight", pad_inches=0.2)
+                plt.close("all")
+                pic_files.append(filename + ".png")
 
-            print(f"\r{i + 1}/{len(companies)}", end="")
-        except Exception:
-            pass
+                print(f"\r{i + 1}/{len(companies)}", end="")
+            except Exception as e:
+                logger.debug("Skipping %s: %s", comp_name, e)
 
-    conn.close()
     plt.ion()
 
     prs = create_widescreen_pptx()
@@ -524,7 +529,7 @@ def plot_companies(
             시가총액 = market_cap_data.loc[_code(comp_name), "시가총액"] / 1_0000_0000
             jo, uk = int(시가총액 // 10000), int(시가총액 % 10000)
             sichong = f"{uk} 억" if jo == 0 else f"{jo}조 {uk}억"
-        except Exception:
+        except (KeyError, IndexError):
             sichong = "N/A"
 
         fig.suptitle(

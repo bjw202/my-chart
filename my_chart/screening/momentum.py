@@ -260,7 +260,7 @@ def _plot_mmt_charts(
             시가총액 = market_cap_data.loc[_code(comp_name), "시가총액"] / 1_0000_0000
             jo, uk = int(시가총액 // 10000), int(시가총액 % 10000)
             sichong = f"{uk} 억" if jo == 0 else f"{jo}조 {uk}억"
-        except Exception:
+        except (KeyError, IndexError):
             sichong = "N/A"
 
         fig.suptitle(
@@ -301,12 +301,11 @@ def mmt_filtering(
     db_name: str = DEFAULT_DB_WEEKLY, rs_rating: float = 90
 ) -> pd.DataFrame:
     """Track momentum stock list changes over time."""
-    conn = sqlite3.connect(f"{db_name}.db")
-
-    df = pd.read_sql_query(
-        f"SELECT * FROM stock_prices WHERE Name = '{REFERENCE_STOCK}'", conn
-    )
-    dates = df["Date"].values
+    with sqlite3.connect(f"{db_name}.db") as conn:
+        df = pd.read_sql_query(
+            "SELECT * FROM stock_prices WHERE Name = ?", conn, params=[REFERENCE_STOCK]
+        )
+        dates = df["Date"].values
 
     date_list = []
     comp_list = []
@@ -331,8 +330,6 @@ def mmt_filtering(
         comp_list.append(df["Name"].values)
         df.loc[:, "Link"] = df["Name"]
         link_list.append(df["Link"].values)
-
-    conn.close()
 
     data = {}
     for i, d in enumerate(date_list):

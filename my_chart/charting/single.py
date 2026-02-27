@@ -109,27 +109,25 @@ def rs_history(
     db_name: str = DEFAULT_DB_WEEKLY,
 ) -> pd.DataFrame:
     """Plot RS history chart with KOSPI benchmark."""
-    conn = sqlite3.connect(f"{db_name}.db")
+    with sqlite3.connect(f"{db_name}.db") as conn:
+        df = pd.read_sql_query(
+            "SELECT Date, Open, High, Low, Close, Volume, RS_Line "
+            "FROM stock_prices WHERE Name = ? AND Date >= ?",
+            conn,
+            params=(comp_name, start),
+        )
+        df.set_index("Date", inplace=True)
+        df.index = pd.to_datetime(df.index, format="%Y-%m-%d")
 
-    df = pd.read_sql_query(
-        "SELECT Date, Open, High, Low, Close, Volume, RS_Line "
-        "FROM stock_prices WHERE Name = ? AND Date >= ?",
-        conn,
-        params=(comp_name, start),
-    )
-    df.set_index("Date", inplace=True)
-    df.index = pd.to_datetime(df.index, format="%Y-%m-%d")
-
-    df_rs = pd.read_sql_query(
-        "SELECT * FROM relative_strength WHERE Name = ? AND Date >= ?",
-        conn,
-        params=(comp_name, start),
-    )
-    df_rs.set_index("Date", inplace=True)
-    df_rs.index = pd.to_datetime(df_rs.index, format="%Y-%m-%d")
+        df_rs = pd.read_sql_query(
+            "SELECT * FROM relative_strength WHERE Name = ? AND Date >= ?",
+            conn,
+            params=(comp_name, start),
+        )
+        df_rs.set_index("Date", inplace=True)
+        df_rs.index = pd.to_datetime(df_rs.index, format="%Y-%m-%d")
 
     df = pd.concat([df, df_rs], axis=1)
-    conn.close()
 
     start_str = datetime.datetime.strftime(df.index[0], "%Y%m%d")
     end_str = datetime.datetime.strftime(df.index[-1], "%Y%m%d")

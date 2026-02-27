@@ -12,11 +12,10 @@ from my_chart.config import DEFAULT_DB_WEEKLY, REFERENCE_STOCK
 
 def get_nearest_date(date: str, db_name: str = DEFAULT_DB_WEEKLY) -> str:
     """Find the nearest date in the DB to the given date string (YYYY-MM-DD)."""
-    conn = sqlite3.connect(f"{db_name}.db")
-    df = pd.read_sql_query(
-        f"SELECT * FROM stock_prices WHERE Name = '{REFERENCE_STOCK}'", conn
-    )
-    conn.close()
+    with sqlite3.connect(f"{db_name}.db") as conn:
+        df = pd.read_sql_query(
+            "SELECT * FROM stock_prices WHERE Name = ?", conn, params=[REFERENCE_STOCK]
+        )
 
     date_strings = df["Date"].values
     dates = [datetime.datetime.strptime(ds, "%Y-%m-%d") for ds in date_strings]
@@ -29,22 +28,20 @@ def load_price_with_rs(
     date: str, db_name: str = DEFAULT_DB_WEEKLY
 ) -> pd.DataFrame:
     """Load stock_prices joined with relative_strength for a given date."""
-    conn = sqlite3.connect(f"{db_name}.db")
+    with sqlite3.connect(f"{db_name}.db") as conn:
+        df = pd.read_sql_query(
+            "SELECT * FROM stock_prices WHERE Date = ?", conn, params=[date]
+        )
+        df.set_index("Name", inplace=True)
 
-    df = pd.read_sql_query(
-        f"SELECT * FROM stock_prices WHERE Date = '{date}'", conn
-    )
-    df.set_index("Name", inplace=True)
-
-    df_rs = pd.read_sql_query(
-        f"SELECT * FROM relative_strength WHERE Date = '{date}'", conn
-    )
+        df_rs = pd.read_sql_query(
+            "SELECT * FROM relative_strength WHERE Date = ?", conn, params=[date]
+        )
     df_rs.set_index("Name", inplace=True)
     if "Date" in df_rs.columns:
         df_rs.drop(columns=["Date"], inplace=True)
 
     df = pd.concat([df, df_rs], axis=1)
-    conn.close()
 
     return df
 
@@ -121,63 +118,62 @@ def get_db_data(
 
     df = add_sector_info(df)
 
-    conn = sqlite3.connect(f"{db_name}.db")
-    companies = df.index
-    s = get_korean_market_style()
+    with sqlite3.connect(f"{db_name}.db") as conn:
+        companies = df.index
+        s = get_korean_market_style()
 
-    pic_files = []
-    for i, comp_name in enumerate(companies):
-        if comp_name in ("KOSPI", "KOSDAQ"):
-            continue
+        pic_files = []
+        for i, comp_name in enumerate(companies):
+            if comp_name in ("KOSPI", "KOSDAQ"):
+                continue
 
-        plt.ioff()
-        plt.close()
+            plt.ioff()
+            plt.close()
 
-        p = price_naver(comp_name, "20180101")
-        p = fix_zero_ohlc(p)
+            p = price_naver(comp_name, "20180101")
+            p = fix_zero_ohlc(p)
 
-        p["MA20"] = p["Close"].rolling(20).mean()
-        p["MA50"] = p["Close"].rolling(50).mean()
-        p["MA200"] = p["Close"].rolling(200).mean()
+            p["MA20"] = p["Close"].rolling(20).mean()
+            p["MA50"] = p["Close"].rolling(50).mean()
+            p["MA200"] = p["Close"].rolling(200).mean()
 
-        idx_num = p.index.get_loc(pd.to_datetime(date))
-        p = p.iloc[idx_num - 250 : idx_num + 100]
+            idx_num = p.index.get_loc(pd.to_datetime(date))
+            p = p.iloc[idx_num - 250 : idx_num + 100]
 
-        arrow = pd.Series(index=p.index, dtype="float64")
-        arrow[date] = p.loc[date]["Close"] * 0.9
+            arrow = pd.Series(index=p.index, dtype="float64")
+            arrow[date] = p.loc[date]["Close"] * 0.9
 
-        plots = [
-            mpf.make_addplot(p[["MA20", "MA50", "MA200"]], panel=0, secondary_y=False),
-            mpf.make_addplot(
-                arrow, panel=0, type="scatter", markersize=100, marker="^", color="g"
-            ),
-        ]
+            plots = [
+                mpf.make_addplot(p[["MA20", "MA50", "MA200"]], panel=0, secondary_y=False),
+                mpf.make_addplot(
+                    arrow, panel=0, type="scatter", markersize=100, marker="^", color="g"
+                ),
+            ]
 
-        fig, ax = mpf.plot(
-            p,
-            type="candle",
-            volume=True,
-            style=s,
-            figsize=(16, 9),
-            addplot=plots,
-            returnfig=True,
-            panel_ratios=(5, 1),
-            scale_width_adjustment=dict(candle=1.5),
-        )
+            fig, ax = mpf.plot(
+                p,
+                type="candle",
+                volume=True,
+                style=s,
+                figsize=(16, 9),
+                addplot=plots,
+                returnfig=True,
+                panel_ratios=(5, 1),
+                scale_width_adjustment=dict(candle=1.5),
+            )
 
-        시가총액 = market_cap.loc[_code(comp_name), "시가총액"] / 1_0000_0000
-        jo, uk = int(시가총액 // 10000), int(시가총액 % 10000)
-        sichong = f"{uk} 억" if jo == 0 else f"{jo}조 {uk}억"
-        fig.suptitle(
-            comp_name + f"\n({sichong}원)", fontsize=24, fontfamily=FONT_NAME
-        )
+            시가총액 = market_cap.loc[_code(comp_name), "시가총액"] / 1_0000_0000
+            jo, uk = int(시가총액 // 10000), int(시가총액 % 10000)
+            sichong = f"{uk} 억" if jo == 0 else f"{jo}조 {uk}억"
+            fig.suptitle(
+                comp_name + f"\n({sichong}원)", fontsize=24, fontfamily=FONT_NAME
+            )
 
-        filename = f"./.cache/price{i + 1}"
-        plt.savefig(filename, bbox_inches="tight", pad_inches=0.2)
-        plt.close("all")
-        pic_files.append(filename + ".png")
+            filename = f"./.cache/price{i + 1}"
+            plt.savefig(filename, bbox_inches="tight", pad_inches=0.2)
+            plt.close("all")
+            pic_files.append(filename + ".png")
 
-    conn.close()
     plt.ion()
 
     prs = create_widescreen_pptx()

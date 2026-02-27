@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import datetime
+import logging
 
 import pandas as pd
 from pykrx import stock
+
+logger = logging.getLogger(__name__)
 
 from my_chart.config import REFERENCE_STOCK
 from my_chart.price import price_naver
@@ -30,8 +33,8 @@ def tradingview(market_cap: float = 2000) -> None:
             if name != "NonName":
                 companies.append(name)
                 market_caps.append(mc_filter.loc[ticker]["시가총액"])
-        except Exception:
-            pass
+        except (KeyError, IndexError):
+            logger.debug("Skipping ticker %s", ticker)
 
     df = pd.DataFrame(companies, columns=["Name"])
     df.set_index("Name", inplace=True)
@@ -61,8 +64,8 @@ def company_list_tradingview(market_cap: float = 1500) -> None:
             if name != "NonName":
                 companies.append(name)
                 market_caps.append(mc.loc[ticker]["시가총액"])
-        except Exception:
-            pass
+        except (KeyError, IndexError):
+            logger.debug("Skipping ticker %s", ticker)
 
     df = pd.DataFrame(companies, columns=["Name"])
     df.set_index("Name", inplace=True)
@@ -99,8 +102,8 @@ def company_to_tradingview_text(market_cap: float = 2000) -> None:
             if name != "NonName":
                 companies.append(name)
                 market_caps.append(mc_filter.loc[ticker]["시가총액"])
-        except Exception:
-            pass
+        except (KeyError, IndexError):
+            logger.debug("Skipping ticker %s", ticker)
 
     df = pd.DataFrame(companies, columns=["Name"])
     df.set_index("Name", inplace=True)
@@ -128,8 +131,8 @@ def company_to_tradingview_text(market_cap: float = 2000) -> None:
                 tickers.append("### " + sector + ",")
                 sector_prev = sector
             tickers.append("KRX:" + _code(row["Name"]) + ",")
-        except Exception:
-            pass
+        except (KeyError, TypeError):
+            logger.debug("Skipping ticker %s", row.get("Name", "unknown"))
 
     ticker_df = pd.DataFrame(tickers)
     ticker_df.to_excel("tickers.xlsx")
@@ -157,5 +160,5 @@ def sector_stocks(sector: str) -> list[str] | str:
             excel_companies(tickers, sector)
             return filtered["Code"].values
         return "NoCode"
-    except Exception:
+    except (KeyError, IndexError):
         return "NoCode"
