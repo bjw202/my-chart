@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 import sqlite3
 
 from my_chart.config import REFERENCE_STOCK
@@ -172,7 +173,15 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
                 int(cap_won) // 100_000_000 if cap_won else None
             )
     except Exception as exc:
-        logger.warning("pykrx market_cap fetch failed (%s); storing NULL for all", exc)
+        logger.warning("pykrx market_cap fetch failed (%s); falling back to sectormap", exc)
+        # Fallback: use sectormap D-day column (億원 unit, same as stock_meta)
+        for _, srow in df_sector.iterrows():
+            code = str(srow["Code"]).zfill(6)
+            dday = srow.get("D-day")
+            if dday is not None and not (isinstance(dday, float) and math.isnan(dday)):
+                market_cap_by_code[code] = int(dday)
+        if market_cap_by_code:
+            logger.info("sectormap fallback loaded %d market_cap entries", len(market_cap_by_code))
 
     # --- Build and insert rows ---
     now_str = datetime.datetime.now().isoformat()
