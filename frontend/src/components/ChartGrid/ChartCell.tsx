@@ -89,13 +89,17 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
 
     fetchChartData(stock.code)
       .then((data: ChartResponse) => {
-        candleSeries.setData(data.candles)
+        // Show only recent 10 months (~200 trading days) for better readability
+        const recentCandles = data.candles.slice(-200)
+        const recentVolume = data.volume.slice(-200)
+
+        candleSeries.setData(recentCandles)
         volumeSeries.setData(
-          data.volume.map((v) => ({
+          recentVolume.map((v) => ({
             time: v.time,
             value: v.value,
             color: (() => {
-              const candle = data.candles.find((c) => c.time === v.time)
+              const candle = recentCandles.find((c) => c.time === v.time)
               return candle && candle.close >= candle.open ? '#26a69a55' : '#ef535055'
             })(),
           }))
@@ -103,7 +107,9 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
         for (const [key, series] of Object.entries(maSeries)) {
           const maData = data.ma[key as keyof typeof data.ma]
           if (maData && maData.length > 0) {
-            series.setData(maData.filter((p) => p.value !== null))
+            // Filter MA data to match the recent 10 months range
+            const recentMaData = maData.slice(-200).filter((p) => p.value !== null)
+            series.setData(recentMaData)
           }
         }
         chart.timeScale().fitContent()

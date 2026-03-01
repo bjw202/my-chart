@@ -39,7 +39,7 @@ def get_chart_data(code: str, daily_db_path: str) -> ChartResponse:
                FROM stock_prices
                WHERE Name = ?
                ORDER BY Date DESC
-               LIMIT 252""",
+               LIMIT 504""",  # 2 years for stable SMA200, frontend shows recent 10 months
             (name,),
         ).fetchall()
     finally:

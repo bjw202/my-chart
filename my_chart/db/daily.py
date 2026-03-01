@@ -174,7 +174,7 @@ def price_daily_db(
     """Generate daily price database for all stocks with parallel fetching."""
     st = time.time()
     today = datetime.date.today()
-    start_date = today - datetime.timedelta(days=365)
+    start_date = today - datetime.timedelta(days=730)  # 2 years for stable SMA200
     start = start_date.strftime("%Y%m%d")
 
     db_path = f"{db_name}.db"
