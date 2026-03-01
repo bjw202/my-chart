@@ -115,11 +115,13 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
           const fromTime = recentCandles[0].time
           const toTime = recentCandles[recentCandles.length - 1].time
           try {
-            // Set visible range with 10-month window
+            // Set visible range with 10-month window and 5-candle right margin
             chart.timeScale().setVisibleRange({
               from: fromTime as any,
               to: toTime as any,
             })
+            // Apply rightOffset to add margin between last candle and price axis
+            chart.timeScale().applyOptions({ rightOffset: 5 })
           } catch {
             // Fallback: if setVisibleRange fails, fit all content
             chart.timeScale().fitContent()
