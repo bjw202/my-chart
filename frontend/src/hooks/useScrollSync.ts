@@ -9,7 +9,7 @@ export function useScrollSync(listRef: React.RefObject<VariableSizeList | null>)
   onPageChange: (page: number) => void
 } {
   const isInternalUpdate = useRef(false)
-  const { gridSize, navigateToStock, setCurrentPage } = useNavigation()
+  const { gridSize, navigateToStock, setCurrentPage, setSelectedIndex } = useNavigation()
 
   const onStockSelect = useCallback(
     (stockIndex: number) => {
@@ -30,14 +30,14 @@ export function useScrollSync(listRef: React.RefObject<VariableSizeList | null>)
       if (isInternalUpdate.current) return
       isInternalUpdate.current = true
       setCurrentPage(page)
-      // Scroll StockList to the first stock of the new page
+      // Update selectedIndex so StockList's useEffect scrolls to the first stock of the new page
       const firstStockIndex = page * gridSize
-      listRef.current?.scrollToItem(firstStockIndex, 'start')
+      setSelectedIndex(firstStockIndex)
       requestAnimationFrame(() => {
         isInternalUpdate.current = false
       })
     },
-    [setCurrentPage, gridSize, listRef]
+    [setCurrentPage, setSelectedIndex, gridSize]
   )
 
   return { onStockSelect, onPageChange }
