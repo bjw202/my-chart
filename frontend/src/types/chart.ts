@@ -43,6 +43,7 @@ export interface UpdateProgress {
 
 export interface LastUpdated {
   last_updated: string | null
+  latest_data_date: string | null // Latest date in stock_prices (YYYY-MM-DD)
   daily_db_size: number // bytes
   weekly_db_size: number // bytes
 }

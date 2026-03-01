@@ -65,14 +65,17 @@ async def last_updated() -> LastUpdated:
     """Return the timestamp of the last successful DB update and current DB file sizes."""
     from backend.services.progress_store import get_progress as _gp
 
-    # Derive last_updated from stock_meta if available
+    # Derive last_updated and latest_data_date from the daily DB
     last_ts: str | None = None
+    latest_date: str | None = None
     try:
         import sqlite3
 
         with sqlite3.connect(DAILY_DB_PATH, check_same_thread=False) as conn:
             row = conn.execute("SELECT MAX(last_updated) FROM stock_meta").fetchone()
             last_ts = row[0] if row else None
+            row2 = conn.execute("SELECT MAX(Date) FROM stock_prices").fetchone()
+            latest_date = row2[0] if row2 else None
     except Exception:
         pass
 
@@ -81,6 +84,7 @@ async def last_updated() -> LastUpdated:
 
     return LastUpdated(
         last_updated=last_ts,
+        latest_data_date=latest_date,
         daily_db_size=daily_size,
         weekly_db_size=weekly_size,
     )

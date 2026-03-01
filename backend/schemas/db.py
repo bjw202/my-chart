@@ -19,6 +19,7 @@ class LastUpdated(BaseModel):
     """Response payload for GET /api/db/last-updated."""
 
     last_updated: str | None = None  # ISO timestamp of last DB update
+    latest_data_date: str | None = None  # Latest date in stock_prices (YYYY-MM-DD)
     daily_db_size: int  # bytes
     weekly_db_size: int  # bytes
 

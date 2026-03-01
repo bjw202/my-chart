@@ -295,6 +295,7 @@ html, body, #root {
 }
 
 .db-update-error { color: var(--negative); font-size: 11px; }
+.db-latest-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 
 /* Main content area */
 .app-main {
