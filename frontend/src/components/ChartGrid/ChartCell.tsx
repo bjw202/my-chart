@@ -89,17 +89,14 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
 
     fetchChartData(stock.code)
       .then((data: ChartResponse) => {
-        // Show only recent 10 months (~200 trading days) for better readability
-        const recentCandles = data.candles.slice(-200)
-        const recentVolume = data.volume.slice(-200)
-
-        candleSeries.setData(recentCandles)
+        // Load all data to support user zoom/scroll to 2-year history
+        candleSeries.setData(data.candles)
         volumeSeries.setData(
-          recentVolume.map((v) => ({
+          data.volume.map((v) => ({
             time: v.time,
             value: v.value,
             color: (() => {
-              const candle = recentCandles.find((c) => c.time === v.time)
+              const candle = data.candles.find((c) => c.time === v.time)
               return candle && candle.close >= candle.open ? '#26a69a55' : '#ef535055'
             })(),
           }))
@@ -107,12 +104,30 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
         for (const [key, series] of Object.entries(maSeries)) {
           const maData = data.ma[key as keyof typeof data.ma]
           if (maData && maData.length > 0) {
-            // Filter MA data to match the recent 10 months range
-            const recentMaData = maData.slice(-200).filter((p) => p.value !== null)
-            series.setData(recentMaData)
+            series.setData(maData.filter((p) => p.value !== null))
           }
         }
-        chart.timeScale().fitContent()
+
+        // Set initial visible range to recent 10 months (~200 trading days)
+        // User can zoom/scroll to see full 2-year history
+        if (data.candles.length > 200) {
+          const recentCandles = data.candles.slice(-200)
+          const fromTime = recentCandles[0].time
+          const toTime = recentCandles[recentCandles.length - 1].time
+          try {
+            // Set visible range with 10-month window
+            chart.timeScale().setVisibleRange({
+              from: fromTime as any,
+              to: toTime as any,
+            })
+          } catch {
+            // Fallback: if setVisibleRange fails, fit all content
+            chart.timeScale().fitContent()
+          }
+        } else {
+          chart.timeScale().fitContent()
+        }
+
         setLoading(false)
       })
       .catch((err: Error) => {
