@@ -159,7 +159,9 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
     ? '-'
     : `${stock.change_1d >= 0 ? '+' : ''}${stock.change_1d.toFixed(2)}%`
 
-  const rsDisplay = stock.rs_12m === null ? '-' : Math.round(stock.rs_12m).toString()
+  const rsValue = stock.rs_12m === null ? null : Math.round(stock.rs_12m)
+  const rsDisplay = rsValue === null ? '-' : rsValue.toString()
+  const rsHighlight = rsValue !== null && rsValue >= 80
 
   return (
     <div
@@ -171,10 +173,22 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
       aria-label={`Chart for ${stock.name}`}
     >
       <div className="chart-cell-header">
-        <span className="chart-cell-name">{stock.name}</span>
-        <span className="chart-cell-code">{stock.code}</span>
-        <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
-        <span className="chart-cell-rs">RS {rsDisplay}</span>
+        <div className="chart-cell-info">
+          <span className="chart-cell-name">{stock.name}</span>
+          <span className="chart-cell-code">{stock.code}</span>
+          <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
+          <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
+        </div>
+        <button
+          className="chart-cell-tr-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            window.open(`https://kr.tradingview.com/chart/?symbol=KRX:${stock.code}`, '_blank')
+          }}
+          title="TradingView에서 열기"
+        >
+          TR
+        </button>
       </div>
 
       <div ref={containerRef} className="chart-cell-canvas" />
