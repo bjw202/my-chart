@@ -375,6 +375,7 @@ html, body, #root {
 .chart-cell-name { font-size: 12px; font-weight: 600; }
 .chart-cell-code { font-size: 10px; color: var(--text-muted); }
 .chart-cell-change { font-size: 11px; margin-left: auto; }
+.chart-cell-rs { font-size: 10px; color: var(--text-secondary); }
 
 .chart-cell-canvas {
   flex: 1;

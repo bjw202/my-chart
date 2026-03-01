@@ -159,6 +159,8 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
     ? '-'
     : `${stock.change_1d >= 0 ? '+' : ''}${stock.change_1d.toFixed(2)}%`
 
+  const rsDisplay = stock.rs_12m === null ? '-' : Math.round(stock.rs_12m).toString()
+
   return (
     <div
       className={`chart-cell${isSelected ? ' chart-cell--selected' : ''}`}
@@ -172,6 +174,7 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
         <span className="chart-cell-name">{stock.name}</span>
         <span className="chart-cell-code">{stock.code}</span>
         <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
+        <span className="chart-cell-rs">RS {rsDisplay}</span>
       </div>
 
       <div ref={containerRef} className="chart-cell-canvas" />
