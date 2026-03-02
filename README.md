@@ -12,23 +12,32 @@ React (Vite+TS)  ->  FastAPI (Python)  ->  my_chart package  ->  SQLite
 
 ## 빠른 시작
 
-### 백엔드
+### 한 번에 실행 (권장)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+cd frontend && pnpm install && cd ..
 
+./dev.sh   # 백엔드(8000) + 프론트엔드(5173) 동시 실행
+```
+
+### 개별 실행
+
+**백엔드:**
+
+```bash
+source .venv/bin/activate
 uvicorn backend.main:app --reload --port 8000
 ```
 
 API 문서: http://localhost:8000/docs
 
-### 프론트엔드
+**프론트엔드:**
 
 ```bash
 cd frontend
-pnpm install
 pnpm dev
 ```
 
@@ -44,8 +53,10 @@ pnpm dev
 
 - **필터 시스템**: 시가총액, 기간수익률(1D/1W/1M/3M), 기술적 패턴 빌더, RS점수, 시장, 섹터 필터
 - **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, 마지막 캔들 5봉 여백
+- **등락폭 측정**: 차트 위 두 지점 클릭으로 가격 등락률(%) 표시, 셀별 독립 동작 (아래 상세 설명 참고)
 - **종목 리스트**: 섹터 그룹별 가상화 리스트, 키보드 네비게이션
 - **스크롤 동기화**: 차트 그리드와 종목 리스트 간 양방향 동기화 (화살표 페이지 이동 시 자동 스크롤 연동)
+- **관심종목**: 체크 버튼으로 관심 등록/해제, 관심 탭에서 모아보기, TradingView 내보내기
 - **DB 업데이트**: SSE 기반 진행률 스트리밍, 백그라운드 일괄 업데이트, DB 기준 최종 날짜 표시
 
 ## API 엔드포인트
@@ -115,6 +126,37 @@ DB 파일은 `Output/` 디렉토리에 저장됩니다:
 - `stock_data_weekly.db` - 주간 주가 데이터
 - `stock_data_daily.db` - 일일 주가 데이터
 - `stock_data_rs.db` - 상대강도 점수 데이터
+
+## 등락폭 측정 도구
+
+TradingView의 "Price Range" 측정 도구와 유사한 기능으로, 차트 위 두 지점을 클릭하여 가격 등락률(%)을 측정합니다.
+
+### 사용법
+
+1. 차트 헤더의 `%` 버튼 클릭 또는 `M` 키 → 측정 모드 진입 (커서 crosshair)
+2. 차트 위 첫 번째 클릭 → 시작점 고정
+3. 마우스 이동 → 실시간 미리보기 (연결 영역 + 라벨)
+4. 두 번째 클릭 → 측정 결과 고정
+5. `ESC` / 버튼 재클릭 / `M` 키 → 측정 해제
+
+### 표시 형식
+
+- 양수: `+20.00%` (초록)
+- 음수: `-13.26%` (빨강)
+
+### 상태 머신
+
+```
+IDLE ──[첫 클릭]──> MEASURING ──[두번째 클릭]──> LOCKED ──[ESC/토글]──> IDLE
+IDLE <──[ESC/토글]── MEASURING
+```
+
+### 기술 구현
+
+- `usePriceRangeMeasure` hook: 상태 머신 + lightweight-charts 이벤트 구독
+- `PriceRangeOverlay` 컴포넌트: HTML div 기반 오버레이 (pointer-events: none)
+- 데이터 좌표(price, time)로 저장, 매 렌더 시 픽셀 좌표로 변환
+- 각 차트 셀이 독립적으로 동작 (Context API 불필요)
 
 ## 개발 참고
 

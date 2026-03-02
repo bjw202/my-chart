@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createChart } from 'lightweight-charts'
-import type { IChartApi } from 'lightweight-charts'
+import type { IChartApi, ISeriesApi } from 'lightweight-charts'
 import { fetchChartData } from '../../api/chart'
 import type { ChartResponse } from '../../types/chart'
 import type { StockItem } from '../../types/stock'
 import { useWatchlist } from '../../contexts/WatchlistContext'
+import { usePriceRangeMeasure } from '../../hooks/usePriceRangeMeasure'
+import { PriceRangeOverlay } from './PriceRangeOverlay'
 
 interface ChartCellProps {
   stock: StockItem
@@ -23,10 +25,17 @@ const MA_COLORS: Record<string, string> = {
 export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const [chartApi, setChartApi] = useState<IChartApi | null>(null)
+  const [candleSeriesApi, setCandleSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { isChecked, toggleStock } = useWatchlist()
   const checked = isChecked(stock.code)
+
+  const { phase, result, toggleMeasure, reset: resetMeasure } = usePriceRangeMeasure(
+    chartApi,
+    candleSeriesApi
+  )
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -62,6 +71,7 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
       height: container.clientHeight,
     })
     chartRef.current = chart
+    setChartApi(chart)
 
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#26a69a',
@@ -89,6 +99,8 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
         lastValueVisible: false,
       })
     }
+
+    setCandleSeriesApi(candleSeries)
 
     fetchChartData(stock.code)
       .then((data: ChartResponse) => {
@@ -151,8 +163,24 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
       resizeObserver.disconnect()
       chart.remove()
       chartRef.current = null
+      setChartApi(null)
+      setCandleSeriesApi(null)
     }
   }, [stock.code])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      resetMeasure()
+    } else if (e.key === 'm' || e.key === 'M') {
+      e.stopPropagation()
+      toggleMeasure()
+    }
+  }, [resetMeasure, toggleMeasure])
+
+  const handleCellClick = useCallback(() => {
+    if (phase !== 'idle') return
+    onClick()
+  }, [phase, onClick])
 
   const changeColor = stock.change_1d === null
     ? ''
@@ -166,13 +194,19 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
   const rsDisplay = rsValue === null ? '-' : rsValue.toString()
   const rsHighlight = rsValue !== null && rsValue >= 80
 
+  const cellClassName = [
+    'chart-cell',
+    isSelected ? 'chart-cell--selected' : '',
+    phase !== 'idle' ? 'chart-cell--measuring' : '',
+  ].filter(Boolean).join(' ')
+
   return (
     <div
-      className={`chart-cell${isSelected ? ' chart-cell--selected' : ''}`}
-      onClick={onClick}
+      className={cellClassName}
+      onClick={handleCellClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      onKeyDown={handleKeyDown}
       aria-label={`Chart for ${stock.name}`}
     >
       <div className="chart-cell-header">
@@ -182,6 +216,16 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
           <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
           <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
         </div>
+        <button
+          className={`chart-cell-measure-btn${phase !== 'idle' ? ' chart-cell-measure-btn--active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleMeasure()
+          }}
+          title="등락폭 측정 (M)"
+        >
+          %
+        </button>
         <button
           className={`chart-cell-check-btn${checked ? ' chart-cell-check-btn--on' : ''}`}
           onClick={(e) => {
@@ -204,7 +248,16 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
         </button>
       </div>
 
-      <div ref={containerRef} className="chart-cell-canvas" />
+      <div className="chart-cell-canvas-wrap">
+        <div ref={containerRef} className="chart-cell-canvas" />
+        {result && chartRef.current && candleSeriesApi && (
+          <PriceRangeOverlay
+            chart={chartRef.current}
+            candleSeries={candleSeriesApi}
+            result={result}
+          />
+        )}
+      </div>
 
       {loading && (
         <div className="chart-cell-overlay">

@@ -421,9 +421,86 @@ html, body, #root {
 }
 .chart-cell-tr-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-.chart-cell-canvas {
+.chart-cell-measure-btn {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.chart-cell-measure-btn:hover { color: var(--accent); border-color: var(--accent); }
+.chart-cell-measure-btn--active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.chart-cell--measuring { cursor: crosshair; }
+.chart-cell--measuring .chart-cell-canvas { cursor: crosshair; }
+
+/* Price range measurement overlay */
+.price-range-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.price-range-marker {
+  position: absolute;
+  height: 1px;
+  border-top: 1px dashed;
+}
+.price-range-marker.price-range--positive { border-color: var(--positive); }
+.price-range-marker.price-range--negative { border-color: var(--negative); }
+
+.price-range-area {
+  position: absolute;
+  opacity: 0.08;
+}
+.price-range-area.price-range--positive { background: var(--positive); }
+.price-range-area.price-range--negative { background: var(--negative); }
+
+.price-range-line {
+  position: absolute;
+  width: 1px;
+  border-left: 1px dashed;
+}
+.price-range-line.price-range--positive { border-color: var(--positive); }
+.price-range-line.price-range--negative { border-color: var(--negative); }
+
+.price-range-label {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.price-range-label.price-range--positive {
+  color: var(--positive);
+  background: rgba(38, 166, 154, 0.15);
+}
+.price-range-label.price-range--negative {
+  color: var(--negative);
+  background: rgba(239, 83, 80, 0.15);
+}
+
+.chart-cell-canvas-wrap {
   flex: 1;
   min-height: 0;
+  position: relative;
+}
+
+.chart-cell-canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .chart-cell-overlay {
