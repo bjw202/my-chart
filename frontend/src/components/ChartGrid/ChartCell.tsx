@@ -4,6 +4,7 @@ import type { IChartApi } from 'lightweight-charts'
 import { fetchChartData } from '../../api/chart'
 import type { ChartResponse } from '../../types/chart'
 import type { StockItem } from '../../types/stock'
+import { useWatchlist } from '../../contexts/WatchlistContext'
 
 interface ChartCellProps {
   stock: StockItem
@@ -24,6 +25,8 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
   const chartRef = useRef<IChartApi | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { isChecked, toggleStock } = useWatchlist()
+  const checked = isChecked(stock.code)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -179,6 +182,16 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
           <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
           <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
         </div>
+        <button
+          className={`chart-cell-check-btn${checked ? ' chart-cell-check-btn--on' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleStock(stock)
+          }}
+          title={checked ? '관심 해제' : '관심 등록'}
+        >
+          {checked ? '\u2713' : '+'}
+        </button>
         <button
           className="chart-cell-tr-btn"
           onClick={(e) => {

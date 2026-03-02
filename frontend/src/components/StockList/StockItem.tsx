@@ -5,8 +5,10 @@ import type { StockItem as StockItemData } from '../../types/stock'
 interface StockItemProps {
   stock: StockItemData
   isSelected: boolean
+  isChecked: boolean
   style: CSSProperties
   onClick: () => void
+  onToggleCheck: () => void
 }
 
 // Display NULL values as "-"
@@ -22,7 +24,7 @@ function fmtChange(v: number | null): { text: string; className: string } {
   return { text, className }
 }
 
-export function StockItemRow({ stock, isSelected, style, onClick }: StockItemProps): React.ReactElement {
+export function StockItemRow({ stock, isSelected, isChecked, style, onClick, onToggleCheck }: StockItemProps): React.ReactElement {
   const change = fmtChange(stock.change_1d)
   const marketCapDisplay = stock.market_cap === null
     ? '-'
@@ -32,7 +34,7 @@ export function StockItemRow({ stock, isSelected, style, onClick }: StockItemPro
 
   return (
     <div
-      className={`stock-item${isSelected ? ' stock-item--selected' : ''}`}
+      className={`stock-item${isSelected ? ' stock-item--selected' : ''}${isChecked ? ' stock-item--checked' : ''}`}
       style={style}
       onClick={onClick}
       role="option"
@@ -40,14 +42,27 @@ export function StockItemRow({ stock, isSelected, style, onClick }: StockItemPro
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
-      <div className="stock-item-main">
-        <span className="stock-item-name">{stock.name}</span>
-        <span className="stock-item-code">{stock.code}</span>
+      <div
+        className="stock-item-check"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleCheck()
+        }}
+        role="checkbox"
+        aria-checked={isChecked}
+      >
+        <span className={`stock-item-checkbox${isChecked ? ' stock-item-checkbox--on' : ''}`} />
       </div>
-      <div className="stock-item-meta">
-        <span className={`stock-item-change ${change.className}`}>{change.text}</span>
-        <span className="stock-item-rs">RS {fmt(stock.rs_12m, 0)}</span>
-        <span className="stock-item-cap">{marketCapDisplay}</span>
+      <div className="stock-item-content">
+        <div className="stock-item-main">
+          <span className="stock-item-name">{stock.name}</span>
+          <span className="stock-item-code">{stock.code}</span>
+        </div>
+        <div className="stock-item-meta">
+          <span className={`stock-item-change ${change.className}`}>{change.text}</span>
+          <span className="stock-item-rs">RS {fmt(stock.rs_12m, 0)}</span>
+          <span className="stock-item-cap">{marketCapDisplay}</span>
+        </div>
       </div>
     </div>
   )

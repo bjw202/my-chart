@@ -388,6 +388,25 @@ html, body, #root {
 .chart-cell-rs { font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
 .chart-cell-rs--high { color: #ef5350; }
 
+.chart-cell-check-btn {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.chart-cell-check-btn:hover { color: var(--positive); border-color: var(--positive); }
+.chart-cell-check-btn--on {
+  color: var(--positive);
+  border-color: var(--positive);
+  background: rgba(38, 166, 154, 0.15);
+}
+
 .chart-cell-tr-btn {
   flex-shrink: 0;
   padding: 1px 5px;
@@ -457,13 +476,78 @@ html, body, #root {
 
 .stock-list-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 4px 8px;
   font-size: 10px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  gap: 4px;
 }
+
+.stock-list-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.stock-list-tab {
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stock-list-tab:hover { color: var(--text-primary); }
+
+.stock-list-tab--active {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
+.stock-list-export-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stock-list-export-btn:hover:not(:disabled) {
+  color: var(--positive);
+  border-color: var(--positive);
+}
+
+.stock-list-export-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stock-list-export-btn--copied {
+  color: var(--positive);
+  border-color: var(--positive);
+}
+
+.watchlist-remove-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 6px;
+  line-height: 1;
+}
+
+.watchlist-remove-btn:hover { color: var(--negative); }
 
 .stock-list-body {
   flex: 1;
@@ -492,8 +576,8 @@ html, body, #root {
 /* Stock item */
 .stock-item {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
@@ -502,6 +586,56 @@ html, body, #root {
 
 .stock-item:hover { background: var(--bg-hover); }
 .stock-item--selected { background: var(--bg-hover); border-left: 2px solid var(--accent); }
+.stock-item--checked { border-left: 2px solid var(--positive); }
+.stock-item--selected.stock-item--checked { border-left: 2px solid var(--accent); }
+
+.stock-item-check {
+  flex-shrink: 0;
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.stock-item-checkbox {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.stock-item-checkbox:hover { border-color: var(--text-secondary); }
+
+.stock-item-checkbox--on {
+  background: var(--positive);
+  border-color: var(--positive);
+}
+
+.stock-item-checkbox--on::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  position: absolute;
+  top: 1px;
+  left: 4px;
+}
+
+.stock-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 
 .stock-item-main {
   display: flex;

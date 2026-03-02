@@ -1,6 +1,7 @@
 import React from 'react'
 import { ScreenProvider } from './contexts/ScreenContext'
 import { NavigationProvider } from './contexts/NavigationContext'
+import { WatchlistProvider } from './contexts/WatchlistContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { FilterBar } from './components/FilterBar/FilterBar'
 import { ChartGrid } from './components/ChartGrid/ChartGrid'
@@ -12,16 +13,18 @@ export default function App(): React.ReactElement {
     <ErrorBoundary>
       <ScreenProvider>
         <NavigationProvider>
-          <div className="app">
-            <FilterBar />
+          <WatchlistProvider>
+            <div className="app">
+              <FilterBar />
 
-            <main className="app-main">
-              <ChartGrid />
-              <StockList />
-            </main>
+              <main className="app-main">
+                <ChartGrid />
+                <StockList />
+              </main>
 
-            <StatusBar />
-          </div>
+              <StatusBar />
+            </div>
+          </WatchlistProvider>
         </NavigationProvider>
       </ScreenProvider>
     </ErrorBoundary>
