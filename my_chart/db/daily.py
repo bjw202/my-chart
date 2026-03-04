@@ -13,6 +13,7 @@ import datetime
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
@@ -170,6 +171,7 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
 def price_daily_db(
     db_name: str = DEFAULT_DB_DAILY,
     max_workers: int = MAX_WORKERS,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> None:
     """Generate daily price database for all stocks with parallel fetching."""
     st = time.time()
@@ -196,9 +198,12 @@ def price_daily_db(
             for comp in companies
         }
         for future in as_completed(futures):
-            company, rows = future.result()
+            _company, rows = future.result()
             all_rows.extend(rows)
             done_count += 1
+
+            if progress_callback is not None:
+                progress_callback(done_count, total, _company)
 
             if done_count % 50 == 0:
                 print(f"  [{done_count}/{total}] fetched, inserting batch...")

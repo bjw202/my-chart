@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 
 from my_chart.config import DEFAULT_DB_WEEKLY, REFERENCE_STOCK
-from my_chart.price import price_naver_rs
+from my_chart.price import fix_zero_ohlc, price_naver_rs
 from my_chart.registry import get_stock_registry
 
 logger = logging.getLogger(__name__)
@@ -65,8 +65,22 @@ def _setup_db(db_path: str) -> sqlite3.Connection:
     return conn
 
 
+_REQUIRED_COLS = {"VolumeSMA10", "SMA10", "SMA20", "SMA40"}
+
+
 def _ensure_stock_prices_table(conn: sqlite3.Connection) -> None:
-    """Create stock_prices table if not exists (UPSERT-compatible with unique key)."""
+    """Create stock_prices table, auto-migrating if old schema is detected."""
+    existing = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(stock_prices)").fetchall()
+    }
+    if existing and not _REQUIRED_COLS.issubset(existing):
+        # 구 스키마 감지 (MA50/MA150/MA200) → DROP 후 재생성
+        conn.execute("DROP TABLE IF EXISTS stock_prices")
+        conn.execute("DROP INDEX IF EXISTS idx_stock_prices_name")
+        conn.execute("DROP INDEX IF EXISTS idx_stock_prices_date")
+        conn.commit()
+
     conn.execute(
         """CREATE TABLE IF NOT EXISTS stock_prices (
             Name TEXT NOT NULL,
@@ -84,7 +98,6 @@ def _ensure_stock_prices_table(conn: sqlite3.Connection) -> None:
             PRIMARY KEY (Name, Date)
         )"""
     )
-    # NOTE: The weekly .db file must be deleted and regenerated after this schema change.
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_stock_prices_name ON stock_prices(Name)"
     )
@@ -118,6 +131,7 @@ def _fetch_one_stock(
         data = price_naver_rs(company, benchmark, start, freq="week")
         if data.empty:
             return company, []
+        data = fix_zero_ohlc(data)
         time.sleep(API_THROTTLE_SLEEP)
         return company, _df_to_rows(company, data)
     except Exception as e:

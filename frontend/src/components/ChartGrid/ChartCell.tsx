@@ -134,8 +134,8 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           }
         }
 
-        // Set initial visible range: 200 bars for daily (~10 months), 52 bars for weekly (~1 year)
-        const visibleBars = timeframe === 'daily' ? 200 : 52
+        // Set initial visible range: 200 bars for both daily (~10 months) and weekly (~4 years)
+        const visibleBars = 200
         if (data.candles.length > visibleBars) {
           const recentCandles = data.candles.slice(-visibleBars)
           const fromTime = recentCandles[0].time

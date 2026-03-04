@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import DAILY_DB_PATH, WEEKLY_DB_PATH
@@ -35,6 +37,11 @@ async def chart(
         if timeframe == "weekly":
             return get_weekly_chart_data(code, DAILY_DB_PATH, WEEKLY_DB_PATH)
         return get_chart_data(code, DAILY_DB_PATH)
+    except sqlite3.OperationalError:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "weekly_db_schema_outdated", "detail": "주간 DB 스키마가 구버전입니다. DB 업데이트를 실행하세요."},
+        )
     except LookupError as exc:
         key = str(exc).split(":")[0]
         if key == "stock_not_found":

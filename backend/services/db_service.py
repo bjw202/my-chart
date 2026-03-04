@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 
 from my_chart.db.daily import price_daily_db
 from my_chart.db.weekly import generate_price_db, generate_rs_db
@@ -43,25 +44,46 @@ def start_update(daily_db_path: str, weekly_db_path: str) -> bool:
     return True
 
 
+def _make_progress_cb(
+    phase: str, start_pct: float, end_pct: float,
+) -> Callable[[int, int, str], None]:
+    """종목/날짜별 진행률을 해당 phase 퍼센트 범위로 매핑하는 콜백을 생성한다."""
+    def _cb(done: int, total: int, current: str) -> None:
+        if total <= 0:
+            return
+        pct = start_pct + (end_pct - start_pct) * (done / total)
+        update_progress(phase=phase, progress=round(pct, 1), current_stock=current, total=total)
+    return _cb
+
+
 def _run_update(daily_db_path: str, weekly_db_path: str) -> None:
     """Background thread: run all DB update phases sequentially."""
     try:
-        # Phase 1: Weekly price data (CHG_* returns, MA, RS_raw)
+        # Phase 1: 주간 가격 데이터 (CHG_* 수익률, MA, RS_raw)
         logger.info("[db-update] Phase 1: generating weekly price DB")
         update_progress(phase="weekly_prices", progress=0.0)
-        generate_price_db(db_name=weekly_db_path.removesuffix(".db"))
+        generate_price_db(
+            db_name=weekly_db_path.removesuffix(".db"),
+            progress_callback=_make_progress_cb("weekly_prices", 0.0, 20.0),
+        )
 
-        # Phase 2: Relative strength ratings
+        # Phase 2: 상대강도 순위
         logger.info("[db-update] Phase 2: generating weekly RS DB")
         update_progress(phase="weekly_rs", progress=20.0)
-        generate_rs_db(db_name=weekly_db_path.removesuffix(".db"))
+        generate_rs_db(
+            db_name=weekly_db_path.removesuffix(".db"),
+            progress_callback=_make_progress_cb("weekly_rs", 20.0, 40.0),
+        )
 
-        # Phase 3: Daily price data + indicators (incl. SMA100)
+        # Phase 3: 일별 가격 데이터 + 지표 (SMA100 포함)
         logger.info("[db-update] Phase 3: generating daily price DB")
         update_progress(phase="daily_prices", progress=40.0)
-        price_daily_db(db_name=daily_db_path.removesuffix(".db"))
+        price_daily_db(
+            db_name=daily_db_path.removesuffix(".db"),
+            progress_callback=_make_progress_cb("daily_prices", 40.0, 75.0),
+        )
 
-        # Phase 4 + 5: Rebuild stock_meta (includes pykrx market cap fetch)
+        # Phase 4: stock_meta 재구축 (pykrx 시가총액 포함)
         logger.info("[db-update] Phase 4: rebuilding stock_meta")
         update_progress(phase="rebuilding_meta", progress=75.0)
         rebuild_stock_meta(daily_db_path, weekly_db_path)
