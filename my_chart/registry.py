@@ -142,15 +142,15 @@ def add_sector_info(df: pd.DataFrame) -> pd.DataFrame:
 def get_companies_by_market_cap(market_cap: float) -> pd.DataFrame:
     """Get companies filtered by market cap (in 억원).
 
-    Note: This function still requires pykrx for market cap data.
+    Note: get_market_cap_safe()를 통해 pykrx 인증 세션을 사용하며,
+    실패 시 sectormap 폴백을 적용한다.
     """
-    from pykrx import stock
-
+    from my_chart.krx_session import get_market_cap_safe
     from my_chart.price import price_naver
 
     a = price_naver(REFERENCE_STOCK, start="20240101")
     day = a.index[-1].strftime("%Y%m%d")
-    mc = stock.get_market_cap(day)
+    mc = get_market_cap_safe(day)
 
     mc_filter = mc.query(f"시가총액>{market_cap * 100000000}")
     companies = []

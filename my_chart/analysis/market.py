@@ -18,6 +18,7 @@ from my_chart.export.pptx_builder import (
     create_widescreen_pptx,
     save_and_cleanup,
 )
+from my_chart.krx_session import get_market_cap_safe
 from my_chart.price import price_naver
 from my_chart.registry import _code, get_sector_registry
 
@@ -29,8 +30,8 @@ def market_cap_analysis(start: str = "20231001") -> dict:
 
     market_cap = {}
     for day in weekdate:
-        mc = stock.get_market_cap(day)
-        market_cap[day] = mc[["시가총액", "거래대금"]]
+        mc = get_market_cap_safe(day)
+        market_cap[day] = mc[["시가총액", "거래대금"]] if "거래대금" in mc.columns else mc[["시가총액"]]
 
     df_sector = get_sector_registry()
     industry = df_sector["산업명(대)"].unique()
@@ -101,8 +102,8 @@ def market_cap_analysis_detail(start: str = "20240601") -> dict:
 
     market_cap = {}
     for day in daydate:
-        mc = stock.get_market_cap(day)
-        market_cap[day] = mc[["시가총액", "거래대금"]]
+        mc = get_market_cap_safe(day)
+        market_cap[day] = mc[["시가총액", "거래대금"]] if "거래대금" in mc.columns else mc[["시가총액"]]
 
     df_sector = get_sector_registry()
     industry = df_sector["산업명(대)"].unique()

@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
-from pykrx import stock
 from pptx.util import Cm
 
 from my_chart.charting.styles import get_korean_market_style
@@ -29,6 +28,7 @@ from my_chart.export.pptx_builder import (
     save_and_cleanup,
 )
 from my_chart.indicators import add_moving_averages
+from my_chart.krx_session import get_market_cap_safe
 from my_chart.price import fix_zero_ohlc, price_naver
 from my_chart.registry import (
     _code,
@@ -64,7 +64,7 @@ def plot_all_companies(
 
     a = price_naver(REFERENCE_STOCK, start="20230101")
     day = a.index[-1].strftime("%Y%m%d")
-    mc = stock.get_market_cap(day)
+    mc = get_market_cap_safe(day)
 
     시가총액 = []
     if market_cap is not None:
@@ -247,7 +247,7 @@ def plot_all_companies_rs_history(
 
     a = price_naver(REFERENCE_STOCK, start="20230101")
     day = a.index[-1].strftime("%Y%m%d")
-    mc = stock.get_market_cap(day)
+    mc = get_market_cap_safe(day)
 
     시가총액 = []
     if market_cap is not None:
@@ -425,13 +425,17 @@ def plot_companies(
     today = datetime.date.today()
     today_str = f"{today.year}-{today.month:02}-{today.day:02}"
 
-    market_cap_data = stock.get_market_cap(today_str)
+    market_cap_data = get_market_cap_safe(today_str)
 
     count_try = 0
-    while market_cap_data["시가총액"].iloc[0] == 0 and count_try < 5:
+    while (
+        not market_cap_data.empty
+        and market_cap_data["시가총액"].iloc[0] == 0
+        and count_try < 5
+    ):
         today = today - datetime.timedelta(days=1)
         today_str = today.strftime("%Y-%m-%d")
-        market_cap_data = stock.get_market_cap(today_str)
+        market_cap_data = get_market_cap_safe(today_str)
         count_try += 1
 
     df = pd.DataFrame(index=companies)

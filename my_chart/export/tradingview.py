@@ -6,11 +6,11 @@ import datetime
 import logging
 
 import pandas as pd
-from pykrx import stock
 
 logger = logging.getLogger(__name__)
 
 from my_chart.config import REFERENCE_STOCK
+from my_chart.krx_session import get_market_cap_safe
 from my_chart.price import price_naver
 from my_chart.registry import _code, _name, _sector, add_sector_info
 
@@ -22,7 +22,7 @@ def tradingview(market_cap: float = 2000) -> None:
 
     a = price_naver(REFERENCE_STOCK, start="20230101")
     day = a.index[-1].strftime("%Y%m%d")
-    mc = stock.get_market_cap(day)
+    mc = get_market_cap_safe(day)
 
     mc_filter = mc.query(f"시가총액>{market_cap * 100000000}")
     companies = []
@@ -54,7 +54,7 @@ def company_list_tradingview(market_cap: float = 1500) -> None:
     """Export company list split by market cap thresholds."""
     a = price_naver(REFERENCE_STOCK, start="20230101")
     day = a.index[-1].strftime("%Y%m%d")
-    mc = stock.get_market_cap(day)
+    mc = get_market_cap_safe(day)
 
     companies = []
     market_caps = []
@@ -91,7 +91,7 @@ def company_to_tradingview_text(market_cap: float = 2000) -> None:
     """Export TradingView-format ticker list grouped by sector."""
     a = price_naver(REFERENCE_STOCK, start="20240101")
     day = a.index[-1].strftime("%Y%m%d")
-    mc = stock.get_market_cap(day)
+    mc = get_market_cap_safe(day)
 
     mc_filter = mc.query(f"시가총액>{market_cap * 100000000}")
     companies = []

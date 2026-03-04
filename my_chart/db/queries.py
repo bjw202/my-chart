@@ -97,7 +97,6 @@ def get_db_data(
 
     import matplotlib.pyplot as plt
     import mplfinance as mpf
-    from pykrx import stock
 
     from my_chart.charting.styles import get_korean_market_style
     from my_chart.config import FONT_NAME
@@ -106,11 +105,12 @@ def get_db_data(
         create_widescreen_pptx,
         save_and_cleanup,
     )
+    from my_chart.krx_session import get_market_cap_safe
     from my_chart.price import fix_zero_ohlc, price_naver
     from my_chart.registry import _code, _sector, add_sector_info
 
     date = get_nearest_date(date, db_name)
-    market_cap = stock.get_market_cap(date)
+    market_cap = get_market_cap_safe(date)
 
     df = load_price_with_rs(date, db_name)
     df.dropna(inplace=True)

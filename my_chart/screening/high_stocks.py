@@ -9,6 +9,7 @@ import pandas as pd
 from pykrx import stock
 
 from my_chart.config import REFERENCE_STOCK
+from my_chart.krx_session import get_market_cap_safe
 from my_chart.price import price_naver
 
 
@@ -56,7 +57,7 @@ def get_high_stocks(
     tickers = []
 
     if market_cap is not None:
-        mc = stock.get_market_cap(end)
+        mc = get_market_cap_safe(end)
         for t in _tickers:
             m = mc.loc[t]["시가총액"] / 1_0000_0000
             v = mc.loc[t]["거래대금"] / 1_0000_0000

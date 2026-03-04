@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
-from pykrx import stock
 
 from my_chart.charting.styles import get_korean_market_style
 from my_chart.config import (
@@ -21,6 +20,7 @@ from my_chart.config import (
     REFERENCE_STOCK,
 )
 from my_chart.db.queries import get_nearest_date, load_price_with_rs
+from my_chart.krx_session import get_market_cap_safe
 from my_chart.export.pptx_builder import (
     add_image_slide,
     create_widescreen_pptx,
@@ -96,7 +96,7 @@ def mmt_companies(
     rs_col = f"RS_{rs_period}_Rating"
 
     date = get_nearest_date(date, db_name)
-    market_cap_data = stock.get_market_cap(date)
+    market_cap_data = get_market_cap_safe(date)
 
     df = load_price_with_rs(date, db_name)
     df.dropna(inplace=True)
