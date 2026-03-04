@@ -12,9 +12,10 @@ interface ChartCellProps {
   stock: StockItem
   isSelected: boolean
   onClick: () => void
+  timeframe: 'daily' | 'weekly'
 }
 
-const MA_COLORS: Record<string, string> = {
+const MA_COLORS_DAILY: Record<string, string> = {
   ema10: '#ff6b6b',
   ema20: '#ffd166',
   sma50: '#06d6a0',
@@ -22,7 +23,13 @@ const MA_COLORS: Record<string, string> = {
   sma200: '#073b4c',
 }
 
-export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React.ReactElement {
+const MA_COLORS_WEEKLY: Record<string, string> = {
+  sma10: '#06d6a0',
+  sma20: '#118ab2',
+  sma40: '#073b4c',
+}
+
+export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const [chartApi, setChartApi] = useState<IChartApi | null>(null)
@@ -83,15 +90,19 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
 
     const volumeSeries = chart.addHistogramSeries({
       color: '#26a69a',
-      priceFormat: { type: 'volume' },
+      priceFormat: {
+        type: 'custom',
+        formatter: (val: number) => val < 1 ? val.toFixed(1) : Math.round(val).toLocaleString('ko-KR'),
+      },
       priceScaleId: 'volume',
     })
     chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.85, bottom: 0 },
     })
 
+    const maColors = timeframe === 'daily' ? MA_COLORS_DAILY : MA_COLORS_WEEKLY
     const maSeries: Record<string, ReturnType<typeof chart.addLineSeries>> = {}
-    for (const [key, color] of Object.entries(MA_COLORS)) {
+    for (const [key, color] of Object.entries(maColors)) {
       maSeries[key] = chart.addLineSeries({
         color,
         lineWidth: 1,
@@ -102,9 +113,9 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
 
     setCandleSeriesApi(candleSeries)
 
-    fetchChartData(stock.code)
+    fetchChartData(stock.code, timeframe)
       .then((data: ChartResponse) => {
-        // Load all data to support user zoom/scroll to 2-year history
+        // Load all data to support user zoom/scroll to full history
         candleSeries.setData(data.candles)
         volumeSeries.setData(
           data.volume.map((v) => ({
@@ -123,19 +134,17 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
           }
         }
 
-        // Set initial visible range to recent 10 months (~200 trading days)
-        // User can zoom/scroll to see full 2-year history
-        if (data.candles.length > 200) {
-          const recentCandles = data.candles.slice(-200)
+        // Set initial visible range: 200 bars for daily (~10 months), 52 bars for weekly (~1 year)
+        const visibleBars = timeframe === 'daily' ? 200 : 52
+        if (data.candles.length > visibleBars) {
+          const recentCandles = data.candles.slice(-visibleBars)
           const fromTime = recentCandles[0].time
           const toTime = recentCandles[recentCandles.length - 1].time
           try {
-            // Set visible range with 10-month window and 5-candle right margin
             chart.timeScale().setVisibleRange({
               from: fromTime as any,
               to: toTime as any,
             })
-            // Apply rightOffset to add margin between last candle and price axis
             chart.timeScale().applyOptions({ rightOffset: 5 })
           } catch {
             // Fallback: if setVisibleRange fails, fit all content
@@ -166,7 +175,7 @@ export function ChartCell({ stock, isSelected, onClick }: ChartCellProps): React
       setChartApi(null)
       setCandleSeriesApi(null)
     }
-  }, [stock.code])
+  }, [stock.code, timeframe])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {

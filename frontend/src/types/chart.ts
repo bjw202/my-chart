@@ -19,14 +19,20 @@ export interface MAPoint {
 }
 
 export interface MAOverlay {
-  ema10: MAPoint[]
-  ema20: MAPoint[]
-  sma50: MAPoint[]
-  sma100: MAPoint[]
-  sma200: MAPoint[]
+  // Daily timeframe fields
+  ema10?: MAPoint[]
+  ema20?: MAPoint[]
+  sma50?: MAPoint[]
+  sma100?: MAPoint[]
+  sma200?: MAPoint[]
+  // Weekly timeframe fields
+  sma10?: MAPoint[]
+  sma20?: MAPoint[]
+  sma40?: MAPoint[]
 }
 
 export interface ChartResponse {
+  timeframe: string
   candles: CandleBar[]
   volume: VolumeBar[]
   ma: MAOverlay

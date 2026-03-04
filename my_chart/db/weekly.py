@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
@@ -30,12 +31,12 @@ API_THROTTLE_SLEEP = 0.1
 
 _STOCK_PRICES_COLS = (
     "Name", "Date", "Open", "High", "Low", "Close",
-    "Volume", "Volume50MA",
+    "Volume", "VolumeSMA10",
     "CHG_1W", "CHG_1M", "CHG_2M", "CHG_3M",
     "CHG_6M", "CHG_9M", "CHG_12M",
-    "MA50", "MA150", "MA200",
-    "MA200_Trend_1M", "MA200_Trend_2M",
-    "MA200_Trend_3M", "MA200_Trend_4M",
+    "SMA10", "SMA20", "SMA40",
+    "SMA40_Trend_1M", "SMA40_Trend_2M",
+    "SMA40_Trend_3M", "SMA40_Trend_4M",
     "MAX10", "MAX52", "min52", "Close_52min",
     "RS_1M", "RS_2M", "RS_3M",
     "RS_6M", "RS_9M", "RS_12M", "RS_Line",
@@ -43,12 +44,12 @@ _STOCK_PRICES_COLS = (
 
 _PRICE_DF_COLS = (
     "Open", "High", "Low", "Close",
-    "Volume", "Volume MA50",
+    "Volume", "Volume SMA10",
     "CHG_1W", "CHG_1M", "CHG_2M", "CHG_3M",
     "CHG_6M", "CHG_9M", "CHG_12M",
-    "MA50", "MA150", "MA200",
-    "MA200_Trend(1M)", "MA200_Trend(2M)",
-    "MA200_Trend(3M)", "MA200_Trend(4M)",
+    "SMA10", "SMA20", "SMA40",
+    "SMA40_Trend(1M)", "SMA40_Trend(2M)",
+    "SMA40_Trend(3M)", "SMA40_Trend(4M)",
     "MAX 10W", "MAX 52W", "min 52W", "Close-min 52W",
     "RS 1M", "RS 2M", "RS 3M",
     "RS 6M", "RS 9M", "RS 12M", "RS_Line",
@@ -71,18 +72,19 @@ def _ensure_stock_prices_table(conn: sqlite3.Connection) -> None:
             Name TEXT NOT NULL,
             Date TEXT NOT NULL,
             Open REAL, High REAL, Low REAL, Close REAL,
-            Volume REAL, Volume50MA REAL,
+            Volume REAL, VolumeSMA10 REAL,
             CHG_1W REAL, CHG_1M REAL, CHG_2M REAL, CHG_3M REAL,
             CHG_6M REAL, CHG_9M REAL, CHG_12M REAL,
-            MA50 REAL, MA150 REAL, MA200 REAL,
-            MA200_Trend_1M REAL, MA200_Trend_2M REAL,
-            MA200_Trend_3M REAL, MA200_Trend_4M REAL,
+            SMA10 REAL, SMA20 REAL, SMA40 REAL,
+            SMA40_Trend_1M REAL, SMA40_Trend_2M REAL,
+            SMA40_Trend_3M REAL, SMA40_Trend_4M REAL,
             MAX10 REAL, MAX52 REAL, min52 REAL, Close_52min REAL,
             RS_1M REAL, RS_2M REAL, RS_3M REAL,
             RS_6M REAL, RS_9M REAL, RS_12M REAL, RS_Line REAL,
             PRIMARY KEY (Name, Date)
         )"""
     )
+    # NOTE: The weekly .db file must be deleted and regenerated after this schema change.
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_stock_prices_name ON stock_prices(Name)"
     )
@@ -96,7 +98,7 @@ def _df_to_rows(name: str, df: pd.DataFrame) -> list[tuple]:
     """Convert a DataFrame of price data into a list of row tuples for insertion."""
     rows = []
     for index, row in df.iterrows():
-        vals = [name, index.strftime("%Y-%m-%d")]
+        vals: list[str | float | None] = [name, str(index)[:10]]
         for col in _PRICE_DF_COLS:
             try:
                 vals.append(float(row[col]))
@@ -139,6 +141,7 @@ def generate_price_db(
     db_name: str = DEFAULT_DB_WEEKLY,
     start: str = "20200101",
     max_workers: int = MAX_WORKERS,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> None:
     """Generate weekly price database for all stocks with parallel fetching.
 
@@ -176,9 +179,12 @@ def generate_price_db(
             for comp in companies
         }
         for future in as_completed(futures):
-            company, rows = future.result()
+            _company, rows = future.result()
             all_rows.extend(rows)
             done_count += 1
+
+            if progress_callback is not None:
+                progress_callback(done_count, total, _company)
 
             if done_count % 50 == 0:
                 print(f"  [{done_count}/{total}] fetched, inserting batch...")
@@ -196,11 +202,11 @@ def generate_price_db(
     elapsed = time.time() - st
     print(f"[weekly] Price DB done: {done_count} stocks in {elapsed:.1f}s")
 
-    # Generate RS rankings
-    generate_rs_db(db_name)
 
-
-def generate_rs_db(db_name: str = DEFAULT_DB_WEEKLY) -> None:
+def generate_rs_db(
+    db_name: str = DEFAULT_DB_WEEKLY,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> None:
     """Generate relative_strength table from existing stock_prices.
 
     Processes all dates in parallel batches for speed.
@@ -226,7 +232,7 @@ def generate_rs_db(db_name: str = DEFAULT_DB_WEEKLY) -> None:
     df_ref = pd.read_sql_query(
         "SELECT Date FROM stock_prices WHERE Name = ?",
         conn,
-        params=(REFERENCE_STOCK,),
+        params=[REFERENCE_STOCK],
     )
     dates = df_ref["Date"].values
     total_dates = len(dates)
@@ -236,7 +242,7 @@ def generate_rs_db(db_name: str = DEFAULT_DB_WEEKLY) -> None:
         df = pd.read_sql_query(
             "SELECT * FROM stock_prices WHERE Date = ?",
             conn,
-            params=(date,),
+            params=[str(date)],
         )
         df.dropna(inplace=True)
 
@@ -275,6 +281,9 @@ def generate_rs_db(db_name: str = DEFAULT_DB_WEEKLY) -> None:
             "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?, ?, ?, ?)",
             rs_rows,
         )
+
+        if progress_callback is not None:
+            progress_callback(i + 1, total_dates, str(date))
 
         if (i + 1) % 20 == 0:
             conn.commit()

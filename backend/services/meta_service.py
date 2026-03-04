@@ -38,9 +38,9 @@ CREATE TABLE IF NOT EXISTS stock_meta (
     chg_1m REAL,
     chg_3m REAL,
     rs_12m REAL,
-    ma50_w REAL,
-    ma150_w REAL,
-    ma200_w REAL,
+    sma10_w REAL,
+    sma20_w REAL,
+    sma40_w REAL,
     last_updated TEXT
 )
 """
@@ -133,12 +133,12 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
 
     if latest_weekly_date:
         w_rows = conn.execute(
-            """SELECT Name, CHG_1W, CHG_1M, CHG_3M, MA50, MA150, MA200
+            """SELECT Name, CHG_1W, CHG_1M, CHG_3M, SMA10, SMA20, SMA40
                FROM weekly.stock_prices
                WHERE Date = ?""",
             (latest_weekly_date,),
         ).fetchall()
-        # weekly_by_name: Name -> (CHG_1W, CHG_1M, CHG_3M, MA50, MA150, MA200)
+        # weekly_by_name: Name -> (CHG_1W, CHG_1M, CHG_3M, SMA10, SMA20, SMA40)
         weekly_by_name = {r[0]: r[1:] for r in w_rows}
 
         rs_rows = conn.execute(
@@ -193,7 +193,7 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             continue
 
         d = daily_by_name[name]   # (Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W)
-        w = weekly_by_name.get(name)  # (CHG_1W, CHG_1M, CHG_3M, MA50, MA150, MA200) or None
+        w = weekly_by_name.get(name)  # (CHG_1W, CHG_1M, CHG_3M, SMA10, SMA20, SMA40) or None
         code = sector_info["code"]
 
         rows_to_insert.append((
@@ -216,9 +216,9 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             w[1] if w else None,  # chg_1m
             w[2] if w else None,  # chg_3m
             rs_by_name.get(name),             # rs_12m
-            w[3] if w else None,  # ma50_w
-            w[4] if w else None,  # ma150_w
-            w[5] if w else None,  # ma200_w
+            w[3] if w else None,  # sma10_w
+            w[4] if w else None,  # sma20_w
+            w[5] if w else None,  # sma40_w
             now_str,
         ))
 

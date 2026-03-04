@@ -1,25 +1,39 @@
-"""Router: GET /api/chart/{code} — daily OHLCV + MA data for TradingView."""
+"""Router: GET /api/chart/{code} — daily/weekly OHLCV + MA data for TradingView."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import DAILY_DB_PATH
+from backend.deps import DAILY_DB_PATH, WEEKLY_DB_PATH
 from backend.schemas.chart import ChartResponse
-from backend.services.chart_service import get_chart_data
+from backend.services.chart_service import get_chart_data, get_weekly_chart_data
 
 router = APIRouter()
 
+_VALID_TIMEFRAMES = {"daily", "weekly"}
+
 
 @router.get("/chart/{code}", response_model=ChartResponse)
-async def chart(code: str) -> ChartResponse:
-    """Return the latest 252 trading days of OHLCV + MA overlays for a stock.
+async def chart(
+    code: str,
+    timeframe: str = Query(default="daily", description="Timeframe: 'daily' or 'weekly'"),
+) -> ChartResponse:
+    """Return OHLCV + MA overlays for a stock.
 
     - **code**: 6-digit KRX ticker code (e.g., "005930")
+    - **timeframe**: 'daily' (default, 2 years) or 'weekly' (4 years)
 
-    Returns 404 if the code is not found in stock_meta or has no price data.
+    Returns 404 if the code is not found or has no price data.
+    Returns 400 if timeframe is invalid.
     """
+    if timeframe not in _VALID_TIMEFRAMES:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_timeframe", "valid": sorted(_VALID_TIMEFRAMES)},
+        )
     try:
+        if timeframe == "weekly":
+            return get_weekly_chart_data(code, DAILY_DB_PATH, WEEKLY_DB_PATH)
         return get_chart_data(code, DAILY_DB_PATH)
     except LookupError as exc:
         key = str(exc).split(":")[0]

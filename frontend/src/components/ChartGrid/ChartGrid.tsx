@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState } from 'react'
 import type { VariableSizeList } from 'react-window'
 import { useScreen } from '../../contexts/ScreenContext'
 import { useNavigation } from '../../contexts/NavigationContext'
@@ -12,6 +12,7 @@ export function ChartGrid(): React.ReactElement {
   const { results } = useScreen()
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
+  const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
 
   // Flatten all stocks from sector groups
   const flatStocks: StockItem[] = results?.sectors.flatMap((s) => s.stocks) ?? []
@@ -24,6 +25,10 @@ export function ChartGrid(): React.ReactElement {
   const handlePageChange = (page: number): void => {
     goToPage(page)
     onPageChange(page)
+  }
+
+  const toggleTimeframe = (): void => {
+    setTimeframe((prev) => (prev === 'daily' ? 'weekly' : 'daily'))
   }
 
   const cols = gridSize === 4 ? 2 : 3
@@ -48,6 +53,14 @@ export function ChartGrid(): React.ReactElement {
         >
           {gridSize === 4 ? '3×3' : '2×2'}
         </button>
+        <button
+          type="button"
+          className="timeframe-toggle-btn"
+          onClick={toggleTimeframe}
+          aria-label={`Switch to ${timeframe === 'daily' ? 'weekly' : 'daily'} charts`}
+        >
+          {timeframe === 'daily' ? 'W' : 'D'}
+        </button>
         <ChartPagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -70,6 +83,7 @@ export function ChartGrid(): React.ReactElement {
               stock={stock}
               isSelected={selectedIndex === stockIndex}
               onClick={() => {/* StockList click navigates; chart click just highlights */}}
+              timeframe={timeframe}
             />
           )
         })}

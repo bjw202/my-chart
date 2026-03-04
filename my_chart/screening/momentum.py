@@ -47,17 +47,17 @@ def _generate_ndarray(x: float) -> np.ndarray:
 # 12M: basic momentum; 6M: adds MA trend alignment; 3M: relaxed (no MA filter)
 _QUERY_FILTERS: dict[str, list[str]] = {
     "12M": [
-        f"Close > {MIN_CLOSE_PRICE} & Volume50MA > 100000",
-        "Close > MA50",
+        f"Close > {MIN_CLOSE_PRICE} & VolumeSMA10 > 100000",
+        "Close > SMA10",
         "Close >= 0.75*MAX52 & Close >= 1.3 * min52",
     ],
     "6M": [
-        f"Close > {MIN_CLOSE_PRICE} & Volume50MA > 100000",
-        "Close > MA50 & MA50 > MA200 & MA150 > MA200",
+        f"Close > {MIN_CLOSE_PRICE} & VolumeSMA10 > 100000",
+        "Close > SMA10 & SMA10 > SMA40 & SMA20 > SMA40",
         "Close >= 0.75*MAX52 & Close >= 1.3 * min52",
     ],
     "3M": [
-        f"Close > {MIN_CLOSE_PRICE} & Volume50MA > 100000",
+        f"Close > {MIN_CLOSE_PRICE} & VolumeSMA10 > 100000",
         "Close >= 0.75*MAX52 & Close >= 1.3 * min52",
     ],
 }
@@ -123,27 +123,25 @@ def mmt_companies(
     ]
     df["Code"] = ["KRX:" + _code(n) + "," for n in df.index]
 
-    mmt = df[
-        [
-            "산업명(대)",
-            "산업명(중)",
-            "주요제품",
-            "Naver",
-            "TradingView",
-            "Close",
-            "RS_12M_Rating",
-            "MAX52_Ratio",
-            "MA50",
-            "MA150",
-            "MA200",
-            "MAX52",
-            "min52",
-            "MA200_Trend_1M",
-            "MA200_Trend_2M",
-            "MA200_Trend_3M",
-            "MA200_Trend_4M",
-        ]
-    ]
+    mmt = pd.DataFrame(df[[
+        "산업명(대)",
+        "산업명(중)",
+        "주요제품",
+        "Naver",
+        "TradingView",
+        "Close",
+        "RS_12M_Rating",
+        "MAX52_Ratio",
+        "SMA10",
+        "SMA20",
+        "SMA40",
+        "MAX52",
+        "min52",
+        "SMA40_Trend_1M",
+        "SMA40_Trend_2M",
+        "SMA40_Trend_3M",
+        "SMA40_Trend_4M",
+    ]])
     mmt.to_excel(f"mmt_{date}_{rs_period}.xlsx")
 
     # Plot charts
@@ -315,11 +313,11 @@ def mmt_filtering(
         df = load_price_with_rs(date, db_name)
 
         is_all_none = df["RS_12M_Rating"].isna().all()
-        if is_all_none:
+        if bool(is_all_none):
             continue
 
-        df = df.query(f"Close > {MIN_CLOSE_PRICE} & Volume50MA > 100000")
-        df = df.query("Close > MA50 & MA50 > MA200")
+        df = df.query(f"Close > {MIN_CLOSE_PRICE} & VolumeSMA10 > 100000")
+        df = df.query("Close > SMA10 & SMA10 > SMA40")
         df = df.query("Close >= 0.75*MAX52 & Close >= 1.3 * min52")
         df = df.query(f"RS_12M_Rating > {rs_rating}")
 
