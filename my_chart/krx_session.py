@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 import pandas as pd
 import requests
@@ -48,13 +49,15 @@ def patch_pykrx_session() -> None:
     try:
         from pykrx.website.comm import webio
 
-        def _post_read(self: webio.Post, **params: object) -> requests.Response:
+        def _post_read(self: Any, **params: Any) -> requests.Response:  # type: ignore[misc]
             """POST 요청을 인증된 세션으로 실행."""
-            return _session.post(self.url, headers=self.headers, data=params)
+            url: str = self.url  # type: ignore[assignment]
+            return _session.post(url, headers=self.headers, data=params)
 
-        def _get_read(self: webio.Get, **params: object) -> requests.Response:
+        def _get_read(self: Any, **params: Any) -> requests.Response:  # type: ignore[misc]
             """GET 요청을 인증된 세션으로 실행."""
-            return _session.get(self.url, headers=self.headers, params=params)
+            url: str = self.url  # type: ignore[assignment]
+            return _session.get(url, headers=self.headers, params=params)  # type: ignore[arg-type]
 
         webio.Post.read = _post_read  # type: ignore[method-assign]
         webio.Get.read = _get_read  # type: ignore[method-assign]
@@ -238,20 +241,22 @@ def get_market_cap_safe(date_str: str) -> pd.DataFrame:
                     break
 
         if dday_col is not None:
-            df_fallback = df_sector[["종목\n코드", dday_col]].copy()
-            df_fallback = df_fallback.dropna(subset=[dday_col])
+            col_name = str(dday_col)
+            df_fallback = df_sector[["종목\n코드", col_name]].copy()
+            df_fallback = df_fallback.dropna(subset=[col_name])  # type: ignore[call-overload]
             df_fallback.set_index("종목\n코드", inplace=True)
             # 억원 → 원 변환 (1억 = 100,000,000)
-            df_fallback["시가총액"] = pd.to_numeric(
-                df_fallback[dday_col], errors="coerce"
-            ) * 100_000_000
-            df_fallback = df_fallback[["시가총액"]].dropna()
+            numeric_vals: pd.Series = pd.to_numeric(  # type: ignore[assignment]
+                df_fallback[col_name], errors="coerce"
+            )
+            df_fallback["시가총액"] = numeric_vals * 100_000_000  # type: ignore[operator]
+            result: pd.DataFrame = df_fallback[["시가총액"]].dropna()  # type: ignore[assignment]
 
-            if not df_fallback.empty:
+            if not result.empty:
                 logger.info(
-                    "sectormap D-day 폴백 사용: %d건 (날짜: %s)", len(df_fallback), date_str
+                    "sectormap D-day 폴백 사용: %d건 (날짜: %s)", len(result), date_str
                 )
-                return df_fallback
+                return result
 
         logger.warning("sectormap에서 D-day 컬럼을 찾을 수 없음")
 
@@ -260,4 +265,4 @@ def get_market_cap_safe(date_str: str) -> pd.DataFrame:
 
     # 3차: 빈 DataFrame 반환
     logger.warning("시가총액 데이터를 가져올 수 없음 - 빈 DataFrame 반환: %s", date_str)
-    return pd.DataFrame(columns=["시가총액"])
+    return pd.DataFrame({"시가총액": pd.Series(dtype="float64")})
