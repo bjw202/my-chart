@@ -43,6 +43,36 @@ pnpm dev
 
 개발 서버: http://localhost:5173
 
+### KRX 세션 인증 설정 (선택사항)
+
+pykrx 라이브러리로 KRX 데이터를 조회할 때 인증을 필요로 할 수 있습니다. 다음과 같이 설정하면 자동으로 인증됩니다:
+
+**1. `.env` 파일 생성:**
+
+`.env.example`을 참고하여 프로젝트 루트에 `.env` 파일을 생성합니다:
+
+```bash
+KRX_ID=your_krx_id
+KRX_PW=your_krx_password
+```
+
+**2. 환경변수 설정:**
+
+- `KRX_ID`: 한국거래소(data.krx.co.kr) 회원 ID
+- `KRX_PW`: 한국거래소 회원 비밀번호
+
+앱이 시작될 때 자동으로 다음 작업이 수행됩니다:
+- pykrx webio를 인증된 세션으로 monkey-patch
+- KRX에 로그인 (3단계 인증 플로우)
+- 인증 실패 시 자동으로 sectormap 폴백 모드로 동작
+
+**3. 폴백 메커니즘:**
+
+만약 KRX 로그인이 실패하거나 환경변수가 설정되지 않으면:
+1. pykrx 호출 시도 (인증 없음)
+2. 실패 시 `Input/sectormap_original.xlsx`의 D-day 컬럼 사용
+3. 폴백 데이터도 없으면 빈 DataFrame 반환
+
 ### 첫 실행
 
 1. 백엔드와 프론트엔드를 시작합니다
