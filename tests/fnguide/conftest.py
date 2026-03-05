@@ -11,7 +11,7 @@ FileNotFoundError 를 발생시킬 수 있다. 이 경우 해당 픽스처는 No
 
 import pytest
 
-from fnguide.crawler import get_fnguide, get_required_rate, read_fs
+from fnguide.crawler import get_fnguide, read_fs
 
 
 @pytest.fixture(scope="session")
@@ -42,9 +42,3 @@ def hynix_fnguide():
         return get_fnguide("000660")
     except Exception:  # noqa: BLE001
         return None
-
-
-@pytest.fixture(scope="session")
-def required_rate():
-    """BBB- 요구수익률"""
-    return get_required_rate()

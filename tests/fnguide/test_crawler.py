@@ -8,7 +8,7 @@ REQ-C-001~006: fnguide.crawler 모듈 라이브 HTTP 통합 테스트.
 
 import pytest
 
-from fnguide.crawler import get_fnguide, get_required_rate, read_fs, read_snapshot
+from fnguide.crawler import get_fnguide, read_fs, read_snapshot
 
 
 # ─────────────────────────────────────────────────────────────
@@ -143,7 +143,6 @@ class TestReadSnapshot:
             pytest.skip(f"read_snapshot 호환성 문제로 스킵: {error[:100] if error else ''}")
         report, _, _ = result
         required_keys = [
-            "종가",
             "시가총액(상장예정포함,억원)",
             "발행주식수(보통주)",
             "발행주식수(우선주)",
@@ -153,14 +152,6 @@ class TestReadSnapshot:
         ]
         for key in required_keys:
             assert key in report, f"report 에 '{key}' 키가 없음"
-
-    def test_characterize_cur_price_positive(self, samsung_snapshot):
-        """현재 종가는 양수"""
-        result, error = samsung_snapshot
-        if result is None:
-            pytest.skip(f"read_snapshot 호환성 문제로 스킵: {error[:100] if error else ''}")
-        report, _, _ = result
-        assert report["종가"] > 0
 
     def test_characterize_snap_dataframes_not_empty(self, samsung_snapshot):
         """스냅샷 DataFrame 이 비어 있지 않음"""
@@ -200,13 +191,13 @@ class TestReadConsensus:
 
 
 # ─────────────────────────────────────────────────────────────
-# REQ-C-005: get_fnguide / get_required_rate 통합
+# REQ-C-005: get_fnguide 통합
 # ─────────────────────────────────────────────────────────────
 
 
 @pytest.mark.live
 class TestGetFnguide:
-    """REQ-C-005: get_fnguide / get_required_rate 특성 테스트"""
+    """REQ-C-005: get_fnguide 특성 테스트"""
 
     @pytest.fixture(scope="class")
     def safe_samsung_fnguide(self):
@@ -224,14 +215,6 @@ class TestGetFnguide:
         if result is None:
             pytest.skip(f"get_fnguide 호환성 문제: {error[:100] if error else ''}")
         assert len(result) == 7
-
-    def test_characterize_required_rate_is_float(self, required_rate):
-        """get_required_rate 반환값이 float"""
-        assert isinstance(required_rate, float)
-
-    def test_characterize_required_rate_in_valid_range(self, required_rate):
-        """BBB- 금리는 1%~20% 범위 내"""
-        assert 0.01 <= required_rate <= 0.20
 
 
 # ─────────────────────────────────────────────────────────────

@@ -8,9 +8,9 @@ analyze_comp: FnGuide 데이터를 수집하고 재무상태를 분석하여 Com
 from __future__ import annotations
 
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from .analysis import DEFAULT_REQUIRED_RATE, fs_analysis
+from .analysis import fs_analysis
 from .crawler import get_fnguide
 
 
@@ -25,23 +25,34 @@ class RateHistory:
 
 
 @dataclass
+class ProfitTrend:
+    """매출/영업이익/순이익 추이 (연간 + Trailing 12M)"""
+
+    periods: list[str]                    # 기간 라벨 ['2021/12', '2022/12', ...]
+    revenue: list[float] = field(default_factory=list)            # 매출액 (억원)
+    operating_profit: list[float] = field(default_factory=list)   # 영업이익 (억원)
+    net_income: list[float] = field(default_factory=list)         # 당기순이익 (억원)
+    operating_margin: list[float] = field(default_factory=list)   # 영업이익률 (%)
+
+
+@dataclass
 class CompResult:
     """종목 재무상태 분석 결과.
 
-    매수/매도가 등 투자 판단 지표는 포함하지 않는다.
     재무구조, 이익률, 수익성 지표에 집중한다.
     """
 
     # ── 기본 정보
     code: str
-    cur_price: int
     market_cap: int           # 시가총액 (억원)
     shares: int               # 발행주식수 (보통주 + 우선주 - 자기주식)
 
     # ── 수익성 지표
     trailing_eps: float       # Trailing 12M EPS (원)
-    trailing_per: int         # Trailing PER (배)
     book_value_per_share: int # 주당 순자산 (원, BPS)
+
+    # ── 매출/영업이익/순이익 추이
+    profit_trend: ProfitTrend
 
     # ── 이익률 추이 (3년 + 예상)
     operating_asset_return: RateHistory   # 영업자산이익률
@@ -83,11 +94,21 @@ class CompResult:
 
     def __str__(self) -> str:
         """분석 결과 텍스트 요약"""
+        # 매출/영업이익/순이익 추이
+        trend = self.profit_trend
+        trend_lines = ["── 매출/이익 추이 (억원) ─────────────────"]
+        header = "  {:>10s}" + " {:>10s}" * len(trend.periods)
+        trend_lines.append(header.format("", *trend.periods))
+        trend_lines.append(header.format("매출액", *[f"{v:,.0f}" for v in trend.revenue]))
+        trend_lines.append(header.format("영업이익", *[f"{v:,.0f}" for v in trend.operating_profit]))
+        trend_lines.append(header.format("순이익", *[f"{v:,.0f}" for v in trend.net_income]))
+        trend_lines.append(header.format("영업이익률", *[f"{v:.1f}%" for v in trend.operating_margin]))
+
         lines = [
-            f"[{self.code}] 주가: {self.cur_price:,}원  "
-            f"시가총액: {self.market_cap:,}억원",
-            f"Trailing EPS: {self.trailing_eps:,.0f}원  "
-            f"PER: {self.trailing_per}X  BPS: {self.book_value_per_share:,}원",
+            f"[{self.code}] 시가총액: {self.market_cap:,}억원",
+            f"Trailing EPS: {self.trailing_eps:,.0f}원  BPS: {self.book_value_per_share:,}원",
+            "",
+            *trend_lines,
             "",
             "── 이익률 추이 (예상) ────────────────────",
             f"  영업자산이익률: {self.operating_asset_return.expected:.1%}  "
@@ -123,31 +144,17 @@ class CompResult:
         return "\n".join(lines)
 
 
-def analyze_comp(
-    code: str,
-    required_rate: float = DEFAULT_REQUIRED_RATE,
-) -> CompResult:
+def analyze_comp(code: str) -> CompResult:
     """FnGuide 데이터를 수집하고 재무상태를 종합 분석한다.
 
-    매수/매도 판단 로직(RIM 적정가)을 포함하지 않으며,
     재무구조·이익률·수익성 지표 분석에 집중한다.
-
-    원본 analyze_comp 대비 변경사항:
-    - comp_name(종목명) → code(종목코드) 입력으로 변경
-    - 매수가/매도가 계산 제거
-    - 차트 시각화 코드 분리 (별도 visualization 모듈로 이전 예정)
-    - 미사용 변수 `최근분기_영업이익` 제거
-    - `txt` UnboundLocalError 버그 수정
 
     Args:
         code: 종목 코드 (6자리, 예: '005930')
-        required_rate: 요구수익률 (기본 0.08, 향후 이익률 비교에 활용)
 
     Returns:
         CompResult: 재무상태 분석 결과
     """
-    del required_rate  # 향후 fs_analysis 연동 시 활용 예정
-
     # ── 데이터 수집
     df_fs_ann, df_fs_quar, _, _, _, report, account_type = get_fnguide(code)
     df_anal, df_invest = fs_analysis(df_fs_ann, df_fs_quar)
@@ -155,7 +162,6 @@ def analyze_comp(
     col = df_fs_ann.columns  # ['YYYY/MM', 'YYYY/MM', 'YYYY/MM', 'YYYY/MM']
 
     # ── 기본 수치
-    cur_price: int = int(report["종가"])
     market_cap: int = int(report["시가총액(상장예정포함,억원)"])
     shares: int = (
         int(report["발행주식수(보통주)"])
@@ -178,7 +184,23 @@ def analyze_comp(
 
     trailing_eps: float = trailing_net_income * 1_0000_0000 / shares
     bps: int = int(latest_equity / shares * 1_0000_0000)
-    trailing_per: int = int(cur_price / trailing_eps) if trailing_eps != 0 else 0
+
+    # ── 매출/영업이익/순이익 추이
+    periods = [str(c) for c in col]
+    revenue = [float(df_fs_ann.loc["매출액", c]) for c in col]
+    op_profit = [float(df_fs_ann.loc["영업이익", c]) for c in col]
+    net_income = [float(df_fs_ann.loc["당기순이익", c]) for c in col]
+    op_margin = [
+        (op / rev * 100) if rev != 0 else 0.0
+        for op, rev in zip(op_profit, revenue)
+    ]
+    profit_trend = ProfitTrend(
+        periods=periods,
+        revenue=revenue,
+        operating_profit=op_profit,
+        net_income=net_income,
+        operating_margin=op_margin,
+    )
 
     # ── 이익률 추이 (col[1]=−2y, col[2]=−1y, col[3]=recent, 예상)
     def _rate_history(metric: str) -> RateHistory:
@@ -209,12 +231,11 @@ def analyze_comp(
 
     return CompResult(
         code=code,
-        cur_price=cur_price,
         market_cap=market_cap,
         shares=shares,
         trailing_eps=trailing_eps,
-        trailing_per=trailing_per,
         book_value_per_share=bps,
+        profit_trend=profit_trend,
         operating_asset_return=_rate_history("영업자산이익률"),
         non_operating_return=_rate_history("비영업자산이익률"),
         borrowing_rate=_rate_history("차입이자율"),

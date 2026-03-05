@@ -10,7 +10,6 @@ import json
 import time
 from io import StringIO
 
-import FinanceDataReader as fdr
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -35,8 +34,6 @@ _FS_URL = (
 )
 _CONS_D_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_D.json"
 _CONS_B_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_B.json"
-_RATING_URL = "https://www.kisrating.com/ratingsStatistics/statics_spread.do"
-
 # 기본 크롤링 대기 시간 (초)
 _CRAWL_DELAY = 0.1
 
@@ -85,11 +82,6 @@ def read_snapshot(
         nv_lookup[n] = v
 
     report: dict = {}
-
-    # 현재 종가/거래량은 FinanceDataReader 기준
-    df_price = fdr.DataReader(code, "2010")
-    report["종가"] = df_price["Close"].iloc[-1]
-    report["거래량"] = df_price["Volume"].iloc[-1]
 
     # 이름 기반 탐색 (위치 의존성 제거)
     def _find_value(keyword: str) -> str:
@@ -242,29 +234,6 @@ def read_consensus(
     df_cons.columns = remove_E(df_cons.columns)
 
     return df_cons
-
-
-def get_required_rate() -> float:
-    """한국신용평가에서 BBB- 5년 채권 금리를 조회한다.
-
-    원본 버그 수정: 로컬 변수에만 할당하고 return 없던 문제 수정.
-
-    Returns:
-        요구수익률 (소수점, 예: 8% → 0.08)
-
-    Raises:
-        ValueError: BBB- 금리 데이터를 찾을 수 없을 때
-    """
-    page = requests.get(_RATING_URL)
-    bs = BeautifulSoup(page.text, "lxml")
-    tables = bs.find_all("table")
-
-    for row in tables[0].find_all("tr"):
-        cols = [x.text.strip() for x in row.find_all("td")]
-        if len(cols) > 0 and cols[0] == "BBB-":
-            return float(cols[8]) / 100  # % → 소수
-
-    raise ValueError("BBB- 금리 데이터를 찾을 수 없습니다.")
 
 
 def get_fnguide(

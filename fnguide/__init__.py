@@ -2,21 +2,17 @@
 FnGuide 크롤링 & 재무 분석 모듈
 
 Usage:
-    from fnguide.crawler import get_fnguide, get_required_rate
-    from fnguide.analysis import fs_analysis, price_analysis
+    from fnguide.crawler import get_fnguide
+    from fnguide.analysis import fs_analysis
 """
 
-from .analyzer import CompResult, RateHistory, analyze_comp
+from .analyzer import CompResult, ProfitTrend, RateHistory, analyze_comp
 from .analysis import (
-    cal_rim,
     calc_weight_coeff,
-    calculate_historical_rim,
     fs_analysis,
-    price_analysis,
 )
 from .crawler import (
     get_fnguide,
-    get_required_rate,
     read_consensus,
     read_fs,
     read_snapshot,
@@ -32,20 +28,17 @@ from .parser import (
 __all__ = [
     # analyzer
     "CompResult",
+    "ProfitTrend",
     "RateHistory",
     "analyze_comp",
     # crawler
     "get_fnguide",
-    "get_required_rate",
     "read_consensus",
     "read_fs",
     "read_snapshot",
     # analysis
-    "cal_rim",
     "calc_weight_coeff",
-    "calculate_historical_rim",
     "fs_analysis",
-    "price_analysis",
     # parser
     "convert_string_to_number",
     "remove_E",

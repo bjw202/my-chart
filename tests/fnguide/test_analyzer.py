@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from fnguide.analyzer import CompResult, RateHistory, analyze_comp
+from fnguide.analyzer import CompResult, ProfitTrend, RateHistory, analyze_comp
 
 
 # ─────────────────────────────────────────────────────────────
@@ -45,10 +45,6 @@ class TestAnalyzeCompSamsung:
         """code 필드가 입력 종목 코드와 일치"""
         assert samsung_result.code == "005930"
 
-    def test_characterize_cur_price_positive(self, samsung_result):
-        """현재 종가는 양수"""
-        assert samsung_result.cur_price > 0
-
     def test_characterize_market_cap_positive(self, samsung_result):
         """시가총액은 양수 (억원)"""
         assert samsung_result.market_cap > 0
@@ -61,9 +57,15 @@ class TestAnalyzeCompSamsung:
         """Trailing EPS 는 0이 아님"""
         assert samsung_result.trailing_eps != 0
 
-    def test_characterize_trailing_per_nonnegative(self, samsung_result):
-        """Trailing PER 은 0 이상"""
-        assert samsung_result.trailing_per >= 0
+    def test_characterize_profit_trend_valid(self, samsung_result):
+        """ProfitTrend 필드가 유효한 구조"""
+        trend = samsung_result.profit_trend
+        assert isinstance(trend, ProfitTrend)
+        assert len(trend.periods) >= 4
+        assert len(trend.revenue) == len(trend.periods)
+        assert len(trend.operating_profit) == len(trend.periods)
+        assert len(trend.net_income) == len(trend.periods)
+        assert len(trend.operating_margin) == len(trend.periods)
 
     def test_characterize_bps_positive(self, samsung_result):
         """BPS(주당 순자산)는 양수"""
@@ -147,10 +149,6 @@ class TestCompResultConsistency:
         """shares > 0 (보통주 + 우선주 - 자기주식 > 0)"""
         assert samsung_result.shares > 0
 
-    def test_characterize_trailing_per_nonnegative(self, samsung_result):
-        """trailing_per >= 0"""
-        assert samsung_result.trailing_per >= 0
-
     def test_characterize_net_cash_ratio_is_valid_float(self, samsung_result):
         """net_cash_ratio 가 유효한 float"""
         assert isinstance(samsung_result.net_cash_ratio, float)
@@ -164,7 +162,7 @@ class TestCompResultConsistency:
         # 핵심 정보가 출력에 포함되어 있음
         assert "005930" in text
 
-    def test_characterize_str_contains_price(self, samsung_result):
-        """str 출력에 종가 정보 포함"""
+    def test_characterize_str_contains_trend(self, samsung_result):
+        """str 출력에 매출/이익 추이 정보 포함"""
         text = str(samsung_result)
-        assert "주가" in text or str(samsung_result.cur_price) in text
+        assert "매출" in text or "이익" in text
