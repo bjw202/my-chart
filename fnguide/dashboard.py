@@ -7,7 +7,7 @@ Returns DashboardResult containing 7 analysis sections.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 import pandas as pd
@@ -646,7 +646,6 @@ def _calc_trend_signals(
 
 def _calc_five_questions(
     df_anal: pd.DataFrame,
-    df_invest: pd.DataFrame,
     df_fs_ann: pd.DataFrame,
     col_recent: str,
 ) -> FiveQuestions:
@@ -658,12 +657,6 @@ def _calc_five_questions(
     def _get_anal(row: str) -> float:
         try:
             return float(df_anal.loc[row, col_recent])
-        except (KeyError, TypeError):
-            return 0.0
-
-    def _get_fs(row: str) -> float:
-        try:
-            return float(df_fs_ann.loc[row, col_recent])
         except (KeyError, TypeError):
             return 0.0
 
@@ -682,7 +675,6 @@ def _calc_five_questions(
 
     # Q2: ROE > Ke (ROE 가 자본비용을 상회하는가)
     # Use 가중평균 ROE vs a simple benchmark of 8% when Ke unavailable
-    roe_weighted = float(df_anal.loc["지배주주ROE", "가중평균"]) if "가중평균" in df_anal.columns else 0.0
     # For Q2 we use recent ROE
     roe_recent = float(df_anal.loc["지배주주ROE", col_recent]) if "지배주주ROE" in df_anal.index else 0.0
     # @MX:NOTE: [AUTO] Using 8% as minimum ROE threshold when CAPM Ke unavailable
@@ -698,7 +690,6 @@ def _calc_five_questions(
     external_debt = _get_anal("외부차입")
     se = _get_anal("주주몫")
     debt_ratio = external_debt / se if se != 0 else 0.0
-    q3_ok = debt_ratio < 0.50
     questions.append(FiveQuestion(
         question="외부차입/자기자본 < 50%?",
         status="ok" if debt_ratio < 0.20 else ("warn" if debt_ratio < 0.50 else "danger"),
@@ -774,7 +765,7 @@ def analyze_dashboard(code: str) -> DashboardResult:
         raise ValueError(f"Invalid stock code: {code!r}. Must be 6 digits.")
 
     # Data acquisition
-    df_fs_ann, df_fs_quar, _, _, _, report, account_type = get_fnguide(code)  # type: ignore[misc]
+    df_fs_ann, df_fs_quar, _, _, _, report, _ = get_fnguide(code)  # type: ignore[misc]
     df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
 
     col = list(df_fs_ann.columns)
@@ -802,7 +793,7 @@ def analyze_dashboard(code: str) -> DashboardResult:
     trend_signals = _calc_trend_signals(df_anal, df_fs_ann)
 
     # Section 7
-    five_questions = _calc_five_questions(df_anal, df_invest, df_fs_ann, col_recent)
+    five_questions = _calc_five_questions(df_anal, df_fs_ann, col_recent)
 
     return DashboardResult(
         code=code,

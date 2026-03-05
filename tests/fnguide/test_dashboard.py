@@ -395,7 +395,7 @@ class TestFiveQuestions:
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             col_recent = list(df_fs_ann.columns)[-1]
-            return _calc_five_questions(df_anal, df_invest, df_fs_ann, col_recent)
+            return _calc_five_questions(df_anal, df_fs_ann, col_recent)
         except Exception as e:
             pytest.skip(f"_calc_five_questions error: {e}")
 
@@ -486,7 +486,7 @@ class TestHynixDashboard:
                 "rd": _calc_rate_decomposition(df_anal, report),
                 "pw": _calc_profit_waterfall(df_anal),
                 "ts": _calc_trend_signals(df_anal, df_fs_ann),
-                "fq": _calc_five_questions(df_anal, df_invest, df_fs_ann, col_recent),
+                "fq": _calc_five_questions(df_anal, df_fs_ann, col_recent),
             }
         except Exception as e:
             pytest.skip(f"hynix section computation error: {e}")

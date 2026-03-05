@@ -44,21 +44,21 @@ class TestFsAnalysisStructure:
                 f"fs_analysis 는 pandas 3.0 에서 TypeError 발생 — "
                 f"convert_string_to_number 가 StringDtype 컬럼을 처리하지 못함: {error[:100]}"
             )
-        assert len(result) == 2  # (df_anal, df_invest)
+        assert len(result) == 3  # (df_anal, df_invest, df_financing)
 
-    def test_characterize_returns_two_dataframes(self, analysis_result):
-        """반환값이 (df_anal, df_invest) 2-튜플"""
+    def test_characterize_returns_three_dataframes(self, analysis_result):
+        """반환값이 (df_anal, df_invest, df_financing) 3-튜플"""
         result, error = analysis_result
         if result is None:
             pytest.skip(f"pandas 3.0 호환성 문제: {error[:100] if error else ''}")
-        assert len(result) == 2
+        assert len(result) == 3
 
     def test_characterize_df_anal_required_rows(self, analysis_result):
         """df_anal 에 필수 분석 행 포함"""
         result, error = analysis_result
         if result is None:
             pytest.skip(f"pandas 3.0 호환성 문제: {error[:100] if error else ''}")
-        df_anal, _ = result
+        df_anal, _, _ = result
         required_rows = [
             "주주몫",
             "비지배주주지분",
@@ -84,7 +84,7 @@ class TestFsAnalysisStructure:
         result, error = analysis_result
         if result is None:
             pytest.skip(f"pandas 3.0 호환성 문제: {error[:100] if error else ''}")
-        _, df_invest = result
+        _, df_invest, _ = result
         required_rows = ["설비투자", "운전자산", "금융투자", "여유자금"]
         for row in required_rows:
             assert row in df_invest.index, f"df_invest 에 '{row}' 행이 없음"
@@ -104,7 +104,7 @@ class TestFsAnalysisRates:
         """삼성전자 df_anal (pandas 3.0 호환 여부 확인)"""
         _, df_fs_ann, df_fs_quar = samsung_fs
         try:
-            df_anal, _ = fs_analysis(df_fs_ann, df_fs_quar)
+            df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
             return df_anal
         except (TypeError, Exception):
             pytest.skip("fs_analysis pandas 3.0 호환성 문제로 스킵")
@@ -148,7 +148,7 @@ class TestFsAnalysisPriority:
         """삼성전자 df_anal (pandas 3.0 호환 여부 확인)"""
         _, df_fs_ann, df_fs_quar = samsung_fs
         try:
-            df_anal, _ = fs_analysis(df_fs_ann, df_fs_quar)
+            df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
             return df_anal
         except (TypeError, Exception):
             pytest.skip("fs_analysis pandas 3.0 호환성 문제로 스킵")
@@ -193,7 +193,7 @@ class TestFsAnalysisExpected:
         """삼성전자 df_anal (pandas 3.0 호환 여부 확인)"""
         _, df_fs_ann, df_fs_quar = samsung_fs
         try:
-            df_anal, _ = fs_analysis(df_fs_ann, df_fs_quar)
+            df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
             return df_anal
         except (TypeError, Exception):
             pytest.skip("fs_analysis pandas 3.0 호환성 문제로 스킵")
@@ -236,7 +236,7 @@ class TestFsAnalysisSeparate:
             try:
                 account_type, df_fs_ann, df_fs_quar = read_fs(code)
                 if account_type == "IFRS(별도)":
-                    df_anal, _ = fs_analysis(df_fs_ann, df_fs_quar)
+                    df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
                     return df_anal, df_fs_ann
             except Exception:  # noqa: BLE001
                 continue
