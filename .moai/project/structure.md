@@ -98,6 +98,13 @@ kr-stock-screener/
 │       └── styles/
 │           └── global.css
 │
+├── fnguide/                     # FnGuide 재무 분석 패키지 (독립형)
+│   ├── __init__.py              # 패키지 export
+│   ├── parser.py                # HTML/JSON 파싱 유틸리티
+│   ├── crawler.py               # FnGuide HTTP 크롤링
+│   ├── analysis.py              # 재무 분석 (fs_analysis)
+│   └── analyzer.py              # 종합 분석 (analyze_comp → CompResult)
+│
 ├── data/                        # SQLite databases (gitignored)
 │   ├── weekly_price.db
 │   ├── weekly_rs.db
