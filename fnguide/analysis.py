@@ -309,6 +309,11 @@ def fs_analysis(
     비지배주주순이익_est = 당기순이익_est * (1 - 지배비율)
     지배주주ROE_est = 지배주주순이익_est / df_anal.loc["주주몫", col[3]]
 
+    # 이익률 예상값 = 1순위 (추세 또는 가중평균)
+    df_anal.loc["영업자산이익률", "예상"] = df_anal.loc["영업자산이익률", "1순위"]
+    df_anal.loc["비영업자산이익률", "예상"] = df_anal.loc["비영업자산이익률", "1순위"]
+    df_anal.loc["차입이자율", "예상"] = df_anal.loc["차입이자율", "1순위"]
+
     df_anal.loc["영업이익", "예상"] = 영업이익_est
     df_anal.loc["비영업이익", "예상"] = 비영업이익_est
     df_anal.loc["이자비용", "예상"] = 이자비용_est
@@ -479,8 +484,10 @@ def price_analysis(
     df_rim.loc["ROE"] = (
         df_rim.loc["지배주주지분순이익"] / df_rim.loc["지배주주지분(평균)"]
     )
-    # 과거 실제 ROE로 앞 3개 컬럼 덮어씀
-    df_rim.loc["ROE"].iloc[:3] = df_snap["Annual"].loc["ROE"].iloc[:3]
+    # 과거 실제 ROE로 앞 3개 컬럼 덮어씀 (Copy-on-Write 호환)
+    for i in range(min(3, len(df_rim.columns))):
+        col_name = df_rim.columns[i]
+        df_rim.loc["ROE", col_name] = df_snap["Annual"].loc["ROE"].iloc[i]
 
     # 기준 지배주주지분 결정
     if finaldata_cnt == 2:
