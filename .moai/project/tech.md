@@ -45,6 +45,13 @@
 - **sse-starlette** - Server-Sent Events for DB update progress streaming
 - **pydantic** - Data validation (bundled with FastAPI)
 
+### fnguide Package Dependencies
+
+- **requests** - HTTP client for comp.fnguide.com crawling
+- **pandas** - DataFrame operations for financial data parsing
+- **beautifulsoup4** - HTML parsing for financial statements
+- **lxml** - HTML parser backend
+
 ### New Frontend Dependencies
 
 - **react**, **react-dom** - UI framework
@@ -258,8 +265,11 @@ The existing `registry.py` uses a global singleton pattern with lazy initializat
 
 ### Current State
 
-- No automated tests (0% coverage)
-- Manual testing via Jupyter notebooks for my_chart package
+- **fnguide package:** 50 tests (pytest), ~93% coverage
+  - 38 tests for core fnguide analysis (parser, crawler, analysis, analyzer)
+  - 12 tests for dashboard activity ratios (SPEC-DASHBOARD-002)
+  - Session-scope fixtures caching HTTP results for fast re-runs
+- **my_chart package:** Manual testing via Jupyter notebooks
 
 ### Target Approach
 

@@ -106,15 +106,34 @@ class FiveQuestionsSchema(BaseModel):
     verdict: Literal["양호", "보통", "주의"]
 
 
+class ActivityRatiosSchema(BaseModel):
+    """Section 8: Activity ratios and cash conversion cycle (4 years)."""
+
+    receivable_turnover: list[float | None]
+    receivable_days: list[int | None]
+    inventory_turnover: list[float | None]
+    inventory_days: list[int | None]
+    payable_turnover: list[float | None]
+    payable_days: list[int | None]
+    ccc: list[int | None]
+    asset_turnover: list[float | None]
+    periods: list[str]
+
+
 class AnalysisResponse(BaseModel):
-    """Response payload for GET /api/analysis/{code}."""
+    """Response payload for GET /api/analysis/{code}.
+
+    Sections 2-8 are optional: None when data is unavailable
+    (e.g. financial companies with incompatible B/S structure).
+    """
 
     code: str
     company_name: str
-    business_performance: BusinessPerformanceSchema
-    health_indicators: HealthIndicatorsSchema
-    balance_sheet: BalanceSheetSchema
-    rate_decomposition: RateDecompositionSchema
-    profit_waterfall: ProfitWaterfallSchema
-    trend_signals: TrendSignalsSchema
-    five_questions: FiveQuestionsSchema
+    business_performance: BusinessPerformanceSchema | None = None
+    health_indicators: HealthIndicatorsSchema | None = None
+    balance_sheet: BalanceSheetSchema | None = None
+    rate_decomposition: RateDecompositionSchema | None = None
+    profit_waterfall: ProfitWaterfallSchema | None = None
+    trend_signals: TrendSignalsSchema | None = None
+    five_questions: FiveQuestionsSchema | None = None
+    activity_ratios: ActivityRatiosSchema | None = None

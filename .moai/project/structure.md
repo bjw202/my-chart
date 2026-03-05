@@ -37,12 +37,14 @@ kr-stock-screener/
 │   │   ├── chart.py            # GET /api/chart/{code}
 │   │   ├── db.py               # POST /api/db/update, GET /api/db/status, /last-updated
 │   │   ├── screen.py           # POST /api/screen
-│   │   └── sectors.py          # GET /api/sectors
+│   │   ├── sectors.py          # GET /api/sectors
+│   │   └── analysis.py         # GET /api/analysis/{code}
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── chart.py            # ChartDataResponse, OHLCV models
 │   │   ├── screen.py           # ScreenRequest, ScreenResponse, FilterCondition
-│   │   └── db.py               # UpdateStatus, LastUpdated
+│   │   ├── db.py               # UpdateStatus, LastUpdated
+│   │   └── analysis.py         # AnalysisResponse, ActivityRatiosSchema, etc.
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── chart_service.py    # Bridges my_chart.price/db -> API response
@@ -65,7 +67,8 @@ kr-stock-screener/
 │       │   ├── chart.ts        # Chart data API
 │       │   ├── screen.ts       # Screen filter API
 │       │   ├── db.ts           # DB update API
-│       │   └── sectors.ts      # Sector list API
+│       │   ├── sectors.ts      # Sector list API
+│       │   └── analysis.ts     # Financial analysis API
 │       ├── components/
 │       │   ├── FilterBar/      # Top filter area
 │       │   │   ├── FilterBar.tsx
@@ -85,16 +88,19 @@ kr-stock-screener/
 │       │   │   ├── SectorGroup.tsx     # Collapsible sector header + stocks
 │       │   │   ├── StockItem.tsx
 │       │   │   └── useStockNavigation.ts  # Keyboard navigation hook
+│       │   ├── AnalysisModal.tsx  # S-RIM financial analysis modal (8 sections)
 │       │   └── StatusBar/      # Bottom status bar
 │       │       └── StatusBar.tsx
 │       ├── hooks/
 │       │   ├── useScrollSync.ts        # Chart <-> StockList sync
 │       │   ├── useScreenResults.ts     # Filter state + API call
-│       │   └── useDbUpdate.ts          # SSE-based update progress
+│       │   ├── useDbUpdate.ts          # SSE-based update progress
+│       │   └── useAnalysis.ts          # Financial analysis data fetching
 │       ├── types/
 │       │   ├── stock.ts
 │       │   ├── filter.ts
-│       │   └── chart.ts
+│       │   ├── chart.ts
+│       │   └── analysis.ts            # Financial analysis TypeScript interfaces
 │       └── styles/
 │           └── global.css
 │
@@ -155,6 +161,7 @@ kr-stock-screener/
 | `GET /api/db/status` | db.py | db_service.py | SSE progress stream |
 | `GET /api/db/last-updated` | db.py | db_service.py | DB file metadata query |
 | `GET /api/sectors` | sectors.py | sector_service.py | `get_stock_registry()`, `add_sector_info()` |
+| `GET /api/analysis/{code}` | analysis.py | — (direct) | `fnguide.dashboard.analyze_dashboard()` |
 
 ## Frontend Component Hierarchy
 
@@ -180,11 +187,12 @@ App
 
 ## Module Organization
 
-The project follows a **3-tier architecture**:
+The project follows a **4-tier architecture**:
 
-1. **Presentation Layer** (frontend/) - React UI with chart visualization and filter controls
+1. **Presentation Layer** (frontend/) - React UI with chart visualization, filter controls, and financial analysis modal
 2. **API Layer** (backend/) - FastAPI routers, Pydantic schemas, service bridge functions
 3. **Data Layer** (my_chart/) - Existing Python library for data acquisition, computation, and storage
+4. **Financial Analysis Layer** (fnguide/) - Independent financial analysis package crawling comp.fnguide.com for S-RIM dashboard data
 
 ### Backend Service Layer Pattern
 

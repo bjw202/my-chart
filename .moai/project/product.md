@@ -22,6 +22,16 @@
 
 6. **Technical Pattern Builder** - Condition builder UI for constructing custom technical patterns: `[Indicator A] [Operator] [Indicator B or Constant] [x Multiplier]`. Supports price, MA(10/20/50/100/200) as indicators with >, <, >=, <=, and proximity(%) operators. Up to 3 patterns combinable with AND/OR
 
+7. **Financial Analysis Modal** - Comprehensive S-RIM financial dashboard accessible per stock via fnguide data. 8-section analysis covering:
+   - Section 1: 사업 실적 (Business Performance) — 매출/영업이익/순이익 추이, YoY 성장률, 이익률, 이익의 질
+   - Section 2: 건전성 지표 (Health Indicators) — 부채비율, 유동비율, 이자보상배율 등 재무 건전성
+   - Section 3: 자본 구조 (Balance Sheet) — 조달(부채/자본) vs 운용(자산) 시각화
+   - Section 4: 수익률 분해 (Rate Decomposition) — ROE 분해, 가중평균 ROE, 스프레드 분석
+   - Section 5: 이익 워터폴 (Profit Waterfall) — 매출 → 영업이익 → 순이익 폭포 차트
+   - Section 6: 활동성 비율 (Activity Ratios) — 매출채권/재고/매입채무 회전율, CCC 타임라인 그래픽
+   - Section 7: 추세 신호 (Trend Signals) — 주요 재무 추세 방향 시그널
+   - Section 8: 5대 질문 (Five Questions) — 종합 투자 체크리스트 (양호/보통/주의)
+
 ## Target Users
 
 - Korean stock market investors running a local screening tool on their machine
@@ -88,6 +98,7 @@ The following `my_chart` package functions serve as the backend data layer:
 | POST | `/api/screen` | Apply filter conditions, return filtered stock list |
 | GET | `/api/chart/{code}` | Stock chart data (OHLCV + MA) |
 | GET | `/api/sectors` | Sector list for filter dropdown |
+| GET | `/api/analysis/{code}` | Comprehensive financial analysis (8-section S-RIM dashboard) |
 
 ## Market Coverage
 

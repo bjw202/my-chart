@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from fnguide.dashboard import (
+    _calc_activity_ratios,
     _calc_balance_sheet,
     _calc_five_questions,
     _calc_profit_waterfall,
@@ -73,12 +74,17 @@ def _make_df_fs_ann() -> pd.DataFrame:
         "자산", "부채", "자본",
         "영업활동으로인한현금흐름",
         "단기사채", "단기차입금", "유동금융부채", "사채", "장기차입금",
+        "매출채권및기타유동채권", "재고자산", "매입채무및기타유동채무", "매출원가",
     ]
     data = {
-        "2020/12": [10000, 500, 400, 20000, 8000, 12000, 600, 0, 100, 50, 200, 150],
-        "2021/12": [11000, 600, 470, 21000, 8500, 12500, 700, 0, 120, 60, 180, 140],
-        "2022/12": [12000, 700, 555, 22000, 9000, 13000, 750, 0, 110, 55, 170, 130],
-        "2023/12": [13000, 800, 650, 23000, 9500, 13500, 900, 0, 100, 50, 160, 120],
+        "2020/12": [10000, 500, 400, 20000, 8000, 12000, 600, 0, 100, 50, 200, 150,
+                    1000, 800, 900, 7000],
+        "2021/12": [11000, 600, 470, 21000, 8500, 12500, 700, 0, 120, 60, 180, 140,
+                    1100, 850, 950, 7500],
+        "2022/12": [12000, 700, 555, 22000, 9000, 13000, 750, 0, 110, 55, 170, 130,
+                    1200, 900, 1000, 8000],
+        "2023/12": [13000, 800, 650, 23000, 9500, 13500, 900, 0, 100, 50, 160, 120,
+                    1300, 950, 1050, 8500],
     }
     return pd.DataFrame(data, index=rows, columns=cols)
 
@@ -387,3 +393,137 @@ class TestBalanceSheetUnit:
             assert len(vals) == n
         for vals in bs.assets.values():
             assert len(vals) == n
+
+
+# ─────────────────────────────────────────────────────────────
+# _calc_activity_ratios (unit) — SPEC-DASHBOARD-002
+# ─────────────────────────────────────────────────────────────
+
+
+class TestActivityRatiosUnit:
+    @pytest.fixture()
+    def ar(self):
+        df_fs_ann = _make_df_fs_ann()
+        return _calc_activity_ratios(df_fs_ann)
+
+    def test_structure(self, ar):
+        """REQ-17: ActivityRatios has all expected fields."""
+        assert len(ar.periods) == 4
+        assert len(ar.receivable_turnover) == 4
+        assert len(ar.receivable_days) == 4
+        assert len(ar.inventory_turnover) == 4
+        assert len(ar.inventory_days) == 4
+        assert len(ar.payable_turnover) == 4
+        assert len(ar.payable_days) == 4
+        assert len(ar.ccc) == 4
+        assert len(ar.asset_turnover) == 4
+
+    def test_first_year_none(self, ar):
+        """First year has no prior data => all None."""
+        assert ar.receivable_turnover[0] is None
+        assert ar.receivable_days[0] is None
+        assert ar.inventory_turnover[0] is None
+        assert ar.inventory_days[0] is None
+        assert ar.payable_turnover[0] is None
+        assert ar.payable_days[0] is None
+        assert ar.ccc[0] is None
+        assert ar.asset_turnover[0] is None
+
+    def test_receivable_turnover(self, ar):
+        """REQ-18: receivable_turnover[1] = 11000 / avg(1000, 1100) = 11000/1050."""
+        expected = round(11000 / 1050, 2)
+        assert ar.receivable_turnover[1] == pytest.approx(expected)
+
+    def test_receivable_days(self, ar):
+        """REQ-18: days = round(365 / turnover)."""
+        turnover = ar.receivable_turnover[1]
+        assert turnover is not None
+        assert ar.receivable_days[1] == round(365 / turnover)
+
+    def test_inventory_turnover(self, ar):
+        """REQ-19: inventory_turnover[1] = 7500 / avg(800, 850) = 7500/825."""
+        expected = round(7500 / 825, 2)
+        assert ar.inventory_turnover[1] == pytest.approx(expected)
+
+    def test_inventory_days(self, ar):
+        """REQ-19: days = round(365 / turnover)."""
+        turnover = ar.inventory_turnover[1]
+        assert turnover is not None
+        assert ar.inventory_days[1] == round(365 / turnover)
+
+    def test_payable_turnover(self, ar):
+        """REQ-20: payable_turnover[1] = 7500 / avg(900, 950) = 7500/925."""
+        expected = round(7500 / 925, 2)
+        assert ar.payable_turnover[1] == pytest.approx(expected)
+
+    def test_payable_days(self, ar):
+        """REQ-20: days = round(365 / turnover)."""
+        turnover = ar.payable_turnover[1]
+        assert turnover is not None
+        assert ar.payable_days[1] == round(365 / turnover)
+
+    def test_ccc(self, ar):
+        """REQ-21: CCC = receivable_days + inventory_days - payable_days."""
+        for i in range(1, 4):
+            rd = ar.receivable_days[i]
+            id_ = ar.inventory_days[i]
+            pd_ = ar.payable_days[i]
+            if rd is not None and id_ is not None and pd_ is not None:
+                assert ar.ccc[i] == rd + id_ - pd_
+
+    def test_asset_turnover(self, ar):
+        """REQ-21: asset_turnover[1] = 11000 / avg(20000, 21000) = 11000/20500."""
+        expected = round(11000 / 20500, 2)
+        assert ar.asset_turnover[1] == pytest.approx(expected)
+
+    def test_missing_row(self):
+        """REQ-17 edge case: missing row => None values."""
+        cols = ["2020/12", "2021/12"]
+        data = {
+            "2020/12": [10000, 5000, 20000],
+            "2021/12": [11000, 5500, 21000],
+        }
+        df = pd.DataFrame(data, index=["매출액", "매출원가", "자산"], columns=cols)
+        ar = _calc_activity_ratios(df)
+        # No receivable/inventory/payable rows => all None
+        assert all(v is None for v in ar.receivable_turnover)
+        assert all(v is None for v in ar.inventory_turnover)
+        assert all(v is None for v in ar.payable_turnover)
+        assert all(v is None for v in ar.ccc)
+        # Asset turnover should still work for year 1
+        assert ar.asset_turnover[0] is None
+        assert ar.asset_turnover[1] is not None
+
+    def test_samsung_verification(self):
+        """SPEC section 4.3: Samsung 005930 verification (3rd year)."""
+        cols = ["2020/12", "2021/12", "2022/12", "2023/12"]
+        data = {
+            "2020/12": [0, 0, 0, 0, 0, 0],
+            "2021/12": [3022314, 1900418, 418708, 521879, 587468, 4484245],
+            "2022/12": [2589355, 1803886, 432806, 516259, 535497, 4559060],
+            "2023/12": [3008709, 1865623, 532460, 517549, 615226, 5145319],
+        }
+        rows = ["매출액", "매출원가", "매출채권및기타유동채권",
+                "재고자산", "매입채무및기타유동채무", "자산"]
+        df = pd.DataFrame(data, index=rows, columns=cols)
+        ar = _calc_activity_ratios(df)
+        # 3rd year (index 2): 2022/12
+        # avg_receivable = (418708 + 432806) / 2 = 425757
+        # turnover = 2589355 / 425757 = 6.08
+        assert ar.receivable_turnover[2] == pytest.approx(6.08, abs=0.01)
+        assert ar.receivable_days[2] == round(365 / ar.receivable_turnover[2])
+        # 4th year (index 3): 2023/12 (the SPEC verification year)
+        # avg_receivable = (432806 + 532460) / 2 = 482633
+        # turnover = 3008709 / 482633 = 6.23
+        assert ar.receivable_turnover[3] == pytest.approx(6.23, abs=0.01)
+        assert ar.receivable_days[3] == round(365 / ar.receivable_turnover[3])
+        # inventory: avg = (516259 + 517549) / 2 = 516904, turnover = 1865623/516904 = 3.61
+        assert ar.inventory_turnover[3] == pytest.approx(3.61, abs=0.01)
+        assert ar.inventory_days[3] == round(365 / ar.inventory_turnover[3])
+        # payable: avg = (535497 + 615226) / 2 = 575361.5, turnover = 1865623/575361.5 = 3.24
+        assert ar.payable_turnover[3] == pytest.approx(3.24, abs=0.01)
+        assert ar.payable_days[3] == round(365 / ar.payable_turnover[3])
+        # CCC = 59 + 101 - 113 = 47
+        assert ar.ccc[3] == ar.receivable_days[3] + ar.inventory_days[3] - ar.payable_days[3]
+        # asset_turnover: avg = (4559060 + 5145319) / 2 = 4852189.5
+        assert ar.asset_turnover[3] == pytest.approx(0.62, abs=0.01)

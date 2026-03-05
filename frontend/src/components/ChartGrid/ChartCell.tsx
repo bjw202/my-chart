@@ -7,6 +7,8 @@ import type { StockItem } from '../../types/stock'
 import { useWatchlist } from '../../contexts/WatchlistContext'
 import { usePriceRangeMeasure } from '../../hooks/usePriceRangeMeasure'
 import { PriceRangeOverlay } from './PriceRangeOverlay'
+import { useAnalysis } from '../../hooks/useAnalysis'
+import { AnalysisModal } from '../AnalysisModal'
 
 interface ChartCellProps {
   stock: StockItem
@@ -38,6 +40,23 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
   const [error, setError] = useState<string | null>(null)
   const { isChecked, toggleStock } = useWatchlist()
   const checked = isChecked(stock.code)
+  const { state: analysisState, load: loadAnalysis, reset: resetAnalysis } = useAnalysis()
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const handleOpenAnalysis = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setModalOpen(true)
+    loadAnalysis(stock.code)
+  }, [stock.code, loadAnalysis])
+
+  const handleCloseAnalysis = useCallback(() => {
+    setModalOpen(false)
+    resetAnalysis()
+  }, [resetAnalysis])
+
+  const handleRetryAnalysis = useCallback(() => {
+    loadAnalysis(stock.code)
+  }, [stock.code, loadAnalysis])
 
   const { phase, result, toggleMeasure, reset: resetMeasure } = usePriceRangeMeasure(
     chartApi,
@@ -246,6 +265,13 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           {checked ? '\u2713' : '+'}
         </button>
         <button
+          className="chart-cell-fs-btn"
+          onClick={handleOpenAnalysis}
+          title="재무 분석"
+        >
+          FS
+        </button>
+        <button
           className="chart-cell-tr-btn"
           onClick={(e) => {
             e.stopPropagation()
@@ -277,6 +303,18 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
         <div className="chart-cell-overlay chart-cell-overlay--error">
           <span>{error}</span>
         </div>
+      )}
+
+      {modalOpen && analysisState.status !== 'idle' && (
+        <AnalysisModal
+          code={stock.code}
+          companyName={stock.name}
+          status={analysisState.status}
+          data={analysisState.status === 'success' ? analysisState.data : null}
+          errorMessage={analysisState.status === 'error' ? analysisState.message : ''}
+          onClose={handleCloseAnalysis}
+          onRetry={handleRetryAnalysis}
+        />
       )}
     </div>
   )

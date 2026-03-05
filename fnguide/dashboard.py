@@ -149,18 +149,42 @@ class FiveQuestions:
 
 
 @dataclass
+class ActivityRatios:
+    """Section 8: Activity ratios and cash conversion cycle (4 years).
+
+    Turnover values as float (회), days as int.
+    First year is None for all metrics (requires prior year for averaging).
+    """
+
+    receivable_turnover: list[float | None]
+    receivable_days: list[int | None]
+    inventory_turnover: list[float | None]
+    inventory_days: list[int | None]
+    payable_turnover: list[float | None]
+    payable_days: list[int | None]
+    ccc: list[int | None]
+    asset_turnover: list[float | None]
+    periods: list[str]
+
+
+@dataclass
 class DashboardResult:
-    """Complete S-RIM financial dashboard result for a single stock."""
+    """Complete S-RIM financial dashboard result for a single stock.
+
+    Sections 2-8 are optional: None when data is unavailable
+    (e.g. financial companies with incompatible B/S structure).
+    """
 
     code: str
     company_name: str
-    business_performance: BusinessPerformance
-    health_indicators: HealthIndicators
-    balance_sheet: BalanceSheet
-    rate_decomposition: RateDecomposition
-    profit_waterfall: ProfitWaterfall
-    trend_signals: TrendSignals
-    five_questions: FiveQuestions
+    business_performance: BusinessPerformance | None = None
+    health_indicators: HealthIndicators | None = None
+    balance_sheet: BalanceSheet | None = None
+    rate_decomposition: RateDecomposition | None = None
+    profit_waterfall: ProfitWaterfall | None = None
+    trend_signals: TrendSignals | None = None
+    five_questions: FiveQuestions | None = None
+    activity_ratios: ActivityRatios | None = None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -739,6 +763,94 @@ def _calc_five_questions(
     return FiveQuestions(questions=questions, verdict=verdict)
 
 
+def _calc_activity_ratios(df_fs_ann: pd.DataFrame) -> ActivityRatios:
+    """Compute Section 8: Activity ratios and cash conversion cycle."""
+    col = list(df_fs_ann.columns)
+    n = len(col)
+
+    receivable = _safe_loc(df_fs_ann, "매출채권및기타유동채권")
+    inventory = _safe_loc(df_fs_ann, "재고자산")
+    payable = _safe_loc(df_fs_ann, "매입채무및기타유동채무")
+    cogs_row = _safe_loc(df_fs_ann, "매출원가")
+    revenue_row = _safe_loc(df_fs_ann, "매출액")
+    asset_row = _safe_loc(df_fs_ann, "자산")
+
+    rec_turnover: list[float | None] = []
+    rec_days: list[int | None] = []
+    inv_turnover: list[float | None] = []
+    inv_days: list[int | None] = []
+    pay_turnover: list[float | None] = []
+    pay_days: list[int | None] = []
+    ast_turnover: list[float | None] = []
+    ccc_list: list[int | None] = []
+
+    for i in range(n):
+        c = col[i]
+
+        # Receivable turnover
+        rt = None
+        rd = None
+        if i > 0 and receivable is not None and revenue_row is not None:
+            avg = (float(receivable[col[i - 1]]) + float(receivable[c])) / 2
+            rev = float(revenue_row[c])
+            if avg > 0:
+                rt = round(rev / avg, 2)
+                rd = round(365 / rt)
+        rec_turnover.append(rt)
+        rec_days.append(rd)
+
+        # Inventory turnover
+        it = None
+        id_ = None
+        if i > 0 and inventory is not None and cogs_row is not None:
+            avg = (float(inventory[col[i - 1]]) + float(inventory[c])) / 2
+            cogs = float(cogs_row[c])
+            if avg > 0 and cogs > 0:
+                it = round(cogs / avg, 2)
+                id_ = round(365 / it)
+        inv_turnover.append(it)
+        inv_days.append(id_)
+
+        # Payable turnover
+        pt = None
+        pd_ = None
+        if i > 0 and payable is not None and cogs_row is not None:
+            avg = (float(payable[col[i - 1]]) + float(payable[c])) / 2
+            cogs = float(cogs_row[c])
+            if avg > 0 and cogs > 0:
+                pt = round(cogs / avg, 2)
+                pd_ = round(365 / pt)
+        pay_turnover.append(pt)
+        pay_days.append(pd_)
+
+        # Asset turnover
+        at = None
+        if i > 0 and asset_row is not None and revenue_row is not None:
+            avg = (float(asset_row[col[i - 1]]) + float(asset_row[c])) / 2
+            rev = float(revenue_row[c])
+            if avg > 0:
+                at = round(rev / avg, 2)
+        ast_turnover.append(at)
+
+        # CCC
+        if rd is not None and id_ is not None and pd_ is not None:
+            ccc_list.append(rd + id_ - pd_)
+        else:
+            ccc_list.append(None)
+
+    return ActivityRatios(
+        receivable_turnover=rec_turnover,
+        receivable_days=rec_days,
+        inventory_turnover=inv_turnover,
+        inventory_days=inv_days,
+        payable_turnover=pay_turnover,
+        payable_days=pay_days,
+        ccc=ccc_list,
+        asset_turnover=ast_turnover,
+        periods=[str(c) for c in col],
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Main API
 # ─────────────────────────────────────────────────────────────
@@ -749,13 +861,13 @@ def analyze_dashboard(code: str) -> DashboardResult:
 
     # @MX:ANCHOR: [AUTO] Primary dashboard computation function
     # @MX:REASON: Called by backend API service layer (fan_in >= 3 expected)
-    # @MX:SPEC: SPEC-DASHBOARD-001
+    # @MX:SPEC: SPEC-DASHBOARD-001, SPEC-DASHBOARD-002
 
     Args:
         code: 6-digit KRX stock code (e.g., '005930').
 
     Returns:
-        DashboardResult with 7 analysis sections.
+        DashboardResult with 8 analysis sections.
 
     Raises:
         ValueError: if code is not 6 digits.
@@ -766,7 +878,6 @@ def analyze_dashboard(code: str) -> DashboardResult:
 
     # Data acquisition
     df_fs_ann, df_fs_quar, _, _, _, report, _ = get_fnguide(code)  # type: ignore[misc]
-    df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
 
     col = list(df_fs_ann.columns)
     col_recent = col[-1]  # Most recent year (e.g., '2023/12')
@@ -774,26 +885,52 @@ def analyze_dashboard(code: str) -> DashboardResult:
     # Company name from report
     company_name = str(report.get("종목명", code))
 
+    # Financial companies (banks, insurance) may lack standard rows like '매출액'.
+    # Wrap each section in try/except to return partial results.
+    business_performance: BusinessPerformance | None = None
+    health_indicators: HealthIndicators | None = None
+    balance_sheet: BalanceSheet | None = None
+    rate_decomposition: RateDecomposition | None = None
+    profit_waterfall: ProfitWaterfall | None = None
+    trend_signals: TrendSignals | None = None
+    five_questions: FiveQuestions | None = None
+    activity_ratios: ActivityRatios | None = None
+
     # Section 1
-    business_performance = _calc_business_performance(df_fs_ann)
+    try:
+        business_performance = _calc_business_performance(df_fs_ann)
+    except Exception:
+        pass
 
-    # Section 2
-    health_indicators = _calc_health_indicators(df_anal, df_invest, df_fs_ann, col_recent)
+    # Sections 2-7 depend on fs_analysis which may fail for financial companies
+    try:
+        df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
 
-    # Section 3
-    balance_sheet = _calc_balance_sheet(df_financing, df_invest, col)
+        # Section 2
+        health_indicators = _calc_health_indicators(df_anal, df_invest, df_fs_ann, col_recent)
 
-    # Section 4
-    rate_decomposition = _calc_rate_decomposition(df_anal, report)
+        # Section 3
+        balance_sheet = _calc_balance_sheet(df_financing, df_invest, col)
 
-    # Section 5
-    profit_waterfall = _calc_profit_waterfall(df_anal)
+        # Section 4
+        rate_decomposition = _calc_rate_decomposition(df_anal, report)
 
-    # Section 6
-    trend_signals = _calc_trend_signals(df_anal, df_fs_ann)
+        # Section 5
+        profit_waterfall = _calc_profit_waterfall(df_anal)
 
-    # Section 7
-    five_questions = _calc_five_questions(df_anal, df_fs_ann, col_recent)
+        # Section 6
+        trend_signals = _calc_trend_signals(df_anal, df_fs_ann)
+
+        # Section 7
+        five_questions = _calc_five_questions(df_anal, df_fs_ann, col_recent)
+    except Exception:
+        pass
+
+    # Section 8 (depends only on df_fs_ann, independent of fs_analysis)
+    try:
+        activity_ratios = _calc_activity_ratios(df_fs_ann)
+    except Exception:
+        pass
 
     return DashboardResult(
         code=code,
@@ -805,4 +942,5 @@ def analyze_dashboard(code: str) -> DashboardResult:
         profit_waterfall=profit_waterfall,
         trend_signals=trend_signals,
         five_questions=five_questions,
+        activity_ratios=activity_ratios,
     )

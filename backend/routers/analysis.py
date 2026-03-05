@@ -7,6 +7,7 @@ import re
 from fastapi import APIRouter, HTTPException
 
 from backend.schemas.analysis import (
+    ActivityRatiosSchema,
     AnalysisResponse,
     BalanceSheetSchema,
     BusinessPerformanceSchema,
@@ -29,7 +30,10 @@ _CODE_PATTERN = re.compile(r"^\d{6}$")
 
 
 def _to_response(result: DashboardResult) -> AnalysisResponse:
-    """Convert DashboardResult dataclass to Pydantic AnalysisResponse."""
+    """Convert DashboardResult dataclass to Pydantic AnalysisResponse.
+
+    Handles optional (None) sections for financial companies.
+    """
     bp = result.business_performance
     hi = result.health_indicators
     bs = result.balance_sheet
@@ -55,7 +59,7 @@ def _to_response(result: DashboardResult) -> AnalysisResponse:
             yoy_op=bp.yoy_op,
             yoy_ni=bp.yoy_ni,
             profit_quality=bp.profit_quality,
-        ),
+        ) if bp else None,
         health_indicators=HealthIndicatorsSchema(
             indicators=[
                 HealthIndicatorSchema(
@@ -66,12 +70,12 @@ def _to_response(result: DashboardResult) -> AnalysisResponse:
                 )
                 for ind in hi.indicators
             ]
-        ),
+        ) if hi else None,
         balance_sheet=BalanceSheetSchema(
             periods=bs.periods,
             financing=bs.financing,
             assets=bs.assets,
-        ),
+        ) if bs else None,
         rate_decomposition=RateDecompositionSchema(
             periods=rd.periods,
             operating_asset_return=rd.operating_asset_return,
@@ -81,13 +85,13 @@ def _to_response(result: DashboardResult) -> AnalysisResponse:
             weighted_avg_roe=rd.weighted_avg_roe,
             ke=rd.ke,
             spread=rd.spread,
-        ),
+        ) if rd else None,
         profit_waterfall=ProfitWaterfallSchema(
             steps=[
                 ProfitWaterfallStepSchema(name=s.name, value=s.value)
                 for s in pw.steps
             ]
-        ),
+        ) if pw else None,
         trend_signals=TrendSignalsSchema(
             signals=[
                 TrendSignalSchema(
@@ -97,7 +101,7 @@ def _to_response(result: DashboardResult) -> AnalysisResponse:
                 )
                 for s in ts.signals
             ]
-        ),
+        ) if ts else None,
         five_questions=FiveQuestionsSchema(
             questions=[
                 FiveQuestionSchema(
@@ -108,7 +112,18 @@ def _to_response(result: DashboardResult) -> AnalysisResponse:
                 for q in fq.questions
             ],
             verdict=fq.verdict,
-        ),
+        ) if fq else None,
+        activity_ratios=ActivityRatiosSchema(
+            receivable_turnover=ar.receivable_turnover,
+            receivable_days=ar.receivable_days,
+            inventory_turnover=ar.inventory_turnover,
+            inventory_days=ar.inventory_days,
+            payable_turnover=ar.payable_turnover,
+            payable_days=ar.payable_days,
+            ccc=ar.ccc,
+            asset_turnover=ar.asset_turnover,
+            periods=ar.periods,
+        ) if (ar := result.activity_ratios) else None,
     )
 
 
