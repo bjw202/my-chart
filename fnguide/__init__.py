@@ -11,6 +11,21 @@ from .analysis import (
     calc_weight_coeff,
     fs_analysis,
 )
+from .dashboard import (
+    BalanceSheet,
+    BusinessPerformance,
+    DashboardResult,
+    FiveQuestion,
+    FiveQuestions,
+    HealthIndicator,
+    HealthIndicators,
+    ProfitWaterfall,
+    ProfitWaterfallStep,
+    RateDecomposition,
+    TrendSignal,
+    TrendSignals,
+    analyze_dashboard,
+)
 from .crawler import (
     get_fnguide,
     read_consensus,
@@ -39,6 +54,20 @@ __all__ = [
     # analysis
     "calc_weight_coeff",
     "fs_analysis",
+    # dashboard
+    "BalanceSheet",
+    "BusinessPerformance",
+    "DashboardResult",
+    "FiveQuestion",
+    "FiveQuestions",
+    "HealthIndicator",
+    "HealthIndicators",
+    "ProfitWaterfall",
+    "ProfitWaterfallStep",
+    "RateDecomposition",
+    "TrendSignal",
+    "TrendSignals",
+    "analyze_dashboard",
     # parser
     "convert_string_to_number",
     "remove_E",

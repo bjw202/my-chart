@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from my_chart.registry import get_sector_registry, get_stock_registry
+from backend.routers.analysis import router as analysis_router
 from backend.routers.chart import router as chart_router
 from backend.routers.db import router as db_router
 from backend.routers.screen import router as screen_router
@@ -49,6 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(analysis_router, prefix="/api")
 app.include_router(chart_router, prefix="/api")
 app.include_router(db_router, prefix="/api")
 app.include_router(screen_router, prefix="/api")

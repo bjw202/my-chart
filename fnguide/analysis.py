@@ -39,7 +39,7 @@ def calc_weight_coeff(date_columns: pd.Index) -> tuple[float, float, float, floa
 def fs_analysis(
     df_fs_ann: pd.DataFrame,
     df_fs_quar: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """재무제표 기반 종합 재무 분석을 수행한다.
 
     분석 단계:
@@ -54,7 +54,7 @@ def fs_analysis(
         df_fs_quar: FnGuide 분기 재무제표 DataFrame (read_fs 결과)
 
     Returns:
-        (df_anal, df_invest)
+        (df_anal, df_invest, df_financing)
     """
     # ─────────────────────────────────────────────────────────────
     # 1. 자금조달 분석
@@ -314,4 +314,4 @@ def fs_analysis(
     df_anal.loc["비지배주주순이익", "예상"] = 비지배주주순이익_est
     df_anal.loc["지배주주ROE", "예상"] = 지배주주ROE_est
 
-    return df_anal, df_invest
+    return df_anal, df_invest, df_financing
