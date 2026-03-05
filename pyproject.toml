@@ -52,6 +52,10 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "live: 라이브 HTTP 요청이 필요한 테스트",
+    "slow: 실행 시간이 긴 테스트 (크롤링 포함)",
+]
 
 [tool.mypy]
 python_version = "3.13"
