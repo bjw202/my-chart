@@ -879,6 +879,12 @@ html, body, #root {
 
 .analysis-modal-title {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analysis-modal-title-row {
+  display: flex;
   align-items: baseline;
   gap: 8px;
 }
@@ -897,6 +903,19 @@ html, body, #root {
 .analysis-modal-subtitle {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.analysis-modal-sector {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.analysis-modal-sector-sep {
+  color: var(--border);
+  margin: 0 2px;
 }
 
 .analysis-modal-close {

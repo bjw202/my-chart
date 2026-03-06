@@ -110,7 +110,7 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
     """
     where_sql, params = _build_where(req)
     query = f"""
-        SELECT code, name, market, market_cap, sector_major, sector_minor,
+        SELECT code, name, market, market_cap, sector_major, sector_minor, product,
                close, change_1d, rs_12m, ema10, ema20, sma50, sma100, sma200
         FROM stock_meta
         WHERE {where_sql}
@@ -126,7 +126,7 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
     # Group by "sector_major > sector_minor"
     sector_map: dict[str, list[StockItem]] = defaultdict(list)
     for row in rows:
-        code, name, market, market_cap, sector_major, sector_minor, close, chg1d, rs12m, e10, e20, s50, s100, s200 = row
+        code, name, market, market_cap, sector_major, sector_minor, product, close, chg1d, rs12m, e10, e20, s50, s100, s200 = row
         item = StockItem(
             code=code,
             name=name,
@@ -134,6 +134,7 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
             market_cap=market_cap,
             sector_major=sector_major,
             sector_minor=sector_minor,
+            product=product,
             close=close,
             change_1d=chg1d,
             rs_12m=rs12m,

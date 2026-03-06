@@ -7,6 +7,7 @@ export interface StockItem {
   market_cap: number | null
   sector_major: string | null
   sector_minor: string | null
+  product: string | null
   close: number | null
   change_1d: number | null
   rs_12m: number | null

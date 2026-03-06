@@ -47,6 +47,7 @@ class StockItem(BaseModel):
     market_cap: int | None = None
     sector_major: str | None = None
     sector_minor: str | None = None
+    product: str | None = None
     close: float | None = None
     change_1d: float | None = None
     rs_12m: float | None = None

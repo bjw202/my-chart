@@ -696,6 +696,9 @@ function ModalError({ message, onRetry }: { message: string; onRetry: () => void
 interface AnalysisModalProps {
   code: string
   companyName: string
+  sectorMajor?: string | null
+  sectorMinor?: string | null
+  product?: string | null
   status: 'loading' | 'success' | 'error'
   data: AnalysisResponse | null
   errorMessage: string
@@ -708,6 +711,9 @@ interface AnalysisModalProps {
 export function AnalysisModal({
   code,
   companyName,
+  sectorMajor,
+  sectorMinor,
+  product,
   status,
   data,
   errorMessage,
@@ -744,9 +750,20 @@ export function AnalysisModal({
       <div className="analysis-modal">
         <div className="analysis-modal-header">
           <div className="analysis-modal-title">
-            <span className="analysis-modal-name">{companyName}</span>
-            <span className="analysis-modal-code">{code}</span>
-            <span className="analysis-modal-subtitle">재무 분석</span>
+            <div className="analysis-modal-title-row">
+              <span className="analysis-modal-name">{companyName}</span>
+              <span className="analysis-modal-code">{code}</span>
+              <span className="analysis-modal-subtitle">재무 분석</span>
+            </div>
+            {sectorMajor && (
+              <div className="analysis-modal-sector">
+                {sectorMajor}
+                {sectorMinor && <span className="analysis-modal-sector-sep">›</span>}
+                {sectorMinor && sectorMinor}
+                {product && <span className="analysis-modal-sector-sep">›</span>}
+                {product && product}
+              </div>
+            )}
           </div>
           <button className="analysis-modal-close" onClick={onClose} aria-label="닫기">
             ✕

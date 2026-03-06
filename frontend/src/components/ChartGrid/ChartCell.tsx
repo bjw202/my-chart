@@ -309,6 +309,9 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
         <AnalysisModal
           code={stock.code}
           companyName={stock.name}
+          sectorMajor={stock.sector_major}
+          sectorMinor={stock.sector_minor}
+          product={stock.product}
           status={analysisState.status}
           data={analysisState.status === 'success' ? analysisState.data : null}
           errorMessage={analysisState.status === 'error' ? analysisState.message : ''}
