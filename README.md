@@ -70,7 +70,7 @@ KRX_PW=your_krx_password
 
 만약 KRX 로그인이 실패하거나 환경변수가 설정되지 않으면:
 1. pykrx 호출 시도 (인증 없음)
-2. 실패 시 `Input/sectormap_original.xlsx`의 D-day 컬럼 사용
+2. 실패 시 `Input/sectormap.xlsx`의 D-day 컬럼 사용
 3. 폴백 데이터도 없으면 빈 DataFrame 반환
 
 ### 첫 실행
@@ -82,7 +82,7 @@ KRX_PW=your_krx_password
 ## 주요 기능
 
 - **필터 시스템**: 시가총액, 기간수익률(1D/1W/1M/3M), 기술적 패턴 빌더, RS점수, 시장, 섹터 필터
-- **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, 마지막 캔들 5봉 여백
+- **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선), 마지막 캔들 5봉 여백
 - **등락폭 측정**: 차트 위 두 지점 클릭으로 가격 등락률(%) 표시, 셀별 독립 동작 (아래 상세 설명 참고)
 - **종목 리스트**: 섹터 그룹별 가상화 리스트, 키보드 네비게이션
 - **스크롤 동기화**: 차트 그리드와 종목 리스트 간 양방향 동기화 (화살표 페이지 이동 시 자동 스크롤 연동)
@@ -146,7 +146,7 @@ pytest tests/ -q
 ## 설정
 
 ### Input 디렉토리
-주식 정보는 `Input/sectormap_original.xlsx`에서 로드합니다:
+주식 정보는 `Input/sectormap.xlsx`에서 로드합니다:
 - KOSPI 주식 (~833개)
 - KOSDAQ 주식 (~1,719개)
 - 섹터 분류 정보

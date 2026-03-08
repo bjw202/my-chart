@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-08
+
+### Added
+
+- **RS Line (상대강도선) 차트 오버레이** (SPEC-RS-LINE-001)
+  - `my_chart/db/daily.py`: RS_Line 컬럼 추가 및 계산 로직
+    - KOSPI 지수 데이터 자동 조회
+    - 매일 RS_Line = 종목 종가 / KOSPI 종가 계산
+    - NULL 값에 대한 폴백 처리
+  - `backend/schemas/chart.py`: ChartResponse에 `rs_line` 필드 추가
+  - `backend/services/chart_service.py`: 일일/주간 차트 API에 RS_Line 데이터 포함
+  - `frontend/src/types/chart.ts`: ChartResponse 인터페이스에 `rs_line` 추가
+  - `frontend/src/components/ChartGrid/ChartCell.tsx`: RS Line 시각화
+    - IBD 스타일 숨겨진 Y축 표시
+    - 반투명 자주색(rgba(108, 92, 231, 0.5)) 렌더링
+    - 토글 버튼으로 표시/숨기기 (세션 기간만 유지)
+  - 주간 차트에도 동일하게 적용되는 일관된 스타일
+
 ## [1.0.0] - 2026-03-04
 
 ### Added
