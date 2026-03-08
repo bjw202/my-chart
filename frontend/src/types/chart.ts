@@ -36,6 +36,7 @@ export interface ChartResponse {
   candles: CandleBar[]
   volume: VolumeBar[]
   ma: MAOverlay
+  rs_line: MAPoint[]
 }
 
 // DB update types (mirroring backend schemas/db.py)

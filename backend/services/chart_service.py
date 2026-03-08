@@ -33,15 +33,29 @@ def get_chart_data(code: str, daily_db_path: str) -> ChartResponse:
     name: str = meta_row[0]
 
     try:
-        rows = conn.execute(
-            """SELECT Date, Open, High, Low, Close, VolumeWon,
-                      EMA10, EMA20, SMA50, SMA100, SMA200
-               FROM stock_prices
-               WHERE Name = ?
-               ORDER BY Date DESC
-               LIMIT 504""",  # 2 years for stable SMA200, frontend shows recent 10 months
-            (name,),
-        ).fetchall()
+        try:
+            rows = conn.execute(
+                """SELECT Date, Open, High, Low, Close, VolumeWon,
+                          EMA10, EMA20, SMA50, SMA100, SMA200, RS_Line
+                   FROM stock_prices
+                   WHERE Name = ?
+                   ORDER BY Date DESC
+                   LIMIT 504""",  # 2 years for stable SMA200, frontend shows recent 10 months
+                (name,),
+            ).fetchall()
+            has_rs_line = True
+        except sqlite3.OperationalError:
+            # RS_Line 컬럼이 없는 구버전 DB
+            rows = conn.execute(
+                """SELECT Date, Open, High, Low, Close, VolumeWon,
+                          EMA10, EMA20, SMA50, SMA100, SMA200
+                   FROM stock_prices
+                   WHERE Name = ?
+                   ORDER BY Date DESC
+                   LIMIT 504""",
+                (name,),
+            ).fetchall()
+            has_rs_line = False
     finally:
         conn.close()
 
@@ -58,9 +72,14 @@ def get_chart_data(code: str, daily_db_path: str) -> ChartResponse:
     sma50_series: list[MAPoint] = []
     sma100_series: list[MAPoint] = []
     sma200_series: list[MAPoint] = []
+    rs_line_series: list[MAPoint] = []
 
     for row in rows:
-        date, o, h, lo, c, vw, e10, e20, s50, s100, s200 = row
+        if has_rs_line:
+            date, o, h, lo, c, vw, e10, e20, s50, s100, s200, rs = row
+        else:
+            date, o, h, lo, c, vw, e10, e20, s50, s100, s200 = row
+            rs = None
         candles.append(CandleBar(time=date, open=o, high=h, low=lo, close=c))
         # VolumeWon is already in 억원 (HLC * Volume / 1_0000_0000)
         trading_value = round(vw, 1) if vw else 0.0
@@ -76,6 +95,8 @@ def get_chart_data(code: str, daily_db_path: str) -> ChartResponse:
             sma100_series.append(MAPoint(time=date, value=s100))
         if s200 is not None:
             sma200_series.append(MAPoint(time=date, value=s200))
+        if rs is not None:
+            rs_line_series.append(MAPoint(time=date, value=rs))
 
     return ChartResponse(
         timeframe="daily",
@@ -88,6 +109,7 @@ def get_chart_data(code: str, daily_db_path: str) -> ChartResponse:
             sma100=sma100_series,
             sma200=sma200_series,
         ),
+        rs_line=rs_line_series,
     )
 
 
@@ -115,15 +137,29 @@ def get_weekly_chart_data(code: str, daily_db_path: str, weekly_db_path: str) ->
 
     weekly_conn = get_db_conn(weekly_db_path)
     try:
-        rows = weekly_conn.execute(
-            """SELECT Date, Open, High, Low, Close, Volume, VolumeSMA10,
-                      SMA10, SMA20, SMA40
-               FROM stock_prices
-               WHERE Name = ?
-               ORDER BY Date DESC
-               LIMIT 200""",  # ~4 years of weekly data
-            (name,),
-        ).fetchall()
+        try:
+            rows = weekly_conn.execute(
+                """SELECT Date, Open, High, Low, Close, Volume, VolumeSMA10,
+                          SMA10, SMA20, SMA40, RS_Line
+                   FROM stock_prices
+                   WHERE Name = ?
+                   ORDER BY Date DESC
+                   LIMIT 200""",  # ~4 years of weekly data
+                (name,),
+            ).fetchall()
+            has_rs_line_w = True
+        except sqlite3.OperationalError:
+            # RS_Line 컬럼이 없는 구버전 주간 DB
+            rows = weekly_conn.execute(
+                """SELECT Date, Open, High, Low, Close, Volume, VolumeSMA10,
+                          SMA10, SMA20, SMA40
+                   FROM stock_prices
+                   WHERE Name = ?
+                   ORDER BY Date DESC
+                   LIMIT 200""",
+                (name,),
+            ).fetchall()
+            has_rs_line_w = False
     finally:
         weekly_conn.close()
 
@@ -137,9 +173,14 @@ def get_weekly_chart_data(code: str, daily_db_path: str, weekly_db_path: str) ->
     sma10_series: list[MAPoint] = []
     sma20_series: list[MAPoint] = []
     sma40_series: list[MAPoint] = []
+    rs_line_w_series: list[MAPoint] = []
 
     for row in rows:
-        date, o, h, lo, c, vol, _, s10, s20, s40 = row
+        if has_rs_line_w:
+            date, o, h, lo, c, vol, _, s10, s20, s40, rs_w = row
+        else:
+            date, o, h, lo, c, vol, _, s10, s20, s40 = row
+            rs_w = None
         candles.append(CandleBar(time=date, open=o, high=h, low=lo, close=c))
         # Weekly volume is raw share count (not VolumeWon)
         volume.append(VolumeBar(time=date, value=float(vol) if vol else 0.0))
@@ -150,6 +191,8 @@ def get_weekly_chart_data(code: str, daily_db_path: str, weekly_db_path: str) ->
             sma20_series.append(MAPoint(time=date, value=s20))
         if s40 is not None:
             sma40_series.append(MAPoint(time=date, value=s40))
+        if rs_w is not None:
+            rs_line_w_series.append(MAPoint(time=date, value=rs_w))
 
     return ChartResponse(
         timeframe="weekly",
@@ -160,4 +203,5 @@ def get_weekly_chart_data(code: str, daily_db_path: str, weekly_db_path: str) ->
             sma20=sma20_series,
             sma40=sma40_series,
         ),
+        rs_line=rs_line_w_series,
     )

@@ -53,3 +53,4 @@ class ChartResponse(BaseModel):
     candles: list[CandleBar]
     volume: list[VolumeBar]
     ma: MAOverlays
+    rs_line: list[MAPoint] = []

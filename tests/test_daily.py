@@ -19,11 +19,11 @@ class TestDailyCols:
 
         assert isinstance(_DAILY_COLS, tuple)
 
-    def test_daily_cols_has_26_elements(self):
-        # SMA100 was added for REQ-011 (SMA100 column in daily DB)
+    def test_daily_cols_has_27_elements(self):
+        # RS_Line 컬럼 추가: SMA100(REQ-011) + RS_Line(SPEC-RS-LINE-001)
         from my_chart.db.daily import _DAILY_COLS
 
-        assert len(_DAILY_COLS) == 26
+        assert len(_DAILY_COLS) == 27
 
     def test_daily_cols_first_is_name(self):
         from my_chart.db.daily import _DAILY_COLS

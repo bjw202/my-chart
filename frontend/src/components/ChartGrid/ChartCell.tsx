@@ -34,10 +34,12 @@ const MA_COLORS_WEEKLY: Record<string, string> = {
 export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const rsLineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   const [chartApi, setChartApi] = useState<IChartApi | null>(null)
   const [candleSeriesApi, setCandleSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showRsLine, setShowRsLine] = useState(true)
   const { isChecked, toggleStock } = useWatchlist()
   const checked = isChecked(stock.code)
   const { state: analysisState, load: loadAnalysis, reset: resetAnalysis } = useAnalysis()
@@ -130,6 +132,21 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
       })
     }
 
+    // RS Line 시리즈: 별도 가격 스케일(rs-line)에 표시
+    const rsLineSeries = chart.addLineSeries({
+      color: 'rgba(108, 92, 231, 0.5)',
+      lineWidth: 2,
+      priceScaleId: 'rs-line',
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    })
+    chart.priceScale('rs-line').applyOptions({
+      scaleMargins: { top: 0.1, bottom: 0.3 },
+      visible: false,
+    })
+    rsLineSeriesRef.current = rsLineSeries
+
     setCandleSeriesApi(candleSeries)
 
     fetchChartData(stock.code, timeframe)
@@ -151,6 +168,11 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           if (maData && maData.length > 0) {
             series.setData(maData.filter((p) => p.value !== null))
           }
+        }
+
+        // RS Line 데이터 설정
+        if (data.rs_line && data.rs_line.length > 0) {
+          rsLineSeries.setData(data.rs_line)
         }
 
         // Set initial visible range: 200 bars for both daily (~10 months) and weekly (~4 years)
@@ -191,10 +213,18 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
       resizeObserver.disconnect()
       chart.remove()
       chartRef.current = null
+      rsLineSeriesRef.current = null
       setChartApi(null)
       setCandleSeriesApi(null)
     }
   }, [stock.code, timeframe])
+
+  // RS Line 표시/숨김 토글
+  useEffect(() => {
+    if (rsLineSeriesRef.current) {
+      rsLineSeriesRef.current.applyOptions({ visible: showRsLine })
+    }
+  }, [showRsLine])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -253,6 +283,16 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           title="등락폭 측정 (M)"
         >
           %
+        </button>
+        <button
+          className={`chart-cell-rs-line-btn${showRsLine ? ' chart-cell-rs-line-btn--on' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowRsLine((prev) => !prev)
+          }}
+          title="RS Line 표시/숨김"
+        >
+          RS
         </button>
         <button
           className={`chart-cell-check-btn${checked ? ' chart-cell-check-btn--on' : ''}`}

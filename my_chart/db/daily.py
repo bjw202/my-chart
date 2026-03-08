@@ -15,7 +15,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -37,6 +37,7 @@ _DAILY_COLS = (
     "DailyRange", "HLC",
     "FromEMA10", "FromEMA20", "FromSMA50", "FromSMA200",
     "Range", "ADR20",
+    "RS_Line",
 )
 
 
@@ -62,6 +63,7 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
             DailyRange REAL, HLC REAL,
             FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
             Range REAL, ADR20 REAL,
+            RS_Line REAL,
             PRIMARY KEY (Name, Date)
         )"""
     )
@@ -76,6 +78,11 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE stock_prices ADD COLUMN SMA100 REAL")
     except sqlite3.OperationalError:
         pass  # Column already exists
+    # RS_Line 컬럼 마이그레이션
+    try:
+        conn.execute("ALTER TABLE stock_prices ADD COLUMN RS_Line REAL")
+    except sqlite3.OperationalError:
+        pass  # 컬럼이 이미 존재하는 경우
     conn.commit()
 
 
@@ -93,7 +100,9 @@ def _sanitize_ohlc(price: pd.DataFrame) -> pd.DataFrame:
 
 # @MX:WARN: [AUTO] ThreadPoolExecutor worker with blocking time.sleep(0.1)
 # @MX:REASON: Sleep throttles Naver API rate (~100 req/min) but wastes worker thread time
-def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
+def _fetch_daily_stock(
+    company: str, start: str, kospi_close: "pd.Series | None" = None
+) -> tuple[str, list[tuple]]:
     """Fetch daily data for one stock and calculate indicators (thread-safe)."""
     try:
         price = price_naver(company, start, freq="day")
@@ -130,35 +139,51 @@ def _fetch_daily_stock(company: str, start: str) -> tuple[str, list[tuple]]:
         price["Range"] = 100 * (price["High"] / price["Low"] - 1)
         price["ADR20"] = price["Range"].rolling(window=20).mean()
 
+        # RS_Line 계산: 주가 종가 / KOSPI 종가
+        if kospi_close is not None and not price.empty:
+            price["RS_Line"] = price["Close"] / kospi_close.reindex(price.index)
+        else:
+            price["RS_Line"] = float("nan")  # 스칼라 NaN을 전체 행에 브로드캐스트
+
         rows = []
         for index, row in price.iterrows():
+            # pandas-stubs에서 row[key]의 반환 타입이 Any로 좁혀지지 않으므로
+            # Any로 명시적 캐스팅 후 float() 호출
+            r: Any = row
+            # RS_Line: NaN → None (SQLite NULL)
+            rs_raw: float | None = r["RS_Line"]
+            if rs_raw is None:
+                rs_line_value: float | None = None
+            else:
+                rs_line_value = None if rs_raw != rs_raw else rs_raw  # NaN != NaN
             rows.append((
                 company,
                 index.strftime("%Y-%m-%d"),  # type: ignore[union-attr]
-                float(row["Open"]),
-                float(row["High"]),
-                float(row["Low"]),
-                float(row["Close"]),
-                float(row["Change(%)"]),
-                float(row["High_52w"]),
-                float(row["Volume"]),
-                float(row["Volume20MA"]),
-                float(row["VolumeWon"]),
-                float(row["EMA10"]),
-                float(row["EMA20"]),
-                float(row["SMA21"]),
-                float(row["SMA50"]),
-                float(row["EMA65"]),
-                float(row["SMA100"]),
-                float(row["SMA200"]),
-                float(row["DailyRange(%)"]),
-                float(row["HLC"]),
-                float(row["FromEMA10(%)"]),
-                float(row["FromEMA20(%)"]),
-                float(row["FromSMA50(%)"]),
-                float(row["FromSMA200(%)"]),
-                float(row["Range"]),
-                float(row["ADR20"]),
+                float(r["Open"]),
+                float(r["High"]),
+                float(r["Low"]),
+                float(r["Close"]),
+                float(r["Change(%)"]),
+                float(r["High_52w"]),
+                float(r["Volume"]),
+                float(r["Volume20MA"]),
+                float(r["VolumeWon"]),
+                float(r["EMA10"]),
+                float(r["EMA20"]),
+                float(r["SMA21"]),
+                float(r["SMA50"]),
+                float(r["EMA65"]),
+                float(r["SMA100"]),
+                float(r["SMA200"]),
+                float(r["DailyRange(%)"]),
+                float(r["HLC"]),
+                float(r["FromEMA10(%)"]),
+                float(r["FromEMA20(%)"]),
+                float(r["FromSMA50(%)"]),
+                float(r["FromSMA200(%)"]),
+                float(r["Range"]),
+                float(r["ADR20"]),
+                rs_line_value,
             ))
 
         time.sleep(API_THROTTLE_SLEEP)
@@ -188,13 +213,22 @@ def price_daily_db(
     total = len(companies)
     print(f"[daily] Fetching data for {total} stocks with {max_workers} workers...")
 
+    # KOSPI 일별 종가 데이터 수집 (RS_Line 계산용) — ThreadPoolExecutor 시작 전에 반드시 실행
+    kospi_close = None
+    try:
+        kospi_df = price_naver("KOSPI", start, freq="day")
+        if kospi_df is not None and not kospi_df.empty:
+            kospi_close: Any = kospi_df["Close"]
+    except Exception as e:
+        logger.warning("KOSPI 데이터 수집 실패: %s", e)
+
     all_rows: list[tuple] = []
     done_count = 0
     placeholders = ", ".join(["?"] * len(_DAILY_COLS))
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_fetch_daily_stock, comp, start): comp
+            executor.submit(_fetch_daily_stock, comp, start, kospi_close): comp
             for comp in companies
         }
         for future in as_completed(futures):
