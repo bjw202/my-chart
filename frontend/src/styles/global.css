@@ -384,6 +384,7 @@ html, body, #root {
 
 .chart-cell-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chart-cell-code { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.chart-cell-group { font-size: 10px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .chart-cell-change { font-size: 11px; white-space: nowrap; }
 .chart-cell-rs { font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
 .chart-cell-rs--high { color: #ef5350; }

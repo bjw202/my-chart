@@ -271,6 +271,11 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
         <div className="chart-cell-info">
           <span className="chart-cell-name">{stock.name}</span>
           <span className="chart-cell-code">{stock.code}</span>
+          {stock.sector_major && (
+            <span className="chart-cell-group">
+              {stock.sector_minor ? `${stock.sector_major} > ${stock.sector_minor}` : stock.sector_major}
+            </span>
+          )}
           <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
           <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
         </div>
