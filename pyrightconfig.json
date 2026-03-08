@@ -1,0 +1,12 @@
+{
+  "pythonPath": ".venv/bin/python",
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.13",
+  "include": [
+    "fnguide",
+    "my_chart",
+    "backend"
+  ],
+  "reportMissingModuleSource": "none"
+}
