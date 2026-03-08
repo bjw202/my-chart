@@ -4,7 +4,7 @@
 
 ### Backend (Python)
 
-- **Python 3.11+** - Runtime for backend API and existing data library
+- **Python 3.13** - Runtime for backend API and existing data library
 - **FastAPI** - Async web framework for REST API endpoints
 - **uvicorn** - ASGI server for running FastAPI application
 - **my_chart package** - Existing data acquisition, indicators, screening, DB modules
@@ -12,7 +12,7 @@
 
 ### Frontend (TypeScript)
 
-- **React 18+** - UI component library
+- **React 19** - UI component library
 - **Vite** - Build tool and dev server with HMR
 - **TypeScript** - Type-safe frontend development
 - **TradingView Lightweight Charts** - Open-source financial charting library (npm: `lightweight-charts`)
@@ -64,7 +64,7 @@
 
 ### Python Environment
 
-- Python 3.11+ (recommended: 3.13)
+- Python 3.13+
 - Virtual environment (venv or conda)
 - pip for package management
 
@@ -91,8 +91,9 @@
 - RS scores per stock per date
 - RS = (Stock return / KOSPI return) * 100
 
-**daily_price.db:**
-- Per-stock tables with columns: Date, Open, High, Low, Close, Volume, EMA10, EMA20, SMA50, SMA200, volume indicators, range indicators
+**daily_price.db (`stock_prices` table, unified schema):**
+- Columns: Date, Open, High, Low, Close, Change, High52W, Volume, Volume20MA, VolumeWon, EMA10, EMA20, SMA21, SMA50, EMA65, SMA100, SMA200, DailyRange, HLC, FromEMA10, FromEMA20, FromSMA50, FromSMA200, Range, ADR20, RS_Line
+- RS_Line = stock Close / KOSPI Close (NULL when KOSPI data unavailable)
 
 ### Schema Enhancement: Market Cap Storage
 
@@ -265,11 +266,10 @@ The existing `registry.py` uses a global singleton pattern with lazy initializat
 
 ### Current State
 
-- **fnguide package:** 50 tests (pytest), ~93% coverage
-  - 38 tests for core fnguide analysis (parser, crawler, analysis, analyzer)
-  - 12 tests for dashboard activity ratios (SPEC-DASHBOARD-002)
-  - Session-scope fixtures caching HTTP results for fast re-runs
-- **my_chart package:** Manual testing via Jupyter notebooks
+- **Total:** 374 tests (pytest), 4 skipped (pre-existing)
+- **fnguide package:** ~50 tests — core analysis, dashboard activity ratios (SPEC-DASHBOARD-002)
+- **my_chart / backend:** DB schema, RS Line, KRX auth, chart service tests
+- Session-scope fixtures caching HTTP results for fast re-runs
 
 ### Target Approach
 

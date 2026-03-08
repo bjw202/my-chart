@@ -12,7 +12,7 @@
 
 1. **Filter System** - Complex multi-condition screening with market cap ranges, period-based return thresholds (1D/1W/1M/3M), technical pattern builder (price vs MA comparisons with AND/OR logic), RS score filters, market selection (KOSPI/KOSDAQ), and sector/theme multi-select
 
-2. **Chart Grid** - TradingView Lightweight Charts displayed in 2x2 or 3x3 grid layout with daily candlestick, moving averages (10/20/50/100/200), and volume bars. Memory-optimized with viewport-only rendering and chart instance destruction on scroll-out
+2. **Chart Grid** - TradingView Lightweight Charts displayed in 2x2 or 3x3 grid layout with daily candlestick, moving averages (10/20/50/100/200), volume bars, and RS Line overlay (stock Close / KOSPI Close ratio, IBD-style purple line with independent hidden Y-axis). Memory-optimized with viewport-only rendering and chart instance destruction on scroll-out. Per-cell header shows stock name, code, sector group (대>중 format matching right-panel grouping), daily change%, and RS score
 
 3. **Stock List** - Right sidebar showing filtered stocks grouped by sector (sectormap `산업명(대)` + `산업명(중)`), sorted by market cap within groups, with collapse/expand headers, keyboard navigation, and display of stock name, code, daily change, and RS score
 
@@ -22,7 +22,7 @@
 
 6. **Technical Pattern Builder** - Condition builder UI for constructing custom technical patterns: `[Indicator A] [Operator] [Indicator B or Constant] [x Multiplier]`. Supports price, MA(10/20/50/100/200) as indicators with >, <, >=, <=, and proximity(%) operators. Up to 3 patterns combinable with AND/OR
 
-7. **Financial Analysis Modal** - Comprehensive S-RIM financial dashboard accessible per stock via fnguide data. 8-section analysis covering:
+7. **Financial Analysis Modal** - Comprehensive S-RIM financial dashboard accessible per stock via FS button. Modal header displays company name, code, sector (산업명(대)), and primary product (주요제품). 8-section analysis covering:
    - Section 1: 사업 실적 (Business Performance) — 매출/영업이익/순이익 추이, YoY 성장률, 이익률, 이익의 질
    - Section 2: 건전성 지표 (Health Indicators) — 부채비율, 유동비율, 이자보상배율 등 재무 건전성
    - Section 3: 자본 구조 (Balance Sheet) — 조달(부채/자본) vs 운용(자산) 시각화

@@ -82,7 +82,8 @@ KRX_PW=your_krx_password
 ## 주요 기능
 
 - **필터 시스템**: 시가총액, 기간수익률(1D/1W/1M/3M), 기술적 패턴 빌더, RS점수, 시장, 섹터 필터
-- **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선), 마지막 캔들 5봉 여백
+- **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선, 종가/KOSPI 비율), 마지막 캔들 5봉 여백
+- **차트 헤더**: 종목명 · 종목코드 · 섹터그룹(대>중) · 등락률 · RS 점수 한눈에 표시
 - **등락폭 측정**: 차트 위 두 지점 클릭으로 가격 등락률(%) 표시, 셀별 독립 동작 (아래 상세 설명 참고)
 - **종목 리스트**: 섹터 그룹별 가상화 리스트, 키보드 네비게이션
 - **스크롤 동기화**: 차트 그리드와 종목 리스트 간 양방향 동기화 (화살표 페이지 이동 시 자동 스크롤 연동)
@@ -97,8 +98,9 @@ KRX_PW=your_krx_password
 | GET | `/api/db/status` | DB 업데이트 진행률 (SSE 스트림) |
 | GET | `/api/db/last-updated` | 마지막 업데이트 시각 및 DB 기준 최종 데이터 날짜 |
 | POST | `/api/screen` | 필터 적용, 섹터별 그룹 결과 반환 |
-| GET | `/api/chart/{code}` | 종목 차트 데이터 (OHLCV + MA 오버레이) |
+| GET | `/api/chart/{code}` | 종목 차트 데이터 (OHLCV + MA 오버레이 + RS Line) |
 | GET | `/api/sectors` | 필터 드롭다운용 섹터 목록 |
+| GET | `/api/analysis/{code}` | 종목 재무 분석 (S-RIM 8개 섹션 대시보드) |
 
 ## 필터 유형
 
@@ -122,7 +124,7 @@ KRX_PW=your_krx_password
 my_chart/           # 기존 Python 데이터 라이브러리 (가격, 지표, DB)
 backend/            # FastAPI API 레이어 (routers, schemas, services)
 frontend/           # React + Vite + TypeScript UI
-tests/              # pytest 테스트 (166개)
+tests/              # pytest 테스트 (374개)
 ```
 
 ## 테스트
