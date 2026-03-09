@@ -16,13 +16,15 @@
 
 3. **Stock List** - Right sidebar showing filtered stocks grouped by sector (sectormap `산업명(대)` + `산업명(중)`), sorted by market cap within groups, with collapse/expand headers, keyboard navigation, and display of stock name, code, daily change, and RS score
 
-4. **Scroll Sync** - Bidirectional synchronization between stock list and chart grid. Clicking a stock navigates to its chart page, keyboard arrows auto-advance chart pages, and chart page changes scroll the stock list
+4. **Scroll Sync** - Bidirectional synchronization between stock list and chart grid. Clicking a stock navigates to its chart page, left/right arrow keys (← →) and pagination buttons advance chart pages, and chart page changes scroll the stock list
 
 5. **DB Update** - One-click batch update of all stock data (daily/weekly OHLCV + moving averages + RS scores + market cap) via background task with progress bar and SSE-based status push. Recommended frequency: once daily after market close
 
-6. **Technical Pattern Builder** - Condition builder UI for constructing custom technical patterns: `[Indicator A] [Operator] [Indicator B or Constant] [x Multiplier]`. Supports price, MA(10/20/50/100/200) as indicators with >, <, >=, <=, and proximity(%) operators. Up to 3 patterns combinable with AND/OR
+6. **Price Range Measurement** - Interactive price range measurement tool (TradingView-style). Click `%` button or press `M` to activate. First click sets start point, second click locks result showing price diff and percent change. Supports continuous measurement: clicking after a locked result immediately starts new measurement from that click point. Per-cell independent operation, no shared state.
 
-7. **Financial Analysis Modal** - Comprehensive S-RIM financial dashboard accessible per stock via FS button. Modal header displays company name, code, sector (산업명(대)), and primary product (주요제품). 8-section analysis covering:
+7. **Technical Pattern Builder** - Condition builder UI for constructing custom technical patterns: `[Indicator A] [Operator] [Indicator B or Constant] [x Multiplier]`. Supports price, MA(10/20/50/100/200) as indicators with >, <, >=, <=, and proximity(%) operators. Up to 3 patterns combinable with AND/OR
+
+8. **Financial Analysis Modal** - Comprehensive S-RIM financial dashboard accessible per stock via FS button. Modal header displays company name, code, sector (산업명(대)), and primary product (주요제품). 8-section analysis covering:
    - Section 1: 사업 실적 (Business Performance) — 매출/영업이익/순이익 추이, YoY 성장률, 이익률, 이익의 질
    - Section 2: 건전성 지표 (Health Indicators) — 부채비율, 유동비율, 이자보상배율 등 재무 건전성
    - Section 3: 자본 구조 (Balance Sheet) — 조달(부채/자본) vs 운용(자산) 시각화
