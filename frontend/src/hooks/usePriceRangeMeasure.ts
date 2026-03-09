@@ -75,6 +75,15 @@ export function usePriceRangeMeasure(
 
       const point: MeasurePoint = { price, time: param.time, logical }
 
+      if (currentPhase === 'locked') {
+        // 측정 완료 상태에서 클릭 → 해당 위치를 시작점으로 새 측정 시작
+        startPointRef.current = point
+        phaseRef.current = 'measuring'
+        setPhase('measuring')
+        setResult(null)
+        return
+      }
+
       if (currentPhase === 'measuring' && !startPointRef.current) {
         startPointRef.current = point
       } else if (currentPhase === 'measuring' && startPointRef.current) {
