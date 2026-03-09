@@ -166,13 +166,17 @@ def _extract_snap_table(df_temp: pd.DataFrame) -> pd.DataFrame:
     return df_temp.drop((col_name1, col_name2), axis=1)  # type: ignore[arg-type]
 
 
-def read_fs(code: str) -> tuple[str, pd.DataFrame, pd.DataFrame]:
+def read_fs(
+    code: str,
+) -> tuple[str, pd.DataFrame, pd.DataFrame, pd.DataFrame | None]:
     """FnGuide 재무제표 페이지를 크롤링한다.
 
     테이블 순서: 0=연간손익, 1=분기손익, 2=연간재무, 3=분기재무, 4=연간현금, 5=분기현금
 
     Returns:
-        (account_type, df_fs_ann, df_fs_quar)
+        (account_type, df_fs_ann, df_fs_quar, df_yoy_base_ann)
+        - df_yoy_base_ann: 마지막 기간이 불완전 연도(전년동기 비교 필요)일 때
+          '전년동기' 절대값 컬럼 데이터. 불필요 시 None.
     """
     fs_url = _FS_URL.format(code=code)
     fs_page = requests.get(fs_url)
@@ -190,11 +194,25 @@ def read_fs(code: str) -> tuple[str, pd.DataFrame, pd.DataFrame]:
     df_fs_ann = pd.concat([df_bs_ann, df_income_ann, df_cash_ann], sort=False)
     df_fs_quar = pd.concat([df_bs_quar, df_income_quar, df_cash_quar], sort=False)
 
-    # 마지막 2개 컬럼은 예상치 컬럼 — 위치 기반으로 제거
+    # 마지막 2개 컬럼 처리: 예상치 컬럼 또는 전년동기 컬럼 여부를 판별한다.
+    # FnGuide는 불완전 연도(예: 2025/09) 마지막 컬럼 뒤에
+    # '전년동기' 절대값 컬럼과 '전년동기(%)' 컬럼을 삽입한다.
+    df_yoy_base_ann: pd.DataFrame | None = None
+    cols_ann = list(df_fs_ann.columns)
+    if len(cols_ann) >= 2:
+        # 마지막 2개 컬럼명이 '전년동기'를 포함하는지 확인
+        last_col = str(cols_ann[-1])
+        second_last_col = str(cols_ann[-2])
+        if "전년동기" in last_col or "전년동기" in second_last_col:
+            # 절대값 컬럼(% 표기 없는 컬럼)을 전년동기 기준으로 보존
+            # 통상 second_last_col이 절대값, last_col이 (%) 컬럼
+            abs_col = second_last_col if "전년동기" in second_last_col else last_col
+            df_yoy_base_ann = pd.DataFrame(df_fs_ann[[abs_col]])
+
     df_fs_ann = df_fs_ann.iloc[:, :-2]
     df_fs_quar = df_fs_quar.iloc[:, :-2]
 
-    return account_type, df_fs_ann, df_fs_quar
+    return account_type, df_fs_ann, df_fs_quar, df_yoy_base_ann
 
 
 def read_consensus(
@@ -238,7 +256,16 @@ def read_consensus(
 
 def get_fnguide(
     code: str,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict, str]:
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    dict,
+    str,
+    pd.DataFrame | None,
+]:
     """FnGuide 전체 데이터를 수집하는 통합 함수.
 
     read_fs → read_snapshot → read_consensus 순서로 호출하며,
@@ -248,10 +275,12 @@ def get_fnguide(
         code: 종목 코드 (6자리)
 
     Returns:
-        (df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report, account_type)
+        (df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report,
+         account_type, df_yoy_base_ann)
+        - df_yoy_base_ann: 전년동기 절대값 데이터 (불완전 연도가 없으면 None)
     """
     time.sleep(_CRAWL_DELAY)
-    account_type, df_fs_ann, df_fs_quar = read_fs(code)
+    account_type, df_fs_ann, df_fs_quar, df_yoy_base_ann = read_fs(code)
 
     time.sleep(_CRAWL_DELAY)
     report, df_snap, df_snap_ann = read_snapshot(code, account_type)
@@ -259,4 +288,4 @@ def get_fnguide(
     time.sleep(_CRAWL_DELAY)
     df_cons = read_consensus(code, account_type)
 
-    return df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report, account_type
+    return df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report, account_type, df_yoy_base_ann

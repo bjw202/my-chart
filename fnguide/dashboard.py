@@ -259,10 +259,35 @@ def _indicator_status(
 # ─────────────────────────────────────────────────────────────
 
 
+def _is_partial_year(col: list) -> bool:
+    """마지막 기간이 불완전 연도(전년동기 비교 필요)인지 판별한다.
+
+    컬럼명이 'YYYY/MM' 형식이며, 마지막 두 컬럼의 월이 다르면 불완전 연도로 간주한다.
+    예: ['2022/12', '2023/12', '2024/12', '2025/09'] → True (2025년은 9월까지만 집계)
+    """
+    if len(col) < 2:
+        return False
+    last = str(col[-1])
+    prev = str(col[-2])
+    # 'YYYY/MM' 형식에서 월 부분 추출
+    last_parts = last.split("/")
+    prev_parts = prev.split("/")
+    if len(last_parts) == 2 and len(prev_parts) == 2:
+        return last_parts[1] != prev_parts[1]
+    return False
+
+
 def _calc_business_performance(
     df_fs_ann: pd.DataFrame,
+    df_yoy_base: "pd.DataFrame | None" = None,
 ) -> BusinessPerformance:
-    """Compute Section 1: BusinessPerformance from annual financial statements."""
+    """Compute Section 1: BusinessPerformance from annual financial statements.
+
+    Args:
+        df_fs_ann: 연간 재무제표 DataFrame.
+        df_yoy_base: 전년동기 절대값 데이터. 마지막 기간이 불완전 연도일 때
+            YoY 계산에 사용한다. None이면 기존 로직(전 기간 대비)을 유지한다.
+    """
     col = list(df_fs_ann.columns)
 
     revenue = [float(df_fs_ann.loc["매출액", c]) for c in col]
@@ -294,7 +319,15 @@ def _calc_business_performance(
     opm = [op / rev if rev != 0 else 0.0 for op, rev in zip(op_profit, revenue)]
     npm = [cp / rev if rev != 0 else 0.0 for cp, rev in zip(controlling_profit, revenue)]
 
-    # YoY calculations
+    # YoY calculations — 마지막 기간이 불완전 연도이고 전년동기 데이터가 있으면
+    # 전년동기 절대값을 비교 기준으로 사용한다(전년 동기 비교).
+    # 그렇지 않으면 기존 방식(직전 기간 대비)을 적용한다.
+    use_yoy_base = (
+        df_yoy_base is not None
+        and len(col) >= 2
+        and _is_partial_year(col)
+    )
+
     yoy_revenue: list[float | None] = [None]
     yoy_op: list[float | None] = [None]
     yoy_ni: list[float | None] = [None]
@@ -302,6 +335,20 @@ def _calc_business_performance(
         yoy_revenue.append(_yoy(revenue[i], revenue[i - 1]))
         yoy_op.append(_yoy(op_profit[i], op_profit[i - 1]))
         yoy_ni.append(_yoy(net_income[i], net_income[i - 1]))
+
+    # 마지막 기간 YoY를 전년동기 기준으로 재계산한다.
+    if use_yoy_base and df_yoy_base is not None:
+        try:
+            base_series = df_yoy_base.iloc[:, 0]  # 전년동기 절대값 (단일 컬럼)
+            base_revenue = float(base_series.at["매출액"])
+            base_op = float(base_series.at["영업이익"])
+            base_ni = float(base_series.at["당기순이익"])
+            yoy_revenue[-1] = _yoy(revenue[-1], base_revenue)
+            yoy_op[-1] = _yoy(op_profit[-1], base_op)
+            yoy_ni[-1] = _yoy(net_income[-1], base_ni)
+        except (KeyError, IndexError, ValueError):
+            # 전년동기 데이터에 해당 계정이 없으면 기존 방식을 유지한다.
+            pass
 
     # Profit quality = 영업CF / 영업이익
     profit_quality: list[float | None] = []
@@ -877,8 +924,8 @@ def analyze_dashboard(code: str) -> DashboardResult:
     if not code.isdigit() or len(code) != 6:
         raise ValueError(f"Invalid stock code: {code!r}. Must be 6 digits.")
 
-    # Data acquisition
-    df_fs_ann, df_fs_quar, _, _, _, report, _ = get_fnguide(code)  # type: ignore[misc]
+    # Data acquisition — 8번째 요소는 전년동기 절대값 데이터 (불완전 연도 시 존재)
+    df_fs_ann, df_fs_quar, _, _, _, report, _, df_yoy_base_ann = get_fnguide(code)  # type: ignore[misc]
 
     col = list(df_fs_ann.columns)
     col_recent = col[-1]  # Most recent year (e.g., '2023/12')
@@ -897,9 +944,9 @@ def analyze_dashboard(code: str) -> DashboardResult:
     five_questions: FiveQuestions | None = None
     activity_ratios: ActivityRatios | None = None
 
-    # Section 1
+    # Section 1 — 전년동기 데이터를 함께 전달하여 불완전 연도 YoY 보정
     try:
-        business_performance = _calc_business_performance(df_fs_ann)
+        business_performance = _calc_business_performance(df_fs_ann, df_yoy_base_ann)
     except Exception:
         pass
 

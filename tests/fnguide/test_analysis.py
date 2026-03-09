@@ -28,7 +28,7 @@ class TestFsAnalysisStructure:
     @pytest.fixture(scope="class")
     def analysis_result(self, samsung_fs):
         """삼성전자 재무 분석 결과 (pandas 3.0 호환 여부 확인)"""
-        _, df_fs_ann, df_fs_quar = samsung_fs
+        _, df_fs_ann, df_fs_quar, _ = samsung_fs
         try:
             return fs_analysis(df_fs_ann, df_fs_quar), None
         except TypeError as e:
@@ -102,7 +102,7 @@ class TestFsAnalysisRates:
     @pytest.fixture(scope="class")
     def df_anal(self, samsung_fs):
         """삼성전자 df_anal (pandas 3.0 호환 여부 확인)"""
-        _, df_fs_ann, df_fs_quar = samsung_fs
+        _, df_fs_ann, df_fs_quar, _ = samsung_fs
         try:
             df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
             return df_anal
@@ -146,7 +146,7 @@ class TestFsAnalysisPriority:
     @pytest.fixture(scope="class")
     def df_anal(self, samsung_fs):
         """삼성전자 df_anal (pandas 3.0 호환 여부 확인)"""
-        _, df_fs_ann, df_fs_quar = samsung_fs
+        _, df_fs_ann, df_fs_quar, _ = samsung_fs
         try:
             df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
             return df_anal
@@ -191,7 +191,7 @@ class TestFsAnalysisExpected:
     @pytest.fixture(scope="class")
     def df_anal(self, samsung_fs):
         """삼성전자 df_anal (pandas 3.0 호환 여부 확인)"""
-        _, df_fs_ann, df_fs_quar = samsung_fs
+        _, df_fs_ann, df_fs_quar, _ = samsung_fs
         try:
             df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
             return df_anal
@@ -234,7 +234,7 @@ class TestFsAnalysisSeparate:
         candidates = ["003550", "015760", "034020"]
         for code in candidates:
             try:
-                account_type, df_fs_ann, df_fs_quar = read_fs(code)
+                account_type, df_fs_ann, df_fs_quar, _ = read_fs(code)
                 if account_type == "IFRS(별도)":
                     df_anal, _, _ = fs_analysis(df_fs_ann, df_fs_quar)
                     return df_anal, df_fs_ann

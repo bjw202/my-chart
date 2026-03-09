@@ -22,7 +22,7 @@ class TestFsAnalysisCharacterize:
     @pytest.fixture(scope="class")
     def analysis_result(self, samsung_fs):
         """Samsung Electronics financial analysis result."""
-        _, df_fs_ann, df_fs_quar = samsung_fs
+        _, df_fs_ann, df_fs_quar, _ = samsung_fs
         try:
             return fs_analysis(df_fs_ann, df_fs_quar), None
         except Exception as e:

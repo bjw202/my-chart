@@ -98,7 +98,7 @@ class TestBusinessPerformance:
     @pytest.fixture(scope="class")
     def bp(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             return _calc_business_performance(df_fs_ann)
         except Exception as e:
@@ -161,7 +161,7 @@ class TestHealthIndicators:
     @pytest.fixture(scope="class")
     def hi(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             col_recent = list(df_fs_ann.columns)[-1]
@@ -210,7 +210,7 @@ class TestBalanceSheet:
     @pytest.fixture(scope="class")
     def bs(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             col = list(df_fs_ann.columns)
@@ -261,7 +261,7 @@ class TestRateDecomposition:
     @pytest.fixture(scope="class")
     def rd(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             return _calc_rate_decomposition(df_anal, report)
@@ -309,7 +309,7 @@ class TestProfitWaterfall:
     @pytest.fixture(scope="class")
     def pw(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             return _calc_profit_waterfall(df_anal)
@@ -352,7 +352,7 @@ class TestTrendSignals:
     @pytest.fixture(scope="class")
     def ts(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             return _calc_trend_signals(df_anal, df_fs_ann)
@@ -391,7 +391,7 @@ class TestFiveQuestions:
     @pytest.fixture(scope="class")
     def fq(self, samsung_fnguide):
         _require_fnguide(samsung_fnguide)
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             col_recent = list(df_fs_ann.columns)[-1]
@@ -443,7 +443,7 @@ class TestZeroInterestEdgeCase:
         import pandas as pd
         from fnguide.analysis import fs_analysis
 
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = samsung_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = samsung_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
         except Exception as e:
@@ -474,7 +474,7 @@ class TestHynixDashboard:
     @pytest.fixture(scope="class")
     def hynix_sections(self, hynix_fnguide):
         _require_fnguide(hynix_fnguide, "hynix_fnguide")
-        df_fs_ann, df_fs_quar, _, _, _, report, account_type = hynix_fnguide
+        df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = hynix_fnguide
         try:
             df_anal, df_invest, df_financing = fs_analysis(df_fs_ann, df_fs_quar)
             col = list(df_fs_ann.columns)

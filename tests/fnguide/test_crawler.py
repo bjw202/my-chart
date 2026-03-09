@@ -20,18 +20,18 @@ from fnguide.crawler import get_fnguide, read_fs, read_snapshot
 class TestReadFsSamsung:
     """REQ-C-001: 삼성전자 재무제표 크롤링 특성 테스트"""
 
-    def test_characterize_returns_three_tuple(self, samsung_fs):
-        """반환값이 (str, DataFrame, DataFrame) 3-튜플"""
-        assert len(samsung_fs) == 3
+    def test_characterize_returns_four_tuple(self, samsung_fs):
+        """반환값이 (str, DataFrame, DataFrame, DataFrame|None) 4-튜플"""
+        assert len(samsung_fs) == 4
 
     def test_characterize_account_type_ifrs_consolidated(self, samsung_fs):
         """account_type 이 IFRS(연결)"""
-        account_type, _, _ = samsung_fs
+        account_type, _, _, _ = samsung_fs
         assert account_type == "IFRS(연결)"
 
     def test_characterize_ann_has_at_least_four_columns(self, samsung_fs):
         """연간 DataFrame 에 최소 4개 이상의 컬럼"""
-        _, df_fs_ann, _ = samsung_fs
+        _, df_fs_ann, _, _ = samsung_fs
         assert df_fs_ann.shape[1] >= 4
 
     def test_characterize_required_index_items_present(self, samsung_fs):
@@ -40,14 +40,14 @@ class TestReadFsSamsung:
         NOTE: FnGuide 재무제표의 대분류 항목명은 '자산총계/부채총계/자본총계' 가 아닌
         '자산/부채/자본' 으로 표기된다. 실제 크롤링 결과를 기준으로 검증한다.
         """
-        _, df_fs_ann, _ = samsung_fs
+        _, df_fs_ann, _, _ = samsung_fs
         required_accounts = ["매출액", "영업이익", "당기순이익", "자산", "부채", "자본"]
         for account in required_accounts:
             assert account in df_fs_ann.index, f"'{account}' 계정이 재무제표에 없음"
 
     def test_characterize_column_format_yyyy_mm(self, samsung_fs):
         """연간 컬럼명이 'YYYY/MM' 형식"""
-        _, df_fs_ann, _ = samsung_fs
+        _, df_fs_ann, _, _ = samsung_fs
         for col in df_fs_ann.columns:
             parts = str(col).split("/")
             assert len(parts) == 2, f"컬럼 '{col}' 형식이 YYYY/MM 이 아님"
@@ -56,9 +56,15 @@ class TestReadFsSamsung:
 
     def test_characterize_quarterly_dataframe_not_empty(self, samsung_fs):
         """분기 DataFrame 이 비어 있지 않음"""
-        _, _, df_fs_quar = samsung_fs
+        _, _, df_fs_quar, _ = samsung_fs
         assert df_fs_quar.shape[0] > 0
         assert df_fs_quar.shape[1] > 0
+
+    def test_characterize_yoy_base_is_none_or_dataframe(self, samsung_fs):
+        """네 번째 요소(df_yoy_base_ann)는 None 또는 DataFrame"""
+        import pandas as pd
+        _, _, _, df_yoy_base = samsung_fs
+        assert df_yoy_base is None or isinstance(df_yoy_base, pd.DataFrame)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -88,14 +94,14 @@ class TestReadFsSeparate:
         """IFRS(별도) 종목은 account_type이 'IFRS(별도)'"""
         if separate_fs is None:
             pytest.skip("IFRS(별도) 종목을 찾지 못함 — 후보 확장 필요")
-        account_type, _, _ = separate_fs
+        account_type, _, _, _ = separate_fs
         assert account_type == "IFRS(별도)"
 
     def test_characterize_separate_has_required_accounts(self, separate_fs):
         """IFRS(별도) 재무제표에도 기본 계정 존재"""
         if separate_fs is None:
             pytest.skip("IFRS(별도) 종목을 찾지 못함")
-        _, df_fs_ann, _ = separate_fs
+        _, df_fs_ann, _, _ = separate_fs
         required_accounts = ["매출액", "영업이익", "당기순이익"]
         for account in required_accounts:
             assert account in df_fs_ann.index
@@ -209,12 +215,12 @@ class TestGetFnguide:
         except Exception as e:
             return None, str(e)
 
-    def test_characterize_get_fnguide_returns_7_tuple(self, safe_samsung_fnguide):
-        """get_fnguide 반환값이 7-튜플 (pandas 3.0 호환 환경)"""
+    def test_characterize_get_fnguide_returns_8_tuple(self, safe_samsung_fnguide):
+        """get_fnguide 반환값이 8-튜플 (pandas 3.0 호환 환경)"""
         result, error = safe_samsung_fnguide
         if result is None:
             pytest.skip(f"get_fnguide 호환성 문제: {error[:100] if error else ''}")
-        assert len(result) == 7
+        assert len(result) == 8
 
 
 # ─────────────────────────────────────────────────────────────

@@ -156,7 +156,7 @@ def analyze_comp(code: str) -> CompResult:
         CompResult: 재무상태 분석 결과
     """
     # ── 데이터 수집
-    df_fs_ann, df_fs_quar, _, _, _, report, account_type = get_fnguide(code)
+    df_fs_ann, df_fs_quar, _, _, _, report, account_type, _ = get_fnguide(code)
     df_anal, df_invest, _df_financing = fs_analysis(df_fs_ann, df_fs_quar)
 
     col = df_fs_ann.columns  # ['YYYY/MM', 'YYYY/MM', 'YYYY/MM', 'YYYY/MM']
