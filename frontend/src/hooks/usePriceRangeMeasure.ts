@@ -49,7 +49,14 @@ export function usePriceRangeMeasure(
       setResult(null)
       startPointRef.current = null
       phaseRef.current = 'measuring'
+    } else if (phaseRef.current === 'locked') {
+      // 측정 완료 후 % 재클릭 → 새 측정 시작 (idle 경유 없이 바로 measuring)
+      setResult(null)
+      startPointRef.current = null
+      phaseRef.current = 'measuring'
+      setPhase('measuring')
     } else {
+      // measuring 중 % → 취소 후 idle
       reset()
     }
   }, [reset])

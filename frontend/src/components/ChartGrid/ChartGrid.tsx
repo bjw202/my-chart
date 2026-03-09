@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { VariableSizeList } from 'react-window'
 import { useScreen } from '../../contexts/ScreenContext'
 import { useNavigation } from '../../contexts/NavigationContext'
@@ -22,14 +22,30 @@ export function ChartGrid(): React.ReactElement {
 
   const { onPageChange } = useScrollSync(listRef)
 
-  const handlePageChange = (page: number): void => {
+  const handlePageChange = useCallback((page: number): void => {
     goToPage(page)
     onPageChange(page)
-  }
+  }, [goToPage, onPageChange])
 
   const toggleTimeframe = (): void => {
     setTimeframe((prev) => (prev === 'daily' ? 'weekly' : 'daily'))
   }
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (currentPage > 0) handlePageChange(currentPage - 1)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (currentPage < totalPages - 1) handlePageChange(currentPage + 1)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [currentPage, totalPages, handlePageChange])
 
   const cols = gridSize === 4 ? 2 : 3
   const rows = gridSize === 4 ? 2 : 3
