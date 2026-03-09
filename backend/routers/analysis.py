@@ -45,6 +45,7 @@ def _to_response(result: DashboardResult) -> AnalysisResponse:
     return AnalysisResponse(
         code=result.code,
         company_name=result.company_name,
+        summary=result.summary,
         business_performance=BusinessPerformanceSchema(
             periods=bp.periods,
             revenue=bp.revenue,

@@ -89,6 +89,7 @@ export interface ActivityRatios {
 export interface AnalysisResponse {
   code: string
   company_name: string
+  summary: string
   business_performance: BusinessPerformance | null
   health_indicators: HealthIndicators | null
   balance_sheet: BalanceSheet | null

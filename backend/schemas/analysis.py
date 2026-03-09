@@ -129,6 +129,7 @@ class AnalysisResponse(BaseModel):
 
     code: str
     company_name: str
+    summary: str = ""
     business_performance: BusinessPerformanceSchema | None = None
     health_indicators: HealthIndicatorsSchema | None = None
     balance_sheet: BalanceSheetSchema | None = None

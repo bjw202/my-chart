@@ -85,6 +85,17 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
   )
 }
 
+// ── Section 0: 사업 개요 ─────────────────────────────────────────────────────
+
+function SectionBusinessSummary({ summary }: { summary: string }): React.ReactElement {
+  return (
+    <section className="analysis-section">
+      <h2 className="analysis-section-title">사업 개요</h2>
+      <p className="analysis-business-summary">{summary}</p>
+    </section>
+  )
+}
+
 // ── Section 1: 사업 성과 ─────────────────────────────────────────────────────
 
 function SectionBusinessPerformance({ data }: { data: BusinessPerformance }): React.ReactElement {
@@ -775,6 +786,7 @@ export function AnalysisModal({
           {status === 'error' && <ModalError message={errorMessage} onRetry={onRetry} />}
           {status === 'success' && data && (
             <>
+              {data.summary && <SectionBusinessSummary summary={data.summary} />}
               {data.business_performance && <SectionBusinessPerformance data={data.business_performance} />}
               {data.health_indicators && <SectionHealthIndicators data={data.health_indicators} />}
               {data.balance_sheet && <SectionBalanceSheet data={data.balance_sheet} />}

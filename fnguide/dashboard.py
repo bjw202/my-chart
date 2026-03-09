@@ -177,6 +177,7 @@ class DashboardResult:
 
     code: str
     company_name: str
+    summary: str = ""
     business_performance: BusinessPerformance | None = None
     health_indicators: HealthIndicators | None = None
     balance_sheet: BalanceSheet | None = None
@@ -935,6 +936,7 @@ def analyze_dashboard(code: str) -> DashboardResult:
     return DashboardResult(
         code=code,
         company_name=company_name,
+        summary=report.get("Summary", "").strip(),
         business_performance=business_performance,
         health_indicators=health_indicators,
         balance_sheet=balance_sheet,
