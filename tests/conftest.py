@@ -134,9 +134,9 @@ CREATE TABLE IF NOT EXISTS stock_meta (
     chg_1m REAL,
     chg_3m REAL,
     rs_12m REAL,
-    ma50_w REAL,
-    ma150_w REAL,
-    ma200_w REAL,
+    sma10_w REAL,
+    sma20_w REAL,
+    sma40_w REAL,
     last_updated TEXT
 )
 """
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS stock_prices (
     Open REAL, High REAL, Low REAL, Close REAL,
     Volume REAL,
     CHG_1W REAL, CHG_1M REAL, CHG_3M REAL,
-    MA50 REAL, MA150 REAL, MA200 REAL,
+    SMA10 REAL, SMA20 REAL, SMA40 REAL,
     PRIMARY KEY (Name, Date)
 )
 """

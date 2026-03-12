@@ -34,7 +34,9 @@ export function usePriceRangeMeasure(
   const phaseRef = useRef<MeasurePhase>('idle')
   const startPointRef = useRef<MeasurePoint | null>(null)
 
-  phaseRef.current = phase
+  useEffect(() => {
+    phaseRef.current = phase
+  }, [phase])
 
   const reset = useCallback(() => {
     setPhase('idle')

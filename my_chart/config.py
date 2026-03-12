@@ -34,7 +34,7 @@ REFERENCE_STOCK = "삼성전자"
 # Paths
 INPUT_DIR = Path(__file__).parent.parent / "Input"
 OUTPUT_DIR = Path(__file__).parent.parent / "Output"
-SECTORMAP_PATH = INPUT_DIR / "sectormap_original.xlsx"
+SECTORMAP_PATH = INPUT_DIR / "sectormap.xlsx"
 
 # Ensure Output directory exists
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -56,12 +56,26 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 # Minimum close price filter
 MIN_CLOSE_PRICE = 5000
 
-# KRX 세션 초기화 (환경변수에서 인증 정보를 읽어 pykrx를 monkey-patch하고 로그인)
-try:
-    from my_chart.krx_session import init_session
+# KRX session initialization guard flag (prevents double initialization)
+_initialized: bool = False
 
-    init_session()
-except Exception as _krx_exc:
-    import logging as _logging
 
-    _logging.getLogger(__name__).warning("KRX 세션 초기화 실패: %s", _krx_exc)
+def initialize() -> None:
+    """Initialize KRX session and pykrx monkey-patch.
+
+    Idempotent: calling multiple times is safe due to the _initialized guard.
+    Call this from the FastAPI lifespan or CLI entry points — NOT at import time.
+    """
+    global _initialized
+    if _initialized:
+        return
+    _initialized = True
+
+    try:
+        from my_chart.krx_session import init_session
+
+        init_session()
+    except Exception as _krx_exc:
+        import logging as _logging
+
+        _logging.getLogger(__name__).warning("KRX 세션 초기화 실패: %s", _krx_exc)

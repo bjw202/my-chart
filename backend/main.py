@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from my_chart.config import initialize
 from my_chart.registry import get_sector_registry, get_stock_registry
 from backend.routers.analysis import router as analysis_router
 from backend.routers.chart import router as chart_router
@@ -23,11 +24,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Pre-initialize expensive singletons before accepting requests.
 
-    get_stock_registry() and get_sector_registry() load sectormap_original.xlsx
+    get_stock_registry() and get_sector_registry() load sectormap.xlsx
     (~2,570 stocks). Pre-initializing here prevents race conditions when
     concurrent requests hit the lazy-loaded globals simultaneously.
     """
-    logger.info("Initializing stock and sector registries...")
+    logger.info("Initializing KRX session and registries...")
+    initialize()
     get_stock_registry()
     get_sector_registry()
     logger.info("Registries loaded. Server ready.")

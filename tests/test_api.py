@@ -71,7 +71,7 @@ def stock_meta_db(tmp_path):
             close REAL, change_1d REAL,
             ema10 REAL, ema20 REAL, sma50 REAL, sma100 REAL, sma200 REAL,
             high52w REAL, chg_1w REAL, chg_1m REAL, chg_3m REAL,
-            rs_12m REAL, ma50_w REAL, ma150_w REAL, ma200_w REAL,
+            rs_12m REAL, sma10_w REAL, sma20_w REAL, sma40_w REAL,
             last_updated TEXT
         )"""
     )

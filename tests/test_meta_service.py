@@ -56,12 +56,12 @@ def _create_weekly_db(path: str, stocks: list[dict], date: str = "2026-02-28") -
         """CREATE TABLE IF NOT EXISTS stock_prices (
             Name TEXT NOT NULL, Date TEXT NOT NULL,
             Open REAL, High REAL, Low REAL, Close REAL,
-            Volume REAL, Volume50MA REAL,
+            Volume REAL, VolumeSMA10 REAL,
             CHG_1W REAL, CHG_1M REAL, CHG_2M REAL, CHG_3M REAL,
             CHG_6M REAL, CHG_9M REAL, CHG_12M REAL,
-            MA50 REAL, MA150 REAL, MA200 REAL,
-            MA200_Trend_1M REAL, MA200_Trend_2M REAL,
-            MA200_Trend_3M REAL, MA200_Trend_4M REAL,
+            SMA10 REAL, SMA20 REAL, SMA40 REAL,
+            SMA40_Trend_1M REAL, SMA40_Trend_2M REAL,
+            SMA40_Trend_3M REAL, SMA40_Trend_4M REAL,
             MAX10 REAL, MAX52 REAL, min52 REAL, Close_52min REAL,
             RS_1M REAL, RS_2M REAL, RS_3M REAL,
             RS_6M REAL, RS_9M REAL, RS_12M REAL, RS_Line REAL,
@@ -79,12 +79,12 @@ def _create_weekly_db(path: str, stocks: list[dict], date: str = "2026-02-28") -
     for s in stocks:
         conn.execute(
             """INSERT INTO stock_prices
-               (Name, Date, CHG_1W, CHG_1M, CHG_3M, MA50, MA150, MA200)
+               (Name, Date, CHG_1W, CHG_1M, CHG_3M, SMA10, SMA20, SMA40)
                VALUES (?,?,?,?,?,?,?,?)""",
             (
                 s["name"], date,
                 s.get("chg_1w", 2.0), s.get("chg_1m", 5.0), s.get("chg_3m", 10.0),
-                s.get("ma50", 68000.0), s.get("ma150", 65000.0), s.get("ma200", 62000.0),
+                s.get("sma10", 68000.0), s.get("sma20", 65000.0), s.get("sma40", 62000.0),
             ),
         )
         conn.execute(

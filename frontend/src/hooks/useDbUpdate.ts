@@ -39,9 +39,12 @@ export function useDbUpdate(): DbUpdateState {
             unsubscribeRef.current = null
           }
         },
-        () => {
-          // SSE error; stop showing running state
+        (event) => {
+          // SSE error; close EventSource and stop running state
+          unsubscribeRef.current?.()
+          unsubscribeRef.current = null
           setIsRunning(false)
+          setError('DB status stream error')
         }
       )
     } catch (err) {
