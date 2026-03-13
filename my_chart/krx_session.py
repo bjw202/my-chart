@@ -106,15 +106,28 @@ def patch_pykrx_session() -> None:
     try:
         from pykrx.website.comm import webio
 
+        # @MX:NOTE: [AUTO] KRX requires AJAX headers (X-Requested-With, Accept) for JSON API.
+        # Without these, KRX WAF returns 403. Merge pykrx default headers with required AJAX headers.
+        _KRX_AJAX_HEADERS = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Origin": "https://data.krx.co.kr",
+            "Referer": "https://data.krx.co.kr/",
+            "X-Requested-With": "XMLHttpRequest",
+        }
+
         def _post_read(self: Any, **params: Any) -> requests.Response:  # type: ignore[misc]
             """POST 요청을 인증된 세션으로 실행."""
             url: str = self.url  # type: ignore[assignment]
-            return _session.post(url, headers=self.headers, data=params)
+            merged_headers = {**self.headers, **_KRX_AJAX_HEADERS}
+            return _session.post(url, headers=merged_headers, data=params)
 
         def _get_read(self: Any, **params: Any) -> requests.Response:  # type: ignore[misc]
             """GET 요청을 인증된 세션으로 실행."""
             url: str = self.url  # type: ignore[assignment]
-            return _session.get(url, headers=self.headers, params=params)  # type: ignore[arg-type]
+            merged_headers = {**self.headers, **_KRX_AJAX_HEADERS}
+            return _session.get(url, headers=merged_headers, params=params)  # type: ignore[arg-type]
 
         webio.Post.read = _post_read  # type: ignore[method-assign]
         webio.Get.read = _get_read  # type: ignore[method-assign]
@@ -282,50 +295,6 @@ def get_market_cap_safe(date_str: str) -> pd.DataFrame:
     except Exception as exc:
         logger.warning("pykrx 시가총액 조회 실패 - 폴백 시도: %s (%s)", date_str, exc)
 
-    # 2차: sectormap_original.xlsx D-day 컬럼 폴백
-    try:
-        from my_chart.config import SECTORMAP_PATH
-
-        df_sector = pd.read_excel(str(SECTORMAP_PATH), skiprows=8)
-        df_sector["종목\n코드"] = df_sector["종목\n코드"].astype(str).str.zfill(6)
-
-        # D-day 컬럼 탐색 (억원 단위 → 원 단위 변환)
-        dday_col = None
-        for col in df_sector.columns:
-            if str(col).strip().lower() in ("d-day", "d day", "dday"):
-                dday_col = col
-                break
-
-        if dday_col is None:
-            # 컬럼명 패턴 기반 탐색 (대소문자 무관)
-            for col in df_sector.columns:
-                if "d" in str(col).lower() and "day" in str(col).lower():
-                    dday_col = col
-                    break
-
-        if dday_col is not None:
-            col_name = str(dday_col)
-            df_fallback = df_sector[["종목\n코드", col_name]].copy()
-            df_fallback = df_fallback.dropna(subset=[col_name])  # type: ignore[call-overload]
-            df_fallback.set_index("종목\n코드", inplace=True)
-            # 억원 → 원 변환 (1억 = 100,000,000)
-            numeric_vals: pd.Series = pd.to_numeric(  # type: ignore[assignment]
-                df_fallback[col_name], errors="coerce"
-            )
-            df_fallback["시가총액"] = numeric_vals * 100_000_000  # type: ignore[operator]
-            result: pd.DataFrame = df_fallback[["시가총액"]].dropna()  # type: ignore[assignment]
-
-            if not result.empty:
-                logger.info(
-                    "sectormap D-day 폴백 사용: %d건 (날짜: %s)", len(result), date_str
-                )
-                return result
-
-        logger.warning("sectormap에서 D-day 컬럼을 찾을 수 없음")
-
-    except Exception as exc:
-        logger.warning("sectormap 폴백 실패: %s", exc)
-
-    # 3차: 빈 DataFrame 반환
+    # 2차: 빈 DataFrame 반환
     logger.warning("시가총액 데이터를 가져올 수 없음 - 빈 DataFrame 반환: %s", date_str)
     return pd.DataFrame({"시가총액": pd.Series(dtype="float64")})
