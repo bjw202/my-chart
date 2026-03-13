@@ -6,7 +6,6 @@ import datetime
 import sqlite3
 
 import pandas as pd
-import pytest
 
 from backend.services.meta_service import _business_days_since, _rebuild
 
@@ -14,39 +13,6 @@ from backend.services.meta_service import _business_days_since, _rebuild
 # ---------------------------------------------------------------------------
 # Helpers to build test SQLite DB files
 # ---------------------------------------------------------------------------
-
-
-def _create_daily_db(path: str, stocks: list[dict], date: str = "2026-02-28") -> None:
-    """Populate a daily DB file with stock_prices rows."""
-    conn = sqlite3.connect(path)
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS stock_prices (
-            Name TEXT NOT NULL, Date TEXT NOT NULL,
-            Open REAL, High REAL, Low REAL, Close REAL,
-            Change REAL, High52W REAL,
-            Volume REAL, Volume20MA REAL, VolumeWon REAL,
-            EMA10 REAL, EMA20 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA200 REAL,
-            DailyRange REAL, HLC REAL,
-            FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
-            Range REAL, ADR20 REAL,
-            PRIMARY KEY (Name, Date)
-        )"""
-    )
-    for s in stocks:
-        conn.execute(
-            """INSERT INTO stock_prices
-               (Name, Date, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (
-                s["name"], date,
-                s.get("close", 70000.0), s.get("change", 1.5),
-                s.get("ema10", 69000.0), s.get("ema20", 68000.0),
-                s.get("sma50", 65000.0), s.get("sma100"), s.get("sma200"),
-                s.get("high52w", 75000.0),
-            ),
-        )
-    conn.commit()
-    conn.close()
 
 
 def _create_weekly_db(path: str, stocks: list[dict], date: str = "2026-02-28") -> None:
@@ -146,7 +112,7 @@ class TestRebuild:
         {"name": "SK하이닉스", "rs_12m": 72.0},
     ]
 
-    def _make_conn(self, daily_stocks, weekly_path: str, monkeypatch) -> sqlite3.Connection:
+    def _make_conn(self, daily_stocks, _weekly_path: str, monkeypatch) -> sqlite3.Connection:
         """Set up in-memory daily conn and patch dependencies."""
         conn = sqlite3.connect(":memory:", check_same_thread=False)
         conn.execute(
@@ -188,7 +154,7 @@ class TestRebuild:
             {"시가총액": [300_000_000_000_000, 100_000_000_000_000]},
             index=pd.Index(["005930", "000660"]),
         )
-        fake_pykrx.get_market_cap = lambda *a, **kw: mc_data
+        setattr(fake_pykrx, "get_market_cap", lambda *_: mc_data)
         monkeypatch.setattr(svc, "pykrx_stock", fake_pykrx, raising=False)
 
         return conn
@@ -292,3 +258,66 @@ class TestRebuild:
             assert rows[0] == 0
         except sqlite3.OperationalError:
             pass  # table might not exist if _rebuild returned early before CREATE TABLE
+
+    def test_market_cap_stored_from_pykrx(self, monkeypatch, tmp_path):
+        """market_cap values from pykrx should be stored in stock_meta (억원 unit)."""
+        weekly_path = str(tmp_path / "weekly.db")
+        _create_weekly_db(weekly_path, self._DEFAULT_WEEKLY_STOCKS)
+
+        conn = self._make_conn(self._DEFAULT_DAILY_STOCKS, weekly_path, monkeypatch)
+
+        # Patch pykrx inside sys.modules so the dynamic import in _rebuild picks it up
+        import sys
+        import types
+        fake_pykrx_pkg = types.ModuleType("pykrx")
+        fake_stock = types.ModuleType("pykrx.stock")
+        mc_data = pd.DataFrame(
+            {"시가총액": [500_000_000_000_000, 200_000_000_000_000]},
+            index=pd.Index(["005930", "000660"]),
+        )
+        setattr(fake_stock, "get_market_cap", lambda *_: mc_data)
+        setattr(fake_pykrx_pkg, "stock", fake_stock)
+        monkeypatch.setitem(sys.modules, "pykrx", fake_pykrx_pkg)
+        monkeypatch.setitem(sys.modules, "pykrx.stock", fake_stock)
+
+        _rebuild(conn, weekly_path)
+
+        row = conn.execute(
+            "SELECT market_cap FROM stock_meta WHERE code = '005930'"
+        ).fetchone()
+        assert row is not None
+        # 500_000_000_000_000 원 / 100_000_000 = 5_000_000 억원
+        assert row[0] == 5_000_000
+
+    def test_market_cap_is_null_when_pykrx_fails_and_no_dday_column(self, monkeypatch, tmp_path):
+        """Regression: when pykrx fails and sectormap has no D-day column,
+        market_cap should be NULL (not cause a crash).
+        This documents the current behavior when the fallback has no data."""
+        weekly_path = str(tmp_path / "weekly.db")
+        _create_weekly_db(weekly_path, self._DEFAULT_WEEKLY_STOCKS)
+
+        conn = self._make_conn(self._DEFAULT_DAILY_STOCKS, weekly_path, monkeypatch)
+
+        # Patch pykrx to raise an exception (simulating network/auth failure)
+        import sys
+        import types
+        fake_pykrx_pkg = types.ModuleType("pykrx")
+        fake_stock = types.ModuleType("pykrx.stock")
+        setattr(fake_stock, "get_market_cap", lambda *_: (_ for _ in ()).throw(
+            Exception("KRX network error")
+        ))
+        setattr(fake_pykrx_pkg, "stock", fake_stock)
+        monkeypatch.setitem(sys.modules, "pykrx", fake_pykrx_pkg)
+        monkeypatch.setitem(sys.modules, "pykrx.stock", fake_stock)
+
+        # sectormap has no D-day column (the current production state)
+        _rebuild(conn, weekly_path)
+
+        # Stocks should still be inserted, but market_cap will be NULL
+        row = conn.execute(
+            "SELECT code, market_cap FROM stock_meta WHERE code = '005930'"
+        ).fetchone()
+        assert row is not None, "Stock should be inserted even when pykrx fails"
+        assert row[1] is None, (
+            "market_cap should be NULL when pykrx fails and sectormap has no D-day column"
+        )
