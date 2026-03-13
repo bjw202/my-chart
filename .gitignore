@@ -126,6 +126,9 @@ logs/
 .env.*
 !.env.example
 
+# KRX session cache (contains auth cookies)
+.krx_session.pkl
+
 # Certificate files
 *.pem
 *.p12

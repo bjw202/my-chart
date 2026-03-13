@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import logging
 import os
+import pickle
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -25,6 +27,9 @@ _LOGIN_URL = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
 # User-Agent: 일반 브라우저로 위장하여 KRX 서버 접근 허용
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+# 세션 pickle 저장 경로 (프로젝트 루트 기준)
+_SESSION_FILE = Path(__file__).parent.parent / ".krx_session.pkl"
+
 # --- 모듈 레벨 싱글턴 상태 ---
 # @MX:WARN: [AUTO] 전역 가변 상태 - requests.Session 싱글턴 및 monkey-patch 가드
 # @MX:REASON: 프로세스당 1회 패치 보장을 위한 전역 플래그; 스레드 안전성 미보장
@@ -32,6 +37,58 @@ _session: requests.Session = requests.Session()
 _session.headers.update({"User-Agent": _UA})
 _patched: bool = False
 _logged_in: bool = False
+
+
+def _save_session() -> None:
+    """로그인된 세션을 pickle 파일에 저장한다.
+
+    서버 재시작 시 재로그인 없이 세션을 재사용할 수 있도록 영속화한다.
+    저장 실패는 경고만 출력하고 무시한다.
+    """
+    try:
+        with open(_SESSION_FILE, "wb") as f:
+            pickle.dump(_session, f)
+        logger.info("KRX 세션 파일 저장 완료: %s", _SESSION_FILE)
+    except Exception as exc:
+        logger.warning("KRX 세션 파일 저장 실패: %s", exc)
+
+
+def _load_saved_session() -> bool:
+    """pickle 파일에서 세션을 로드한다.
+
+    로드 성공 시 _session과 _logged_in 플래그를 갱신한다.
+    파일이 없거나 유효하지 않으면 False를 반환하여 재로그인을 유도한다.
+
+    세션 유효성은 _LOGIN_PAGE GET 요청(200 응답)으로 간이 검증한다.
+    """
+    global _session, _logged_in
+
+    if not _SESSION_FILE.exists():
+        return False
+
+    try:
+        with open(_SESSION_FILE, "rb") as f:
+            loaded: requests.Session = pickle.load(f)
+
+        # 간이 유효성 검증: KRX 메인 페이지 접근 확인
+        resp = loaded.get(_LOGIN_PAGE, timeout=5)
+        if resp.status_code == 200:
+            _session = loaded
+            _logged_in = True
+            logger.info("KRX 세션 파일 로드 완료 (재로그인 생략)")
+            return True
+
+        logger.warning("KRX 세션 파일 만료 - 재로그인 필요")
+    except Exception as exc:
+        logger.warning("KRX 세션 파일 로드 실패: %s", exc)
+
+    # 만료된 파일 삭제
+    try:
+        _SESSION_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    return False
 
 
 def patch_pykrx_session() -> None:
@@ -127,6 +184,7 @@ def login_krx(login_id: str, login_pw: str) -> bool:
             # 로그인 성공
             _logged_in = True
             logger.info("KRX 로그인 성공 (ID: %s)", login_id)
+            _save_session()
             return True
 
         if error_code == "CD011":
@@ -141,6 +199,7 @@ def login_krx(login_id: str, login_pw: str) -> bool:
             if error_code == "CD001":
                 _logged_in = True
                 logger.info("KRX 로그인 성공 (중복 로그인 해소, ID: %s)", login_id)
+                _save_session()
                 return True
 
         logger.warning("KRX 로그인 실패 - error_code: %s", error_code)
@@ -167,6 +226,10 @@ def init_session() -> None:
     """
     # monkey-patch를 먼저 적용하여 이후 pykrx 호출이 세션을 사용하도록 함
     patch_pykrx_session()
+
+    # 저장된 세션이 있으면 재사용 (재로그인 생략)
+    if _load_saved_session():
+        return
 
     krx_id = os.environ.get("KRX_ID", "")
     krx_pw = os.environ.get("KRX_PW", "")

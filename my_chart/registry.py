@@ -23,9 +23,8 @@ _df_sector: pd.DataFrame | None = None
 
 
 def _load_sectormap() -> pd.DataFrame:
-    """Load sectormap_original.xlsx, skipping 8 comment/header rows, and normalize column names."""
-    df = pd.read_excel(str(SECTORMAP_PATH), skiprows=8)
-    df.rename(columns={"종목\n코드": "Code", "종목명": "Name", "시장": "Market"}, inplace=True)
+    """Load sectormap.xlsx with English column headers (Code, Name, Market)."""
+    df = pd.read_excel(str(SECTORMAP_PATH))
     df["Code"] = df["Code"].astype(str).str.zfill(6)
     return df
 

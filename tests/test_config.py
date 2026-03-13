@@ -42,7 +42,7 @@ def test_sectormap_path_is_path_object():
 def test_sectormap_path_filename():
     from my_chart.config import SECTORMAP_PATH
 
-    assert SECTORMAP_PATH.name == "sectormap_original.xlsx"
+    assert SECTORMAP_PATH.name == "sectormap.xlsx"
 
 
 def test_sectormap_path_parent_is_input_dir():

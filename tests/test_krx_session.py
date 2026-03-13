@@ -207,13 +207,14 @@ class TestInitSession:
         mock_login.assert_not_called()
 
     def test_characterize_init_with_env_vars_calls_login(self, monkeypatch):
-        """KRX_ID, KRX_PW 환경변수 설정 시 init_session()이 login_krx()를 호출한다."""
+        """KRX_ID, KRX_PW 환경변수 설정 시 저장된 세션 없으면 login_krx()를 호출한다."""
         monkeypatch.setenv("KRX_ID", "test_user")
         monkeypatch.setenv("KRX_PW", "test_password")
 
         with patch.object(krx_session, "patch_pykrx_session"):
-            with patch.object(krx_session, "login_krx", return_value=True) as mock_login:
-                krx_session.init_session()
+            with patch.object(krx_session, "_load_saved_session", return_value=False):
+                with patch.object(krx_session, "login_krx", return_value=True) as mock_login:
+                    krx_session.init_session()
 
         mock_login.assert_called_once_with("test_user", "test_password")
 
@@ -223,9 +224,10 @@ class TestInitSession:
         monkeypatch.setenv("KRX_PW", "wrong_password")
 
         with patch.object(krx_session, "patch_pykrx_session"):
-            with patch.object(krx_session, "login_krx", return_value=False):
-                # 예외 없이 완료되어야 함
-                krx_session.init_session()
+            with patch.object(krx_session, "_load_saved_session", return_value=False):
+                with patch.object(krx_session, "login_krx", return_value=False):
+                    # 예외 없이 완료되어야 함
+                    krx_session.init_session()
 
 
 # ---------------------------------------------------------------------------
