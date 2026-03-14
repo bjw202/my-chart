@@ -10,6 +10,6 @@ export async function fetchMarketOverview(): Promise<MarketOverviewResponse> {
 }
 
 export async function fetchSectorRanking(): Promise<SectorRankingResponse> {
-  const { data } = await client.get<SectorRankingResponse>('/sector/ranking')
+  const { data } = await client.get<SectorRankingResponse>('/sectors/ranking')
   return data
 }

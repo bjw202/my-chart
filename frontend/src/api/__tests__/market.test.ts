@@ -76,12 +76,12 @@ describe('fetchSectorRanking', () => {
     vi.clearAllMocks()
   })
 
-  it('should call GET /sector/ranking', async () => {
+  it('should call GET /sectors/ranking', async () => {
     vi.mocked(client.get).mockResolvedValue({ data: mockSectorRanking })
 
     await fetchSectorRanking()
 
-    expect(client.get).toHaveBeenCalledWith('/sector/ranking')
+    expect(client.get).toHaveBeenCalledWith('/sectors/ranking')
   })
 
   it('should return SectorRankingResponse data', async () => {

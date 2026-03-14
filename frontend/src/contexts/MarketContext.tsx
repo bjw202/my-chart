@@ -35,14 +35,24 @@ export function MarketProvider({ children }: { children: React.ReactNode }): Rea
     setLoading(true)
     setError(null)
     try {
-      // Fetch both endpoints in parallel
-      const [overviewData, rankingData] = await Promise.all([
+      // Fetch both endpoints in parallel; settle independently so one failure
+      // does not block the other from providing data to the UI.
+      const [overviewResult, rankingResult] = await Promise.allSettled([
         fetchMarketOverview(),
         fetchSectorRanking(),
       ])
-      setOverview(overviewData)
-      setSectorRanking(rankingData)
-      lastFetchRef.current = Date.now()
+      if (overviewResult.status === 'fulfilled') {
+        setOverview(overviewResult.value)
+      }
+      if (rankingResult.status === 'fulfilled') {
+        setSectorRanking(rankingResult.value)
+      }
+      // Only set error if both failed
+      if (overviewResult.status === 'rejected' && rankingResult.status === 'rejected') {
+        setError(overviewResult.reason instanceof Error ? overviewResult.reason.message : 'Failed to fetch market data')
+      } else {
+        lastFetchRef.current = Date.now()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch market data')
     } finally {
