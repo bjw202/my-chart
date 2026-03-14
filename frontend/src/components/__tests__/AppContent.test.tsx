@@ -52,6 +52,11 @@ vi.mock('../MarketOverview/MarketOverview', () => ({
   MarketOverview: () => <div data-testid="market-overview">MarketOverview</div>,
 }))
 
+// Mock StockExplorer to avoid API calls in integration test
+vi.mock('../StockExplorer/StockExplorer', () => ({
+  StockExplorer: () => <div data-testid="stock-explorer">StockExplorer</div>,
+}))
+
 import { MarketProvider } from '../../contexts/MarketContext'
 import { TabProvider } from '../../contexts/TabContext'
 import { ScreenProvider } from '../../contexts/ScreenContext'

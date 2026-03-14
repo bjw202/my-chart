@@ -1737,3 +1737,53 @@ html, body, #root {
 .sector-detail-metric { background: var(--bg-surface); border-radius: 6px; padding: 10px; }
 .sector-detail-metric-label { font-size: 11px; color: var(--text-muted); }
 .sector-detail-metric-value { font-size: 16px; font-weight: 600; margin-top: 2px; }
+
+/* ============================
+   SPEC-TOPDOWN-001E: Stock Explorer
+   ============================ */
+
+/* Stock Explorer container */
+.stock-explorer { display: flex; flex-direction: column; height: 100%; padding: 12px; gap: 12px; overflow: hidden; }
+.stock-explorer-toolbar { display: flex; justify-content: space-between; align-items: center; }
+.stock-explorer-toolbar-left { display: flex; align-items: center; gap: 8px; }
+.stock-explorer-toolbar-right { display: flex; gap: 8px; align-items: center; }
+.stock-explorer-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
+.stock-explorer-error { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--negative); font-size: 14px; }
+.stock-explorer-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
+.selected-count { font-size: 12px; color: var(--text-muted); }
+.view-charts-btn { background: var(--accent); color: #fff; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.view-charts-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Stage distribution bar */
+.stage-distribution-bar { display: flex; height: 32px; border-radius: 4px; overflow: hidden; cursor: pointer; flex-shrink: 0; }
+.stage-distribution-segment { display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; font-weight: 500; transition: opacity 0.15s; min-width: 40px; border: none; cursor: pointer; }
+.stage-distribution-segment:hover { opacity: 0.85; }
+.stage-distribution-segment.active { outline: 2px solid var(--accent); outline-offset: -2px; }
+.stage-segment--s1 { background: #6b7280; }
+.stage-segment--s2 { background: #26a69a; }
+.stage-segment--s3 { background: #f59e0b; }
+.stage-segment--s4 { background: #ef5350; }
+
+/* Stock table */
+.stock-table-wrapper { flex: 1; overflow-y: auto; }
+.stock-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.stock-table th { text-align: left; padding: 6px 8px; color: var(--text-muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-primary); z-index: 1; }
+.stock-table td { padding: 5px 8px; border-bottom: 1px solid rgba(45,45,68,0.3); }
+.stock-table tr:hover { background: var(--bg-hover); }
+.stock-table input[type="checkbox"] { accent-color: var(--accent); }
+.stock-name { color: var(--text-primary); font-weight: 500; }
+.stock-code { color: var(--text-muted); font-size: 11px; }
+
+/* Stage badges */
+.stage-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.stage-badge--s1 { background: rgba(107,114,128,0.2); color: #9ca3af; }
+.stage-badge--s2 { background: rgba(38,166,154,0.2); color: #26a69a; }
+.stage-badge--s2-strong { background: rgba(38,166,154,0.2); color: #26a69a; border: 1.5px solid #26a69a; }
+.stage-badge--s2-entry { background: rgba(38,166,154,0.3); color: #26a69a; border: 1.5px solid #26a69a; }
+.stage-badge--s3 { background: rgba(245,158,11,0.2); color: #f59e0b; }
+.stage-badge--s4 { background: rgba(239,83,80,0.2); color: #ef5350; }
+.entry-star { color: #f59e0b; margin-left: 2px; }
+
+/* Sector filter chip */
+.sector-filter-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--text-secondary); }
+.sector-filter-chip button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; font-size: 14px; }

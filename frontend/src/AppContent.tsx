@@ -8,6 +8,7 @@ import { StockList } from './components/StockList/StockList'
 import { StatusBar } from './components/StatusBar/StatusBar'
 import { MarketOverview } from './components/MarketOverview/MarketOverview'
 import { SectorAnalysis } from './components/SectorAnalysis/SectorAnalysis'
+import { StockExplorer } from './components/StockExplorer/StockExplorer'
 
 // @MX:NOTE: [AUTO] AppContent is extracted from App so it can consume TabContext
 // Inside the provider tree, uses useTab to render tab panels via CSS display:none/block
@@ -30,7 +31,7 @@ export function AppContent(): ReactElement {
       </div>
 
       <div className="tab-content" style={{ display: activeTab === 'stock-explorer' ? 'flex' : 'none' }}>
-        <div className="tab-placeholder">Stock Explorer - Coming in SPEC-TOPDOWN-001E</div>
+        <StockExplorer />
       </div>
 
       {/* Chart Grid tab - default active; preserves existing FilterBar + ChartGrid + StockList layout */}
