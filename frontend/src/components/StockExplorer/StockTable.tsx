@@ -14,18 +14,20 @@ type SortKey = 'name' | 'market' | 'stage' | 'rs_12m' | 'chg_1m' | 'volume_ratio
 type SortDir = 'asc' | 'desc'
 
 // Determine badge class based on stage and RS rating
+// stage can be a number (1-4) or a string ("Stage 2", etc.) from the API
 function getStageBadgeClass(candidate: Stage2Candidate): string {
   const { stage, stage_detail, rs_12m } = candidate
-  if (stage.includes('Stage 2') || stage.includes('stage 2')) {
-    // Strong: RS > 60
+  const stageNum = typeof stage === 'number' ? stage : parseInt(String(stage), 10)
+  const stageStr = String(stage).toLowerCase()
+
+  if (stageNum === 2 || stageStr.includes('stage 2')) {
     if (rs_12m > 60) return 'stage-badge--s2-strong'
-    // Entry: stage_detail contains "entry"
-    if (stage_detail.toLowerCase().includes('entry')) return 'stage-badge--s2-entry'
+    if (stage_detail?.toLowerCase().includes('entry')) return 'stage-badge--s2-entry'
     return 'stage-badge--s2'
   }
-  if (stage.includes('Stage 1') || stage.includes('stage 1')) return 'stage-badge--s1'
-  if (stage.includes('Stage 3') || stage.includes('stage 3')) return 'stage-badge--s3'
-  if (stage.includes('Stage 4') || stage.includes('stage 4')) return 'stage-badge--s4'
+  if (stageNum === 1 || stageStr.includes('stage 1')) return 'stage-badge--s1'
+  if (stageNum === 3 || stageStr.includes('stage 3')) return 'stage-badge--s3'
+  if (stageNum === 4 || stageStr.includes('stage 4')) return 'stage-badge--s4'
   return 'stage-badge--s1'
 }
 
@@ -53,7 +55,7 @@ export function StockTable({
 
   // Apply filters
   const filtered = candidates.filter((c) => {
-    if (stageFilter && c.stage !== stageFilter) return false
+    if (stageFilter && String(c.stage) !== stageFilter) return false
     if (sectorFilter && c.sector_major !== sectorFilter) return false
     return true
   })
@@ -125,7 +127,7 @@ export function StockTable({
                 <td>{c.market}</td>
                 <td>
                   <span className={`stage-badge ${badgeClass}`}>
-                    {c.stage}
+                    S{typeof c.stage === 'number' ? c.stage : c.stage.replace(/\D/g, '')}
                   </span>
                   {isEntry && <span className="entry-star">★</span>}
                 </td>

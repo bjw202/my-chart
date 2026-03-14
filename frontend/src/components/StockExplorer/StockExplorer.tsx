@@ -55,22 +55,23 @@ export function StockExplorer(): ReactElement {
       setStageFilter(null)
       return
     }
+    // Map distribution bar keys to API stage values (numbers as strings)
     const stageMap: Record<string, string> = {
-      stage1: 'Stage 1',
-      stage2: 'Stage 2',
-      stage3: 'Stage 3',
-      stage4: 'Stage 4',
+      stage1: '1',
+      stage2: '2',
+      stage3: '3',
+      stage4: '4',
     }
     setStageFilter(stageMap[stage] ?? null)
   }
 
-  // Derive activeStage key from current stageFilter string
+  // Derive activeStage key from current stageFilter
   const activeStageKey = stageFilter
     ? Object.entries({
-        stage1: 'Stage 1',
-        stage2: 'Stage 2',
-        stage3: 'Stage 3',
-        stage4: 'Stage 4',
+        stage1: '1',
+        stage2: '2',
+        stage3: '3',
+        stage4: '4',
       }).find(([, v]) => v === stageFilter)?.[0] ?? null
     : null
 

@@ -22,7 +22,7 @@ export interface Stage2Candidate {
   market: string
   sector_major: string
   sector_minor: string
-  stage: string
+  stage: number | string
   stage_detail: string
   rs_12m: number
   chg_1m: number
