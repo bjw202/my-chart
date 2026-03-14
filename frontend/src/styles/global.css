@@ -1701,3 +1701,39 @@ html, body, #root {
   display: flex; align-items: center; justify-content: center;
   height: 100%; color: var(--text-muted); font-size: 14px;
 }
+
+/* ========================================
+   Sector Analysis (SPEC-TOPDOWN-001D)
+   ======================================== */
+
+/* Sector Analysis layout */
+.sector-analysis { display: flex; flex-direction: column; height: 100%; padding: 12px; overflow-y: auto; }
+.sector-analysis-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+
+/* Period toggle */
+.period-toggle { display: flex; gap: 4px; }
+.period-toggle button { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.period-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.period-toggle button:hover:not(.active) { color: var(--text-primary); }
+
+/* Ranking table */
+.sector-ranking-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sector-ranking-table th { text-align: left; padding: 6px 8px; color: var(--text-muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+.sector-ranking-table th:hover { color: var(--text-primary); }
+.sector-ranking-table th .sort-arrow { margin-left: 4px; font-size: 10px; }
+.sector-ranking-table td { padding: 6px 8px; border-bottom: 1px solid rgba(45,45,68,0.5); }
+.sector-ranking-table tr { cursor: pointer; transition: background 0.1s; }
+.sector-ranking-table tr:hover { background: var(--bg-hover); }
+.sector-ranking-table tr.selected { background: rgba(59,130,246,0.1); }
+.rank-change { font-size: 11px; margin-left: 4px; }
+.rank-change--up { color: var(--positive); }
+.rank-change--down { color: var(--negative); }
+.rank-change--flat { color: var(--text-muted); }
+
+/* Detail panel */
+.sector-detail-panel { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; }
+.sector-detail-panel-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; }
+.sector-detail-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.sector-detail-metric { background: var(--bg-surface); border-radius: 6px; padding: 10px; }
+.sector-detail-metric-label { font-size: 11px; color: var(--text-muted); }
+.sector-detail-metric-value { font-size: 16px; font-weight: 600; margin-top: 2px; }

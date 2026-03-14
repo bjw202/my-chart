@@ -7,6 +7,7 @@ import { ChartGrid } from './components/ChartGrid/ChartGrid'
 import { StockList } from './components/StockList/StockList'
 import { StatusBar } from './components/StatusBar/StatusBar'
 import { MarketOverview } from './components/MarketOverview/MarketOverview'
+import { SectorAnalysis } from './components/SectorAnalysis/SectorAnalysis'
 
 // @MX:NOTE: [AUTO] AppContent is extracted from App so it can consume TabContext
 // Inside the provider tree, uses useTab to render tab panels via CSS display:none/block
@@ -25,7 +26,7 @@ export function AppContent(): ReactElement {
       </div>
 
       <div className="tab-content" style={{ display: activeTab === 'sector-analysis' ? 'flex' : 'none' }}>
-        <div className="tab-placeholder">Sector Analysis - Coming in SPEC-TOPDOWN-001D</div>
+        <SectorAnalysis />
       </div>
 
       <div className="tab-content" style={{ display: activeTab === 'stock-explorer' ? 'flex' : 'none' }}>
