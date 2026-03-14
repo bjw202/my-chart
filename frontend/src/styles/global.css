@@ -18,6 +18,8 @@
   --accent-hover: #2563eb;
   --positive: #26a69a;
   --negative: #ef5350;
+  --tab-bar-height: 40px;
+  --context-bar-height: 28px;
   --filter-bar-height: 60px;
   --status-bar-height: 32px;
   --stock-list-width: 280px;
@@ -36,9 +38,151 @@ html, body, #root {
 /* App layout grid */
 .app {
   display: grid;
-  grid-template-rows: var(--filter-bar-height) 1fr var(--status-bar-height);
+  grid-template-rows: var(--tab-bar-height) var(--context-bar-height) 1fr var(--status-bar-height);
   height: 100%;
   overflow: hidden;
+}
+
+/* Tab navigation bar */
+.tab-navigation {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  height: var(--tab-bar-height);
+  padding: 0 8px;
+  gap: 2px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0 14px;
+  height: 100%;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn--active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* Context bar */
+.context-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: var(--context-bar-height);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.context-bar-phase {
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.context-bar-phase--bull {
+  background: rgba(38, 166, 154, 0.18);
+  color: var(--positive);
+}
+
+.context-bar-phase--sideways {
+  background: rgba(255, 209, 102, 0.18);
+  color: #ffd166;
+}
+
+.context-bar-phase--bear {
+  background: rgba(239, 83, 80, 0.18);
+  color: var(--negative);
+}
+
+.context-bar-choppy {
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 209, 102, 0.15);
+  color: #ffd166;
+  flex-shrink: 0;
+}
+
+.context-bar-divider {
+  color: var(--border);
+  flex-shrink: 0;
+}
+
+.context-bar-strong {
+  color: var(--positive);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-bar-weak {
+  color: var(--negative);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-bar-skeleton {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.context-bar-error {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Tab content panels */
+.tab-content {
+  overflow: hidden;
+  flex-direction: column;
+  /* grid-area: takes up the 1fr row */
+}
+
+/* Chart Grid tab needs FilterBar + main */
+.tab-content .filter-bar {
+  flex-shrink: 0;
+  height: var(--filter-bar-height);
+}
+
+.tab-content .app-main {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Placeholder for tabs not yet implemented */
+.tab-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 16px;
 }
 
 /* Filter bar */
