@@ -1,4 +1,4 @@
-import React from 'react'
+import type { ReactElement } from 'react'
 import { useTab } from './contexts/TabContext'
 import { TabNavigation } from './components/TabNavigation/TabNavigation'
 import { ContextBar } from './components/ContextBar/ContextBar'
@@ -11,7 +11,7 @@ import { MarketOverview } from './components/MarketOverview/MarketOverview'
 // @MX:NOTE: [AUTO] AppContent is extracted from App so it can consume TabContext
 // Inside the provider tree, uses useTab to render tab panels via CSS display:none/block
 
-export function AppContent(): React.ReactElement {
+export function AppContent(): ReactElement {
   const { activeTab } = useTab()
 
   return (
