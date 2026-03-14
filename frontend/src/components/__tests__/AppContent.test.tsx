@@ -47,6 +47,11 @@ vi.mock('../../api/db', () => ({
   fetchUpdateStatus: vi.fn(),
 }))
 
+// Mock MarketOverview to avoid lightweight-charts Canvas API issues in jsdom
+vi.mock('../MarketOverview/MarketOverview', () => ({
+  MarketOverview: () => <div data-testid="market-overview">MarketOverview</div>,
+}))
+
 import { MarketProvider } from '../../contexts/MarketContext'
 import { TabProvider } from '../../contexts/TabContext'
 import { ScreenProvider } from '../../contexts/ScreenContext'
@@ -85,13 +90,13 @@ describe('AppContent tab structure', () => {
     expect(screen.getByTestId('filter-bar')).toBeInTheDocument()
   })
 
-  it('should show placeholder for non-chart-grid tabs', async () => {
+  it('should show MarketOverview component when Market Overview tab is active', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await user.click(screen.getByText('Market Overview'))
 
-    expect(screen.getByText('Market Overview - Coming in SPEC-TOPDOWN-001C')).toBeInTheDocument()
+    expect(screen.getByTestId('market-overview')).toBeInTheDocument()
   })
 
   it('should keep chart grid mounted but hidden when switching tabs', async () => {
