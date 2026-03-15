@@ -10,12 +10,14 @@ import { PriceRangeOverlay } from './PriceRangeOverlay'
 import { useAnalysis } from '../../hooks/useAnalysis'
 import { AnalysisModal } from '../AnalysisModal'
 
-// 시가총액을 간결하게 포맷 (조/억원 단위)
-function formatMarketCap(cap: number): string {
-  const eok = cap / 1e8
-  if (eok >= 10000) return `${(eok / 10000).toFixed(1)}조`
-  if (eok >= 1) return `${Math.round(eok).toLocaleString()}억`
-  return `${Math.round(cap / 1e4).toLocaleString()}만`
+// 시가총액(원 단위)을 간결하게 포맷
+function formatMarketCap(capWon: number): string {
+  const cho = capWon / 1_000_000_000_000  // 조
+  if (cho >= 1) return `${cho.toFixed(1)}조`
+  const eok = capWon / 100_000_000        // 억
+  if (eok >= 1) return `${Math.round(eok).toLocaleString('ko-KR')}억`
+  const man = capWon / 10_000             // 만
+  return `${Math.round(man).toLocaleString('ko-KR')}만`
 }
 
 interface ChartCellProps {
