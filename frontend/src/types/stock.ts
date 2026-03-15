@@ -16,6 +16,7 @@ export interface StockItem {
   sma50: number | null
   sma100: number | null
   sma200: number | null
+  stage: number | null // Weinstein stage (1-4), enriched from /api/stage/overview
 }
 
 export interface SectorGroup {

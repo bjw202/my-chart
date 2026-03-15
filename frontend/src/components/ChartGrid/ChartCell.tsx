@@ -10,6 +10,16 @@ import { PriceRangeOverlay } from './PriceRangeOverlay'
 import { useAnalysis } from '../../hooks/useAnalysis'
 import { AnalysisModal } from '../AnalysisModal'
 
+// 시가총액(원 단위)을 간결하게 포맷
+function formatMarketCap(capWon: number): string {
+  const cho = capWon / 1_000_000_000_000  // 조
+  if (cho >= 1) return `${cho.toFixed(1)}조`
+  const eok = capWon / 100_000_000        // 억
+  if (eok >= 1) return `${Math.round(eok).toLocaleString('ko-KR')}억`
+  const man = capWon / 10_000             // 만
+  return `${Math.round(man).toLocaleString('ko-KR')}만`
+}
+
 interface ChartCellProps {
   stock: StockItem
   isSelected: boolean
@@ -278,6 +288,12 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           )}
           <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
           <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
+          {stock.stage !== null && (
+            <span className={`stage-badge stage-badge--s${stock.stage}`}>S{stock.stage}</span>
+          )}
+          {stock.market_cap != null && stock.market_cap > 0 && (
+            <span className="chart-cell-mcap">{formatMarketCap(stock.market_cap)}</span>
+          )}
         </div>
         <button
           className={`chart-cell-measure-btn${phase !== 'idle' ? ' chart-cell-measure-btn--active' : ''}`}

@@ -28,6 +28,8 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "python-pptx>=0.6",
     "yfinance>=0.2",
+    "setuptools>=82.0.1",
+    "cachetools>=7.0.5",
 ]
 
 [project.optional-dependencies]
@@ -60,3 +62,11 @@ markers = [
 [tool.mypy]
 python_version = "3.13"
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]

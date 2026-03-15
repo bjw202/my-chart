@@ -36,6 +36,7 @@ class ScreenRequest(BaseModel):
     rs_min: float | None = Field(default=None, ge=0.0, le=100.0, description="Minimum RS_12M_Rating")
     markets: list[MarketName] = Field(default_factory=list, description="KOSPI and/or KOSDAQ")
     sectors: list[str] = Field(default_factory=list, description="산업명(대) values to include")
+    codes: list[str] = Field(default_factory=list, description="Stock codes to filter by (from cross-tab navigation)")
 
 
 class StockItem(BaseModel):

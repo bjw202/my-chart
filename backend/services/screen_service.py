@@ -50,8 +50,9 @@ def _build_where(req: ScreenRequest) -> tuple[str, list[object]]:
     params: list[object] = []
 
     if req.market_cap_min is not None:
+        # 프론트엔드는 억원 단위로 전송, DB는 원 단위로 저장
         conditions.append("market_cap >= ?")
-        params.append(req.market_cap_min)
+        params.append(int(req.market_cap_min) * 100_000_000)
 
     if req.chg_1d_min is not None:
         conditions.append("change_1d >= ?")
@@ -84,6 +85,11 @@ def _build_where(req: ScreenRequest) -> tuple[str, list[object]]:
         placeholders = ",".join("?" * len(req.sectors))
         conditions.append(f"sector_major IN ({placeholders})")
         params.extend(req.sectors)
+
+    if req.codes:
+        placeholders = ",".join("?" * len(req.codes))
+        conditions.append(f"code IN ({placeholders})")
+        params.extend(req.codes)
 
     # Pattern conditions: column names sourced exclusively from _INDICATOR_COLUMN
     pattern_clauses: list[str] = []
