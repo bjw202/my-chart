@@ -26,11 +26,15 @@ function fmtChange(v: number | null): { text: string; className: string } {
 
 export function StockItemRow({ stock, isSelected, isChecked, style, onClick, onToggleCheck }: StockItemProps): React.ReactElement {
   const change = fmtChange(stock.change_1d)
-  const marketCapDisplay = stock.market_cap === null
+  // market_cap은 원 단위로 저장됨 → 조/억 환산 표시
+  const marketCapDisplay = stock.market_cap === null || stock.market_cap === 0
     ? '-'
-    : stock.market_cap >= 10000
-      ? `${Math.floor(stock.market_cap / 10000)}조 ${stock.market_cap % 10000}억`
-      : `${stock.market_cap}억`
+    : (() => {
+        const cho = stock.market_cap / 1_000_000_000_000
+        if (cho >= 1) return `${cho.toFixed(1)}조`
+        const eok = stock.market_cap / 100_000_000
+        return `${Math.round(eok).toLocaleString('ko-KR')}억`
+      })()
 
   return (
     <div
