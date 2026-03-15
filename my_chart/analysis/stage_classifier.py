@@ -23,7 +23,8 @@ _STAGE2_ENTRY_VOLUME_RATIO = 1.5  # Volume > VolumeSMA10 * 1.5
 _STAGE4_SLOPE_THRESHOLD = -0.01   # SMA200_slope < -1%
 _STAGE2_SLOPE_THRESHOLD = 0.005   # SMA200_slope > 0.5%
 _STAGE2_RS_STRONG = 60.0          # RS > 60 → Stage 2 Strong
-_STAGE3_PROXIMITY = 0.03          # Close within SMA200 ±3%
+_STAGE3_PROXIMITY = 0.07          # Close within SMA200 ±7%
+_STAGE3_SLOPE_MAX = 0.02          # SMA200 slope 둔화 기준 (±2%)
 _STAGE1_SLOPE_FLAT = 0.005        # abs(SMA200_slope) < 0.5%
 _STAGE1_PROXIMITY = 0.05          # Close within SMA200 ±5%
 
@@ -113,13 +114,15 @@ def classify_stage(stock_row: dict[str, Any]) -> StageResult:
         )
 
     # --- Priority 3: Stage 3 (Top) ---
-    # Close near SMA200 (±3%) AND SMA200 flattening AND SMA50 declining (SMA50 < SMA200)
+    # Weinstein Stage 3: 상승 추세가 둔화되며 천장을 형성하는 구간
+    # 조건: Close가 SMA200 근처 (±7%) AND SMA200 slope가 둔화 (±2%) AND
+    #        SMA50 < SMA200 (골든크로스 해제, 하락 전환 시작)
     if sma200_proxy > 0:
         proximity_to_sma200 = abs(close - sma200_proxy) / sma200_proxy
         sma50_declining = sma50_proxy < sma200_proxy
 
         if (proximity_to_sma200 <= _STAGE3_PROXIMITY
-                and abs(sma40_slope) <= _STAGE2_SLOPE_THRESHOLD  # flattening
+                and abs(sma40_slope) <= _STAGE3_SLOPE_MAX
                 and sma50_declining):
             return StageResult(
                 name=name, stage=3, detail="Stage 3",
@@ -178,9 +181,8 @@ def _load_stocks_for_classification(
         name = r[0]
         if name in _INDEX_NAMES:
             continue
-        sma40 = float(r[3] or 0.0)
-        sma40_4w_ago = float(r[4] or 0.0)  # SMA40_Trend_4M = value 4 weeks ago
-        slope = _compute_slope(sma40, sma40_4w_ago)
+        # SMA40_Trend_4M은 SMA40의 4개월 추세 slope 값 (이미 비율로 계산됨)
+        slope = float(r[4] or 0.0)
 
         result.append({
             "Name": name,
