@@ -14,10 +14,10 @@ interface Props {
 
 // Weinstein Stage 색상 매핑
 const STAGE_COLORS: Record<number, string> = {
-  1: '#EAB308', // yellow-500: 축적 구간
-  2: '#22C55E', // green-500: 상승 구간
-  3: '#F97316', // orange-500: 분산 구간
-  4: '#EF4444', // red-500: 하락 구간
+  1: '#EAB308', // yellow-500: 바닥 구간 (Base)
+  2: '#22C55E', // green-500: 상승 구간 (Advance)
+  3: '#F97316', // orange-500: 천장 구간 (Top)
+  4: '#EF4444', // red-500: 하락 구간 (Decline)
 }
 const DEFAULT_COLOR = '#6B7280' // gray-500: stage 미분류
 
@@ -128,9 +128,9 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
         top: 'middle',
         textStyle: { color: '#9ca3af', fontSize: 11 },
         data: [
-          { name: 'S1 (축적)', icon: 'circle', itemStyle: { color: STAGE_COLORS[1] } },
+          { name: 'S1 (바닥)', icon: 'circle', itemStyle: { color: STAGE_COLORS[1] } },
           { name: 'S2 (상승)', icon: 'circle', itemStyle: { color: STAGE_COLORS[2] } },
-          { name: 'S3 (분산)', icon: 'circle', itemStyle: { color: STAGE_COLORS[3] } },
+          { name: 'S3 (천장)', icon: 'circle', itemStyle: { color: STAGE_COLORS[3] } },
           { name: 'S4 (하락)', icon: 'circle', itemStyle: { color: STAGE_COLORS[4] } },
           { name: '미분류', icon: 'circle', itemStyle: { color: DEFAULT_COLOR } },
         ],

@@ -72,10 +72,10 @@ export function StageDistributionBar({
         })}
       </div>
       <div className="stage-legend">
-        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s1"></span>S1 Base: SMA200 횡보, 주가 근접</span>
-        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s2"></span>S2 Advance: 주가 &gt; SMA50/200, 상승추세</span>
-        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s3"></span>S3 Top: SMA200 근접, 모멘텀 둔화</span>
-        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s4"></span>S4 Decline: 주가 &lt; SMA50/200, 하락추세</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s1"></span>S1 Base: SMA200 평탄, 바닥권 횡보</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s2"></span>S2 Advance: SMA50 &gt; SMA200, 상승 추세</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s3"></span>S3 Top: SMA200 둔화, SMA50 꺾임 (천장)</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s4"></span>S4 Decline: SMA200 하락, 하락 추세</span>
       </div>
     </div>
   )
