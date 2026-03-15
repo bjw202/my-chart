@@ -159,6 +159,26 @@ def get_market_overview(weekly_db_path: str) -> MarketOverviewResponse:
         for c in cycle_result.criteria
     ]
 
+    # 섹터 전환 감지 (non-critical — 실패 시 None 반환)
+    try:
+        from my_chart.analysis.sector_advanced import detect_sector_transitions
+        from backend.schemas.market import SectorAlertItem, SectorAlertsData
+
+        alerts = detect_sector_transitions(weekly_db_path)
+        sector_alerts: SectorAlertsData | None = SectorAlertsData(
+            emerging_leaders=[
+                SectorAlertItem(name=a.name, signals=a.signals)
+                for a in alerts.emerging_leaders
+            ],
+            weakening_sectors=[
+                SectorAlertItem(name=a.name, signals=a.signals)
+                for a in alerts.weakening_sectors
+            ],
+        )
+    except Exception:
+        logger.warning("섹터 전환 감지 실패", exc_info=True)
+        sector_alerts = None
+
     return MarketOverviewResponse(
         kospi=kospi_index,
         breadth=MarketBreadth(
@@ -171,4 +191,5 @@ def get_market_overview(weekly_db_path: str) -> MarketOverviewResponse:
             confidence=cycle_result.confidence,
         ),
         breadth_history=[_breadth_to_history_item(h) for h in history],
+        sector_alerts=sector_alerts,
     )

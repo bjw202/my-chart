@@ -63,6 +63,20 @@ class BreadthHistoryItem(BaseModel):
     breadth_score: float
 
 
+class SectorAlertItem(BaseModel):
+    """섹터 전환 알림 항목."""
+
+    name: str
+    signals: list[str]
+
+
+class SectorAlertsData(BaseModel):
+    """섹터 전환 알림 데이터."""
+
+    emerging_leaders: list[SectorAlertItem]
+    weakening_sectors: list[SectorAlertItem]
+
+
 class MarketOverviewResponse(BaseModel):
     """Response for GET /api/market/overview."""
 
@@ -71,3 +85,4 @@ class MarketOverviewResponse(BaseModel):
     breadth: MarketBreadth
     cycle: CycleData
     breadth_history: list[BreadthHistoryItem]
+    sector_alerts: SectorAlertsData | None = None

@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { SectorAlertsData } from '../../types/market'
 
 // Phase display configuration for badges
 const PHASE_CONFIG = {
@@ -13,6 +14,8 @@ export interface WeeklyHighlightsProps {
   sectors: Array<{ name: string; rank_change: number }>
   // R7: Stage 2 stock count; null means not yet loaded
   stage2Count?: number | null
+  // SPEC-TOPDOWN-002E: 섹터 전환 알림
+  sectorAlerts?: SectorAlertsData | null
 }
 
 // Format a rank change number as a signed string
@@ -21,9 +24,9 @@ function formatRankChange(change: number): string {
   return `${sign}${change}`
 }
 
-// @MX:NOTE: [AUTO] WeeklyHighlights shows phase summary + top-3 rank movers + Stage 2 count
-// @MX:SPEC: SPEC-TOPDOWN-001 R7
-export function WeeklyHighlights({ phase, choppy, sectors, stage2Count }: WeeklyHighlightsProps): ReactElement {
+// @MX:NOTE: [AUTO] WeeklyHighlights shows phase summary + top-3 rank movers + Stage 2 count + sector alerts
+// @MX:SPEC: SPEC-TOPDOWN-001 R7, SPEC-TOPDOWN-002E
+export function WeeklyHighlights({ phase, choppy, sectors, stage2Count, sectorAlerts }: WeeklyHighlightsProps): ReactElement {
   const phaseConfig = PHASE_CONFIG[phase]
 
   // Top 3 sectors by absolute rank change
@@ -83,6 +86,40 @@ export function WeeklyHighlights({ phase, choppy, sectors, stage2Count }: Weekly
           </div>
         )}
       </div>
+
+      {/* Emerging Leaders */}
+      {sectorAlerts && sectorAlerts.emerging_leaders.length > 0 && (
+        <div className="weekly-highlights-section">
+          <h4>Emerging Leaders</h4>
+          {sectorAlerts.emerging_leaders.map(alert => (
+            <div
+              key={alert.name}
+              className="rank-change-item"
+              style={{ color: 'var(--positive)' }}
+              title={alert.signals.join('\n')}
+            >
+              {'↑ '}{alert.name}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Weakening Sectors */}
+      {sectorAlerts && sectorAlerts.weakening_sectors.length > 0 && (
+        <div className="weekly-highlights-section">
+          <h4>Weakening Sectors</h4>
+          {sectorAlerts.weakening_sectors.map(alert => (
+            <div
+              key={alert.name}
+              className="rank-change-item"
+              style={{ color: 'var(--negative)' }}
+              title={alert.signals.join('\n')}
+            >
+              {'↓ '}{alert.name}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

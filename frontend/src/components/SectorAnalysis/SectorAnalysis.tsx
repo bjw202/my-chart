@@ -1,6 +1,6 @@
 // @MX:ANCHOR: [AUTO] SectorAnalysis is the container for sector ranking tab, consumes MarketContext and TabContext
-// @MX:REASON: Called from AppContent for sector-analysis tab; orchestrates SectorRankingTable + SectorDetailPanel
-// @MX:SPEC: SPEC-TOPDOWN-001D
+// @MX:REASON: Called from AppContent for sector-analysis tab; orchestrates SectorRankingTable + SectorDetailPanel + BubbleChart + BumpChart
+// @MX:SPEC: SPEC-TOPDOWN-001D, SPEC-TOPDOWN-002F, SPEC-TOPDOWN-002D
 import { useState, useMemo, useEffect } from 'react'
 import type { ReactElement } from 'react'
 import type { SectorRankItem } from '../../types/market'
@@ -8,6 +8,18 @@ import { useMarket } from '../../contexts/MarketContext'
 import { useTab } from '../../contexts/TabContext'
 import { SectorRankingTable } from './SectorRankingTable'
 import { SectorDetailPanel } from './SectorDetailPanel'
+import { BubbleChart } from './BubbleChart'
+import { BumpChart } from './BumpChart'
+import { RRGChart } from './RRGChart'
+
+// 서브 탭 타입 정의
+type SubTab = 'table' | 'bubble' | 'rrg' | 'bump'
+const SUB_TAB_LABELS: Record<SubTab, string> = {
+  table: 'Table',
+  bubble: 'Bubble',
+  rrg: 'RRG',
+  bump: 'Bump',
+}
 
 // Period toggle label map — module-level constant to avoid re-creation on each render
 const PERIOD_LABELS: Record<'w1' | 'm1' | 'm3', string> = { w1: '1W', m1: '1M', m3: '3M' }
@@ -35,6 +47,9 @@ function getSortValue(sector: SectorRankItem, field: string): number {
 export function SectorAnalysis(): ReactElement {
   const { sectorRanking } = useMarket()
   const { crossTabParams, clearCrossTabParams } = useTab()
+
+  // 서브 탭 상태 (로컬 상태 — context 불필요)
+  const [subTab, setSubTab] = useState<SubTab>('table')
 
   const [sortField, setSortField] = useState('rank')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -93,43 +108,86 @@ export function SectorAnalysis(): ReactElement {
 
   return (
     <div className="sector-analysis">
-      <div className="sector-analysis-toolbar">
-        <div className="period-toggle">
-          {(['w1', 'm1', 'm3'] as const).map(p => (
-            <button
-              key={p}
-              className={period === p ? 'active' : undefined}
-              onClick={() => handlePeriodChange(p)}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
-        </div>
-        {/* R6: Market filter toggle */}
-        <div className="market-toggle">
-          {(['all', 'KOSPI', 'KOSDAQ'] as const).map(m => (
-            <button
-              key={m}
-              className={marketFilter === m ? 'active' : undefined}
-              onClick={() => setMarketFilter(m)}
-            >
-              {MARKET_LABELS[m]}
-            </button>
-          ))}
-        </div>
+      {/* 서브 탭 내비게이션 */}
+      <div className="sector-sub-nav">
+        {(['table', 'bubble', 'rrg', 'bump'] as SubTab[]).map(tab => (
+          <button
+            key={tab}
+            className={`sector-sub-nav-btn${subTab === tab ? ' active' : ''}`}
+            onClick={() => setSubTab(tab)}
+          >
+            {SUB_TAB_LABELS[tab]}
+          </button>
+        ))}
       </div>
 
-      <SectorRankingTable
-        sectors={sortedSectors}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onSort={handleSort}
-        onSectorClick={setSelectedSector}
-        selectedSector={selectedSector}
-      />
+      {/* Table 뷰: 기존 섹터 랭킹 테이블 + 상세 패널 */}
+      {subTab === 'table' && (
+        <>
+          <div className="sector-analysis-toolbar">
+            <div className="period-toggle">
+              {(['w1', 'm1', 'm3'] as const).map(p => (
+                <button
+                  key={p}
+                  className={period === p ? 'active' : undefined}
+                  onClick={() => handlePeriodChange(p)}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+            {/* R6: Market filter toggle */}
+            <div className="market-toggle">
+              {(['all', 'KOSPI', 'KOSDAQ'] as const).map(m => (
+                <button
+                  key={m}
+                  className={marketFilter === m ? 'active' : undefined}
+                  onClick={() => setMarketFilter(m)}
+                >
+                  {MARKET_LABELS[m]}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {selectedSector && selectedSectorData && (
-        <SectorDetailPanel sector={selectedSectorData} />
+          <SectorRankingTable
+            sectors={sortedSectors}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onSectorClick={setSelectedSector}
+            selectedSector={selectedSector}
+          />
+
+          {selectedSector && selectedSectorData && (
+            <SectorDetailPanel sector={selectedSectorData} />
+          )}
+        </>
+      )}
+
+      {/* Bubble 뷰: 섹터/종목 버블 차트 */}
+      {subTab === 'bubble' && (
+        <BubbleChart initialSector={null} />
+      )}
+
+      {/* RRG 뷰: Relative Rotation Graph */}
+      {subTab === 'rrg' && (
+        <RRGChart
+          onSectorClick={(name) => {
+            setSelectedSector(name)
+            setSubTab('table')
+          }}
+        />
+      )}
+
+      {/* Bump 뷰: 섹터 순위 변동 bump chart */}
+      {subTab === 'bump' && (
+        <BumpChart
+          onSectorClick={(name) => {
+            setSelectedSector(name)
+            setSubTab('table')
+          }}
+        />
       )}
     </div>
   )

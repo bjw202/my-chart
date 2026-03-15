@@ -54,6 +54,17 @@ export interface MarketOverviewResponse {
     confidence: number
   }
   breadth_history: BreadthHistoryEntry[]
+  sector_alerts?: SectorAlertsData | null
+}
+
+export interface SectorAlertItem {
+  name: string
+  signals: string[]
+}
+
+export interface SectorAlertsData {
+  emerging_leaders: SectorAlertItem[]
+  weakening_sectors: SectorAlertItem[]
 }
 
 // Sector ranking API response types (matching GET /api/sector/ranking)
