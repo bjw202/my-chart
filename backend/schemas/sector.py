@@ -42,3 +42,31 @@ class SectorRankingResponse(BaseModel):
 
     date: str
     sectors: list[SectorRankItem]
+
+
+class SubSectorItem(BaseModel):
+    """A sub-sector breakdown item within a major sector."""
+
+    name: str
+    stock_count: int
+    stage1_count: int
+    stage2_count: int
+    stage3_count: int
+    stage4_count: int
+
+
+class TopStockItem(BaseModel):
+    """A top stock entry within a sector, ordered by RS."""
+
+    code: str
+    name: str
+    rs_12m: float
+    stage: int | None = None
+
+
+class SectorDetailResponse(BaseModel):
+    """Response for GET /api/sectors/{name}/detail."""
+
+    sector_name: str
+    sub_sectors: list[SubSectorItem]
+    top_stocks: list[TopStockItem]

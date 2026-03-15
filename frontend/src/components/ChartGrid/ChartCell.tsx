@@ -278,6 +278,9 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           )}
           <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
           <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
+          {stock.stage !== null && (
+            <span className={`stage-badge stage-badge--s${stock.stage}`}>S{stock.stage}</span>
+          )}
         </div>
         <button
           className={`chart-cell-measure-btn${phase !== 'idle' ? ' chart-cell-measure-btn--active' : ''}`}

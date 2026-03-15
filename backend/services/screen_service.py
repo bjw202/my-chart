@@ -85,6 +85,11 @@ def _build_where(req: ScreenRequest) -> tuple[str, list[object]]:
         conditions.append(f"sector_major IN ({placeholders})")
         params.extend(req.sectors)
 
+    if req.codes:
+        placeholders = ",".join("?" * len(req.codes))
+        conditions.append(f"code IN ({placeholders})")
+        params.extend(req.codes)
+
     # Pattern conditions: column names sourced exclusively from _INDICATOR_COLUMN
     pattern_clauses: list[str] = []
     for pat in req.patterns:

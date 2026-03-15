@@ -33,6 +33,7 @@ export interface ScreenRequest {
   rs_min: number | null
   markets: MarketName[]
   sectors: string[]
+  codes: string[] // Stock codes to filter by (from cross-tab navigation)
 }
 
 export const DEFAULT_SCREEN_REQUEST: ScreenRequest = {
@@ -46,4 +47,5 @@ export const DEFAULT_SCREEN_REQUEST: ScreenRequest = {
   rs_min: null,
   markets: [],
   sectors: [],
+  codes: [],
 }

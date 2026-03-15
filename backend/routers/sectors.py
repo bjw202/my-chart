@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.deps import DAILY_DB_PATH, WEEKLY_DB_PATH
 from backend.services.sector_service import get_sectors
-from backend.schemas.sector import SectorRankingResponse
+from backend.schemas.sector import SectorDetailResponse, SectorRankingResponse
 
 router = APIRouter()
 
@@ -50,3 +50,16 @@ async def sector_ranking() -> SectorRankingResponse:
             status_code=503,
             detail={"error": "weekly_db_not_ready", "detail": str(exc)},
         ) from exc
+
+
+# @MX:NOTE: [AUTO] /sectors/{sector_name}/detail must be declared AFTER /sectors/ranking
+# to prevent FastAPI routing "ranking" as a sector_name path parameter
+@router.get("/sectors/{sector_name}/detail", response_model=SectorDetailResponse)
+async def sector_detail(sector_name: str) -> SectorDetailResponse:
+    """Return sub-sector breakdown and top 5 stocks by RS for a major sector.
+
+    Uses daily DB (stock_meta) for stock data.
+    Returns empty lists if sector is not found.
+    """
+    from backend.services.sector_detail_service import get_sector_detail
+    return get_sector_detail(DAILY_DB_PATH, sector_name)

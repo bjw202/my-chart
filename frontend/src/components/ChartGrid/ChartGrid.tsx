@@ -5,6 +5,7 @@ import { useNavigation } from '../../contexts/NavigationContext'
 import { useChartGrid } from '../../hooks/useChartGrid'
 import { useScrollSync } from '../../hooks/useScrollSync'
 import type { StockItem } from '../../types/stock'
+import { fetchStageOverview } from '../../api/stage'
 import { ChartCell } from './ChartCell'
 import { ChartPagination } from './ChartPagination'
 
@@ -13,9 +14,28 @@ export function ChartGrid(): React.ReactElement {
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
+  const [stageMap, setStageMap] = useState<Map<string, number>>(new Map())
 
-  // Flatten all stocks from sector groups
-  const flatStocks: StockItem[] = results?.sectors.flatMap((s) => s.stocks) ?? []
+  // Fetch stage overview once and build code->stage lookup map
+  useEffect(() => {
+    fetchStageOverview()
+      .then((data) => {
+        const map = new Map<string, number>()
+        for (const stock of data.all_stocks) {
+          map.set(stock.code, stock.stage)
+        }
+        setStageMap(map)
+      })
+      .catch(() => {
+        // Stage data is optional; chart grid works without it
+      })
+  }, [])
+
+  // Flatten all stocks from sector groups and merge stage data
+  const flatStocks: StockItem[] = (results?.sectors.flatMap((s) => s.stocks) ?? []).map((stock) => ({
+    ...stock,
+    stage: stageMap.get(stock.code) ?? null,
+  }))
 
   const { currentPage, gridSize, totalPages, visibleStocks, goToPage, toggleGridSize } =
     useChartGrid(flatStocks)
