@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
+import type { ReactElement } from 'react'
 import { createChart, LineStyle } from 'lightweight-charts'
 import type { UTCTimestamp } from 'lightweight-charts'
 import type { BreadthHistoryEntry } from '../../types/market'
@@ -12,52 +13,111 @@ function dateToTimestamp(dateStr: string): UTCTimestamp {
   return Math.floor(new Date(dateStr).getTime() / 1000) as UTCTimestamp
 }
 
-// @MX:NOTE: [AUTO] BreadthChart renders 3 series via Lightweight Charts; uses ResizeObserver for responsive width
-export function BreadthChart({ history }: BreadthChartProps): React.ReactElement {
-  const containerRef = useRef<HTMLDivElement>(null)
+// Common dark theme options shared by both charts
+const CHART_LAYOUT = {
+  background: { color: '#1a1a2e' },
+  textColor: '#9ca3af',
+}
+
+const CHART_GRID = {
+  vertLines: { color: 'transparent' },
+  horzLines: { color: '#2d2d44' },
+}
+
+// @MX:NOTE: [AUTO] BreadthChart redesign: two separate chart instances (main 200px + mini 80px) + HTML legend panel.
+// @MX:NOTE: [AUTO] Main chart shows pct_above_sma50 and breadth_score on a shared 0-100 scale.
+// @MX:NOTE: [AUTO] Mini chart shows nh_nl_ratio independently on 0-1 scale to avoid scale mismatch.
+export function BreadthChart({ history }: BreadthChartProps): ReactElement {
+  const mainRef = useRef<HTMLDivElement>(null)
+  const miniRef = useRef<HTMLDivElement>(null)
+
+  // Derive latest values for the legend panel
+  const latest = history.length > 0
+    ? [...history].sort((a, b) => a.date.localeCompare(b.date)).at(-1)!
+    : null
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!mainRef.current || !miniRef.current) return
 
-    const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
-      height: 280,
-      layout: {
-        background: { color: '#1a1a2e' },
-        textColor: '#9ca3af',
-      },
+    // --- Main chart: pct_above_sma50 + breadth_score ---
+    const mainChart = createChart(mainRef.current, {
+      width: mainRef.current.clientWidth,
+      height: 200,
+      layout: CHART_LAYOUT,
+      grid: CHART_GRID,
+      rightPriceScale: { visible: false },
+      leftPriceScale: { visible: true },
+      timeScale: { borderColor: '#2d2d44' },
+    })
+
+    const pctSeries = mainChart.addLineSeries({
+      color: '#3b82f6',
+      lineWidth: 2,
+      priceScaleId: 'left',
+    })
+
+    const breadthSeries = mainChart.addLineSeries({
+      color: '#8b5cf6',
+      lineWidth: 1,
+      priceScaleId: 'left',
+    })
+
+    // Overbought / oversold reference lines
+    pctSeries.createPriceLine({
+      price: 60,
+      color: 'rgba(38,166,154,0.5)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: 'Overbought',
+    })
+    pctSeries.createPriceLine({
+      price: 40,
+      color: 'rgba(239,83,80,0.5)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: 'Oversold',
+    })
+
+    // --- Mini chart: nh_nl_ratio only ---
+    const miniChart = createChart(miniRef.current, {
+      width: miniRef.current.clientWidth,
+      height: 80,
+      layout: CHART_LAYOUT,
       grid: {
-        vertLines: { color: '#2d2d44' },
+        vertLines: { color: 'transparent' },
         horzLines: { color: '#2d2d44' },
       },
       rightPriceScale: { visible: true },
-      leftPriceScale: { visible: true },
+      leftPriceScale: { visible: false },
+      timeScale: { borderColor: '#2d2d44' },
     })
 
-    // Series 1: % above SMA50 (left axis, blue)
-    const pctSeries = chart.addLineSeries({
-      color: '#3b82f6',
-      lineWidth: 2,
-      title: '% > SMA50',
-      priceScaleId: 'left',
-    })
-
-    // Series 2: Breadth score (left axis, purple)
-    const breadthSeries = chart.addLineSeries({
-      color: '#8b5cf6',
-      lineWidth: 1,
-      title: 'Breadth Score',
-      priceScaleId: 'left',
-    })
-
-    // Series 3: NH-NL ratio (right axis, amber)
-    const nhNlSeries = chart.addLineSeries({
+    const nhNlSeries = miniChart.addLineSeries({
       color: '#f59e0b',
       lineWidth: 1,
-      title: 'NH-NL Ratio',
-      priceScaleId: 'nh-nl',
+      priceScaleId: 'right',
     })
 
+    nhNlSeries.createPriceLine({
+      price: 0.6,
+      color: 'rgba(38,166,154,0.5)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: 'Bullish',
+    })
+    nhNlSeries.createPriceLine({
+      price: 0.4,
+      color: 'rgba(239,83,80,0.5)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: 'Bearish',
+    })
+
+    // Populate series data
     if (history.length > 0) {
       const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date))
 
@@ -72,41 +132,63 @@ export function BreadthChart({ history }: BreadthChartProps): React.ReactElement
       )
     }
 
-    // Reference lines on pct_above_sma50: 60% (overbought) and 40% (oversold)
-    pctSeries.createPriceLine({
-      price: 60,
-      color: 'rgba(38,166,154,0.5)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: '60%',
+    // Responsive width: observe both containers
+    const ro = new ResizeObserver(() => {
+      if (mainRef.current) {
+        mainChart.applyOptions({ width: mainRef.current.clientWidth })
+      }
+      if (miniRef.current) {
+        miniChart.applyOptions({ width: miniRef.current.clientWidth })
+      }
     })
-    pctSeries.createPriceLine({
-      price: 40,
-      color: 'rgba(239,83,80,0.5)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: '40%',
-    })
-
-    // Responsive width via ResizeObserver
-    const ro = new ResizeObserver(entries => {
-      const { width } = entries[0].contentRect
-      chart.applyOptions({ width })
-    })
-    ro.observe(containerRef.current)
+    if (mainRef.current) ro.observe(mainRef.current)
+    if (miniRef.current) ro.observe(miniRef.current)
 
     return () => {
       ro.disconnect()
-      chart.remove()
+      mainChart.remove()
+      miniChart.remove()
     }
   }, [history])
 
   return (
     <div className="breadth-chart">
       <div className="breadth-chart-title">Market Breadth (12-week)</div>
-      <div ref={containerRef} className="breadth-chart-container" />
+
+      {/* Legend panel with current values and descriptions */}
+      <div className="breadth-legend" data-testid="breadth-legend">
+        <div className="breadth-legend-item">
+          <span className="breadth-legend-dot" style={{ background: '#3b82f6' }} />
+          <span className="breadth-legend-value">
+            {latest != null ? `${latest.pct_above_sma50.toFixed(1)}%` : '--'}
+          </span>
+          <span className="breadth-legend-label">% &gt; SMA50</span>
+          <span className="breadth-legend-desc">50일 이평선 위 종목 비율</span>
+        </div>
+        <div className="breadth-legend-item">
+          <span className="breadth-legend-dot" style={{ background: '#8b5cf6' }} />
+          <span className="breadth-legend-value">
+            {latest != null ? latest.breadth_score.toFixed(1) : '--'}
+          </span>
+          <span className="breadth-legend-label">Breadth Score</span>
+          <span className="breadth-legend-desc">시장 건전성 종합점수 (0-100)</span>
+        </div>
+        <div className="breadth-legend-item">
+          <span className="breadth-legend-dot" style={{ background: '#f59e0b' }} />
+          <span className="breadth-legend-value">
+            {latest != null ? latest.nh_nl_ratio.toFixed(2) : '--'}
+          </span>
+          <span className="breadth-legend-label">NH-NL Ratio</span>
+          <span className="breadth-legend-desc">신고가 / (신고가+신저가)</span>
+        </div>
+      </div>
+
+      {/* Main chart: % > SMA50 and Breadth Score */}
+      <div ref={mainRef} className="breadth-main-chart" data-testid="breadth-main-chart" />
+
+      {/* Mini chart: NH-NL Ratio */}
+      <div className="breadth-mini-label">NH-NL Ratio</div>
+      <div ref={miniRef} className="breadth-mini-chart" data-testid="breadth-mini-chart" />
     </div>
   )
 }

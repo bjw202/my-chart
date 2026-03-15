@@ -1,9 +1,9 @@
-// RED: Specification tests for BreadthChart component
+// RED: Specification tests for redesigned BreadthChart component
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
-// Lightweight Charts requires Canvas API (not in jsdom); mock the entire module
-// vi.mock is hoisted, so we cannot reference variables declared outside the factory
+// Lightweight Charts requires Canvas API (not in jsdom); mock the entire module.
+// vi.mock is hoisted, so we cannot reference variables declared outside the factory.
 vi.mock('lightweight-charts', () => {
   const mockCreatePriceLine = vi.fn()
   const mockLineSeries = {
@@ -26,15 +26,14 @@ import { BreadthChart } from '../BreadthChart'
 import * as LWC from 'lightweight-charts'
 
 const sampleHistory = [
-  { date: '2025-01-01', pct_above_sma50: 65.0, nh_nl_ratio: 1.5, breadth_score: 70.0 },
-  { date: '2025-01-08', pct_above_sma50: 60.0, nh_nl_ratio: 1.2, breadth_score: 65.0 },
-  { date: '2025-01-15', pct_above_sma50: 55.0, nh_nl_ratio: 1.0, breadth_score: 58.0 },
+  { date: '2025-01-01', pct_above_sma50: 65.0, nh_nl_ratio: 0.65, breadth_score: 70.0 },
+  { date: '2025-01-08', pct_above_sma50: 60.0, nh_nl_ratio: 0.55, breadth_score: 65.0 },
+  { date: '2025-01-15', pct_above_sma50: 40.5, nh_nl_ratio: 0.38, breadth_score: 46.0 },
 ]
 
 describe('BreadthChart', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Re-setup the mock return value after clearAllMocks
     const mockCreatePriceLine = vi.fn()
     const mockLineSeries = {
       setData: vi.fn(),
@@ -48,45 +47,59 @@ describe('BreadthChart', () => {
     } as unknown as ReturnType<typeof LWC.createChart>)
   })
 
-  it('renders chart container element', () => {
+  it('renders breadth-chart wrapper element', () => {
     render(<BreadthChart history={sampleHistory} />)
-    const container = document.querySelector('.breadth-chart-container')
-    expect(container).toBeInTheDocument()
+    expect(document.querySelector('.breadth-chart')).toBeInTheDocument()
   })
 
-  it('renders without error with empty history', () => {
+  it('renders both chart containers (main and mini)', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    expect(screen.getByTestId('breadth-main-chart')).toBeInTheDocument()
+    expect(screen.getByTestId('breadth-mini-chart')).toBeInTheDocument()
+  })
+
+  it('renders legend panel', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    expect(screen.getByTestId('breadth-legend')).toBeInTheDocument()
+  })
+
+  it('legend shows current (latest) value for pct_above_sma50', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    // Latest entry sorted by date is 2025-01-15 with pct_above_sma50 = 40.5
+    expect(screen.getByTestId('breadth-legend').textContent).toContain('40.5%')
+  })
+
+  it('legend shows current (latest) value for breadth_score', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    expect(screen.getByTestId('breadth-legend').textContent).toContain('46.0')
+  })
+
+  it('legend shows current (latest) value for nh_nl_ratio', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    expect(screen.getByTestId('breadth-legend').textContent).toContain('0.38')
+  })
+
+  it('legend shows Korean descriptions', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    const legend = screen.getByTestId('breadth-legend')
+    expect(legend.textContent).toContain('50일 이평선 위 종목 비율')
+    expect(legend.textContent).toContain('시장 건전성 종합점수')
+    expect(legend.textContent).toContain('신고가 / (신고가+신저가)')
+  })
+
+  it('creates two separate chart instances (main + mini)', () => {
+    render(<BreadthChart history={sampleHistory} />)
+    expect(LWC.createChart).toHaveBeenCalledTimes(2)
+  })
+
+  it('handles empty history without throwing', () => {
     expect(() => render(<BreadthChart history={[]} />)).not.toThrow()
   })
 
-  it('renders without error with sample history', () => {
-    expect(() => render(<BreadthChart history={sampleHistory} />)).not.toThrow()
-  })
-
-  it('calls createChart on mount', () => {
-    render(<BreadthChart history={sampleHistory} />)
-    expect(LWC.createChart).toHaveBeenCalled()
-  })
-
-  it('adds 3 line series for 3 data dimensions', () => {
-    render(<BreadthChart history={sampleHistory} />)
-    const chartInstance = vi.mocked(LWC.createChart).mock.results[0].value as ReturnType<typeof LWC.createChart>
-    expect(chartInstance.addLineSeries).toHaveBeenCalledTimes(3)
-  })
-
-  it('creates reference lines at 60 and 40 on pct_above_sma50 series', () => {
-    render(<BreadthChart history={sampleHistory} />)
-    const chartInstance = vi.mocked(LWC.createChart).mock.results[0].value as ReturnType<typeof LWC.createChart>
-    // First addLineSeries call = pct_above_sma50 series
-    const pctSeries = vi.mocked(chartInstance.addLineSeries).mock.results[0].value as ReturnType<typeof chartInstance.addLineSeries>
-    const priceCalls = vi.mocked(pctSeries.createPriceLine).mock.calls
-    const prices = priceCalls.map((call: unknown[]) => (call[0] as { price: number }).price)
-    expect(prices).toContain(60)
-    expect(prices).toContain(40)
-  })
-
-  it('has breadth-chart wrapper element', () => {
-    render(<BreadthChart history={sampleHistory} />)
-    const wrapper = document.querySelector('.breadth-chart')
-    expect(wrapper).toBeInTheDocument()
+  it('shows -- placeholders in legend when history is empty', () => {
+    render(<BreadthChart history={[]} />)
+    const legend = screen.getByTestId('breadth-legend')
+    const dashes = legend.textContent?.match(/--/g) ?? []
+    expect(dashes.length).toBeGreaterThanOrEqual(3)
   })
 })
