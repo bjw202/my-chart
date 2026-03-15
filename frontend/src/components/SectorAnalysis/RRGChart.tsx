@@ -206,7 +206,7 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       const total = points.length
 
       return {
-        type: 'line', name: sector.name, showSymbol: true,
+        type: 'line', name: sector.name, showSymbol: true, smooth: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: points.map((pt: any, i: number) => ({
           value: pt,
