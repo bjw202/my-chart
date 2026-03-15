@@ -23,11 +23,11 @@ describe('StageDistributionBar', () => {
       />
     )
 
-    // Each stage should display its name
-    expect(screen.getByText(/S1/i)).toBeInTheDocument()
-    expect(screen.getByText(/S2/i)).toBeInTheDocument()
-    expect(screen.getByText(/S3/i)).toBeInTheDocument()
-    expect(screen.getByText(/S4/i)).toBeInTheDocument()
+    // Each stage segment button should display its label + count
+    expect(screen.getByText('S1 120')).toBeInTheDocument()
+    expect(screen.getByText('S2 85')).toBeInTheDocument()
+    expect(screen.getByText('S3 45')).toBeInTheDocument()
+    expect(screen.getByText('S4 30')).toBeInTheDocument()
   })
 
   it('should display count and percentage for each stage', () => {

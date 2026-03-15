@@ -41,34 +41,42 @@ export function StageDistributionBar({
   }
 
   return (
-    <div className="stage-distribution-bar" role="group" aria-label="Stage distribution">
-      {STAGE_DEFS.map(({ key, label, cssClass, ariaLabel }) => {
-        const count = distribution[key]
-        const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0'
-        const widthPct = total > 0 ? (count / total) * 100 : 0
-        const isActive = activeStage === key
+    <div>
+      <div className="stage-distribution-bar" role="group" aria-label="Stage distribution">
+        {STAGE_DEFS.map(({ key, label, cssClass, ariaLabel }) => {
+          const count = distribution[key]
+          const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0'
+          const widthPct = total > 0 ? (count / total) * 100 : 0
+          const isActive = activeStage === key
 
-        return (
-          <button
-            key={key}
-            type="button"
-            className={[
-              'stage-distribution-segment',
-              cssClass,
-              isActive ? 'active' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            style={{ width: `${widthPct}%` }}
-            onClick={() => handleClick(key)}
-            aria-label={`${ariaLabel}: ${count} stocks (${pct}%)`}
-            aria-pressed={isActive}
-            title={`${ariaLabel}: ${count} (${pct}%)`}
-          >
-            {label} {count}
-          </button>
-        )
-      })}
+          return (
+            <button
+              key={key}
+              type="button"
+              className={[
+                'stage-distribution-segment',
+                cssClass,
+                isActive ? 'active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              style={{ width: `${widthPct}%` }}
+              onClick={() => handleClick(key)}
+              aria-label={`${ariaLabel}: ${count} stocks (${pct}%)`}
+              aria-pressed={isActive}
+              title={`${ariaLabel}: ${count} (${pct}%)`}
+            >
+              {label} {count}
+            </button>
+          )
+        })}
+      </div>
+      <div className="stage-legend">
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s1"></span>S1 Base: SMA200 횡보, 주가 근접</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s2"></span>S2 Advance: 주가 &gt; SMA50/200, 상승추세</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s3"></span>S3 Top: SMA200 근접, 모멘텀 둔화</span>
+        <span className="stage-legend-item"><span className="stage-legend-dot stage-dot--s4"></span>S4 Decline: 주가 &lt; SMA50/200, 하락추세</span>
+      </div>
     </div>
   )
 }
