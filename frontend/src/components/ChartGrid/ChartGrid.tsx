@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { VariableSizeList } from 'react-window'
 import { useScreen } from '../../contexts/ScreenContext'
+import { useTab } from '../../contexts/TabContext'
 import { useNavigation } from '../../contexts/NavigationContext'
 import { useChartGrid } from '../../hooks/useChartGrid'
 import { useScrollSync } from '../../hooks/useScrollSync'
 import type { StockItem } from '../../types/stock'
 import { fetchStageOverview } from '../../api/stage'
+import { DEFAULT_SCREEN_REQUEST } from '../../types/filter'
 import { ChartCell } from './ChartCell'
 import { ChartPagination } from './ChartPagination'
 
 export function ChartGrid(): React.ReactElement {
-  const { results } = useScreen()
+  const { results, applyFilters } = useScreen()
+  const { crossTabParams, clearCrossTabParams } = useTab()
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
@@ -30,6 +33,14 @@ export function ChartGrid(): React.ReactElement {
         // Stage data is optional; chart grid works without it
       })
   }, [])
+
+  // crossTabParams.stockCodes 수신 시 해당 종목만 필터링하여 조회
+  useEffect(() => {
+    if (crossTabParams?.stockCodes && crossTabParams.stockCodes.length > 0) {
+      applyFilters({ ...DEFAULT_SCREEN_REQUEST, codes: crossTabParams.stockCodes })
+      clearCrossTabParams()
+    }
+  }, [crossTabParams, applyFilters, clearCrossTabParams])
 
   // Flatten all stocks from sector groups and merge stage data
   const flatStocks: StockItem[] = (results?.sectors.flatMap((s) => s.stocks) ?? []).map((stock) => ({

@@ -92,80 +92,110 @@ export function SectorDetailPanel({ sector }: SectorDetailPanelProps): ReactElem
         <MetricCard label="Stock Count" value={sector.stock_count} />
       </div>
 
-      {/* Sub-sector breakdown */}
+      {/* Sub-sector breakdown + Top 5 stocks: 2-column layout */}
       {loadingDetail && (
-        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
+        <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)' }}>
           Loading sub-sector data...
         </div>
       )}
 
-      {detail && detail.sub_sectors.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
-            Sub-sector breakdown
-          </div>
-          <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ color: 'var(--text-muted)' }}>
-                <th style={{ textAlign: 'left', paddingBottom: 4 }}>Sub-sector</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4 }}>Stocks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.sub_sectors.map((sub) => (
-                <tr key={sub.name}>
-                  <td style={{ color: 'var(--text-primary)', paddingBottom: 2 }}>{sub.name}</td>
-                  <td style={{ textAlign: 'right', color: 'var(--text-secondary)', paddingBottom: 2 }}>
-                    {sub.stock_count}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {detail && (detail.sub_sectors.length > 0 || detail.top_stocks.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+          {/* Sub-sector breakdown */}
+          {detail.sub_sectors.length > 0 && (
+            <div style={{ background: 'var(--bg-surface)', borderRadius: 6, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
+                Sub-sector
+              </div>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                    <th style={{ textAlign: 'left', padding: '4px 0' }}>Name</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', width: 44 }}>Stocks</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', width: 44 }}>RS</th>
+                    <th style={{ textAlign: 'right', padding: '4px 0', width: 44 }}>S2%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.sub_sectors.map((sub, idx) => (
+                    <tr key={sub.name} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                      <td style={{ color: 'var(--text-primary)', padding: '5px 0', fontWeight: 500 }}>{sub.name}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px' }}>
+                        {sub.stock_count}
+                      </td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px' }}>
+                        {sub.rs_avg != null ? Math.round(sub.rs_avg) : '-'}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '5px 0', color: sub.stage2_pct != null && sub.stage2_pct >= 50 ? 'var(--positive)' : 'var(--text-secondary)' }}>
+                        {sub.stage2_pct != null ? `${Math.round(sub.stage2_pct)}%` : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-      {/* Top 5 stocks by RS */}
-      {detail && detail.top_stocks.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
-            Top 5 by RS
-          </div>
-          <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ color: 'var(--text-muted)' }}>
-                <th style={{ textAlign: 'left', paddingBottom: 4 }}>Stock</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4 }}>RS</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4 }}>Stage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.top_stocks.map((stock) => (
-                <tr key={stock.code}>
-                  <td style={{ color: 'var(--text-primary)', paddingBottom: 2 }}>
-                    {stock.name}
-                    <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{stock.code}</span>
-                  </td>
-                  <td style={{ textAlign: 'right', color: 'var(--text-secondary)', paddingBottom: 2 }}>
-                    {Math.round(stock.rs_12m)}
-                  </td>
-                  <td style={{ textAlign: 'right', paddingBottom: 2 }}>
-                    {stock.stage !== null ? (
-                      <span className={`stage-badge stage-badge--s${stock.stage}`}>S{stock.stage}</span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Top 5 stocks by RS */}
+          {detail.top_stocks.length > 0 && (
+            <div style={{ background: 'var(--bg-surface)', borderRadius: 6, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
+                Top 5 by RS
+              </div>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                    <th style={{ textAlign: 'left', padding: '4px 0' }}>Stock</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', width: 36 }}>RS</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', width: 52 }}>1M%</th>
+                    <th style={{ textAlign: 'right', padding: '4px 0', width: 36 }}>Stage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.top_stocks.map((stock, idx) => {
+                    const chgColor = stock.chg_1m == null
+                      ? 'var(--text-muted)'
+                      : stock.chg_1m >= 0
+                        ? 'var(--positive)'
+                        : 'var(--negative)'
+                    const chgText = stock.chg_1m == null
+                      ? '-'
+                      : stock.chg_1m >= 0
+                        ? `+${stock.chg_1m.toFixed(1)}%`
+                        : `${stock.chg_1m.toFixed(1)}%`
+
+                    return (
+                      <tr key={stock.code} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                        <td style={{ padding: '5px 0' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{stock.name}</span>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: 4, fontSize: 11 }}>{stock.code}</span>
+                        </td>
+                        <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px', fontWeight: 600 }}>
+                          {Math.round(stock.rs_12m)}
+                        </td>
+                        <td style={{ textAlign: 'right', color: chgColor, padding: '5px 6px', fontWeight: 500 }}>
+                          {chgText}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '5px 0' }}>
+                          {stock.stage !== null ? (
+                            <span className={`stage-badge stage-badge--s${stock.stage}`}>S{stock.stage}</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {/* Fallback for when detail is not loaded yet */}
       {!loadingDetail && !detail && (
-        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+        <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
           Sub-sector breakdown available in future update
         </div>
       )}

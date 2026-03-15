@@ -49,10 +49,14 @@ class SubSectorItem(BaseModel):
 
     name: str
     stock_count: int
-    stage1_count: int
-    stage2_count: int
-    stage3_count: int
-    stage4_count: int
+    stage1_count: int = 0
+    stage2_count: int = 0
+    stage3_count: int = 0
+    stage4_count: int = 0
+    # 소그룹 내 rs_12m 평균
+    rs_avg: float = 0.0
+    # Stage 2 종목 비율 (%)
+    stage2_pct: float = 0.0
 
 
 class TopStockItem(BaseModel):
@@ -62,6 +66,10 @@ class TopStockItem(BaseModel):
     name: str
     rs_12m: float
     stage: int | None = None
+    # 1개월 가격 변동률 (%)
+    chg_1m: float | None = None
+    # 상세 스테이지 설명 (예: "Stage 2", "Stage 4")
+    stage_detail: str | None = None
 
 
 class SectorDetailResponse(BaseModel):
