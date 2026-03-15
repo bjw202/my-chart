@@ -12,7 +12,7 @@ const makeCandidates = (): Stage2Candidate[] => [
     market: 'KOSPI',
     sector_major: 'IT',
     sector_minor: '반도체',
-    stage: 'Stage 2',
+    stage: 2,
     stage_detail: 'Stage 2 Strong',
     rs_12m: 75.5,
     chg_1m: 3.2,
@@ -27,7 +27,7 @@ const makeCandidates = (): Stage2Candidate[] => [
     market: 'KOSPI',
     sector_major: 'IT',
     sector_minor: '반도체',
-    stage: 'Stage 2',
+    stage: 2,
     stage_detail: 'Stage 2 entry',
     rs_12m: 45.0,
     chg_1m: 1.5,
@@ -42,7 +42,7 @@ const makeCandidates = (): Stage2Candidate[] => [
     market: 'KOSPI',
     sector_major: 'IT',
     sector_minor: '인터넷',
-    stage: 'Stage 1',
+    stage: 1,
     stage_detail: 'Stage 1',
     rs_12m: 30.0,
     chg_1m: -1.0,
@@ -74,7 +74,7 @@ describe('StockTable', () => {
     render(
       <StockTable
         candidates={makeCandidates()}
-        stageFilter="Stage 2"
+        stageFilter={2}
         sectorFilter={null}
         onStockSelect={vi.fn()}
         selectedStocks={new Set()}
@@ -95,7 +95,7 @@ describe('StockTable', () => {
         market: 'KOSPI',
         sector_major: 'Healthcare',
         sector_minor: '바이오',
-        stage: 'Stage 2',
+        stage: 2,
         stage_detail: 'Stage 2 Strong',
         rs_12m: 65.0,
         chg_1m: 2.1,

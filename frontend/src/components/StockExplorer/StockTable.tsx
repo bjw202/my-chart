@@ -4,7 +4,7 @@ import type { Stage2Candidate } from '../../types/stage'
 
 interface StockTableProps {
   candidates: Stage2Candidate[]
-  stageFilter: string | null
+  stageFilter: number | null
   sectorFilter: string | null
   onStockSelect: (code: string) => void
   selectedStocks: Set<string>
@@ -13,21 +13,18 @@ interface StockTableProps {
 type SortKey = 'name' | 'market' | 'stage' | 'rs_12m' | 'chg_1m' | 'volume_ratio'
 type SortDir = 'asc' | 'desc'
 
-// Determine badge class based on stage and RS rating
-// stage can be a number (1-4) or a string ("Stage 2", etc.) from the API
+// Determine badge class based on stage (integer 1-4) and RS rating
 function getStageBadgeClass(candidate: Stage2Candidate): string {
   const { stage, stage_detail, rs_12m } = candidate
-  const stageNum = typeof stage === 'number' ? stage : parseInt(String(stage), 10)
-  const stageStr = String(stage).toLowerCase()
 
-  if (stageNum === 2 || stageStr.includes('stage 2')) {
+  if (stage === 2) {
     if (rs_12m > 60) return 'stage-badge--s2-strong'
     if (stage_detail?.toLowerCase().includes('entry')) return 'stage-badge--s2-entry'
     return 'stage-badge--s2'
   }
-  if (stageNum === 1 || stageStr.includes('stage 1')) return 'stage-badge--s1'
-  if (stageNum === 3 || stageStr.includes('stage 3')) return 'stage-badge--s3'
-  if (stageNum === 4 || stageStr.includes('stage 4')) return 'stage-badge--s4'
+  if (stage === 1) return 'stage-badge--s1'
+  if (stage === 3) return 'stage-badge--s3'
+  if (stage === 4) return 'stage-badge--s4'
   return 'stage-badge--s1'
 }
 
@@ -53,9 +50,9 @@ export function StockTable({
     }
   }
 
-  // Apply filters
+  // Apply filters — stage is integer, compare directly with numeric stageFilter
   const filtered = candidates.filter((c) => {
-    if (stageFilter && String(c.stage) !== stageFilter) return false
+    if (stageFilter !== null && c.stage !== stageFilter) return false
     if (sectorFilter && c.sector_major !== sectorFilter) return false
     return true
   })
@@ -127,7 +124,7 @@ export function StockTable({
                 <td>{c.market}</td>
                 <td>
                   <span className={`stage-badge ${badgeClass}`}>
-                    S{typeof c.stage === 'number' ? c.stage : c.stage.replace(/\D/g, '')}
+                    S{c.stage}
                   </span>
                   {isEntry && <span className="entry-star">★</span>}
                 </td>

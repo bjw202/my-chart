@@ -1,4 +1,4 @@
-import React from 'react'
+import type { ReactElement } from 'react'
 
 export interface MiniHeatmapSector {
   name: string
@@ -12,9 +12,10 @@ export interface MiniHeatmapProps {
 }
 
 // Map a return percentage to a heatmap background color (green = positive, red = negative)
+// Clamp range is ±15 to accommodate real API data where sector returns can exceed 16%
 function getHeatmapColor(returnPct: number): string {
-  const clamped = Math.max(-5, Math.min(5, returnPct))
-  const normalized = clamped / 5 // -1 to 1
+  const clamped = Math.max(-15, Math.min(15, returnPct))
+  const normalized = clamped / 15 // -1 to 1
   if (normalized >= 0) {
     const lightness = 25 - normalized * 12 // 25% to 13% (darker = stronger green)
     return `hsl(152, 60%, ${lightness}%)`
@@ -31,7 +32,7 @@ function formatReturn(returnPct: number): string {
 }
 
 // @MX:NOTE: [AUTO] MiniHeatmap renders CSS Grid of colored sector tiles; color driven by w1 return
-export function MiniHeatmap({ sectors, onSectorClick }: MiniHeatmapProps): React.ReactElement {
+export function MiniHeatmap({ sectors, onSectorClick }: MiniHeatmapProps): ReactElement {
   return (
     <div className="mini-heatmap">
       <div className="mini-heatmap-title">Sector Performance (1W)</div>

@@ -41,10 +41,11 @@ export interface BreadthHistoryEntry {
 
 export interface MarketOverviewResponse {
   kospi: MarketIndexData
-  kosdaq: MarketIndexData
+  // API returns null when KOSDAQ data is unavailable
+  kosdaq: MarketIndexData | null
   breadth: {
     kospi: BreadthData
-    kosdaq: BreadthData
+    kosdaq: BreadthData | null
   }
   cycle: {
     phase: 'bull' | 'sideways' | 'bear'

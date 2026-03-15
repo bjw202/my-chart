@@ -22,7 +22,7 @@ const mockResponse: StageOverviewResponse = {
       market: 'KOSPI',
       sector_major: 'IT',
       sector_minor: '반도체',
-      stage: 'Stage 2',
+      stage: 2,
       stage_detail: 'Stage 2 Strong',
       rs_12m: 75.5,
       chg_1m: 3.2,

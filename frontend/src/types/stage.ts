@@ -22,7 +22,8 @@ export interface Stage2Candidate {
   market: string
   sector_major: string
   sector_minor: string
-  stage: number | string
+  // API always returns integer stage values (1-4)
+  stage: number
   stage_detail: string
   rs_12m: number
   chg_1m: number

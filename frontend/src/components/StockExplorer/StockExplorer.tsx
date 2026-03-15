@@ -14,7 +14,7 @@ export function StockExplorer(): ReactElement {
   const [data, setData] = useState<StageOverviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [stageFilter, setStageFilter] = useState<string | null>(null)
+  const [stageFilter, setStageFilter] = useState<number | null>(null)
   const [sectorFilter, setSectorFilter] = useState<string | null>(null)
   const [selectedStocks, setSelectedStocks] = useState<Set<string>>(new Set())
 
@@ -55,24 +55,24 @@ export function StockExplorer(): ReactElement {
       setStageFilter(null)
       return
     }
-    // Map distribution bar keys to API stage values (numbers as strings)
-    const stageMap: Record<string, string> = {
-      stage1: '1',
-      stage2: '2',
-      stage3: '3',
-      stage4: '4',
+    // Map distribution bar keys to API stage integer values
+    const stageMap: Record<string, number> = {
+      stage1: 1,
+      stage2: 2,
+      stage3: 3,
+      stage4: 4,
     }
     setStageFilter(stageMap[stage] ?? null)
   }
 
   // Derive activeStage key from current stageFilter
-  const activeStageKey = stageFilter
+  const activeStageKey = stageFilter !== null
     ? Object.entries({
-        stage1: '1',
-        stage2: '2',
-        stage3: '3',
-        stage4: '4',
-      }).find(([, v]) => v === stageFilter)?.[0] ?? null
+        stage1: 1,
+        stage2: 2,
+        stage3: 3,
+        stage4: 4,
+      } as Record<string, number>).find(([, v]) => v === stageFilter)?.[0] ?? null
     : null
 
   if (loading) {
