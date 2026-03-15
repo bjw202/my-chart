@@ -1,4 +1,4 @@
-import React from 'react'
+import type { ReactElement } from 'react'
 
 // Phase display configuration for badges
 const PHASE_CONFIG = {
@@ -11,6 +11,8 @@ export interface WeeklyHighlightsProps {
   phase: 'bull' | 'sideways' | 'bear'
   choppy: boolean
   sectors: Array<{ name: string; rank_change: number }>
+  // R7: Stage 2 stock count; null means not yet loaded
+  stage2Count?: number | null
 }
 
 // Format a rank change number as a signed string
@@ -19,8 +21,9 @@ function formatRankChange(change: number): string {
   return `${sign}${change}`
 }
 
-// @MX:NOTE: [AUTO] WeeklyHighlights shows phase summary + top-3 rank movers; Stage 2 deferred to 001E
-export function WeeklyHighlights({ phase, choppy, sectors }: WeeklyHighlightsProps): React.ReactElement {
+// @MX:NOTE: [AUTO] WeeklyHighlights shows phase summary + top-3 rank movers + Stage 2 count
+// @MX:SPEC: SPEC-TOPDOWN-001 R7
+export function WeeklyHighlights({ phase, choppy, sectors, stage2Count }: WeeklyHighlightsProps): ReactElement {
   const phaseConfig = PHASE_CONFIG[phase]
 
   // Top 3 sectors by absolute rank change
@@ -66,12 +69,19 @@ export function WeeklyHighlights({ phase, choppy, sectors }: WeeklyHighlightsPro
         )}
       </div>
 
-      {/* Stage 2 entry - deferred to SPEC-TOPDOWN-001E */}
+      {/* Stage 2 stock count */}
       <div className="weekly-highlights-section">
-        <h4>Stage 2 Entry</h4>
-        <div className="rank-change-item" style={{ color: 'var(--text-muted)' }}>
-          Available in Stock Explorer tab
-        </div>
+        <h4>Stage 2</h4>
+        {stage2Count !== null && stage2Count !== undefined ? (
+          <div className="stage2-count">
+            <span className="stage2-count-number">{stage2Count}</span>
+            <span className="stage2-count-label"> stocks</span>
+          </div>
+        ) : (
+          <div className="rank-change-item" style={{ color: 'var(--text-muted)' }}>
+            —
+          </div>
+        )}
       </div>
     </div>
   )

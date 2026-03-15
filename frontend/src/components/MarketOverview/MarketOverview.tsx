@@ -1,6 +1,8 @@
-import React from 'react'
+import { useEffect, useState } from 'react'
+import type { ReactElement } from 'react'
 import { useMarket } from '../../contexts/MarketContext'
 import { useTab } from '../../contexts/TabContext'
+import { fetchStageOverview } from '../../api/stage'
 import { MarketPhaseCard } from './MarketPhaseCard'
 import { BreadthChart } from './BreadthChart'
 import { MiniHeatmap } from './MiniHeatmap'
@@ -9,9 +11,18 @@ import { WeeklyHighlights } from './WeeklyHighlights'
 // @MX:ANCHOR: [AUTO] MarketOverview is the top-level container for the Market Overview tab
 // @MX:REASON: Consumes MarketContext and TabContext; composed of 4 child components; high fan_in expected from AppContent
 
-export function MarketOverview(): React.ReactElement {
+export function MarketOverview(): ReactElement {
   const { overview, sectorRanking, loading, error } = useMarket()
   const { navigateToTab } = useTab()
+
+  // R7: Fetch Stage 2 count for WeeklyHighlights
+  const [stage2Count, setStage2Count] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetchStageOverview()
+      .then((data) => setStage2Count(data.distribution.stage2))
+      .catch(() => { /* non-critical: leave as null */ })
+  }, [])
 
   if (loading) {
     return <div className="market-overview-loading">Loading market data...</div>
@@ -46,6 +57,7 @@ export function MarketOverview(): React.ReactElement {
           phase={overview.cycle.phase}
           choppy={overview.cycle.choppy}
           sectors={sectorRanking?.sectors ?? []}
+          stage2Count={stage2Count}
         />
       </div>
     </div>

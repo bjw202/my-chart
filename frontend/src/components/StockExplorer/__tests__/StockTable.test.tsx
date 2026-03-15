@@ -242,4 +242,143 @@ describe('StockTable', () => {
 
     expect(screen.getByText('1.50')).toBeInTheDocument()
   })
+
+  // R4: 1M trend bar visual indicator
+  it('should show a trend bar element for each row', () => {
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[0]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    expect(container.querySelector('.trend-bar')).toBeTruthy()
+  })
+
+  it('should show positive trend bar for positive chg_1m', () => {
+    // 삼성전자: chg_1m=3.2 → positive
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[0]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const bar = container.querySelector('.trend-bar')
+    expect(bar?.classList.contains('trend-bar--positive')).toBe(true)
+  })
+
+  it('should show negative trend bar for negative chg_1m', () => {
+    // NAVER: chg_1m=-1.0 → negative
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[2]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const bar = container.querySelector('.trend-bar')
+    expect(bar?.classList.contains('trend-bar--negative')).toBe(true)
+  })
+
+  // R5: Key Checklist column
+  it('should show checklist column header', () => {
+    render(
+      <StockTable
+        candidates={makeCandidates()}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    expect(screen.getByText('Check')).toBeInTheDocument()
+  })
+
+  it('should show MA alignment indicator when close > sma50 > sma200', () => {
+    // 삼성전자: close=75000 > sma50=72000 > sma200=68000 → MA aligned
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[0]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const maIndicator = container.querySelector('[data-check="ma"]')
+    expect(maIndicator).toBeTruthy()
+    expect(maIndicator?.classList.contains('check-pass')).toBe(true)
+  })
+
+  it('should show MA fail indicator when MA not aligned', () => {
+    const candidates: Stage2Candidate[] = [{
+      ...makeCandidates()[0],
+      close: 60000, // close < sma50 → not aligned
+      sma50: 72000,
+      sma200: 68000,
+    }]
+    const { container } = render(
+      <StockTable
+        candidates={candidates}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const maIndicator = container.querySelector('[data-check="ma"]')
+    expect(maIndicator?.classList.contains('check-fail')).toBe(true)
+  })
+
+  it('should show volume surge indicator when volume_ratio >= 1.5', () => {
+    // 삼성전자: volume_ratio=1.5 → surge
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[0]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const volIndicator = container.querySelector('[data-check="vol"]')
+    expect(volIndicator?.classList.contains('check-pass')).toBe(true)
+  })
+
+  it('should show RS strength indicator when rs_12m >= 70', () => {
+    // 삼성전자: rs_12m=75.5 ≥ 70 → RS strong
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[0]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const rsIndicator = container.querySelector('[data-check="rs"]')
+    expect(rsIndicator?.classList.contains('check-pass')).toBe(true)
+  })
+
+  it('should show RS fail indicator when rs_12m < 70', () => {
+    // SK하이닉스: rs_12m=45.0 < 70 → RS weak
+    const { container } = render(
+      <StockTable
+        candidates={[makeCandidates()[1]]}
+        stageFilter={null}
+        sectorFilter={null}
+        onStockSelect={vi.fn()}
+        selectedStocks={new Set()}
+      />
+    )
+    const rsIndicator = container.querySelector('[data-check="rs"]')
+    expect(rsIndicator?.classList.contains('check-fail')).toBe(true)
+  })
 })

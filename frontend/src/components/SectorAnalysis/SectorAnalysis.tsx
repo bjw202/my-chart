@@ -12,6 +12,10 @@ import { SectorDetailPanel } from './SectorDetailPanel'
 // Period toggle label map — module-level constant to avoid re-creation on each render
 const PERIOD_LABELS: Record<'w1' | 'm1' | 'm3', string> = { w1: '1W', m1: '1M', m3: '3M' }
 
+// Market filter options
+type MarketFilter = 'all' | 'KOSPI' | 'KOSDAQ'
+const MARKET_LABELS: Record<MarketFilter, string> = { all: 'All', KOSPI: 'KOSPI', KOSDAQ: 'KOSDAQ' }
+
 // Map sort field names to sector property accessors
 function getSortValue(sector: SectorRankItem, field: string): number {
   switch (field) {
@@ -36,6 +40,8 @@ export function SectorAnalysis(): ReactElement {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedSector, setSelectedSector] = useState<string | null>(null)
   const [period, setPeriod] = useState<'w1' | 'm1' | 'm3'>('m1')
+  // R6: Market filter — all sectors span both markets; toggle is UI state only
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('all')
 
   // Handle cross-tab navigation from Market Overview heatmap click
   useEffect(() => {
@@ -96,6 +102,18 @@ export function SectorAnalysis(): ReactElement {
               onClick={() => handlePeriodChange(p)}
             >
               {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        {/* R6: Market filter toggle */}
+        <div className="market-toggle">
+          {(['all', 'KOSPI', 'KOSDAQ'] as const).map(m => (
+            <button
+              key={m}
+              className={marketFilter === m ? 'active' : undefined}
+              onClick={() => setMarketFilter(m)}
+            >
+              {MARKET_LABELS[m]}
             </button>
           ))}
         </div>

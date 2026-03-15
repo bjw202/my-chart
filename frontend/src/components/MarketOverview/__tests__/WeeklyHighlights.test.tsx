@@ -17,6 +17,24 @@ describe('WeeklyHighlights', () => {
     expect(screen.getByText(/market phase/i)).toBeInTheDocument()
   })
 
+  // R7: Stage 2 count display
+  it('shows stage 2 count when stage2Count is provided', () => {
+    render(<WeeklyHighlights phase="bull" choppy={false} sectors={sampleSectors} stage2Count={42} />)
+    expect(screen.getByText(/42/)).toBeInTheDocument()
+    expect(screen.getByText(/stage 2/i)).toBeInTheDocument()
+  })
+
+  it('shows placeholder when stage2Count is null', () => {
+    render(<WeeklyHighlights phase="bull" choppy={false} sectors={sampleSectors} stage2Count={null} />)
+    // Should show Stage 2 section header but no specific count
+    expect(screen.getByText(/stage 2/i)).toBeInTheDocument()
+  })
+
+  it('shows stage2Count as 0 correctly', () => {
+    render(<WeeklyHighlights phase="bull" choppy={false} sectors={sampleSectors} stage2Count={0} />)
+    expect(screen.getByText(/0/)).toBeInTheDocument()
+  })
+
   it('shows bull phase badge', () => {
     render(<WeeklyHighlights phase="bull" choppy={false} sectors={sampleSectors} />)
     expect(screen.getByText(/bull/i)).toBeInTheDocument()
@@ -66,9 +84,10 @@ describe('WeeklyHighlights', () => {
     expect(screen.getByText(/↓.*Healthcare/)).toBeInTheDocument()
   })
 
-  it('shows stage 2 placeholder text', () => {
+  it('shows stage 2 section with stock explorer reference when no count provided', () => {
     render(<WeeklyHighlights phase="bull" choppy={false} sectors={sampleSectors} />)
-    expect(screen.getByText(/Stock Explorer/i)).toBeInTheDocument()
+    // Stage 2 section should be present
+    expect(screen.getByText(/stage 2/i)).toBeInTheDocument()
   })
 
   it('renders with empty sectors without error', () => {

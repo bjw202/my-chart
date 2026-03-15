@@ -186,3 +186,40 @@ describe('SectorAnalysis — sorting', () => {
     expect(rsAvgHeader!.querySelector('.sort-arrow')).toBeInTheDocument()
   })
 })
+
+// R6: Market filter toggle
+describe('SectorAnalysis — market filter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCrossTabParams = null
+  })
+
+  it('renders market toggle buttons', () => {
+    render(<SectorAnalysis />)
+    expect(screen.getByRole('button', { name: /all/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /kospi/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /kosdaq/i })).toBeInTheDocument()
+  })
+
+  it('All market button is active by default', () => {
+    render(<SectorAnalysis />)
+    const allBtn = screen.getByRole('button', { name: /all/i })
+    expect(allBtn.classList.contains('active')).toBe(true)
+  })
+
+  it('clicking KOSPI button sets it as active', async () => {
+    const user = userEvent.setup()
+    render(<SectorAnalysis />)
+    const kospiBtn = screen.getByRole('button', { name: /kospi/i })
+    await user.click(kospiBtn)
+    expect(kospiBtn.classList.contains('active')).toBe(true)
+  })
+
+  it('clicking KOSDAQ button sets it as active', async () => {
+    const user = userEvent.setup()
+    render(<SectorAnalysis />)
+    const kosdaqBtn = screen.getByRole('button', { name: /kosdaq/i })
+    await user.click(kosdaqBtn)
+    expect(kosdaqBtn.classList.contains('active')).toBe(true)
+  })
+})

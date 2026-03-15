@@ -13,6 +13,34 @@ interface StockTableProps {
 type SortKey = 'name' | 'market' | 'stage' | 'rs_12m' | 'chg_1m' | 'volume_ratio'
 type SortDir = 'asc' | 'desc'
 
+// R5: Key checklist — evaluate the three criteria for a stock
+interface ChecklistResult {
+  ma: boolean    // close > sma50 > sma200
+  vol: boolean   // volume_ratio >= 1.5
+  rs: boolean    // rs_12m >= 70
+}
+
+function computeChecklist(c: Stage2Candidate): ChecklistResult {
+  return {
+    ma: c.close > c.sma50 && c.sma50 > c.sma200,
+    vol: c.volume_ratio >= 1.5,
+    rs: c.rs_12m >= 70,
+  }
+}
+
+// Render a single check indicator dot
+function CheckDot({ pass, label, checkKey }: { pass: boolean; label: string; checkKey: string }): ReactElement {
+  return (
+    <span
+      className={`check-dot ${pass ? 'check-pass' : 'check-fail'}`}
+      data-check={checkKey}
+      title={label}
+    >
+      {pass ? '●' : '○'}
+    </span>
+  )
+}
+
 // Determine badge class based on stage (integer 1-4) and RS rating
 function getStageBadgeClass(candidate: Stage2Candidate): string {
   const { stage, stage_detail, rs_12m } = candidate
@@ -97,6 +125,7 @@ export function StockTable({
             <th onClick={() => handleSort('volume_ratio')}>
               Vol Ratio{renderSortIndicator('volume_ratio')}
             </th>
+            <th>Check</th>
           </tr>
         </thead>
         <tbody>
@@ -106,6 +135,11 @@ export function StockTable({
             const rsRounded = Math.round(c.rs_12m)
             const chgColor = c.chg_1m >= 0 ? 'positive' : 'negative'
             const chgDisplay = `${c.chg_1m >= 0 ? '+' : ''}${c.chg_1m.toFixed(2)}%`
+            // R4: Trend bar — width proportional to |chg_1m|, capped at 100% at 20%
+            const trendBarWidth = Math.min(Math.abs(c.chg_1m) / 20 * 100, 100)
+            const trendBarClass = c.chg_1m >= 0 ? 'trend-bar--positive' : 'trend-bar--negative'
+
+            const checklist = computeChecklist(c)
 
             return (
               <tr key={c.code}>
@@ -129,8 +163,22 @@ export function StockTable({
                   {isEntry && <span className="entry-star">★</span>}
                 </td>
                 <td>{rsRounded}</td>
-                <td className={chgColor}>{chgDisplay}</td>
+                <td className={`chg-cell ${chgColor}`}>
+                  <div className="chg-cell-inner">
+                    <span>{chgDisplay}</span>
+                    <div
+                      className={`trend-bar ${trendBarClass}`}
+                      style={{ width: `${trendBarWidth}%` }}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </td>
                 <td>{c.volume_ratio.toFixed(2)}</td>
+                <td className="checklist-cell">
+                  <CheckDot pass={checklist.ma} label="MA Aligned (close > SMA50 > SMA200)" checkKey="ma" />
+                  <CheckDot pass={checklist.vol} label="Vol Surge (ratio ≥ 1.5)" checkKey="vol" />
+                  <CheckDot pass={checklist.rs} label="RS Strong (≥ 70)" checkKey="rs" />
+                </td>
               </tr>
             )
           })}
