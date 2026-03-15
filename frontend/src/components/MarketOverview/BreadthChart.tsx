@@ -83,21 +83,21 @@ export function BreadthChart({ history }: BreadthChartProps): ReactElement {
     // --- Mini chart: nh_nl_ratio only ---
     const miniChart = createChart(miniRef.current, {
       width: miniRef.current.clientWidth,
-      height: 80,
+      height: 120,
       layout: CHART_LAYOUT,
       grid: {
         vertLines: { color: 'transparent' },
         horzLines: { color: '#2d2d44' },
       },
-      rightPriceScale: { visible: true },
-      leftPriceScale: { visible: false },
+      rightPriceScale: { visible: false },
+      leftPriceScale: { visible: true },
       timeScale: { borderColor: '#2d2d44' },
     })
 
     const nhNlSeries = miniChart.addLineSeries({
       color: '#f59e0b',
-      lineWidth: 1,
-      priceScaleId: 'right',
+      lineWidth: 2,
+      priceScaleId: 'left',
     })
 
     nhNlSeries.createPriceLine({
