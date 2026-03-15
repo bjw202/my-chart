@@ -1,4 +1,4 @@
-import React from 'react'
+import type { ReactElement } from 'react'
 import { useMarket } from '../../contexts/MarketContext'
 import type { SectorRankItem } from '../../types/market'
 
@@ -21,7 +21,7 @@ function getWeakSectors(sectors: SectorRankItem[], count: number): SectorRankIte
   return [...sectors].sort((a, b) => b.rank - a.rank).slice(0, count)
 }
 
-export function ContextBar(): React.ReactElement {
+export function ContextBar(): ReactElement {
   const { overview, sectorRanking, loading, error } = useMarket()
 
   if (loading) {

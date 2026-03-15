@@ -27,8 +27,9 @@ const COLUMNS: { label: string; field: string; align: 'left' | 'right' }[] = [
 
 function getCellColor(value: number, type: 'return' | 'percentage'): string {
   if (type === 'return') {
-    if (value > 0) return `rgba(38, 166, 154, ${Math.min(Math.abs(value) / 5, 0.4)})`
-    if (value < 0) return `rgba(239, 83, 80, ${Math.min(Math.abs(value) / 5, 0.4)})`
+    // Clamp to ±15 to handle large sector returns (API returns up to 16%+)
+    if (value > 0) return `rgba(38, 166, 154, ${Math.min(Math.abs(value) / 15, 0.4)})`
+    if (value < 0) return `rgba(239, 83, 80, ${Math.min(Math.abs(value) / 15, 0.4)})`
     return 'transparent'
   }
   // percentage: 0-100 scale
@@ -83,10 +84,10 @@ export function SectorRankingTable({
             className={selectedSector === sector.name ? 'selected' : undefined}
             onClick={() => onSectorClick(sector.name)}
           >
-            {/* Rank column */}
+            {/* Rank column with rank change indicator */}
             <td style={{ textAlign: 'right' }}>
-              {sector.rank}
-              <RankChange change={sector.rank_change} />
+              <span>{sector.rank}</span>
+              {' '}<RankChange change={sector.rank_change} />
             </td>
             {/* Sector name */}
             <td style={{ textAlign: 'left' }}>{sector.name}</td>
