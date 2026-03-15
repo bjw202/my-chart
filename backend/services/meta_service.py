@@ -160,28 +160,42 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             "product": srow.get("주요제품"),
         }
 
-    # --- Fetch market cap from pykrx (batch) ---
+    # --- 시가총액 계산: basic_data.xlsx의 상장주식수 × 종가 ---
     market_cap_by_code: dict[str, int | None] = {}
     try:
-        from pykrx import stock as pykrx_stock
+        import pandas as pd
+        from pathlib import Path
 
-        pykrx_date = latest_daily_date.replace("-", "")  # YYYYMMDD
-        mc_df = pykrx_stock.get_market_cap(pykrx_date)
-        for code_idx, mc_row in mc_df.iterrows():
-            cap_won = mc_row.get("시가총액")
-            market_cap_by_code[str(code_idx).zfill(6)] = (
-                int(cap_won) // 100_000_000 if cap_won else None
+        basic_data_path = Path(__file__).resolve().parents[2] / "Input" / "basic_data.xlsx"
+        if basic_data_path.exists():
+            bd_df = pd.read_excel(
+                basic_data_path,
+                usecols=["단축코드", "상장주식수"],
+                dtype={"단축코드": str},
             )
+            shares_by_code: dict[str, int] = {}
+            for _, brow in bd_df.iterrows():
+                code = str(brow["단축코드"]).zfill(6)
+                shares = brow.get("상장주식수")
+                if shares and not (isinstance(shares, float) and math.isnan(shares)):
+                    shares_by_code[code] = int(shares)
+
+            # 종가(daily_by_name) × 상장주식수 = 시가총액(원)
+            for name, sector_info in sector_by_name.items():
+                code = sector_info["code"]
+                if code in shares_by_code and name in daily_by_name:
+                    close_price = daily_by_name[name][0]  # Close
+                    if close_price and close_price > 0:
+                        cap_won = int(close_price * shares_by_code[code])
+                        market_cap_by_code[code] = cap_won
+            logger.info(
+                "basic_data.xlsx에서 %d개 종목 시가총액 계산 완료",
+                len(market_cap_by_code),
+            )
+        else:
+            logger.warning("Input/basic_data.xlsx 파일 없음 — 시가총액 미반영")
     except Exception as exc:
-        logger.warning("pykrx market_cap fetch failed (%s); falling back to sectormap", exc)
-        # Fallback: use sectormap D-day column (億원 unit, same as stock_meta)
-        for _, srow in df_sector.iterrows():
-            code = str(srow["Code"]).zfill(6)
-            dday = srow.get("D-day")
-            if dday is not None and not (isinstance(dday, float) and math.isnan(dday)):
-                market_cap_by_code[code] = int(dday)
-        if market_cap_by_code:
-            logger.info("sectormap fallback loaded %d market_cap entries", len(market_cap_by_code))
+        logger.warning("basic_data.xlsx 시가총액 계산 실패 (%s)", exc)
 
     # --- Build and insert rows ---
     now_str = datetime.datetime.now().isoformat()
