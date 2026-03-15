@@ -140,9 +140,9 @@ export function StockExplorer(): ReactElement {
         onStageClick={handleStageClick}
       />
 
-      {/* Stock table */}
+      {/* Stock table — use all_stocks for full stage coverage, fallback to stage2_candidates */}
       <StockTable
-        candidates={data.stage2_candidates}
+        candidates={data.all_stocks?.length ? data.all_stocks : data.stage2_candidates}
         stageFilter={stageFilter}
         sectorFilter={sectorFilter}
         onStockSelect={handleStockSelect}

@@ -37,4 +37,5 @@ export interface StageOverviewResponse {
   distribution: StageDistribution
   by_sector: StageBySector[]
   stage2_candidates: Stage2Candidate[]
+  all_stocks: Stage2Candidate[]
 }

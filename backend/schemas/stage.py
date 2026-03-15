@@ -25,8 +25,8 @@ class SectorStageBreakdown(BaseModel):
     stage4: int
 
 
-class Stage2Candidate(BaseModel):
-    """Stage 2 entry candidate stock."""
+class StageStock(BaseModel):
+    """Stock with stage classification info."""
 
     code: str = ""
     name: str
@@ -43,9 +43,14 @@ class Stage2Candidate(BaseModel):
     sma200: float
 
 
+# Keep backward-compatible alias
+Stage2Candidate = StageStock
+
+
 class StageOverviewResponse(BaseModel):
     """Response for GET /api/stage/overview."""
 
     distribution: StageDistribution
     by_sector: list[SectorStageBreakdown]
-    stage2_candidates: list[Stage2Candidate]
+    stage2_candidates: list[StageStock]
+    all_stocks: list[StageStock] = []

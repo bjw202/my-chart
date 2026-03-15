@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 import sqlite3
 
-from my_chart.analysis.stage_classifier import classify_all, screen_stage2_entry
+from my_chart.analysis.stage_classifier import classify_all, classify_stage, screen_stage2_entry
 from my_chart.registry import get_sector_registry
 from backend.schemas.stage import (
     SectorStageBreakdown,
-    Stage2Candidate,
+    StageStock,
     StageDistribution,
     StageOverviewResponse,
 )
@@ -109,7 +109,7 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
         sector_minor_map[name] = str(row.get("산업명(중)", "") or "")
 
     candidates = [
-        Stage2Candidate(
+        StageStock(
             code=code_map.get(c["name"], ""),
             name=c["name"],
             market=market_map.get(c["name"], ""),
@@ -127,8 +127,48 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
         for c in candidates_raw
     ]
 
+    # Build all_stocks from classify_all results enriched with RS/price data
+    # Re-use the internal loader via the same query pattern as screen_stage2_entry
+    conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
+    try:
+        # Use the same SQL that stage_classifier uses internally
+        from my_chart.analysis.stage_classifier import _load_stocks_for_classification
+        raw_stocks = _load_stocks_for_classification(conn, date)
+    finally:
+        conn.close()
+
+    all_stocks_list: list[StageStock] = []
+    for stock in raw_stocks:
+        sr = classify_stage(stock)
+        sname = stock["Name"]
+        close = float(stock.get("Close", 0.0) or 0.0)
+        sma50_val = float(stock.get("SMA10", 0.0) or 0.0)
+        sma200_val = float(stock.get("SMA40", 0.0) or 0.0)
+        rs = float(stock.get("RS_12M_Rating", 0.0) or 0.0)
+        chg_1m_val = float(stock.get("CHG_1M", 0.0) or 0.0)
+        vol = float(stock.get("Volume", 0.0) or 0.0)
+        vol_sma = float(stock.get("VolumeSMA10", 0.0) or 0.0)
+        vol_ratio = vol / max(vol_sma, 1.0)
+
+        all_stocks_list.append(StageStock(
+            code=code_map.get(sname, ""),
+            name=sname,
+            market=market_map.get(sname, ""),
+            sector_major=sector_map.get(sname, ""),
+            sector_minor=sector_minor_map.get(sname, ""),
+            stage=sr.stage,
+            stage_detail=sr.detail,
+            rs_12m=round(rs, 2),
+            chg_1m=round(chg_1m_val * 100, 2),
+            volume_ratio=round(vol_ratio, 2),
+            close=round(close, 2),
+            sma50=round(sma50_val, 2),
+            sma200=round(sma200_val, 2),
+        ))
+
     return StageOverviewResponse(
         distribution=distribution,
         by_sector=by_sector,
         stage2_candidates=candidates,
+        all_stocks=all_stocks_list,
     )
