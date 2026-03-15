@@ -10,6 +10,14 @@ import { PriceRangeOverlay } from './PriceRangeOverlay'
 import { useAnalysis } from '../../hooks/useAnalysis'
 import { AnalysisModal } from '../AnalysisModal'
 
+// 시가총액을 간결하게 포맷 (조/억원 단위)
+function formatMarketCap(cap: number): string {
+  const eok = cap / 1e8
+  if (eok >= 10000) return `${(eok / 10000).toFixed(1)}조`
+  if (eok >= 1) return `${Math.round(eok).toLocaleString()}억`
+  return `${Math.round(cap / 1e4).toLocaleString()}만`
+}
+
 interface ChartCellProps {
   stock: StockItem
   isSelected: boolean
@@ -280,6 +288,9 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
           {stock.stage !== null && (
             <span className={`stage-badge stage-badge--s${stock.stage}`}>S{stock.stage}</span>
+          )}
+          {stock.market_cap != null && stock.market_cap > 0 && (
+            <span className="chart-cell-mcap">{formatMarketCap(stock.market_cap)}</span>
           )}
         </div>
         <button

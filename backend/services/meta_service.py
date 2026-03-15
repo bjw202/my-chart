@@ -175,10 +175,18 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             )
             shares_by_code: dict[str, int] = {}
             for _, brow in bd_df.iterrows():
-                code = str(brow["단축코드"]).zfill(6)
+                raw_code = brow.get("단축코드")
+                # 결측치 방어: 코드나 상장주식수가 NaN/None이면 건너뜀
+                if raw_code is None or (isinstance(raw_code, float) and math.isnan(raw_code)):
+                    continue
+                code = str(raw_code).zfill(6)
                 shares = brow.get("상장주식수")
-                if shares and not (isinstance(shares, float) and math.isnan(shares)):
+                if shares is None or (isinstance(shares, float) and math.isnan(shares)):
+                    continue
+                try:
                     shares_by_code[code] = int(shares)
+                except (ValueError, TypeError):
+                    continue
 
             # 종가(daily_by_name) × 상장주식수 = 시가총액(원)
             for name, sector_info in sector_by_name.items():
