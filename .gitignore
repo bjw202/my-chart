@@ -60,7 +60,6 @@ env/
 .coverage
 coverage.json
 htmlcov/
-frontend/coverage/
 
 # ===========================================
 # IDE & Editors
@@ -127,9 +126,6 @@ logs/
 .env.*
 !.env.example
 
-# KRX session cache (contains auth cookies)
-.krx_session.pkl
-
 # Certificate files
 *.pem
 *.p12
@@ -167,6 +163,8 @@ secret-*.*
 .claude/.env.local*
 .claude/local/
 .claude/plans/
+.claude/agent-memory/
+.claude/worktrees/
 
 # Skill-specific credentials
 .claude/skills/*/.env*
@@ -176,6 +174,13 @@ secret-*.*
 .claude/skills/*/*/*token*
 # Re-include legitimate skill module files containing "token" in their name
 !.claude/skills/*/modules/*token*.md
+
+# ===========================================
+# Local-Only Files (never sync via git pull)
+# ===========================================
+.moai/status_line.sh
+.moai/memory/
+.moai/worktrees/
 
 # ===========================================
 # Node.js (for docs/Nextra)
@@ -200,27 +205,22 @@ dist-ssr/
 .netlify/
 .firebase/
 
-# ===========================================
-# Auto Memory (user-specific, not tracked)
-# ===========================================
+# User Custom Patterns (preserved by moai update)
+CLAUDE.local.md
+Input/
+~$*
+*.pdf
+rim_fnguide/
+docs/
+tests/Untitled.md
+frontend/coverage/
+.krx_session.pkl
 memory/
-.claude/agent-memory/
-
-# ===========================================
-# Project-Specific
-# ===========================================
-# Generated output files (charts, PPTX, DB)
 Output/*.pptx
 Output/*.png
 Output/*.db
 Output/*.db-wal
 Output/*.db-shm
-
-# Cache directory
 .cache/
-
-# Session continuation files
 2026-*.txt
-
-# Original monolith (preserved locally, not tracked)
 my_chart_home_v5-10_noterin.py
