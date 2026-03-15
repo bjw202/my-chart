@@ -60,6 +60,7 @@ env/
 .coverage
 coverage.json
 htmlcov/
+frontend/coverage/
 
 # ===========================================
 # IDE & Editors
