@@ -247,7 +247,7 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
     sector_to_stocks: dict[str, list[str]] = {}
     for _, row in df_sector.iterrows():
         name = str(row["Name"])
-        sector = str(row.get("산업명(대)") or "Unknown")
+        sector = str(row.get("산업명(대)") or "기타")
         if sector not in sector_to_stocks:
             sector_to_stocks[sector] = []
         sector_to_stocks[sector].append(name)

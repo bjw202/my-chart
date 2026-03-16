@@ -22,10 +22,25 @@ _df_stock: pd.DataFrame | None = None
 _df_sector: pd.DataFrame | None = None
 
 
+def _normalize_sector_column(series: pd.Series) -> pd.Series:
+    """섹터 컬럼에서 빈 값, nan, '-' 등을 '기타'로 정규화."""
+    return (
+        series
+        .fillna("기타")
+        .astype(str)
+        .str.strip()
+        .replace({"": "기타", "-": "기타", "nan": "기타", "NaN": "기타", "None": "기타"})
+    )
+
+
 def _load_sectormap() -> pd.DataFrame:
     """Load sectormap.xlsx with English column headers (Code, Name, Market)."""
     df = pd.read_excel(str(SECTORMAP_PATH))
     df["Code"] = df["Code"].astype(str).str.zfill(6)
+    # 섹터 컬럼 정규화: 빈 값, nan, '-' 등을 '기타'로 처리
+    for col in ["산업명(대)", "산업명(중)"]:
+        if col in df.columns:
+            df[col] = _normalize_sector_column(df[col])
     return df
 
 
