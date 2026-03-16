@@ -11,6 +11,7 @@ interface ScreenContextValue {
   error: string | null
   applyFilters: (filters: ScreenRequest) => Promise<void>
   updateFilters: (partial: Partial<ScreenRequest>) => void
+  clearResults: () => void
 }
 
 const ScreenContext = createContext<ScreenContextValue | null>(null)
@@ -40,8 +41,13 @@ export function ScreenProvider({ children }: { children: React.ReactNode }): Rea
     setFilters((prev) => ({ ...prev, ...partial }))
   }, [])
 
+  const clearResults = useCallback(() => {
+    setResults(null)
+    setFilters(DEFAULT_SCREEN_REQUEST)
+  }, [])
+
   return (
-    <ScreenContext.Provider value={{ filters, results, loading, error, applyFilters, updateFilters }}>
+    <ScreenContext.Provider value={{ filters, results, loading, error, applyFilters, updateFilters, clearResults }}>
       {children}
     </ScreenContext.Provider>
   )

@@ -9,7 +9,7 @@ import { RSFilter } from './RSFilter'
 import { ReturnFilter } from './ReturnFilter'
 
 export function FilterBar(): React.ReactElement {
-  const { applyFilters } = useScreen()
+  const { applyFilters, clearResults } = useScreen()
   const [local, setLocal] = useState<ScreenRequest>(DEFAULT_SCREEN_REQUEST)
 
   const update = <K extends keyof ScreenRequest>(key: K, value: ScreenRequest[K]): void => {
@@ -23,6 +23,7 @@ export function FilterBar(): React.ReactElement {
 
   const handleReset = (): void => {
     setLocal(DEFAULT_SCREEN_REQUEST)
+    clearResults()
   }
 
   return (

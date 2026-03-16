@@ -140,9 +140,9 @@ describe('StockExplorer', () => {
     const viewChartsBtn = screen.getByRole('button', { name: /view charts/i })
     expect(viewChartsBtn).toBeDisabled()
 
-    // Select a stock
+    // Select a stock (checkboxes[0] is header "select all", checkboxes[1] is first stock row)
     const checkboxes = screen.getAllByRole('checkbox')
-    await user.click(checkboxes[0])
+    await user.click(checkboxes[1])
 
     // Now should be enabled
     expect(viewChartsBtn).not.toBeDisabled()
@@ -156,9 +156,9 @@ describe('StockExplorer', () => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
     })
 
-    // Select a stock
+    // Select a stock (checkboxes[0] is header "select all", checkboxes[1] is first stock row)
     const checkboxes = screen.getAllByRole('checkbox')
-    await user.click(checkboxes[0])
+    await user.click(checkboxes[1])
 
     // Click View Charts
     await user.click(screen.getByRole('button', { name: /view charts/i }))

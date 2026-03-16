@@ -31,23 +31,35 @@ function formatReturn(returnPct: number): string {
   return `${sign}${returnPct.toFixed(1)}%`
 }
 
+// 섹터명이 유효하지 않으면 "기타" 반환
+function normalizeSectorName(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'nan' || trimmed === 'None') {
+    return '기타'
+  }
+  return trimmed
+}
+
 // @MX:NOTE: [AUTO] MiniHeatmap renders CSS Grid of colored sector tiles; color driven by w1 return
 export function MiniHeatmap({ sectors, onSectorClick }: MiniHeatmapProps): ReactElement {
   return (
     <div className="mini-heatmap">
       <div className="mini-heatmap-title">Sector Performance (1W)</div>
       <div className="mini-heatmap-grid">
-        {sectors.map(sector => (
-          <div
-            key={sector.name}
-            className="mini-heatmap-cell"
-            style={{ backgroundColor: getHeatmapColor(sector.returns.w1) }}
-            onClick={() => onSectorClick(sector.name)}
-          >
-            <div className="mini-heatmap-cell-name">{sector.name}</div>
-            <div className="mini-heatmap-cell-return">{formatReturn(sector.returns.w1)}</div>
-          </div>
-        ))}
+        {sectors.map(sector => {
+          const displayName = normalizeSectorName(sector.name)
+          return (
+            <div
+              key={sector.name}
+              className="mini-heatmap-cell"
+              style={{ backgroundColor: getHeatmapColor(sector.returns.w1) }}
+              onClick={() => onSectorClick(sector.name)}
+            >
+              <div className="mini-heatmap-cell-name">{displayName}</div>
+              <div className="mini-heatmap-cell-return">{formatReturn(sector.returns.w1)}</div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -22,13 +22,13 @@ const PERIOD_OPTIONS = [
 
 // price_change 값을 기반으로 트리맵 색상 결정
 function getPriceChangeColor(priceChange: number): string {
-  if (priceChange > 5) return '#006400'      // 짙은 초록 (> +5%)
-  if (priceChange > 2) return '#228B22'      // 숲 초록 (+2~5%)
-  if (priceChange > 0.5) return '#90EE90'   // 연한 초록 (+0.5~2%)
-  if (priceChange >= -0.5) return '#808080' // 회색 (±0.5%)
-  if (priceChange >= -2) return '#FFB6C1'   // 연한 핑크 (-0.5~2%)
-  if (priceChange >= -5) return '#DC143C'   // 크림슨 (-2~5%)
-  return '#8B0000'                           // 짙은 빨강 (< -5%)
+  if (priceChange > 5) return '#1b5e20'      // 짙은 초록 (> +5%)
+  if (priceChange > 2) return '#2e7d32'      // 숲 초록 (+2~5%)
+  if (priceChange > 0.5) return '#4caf50'   // 초록 (+0.5~2%)
+  if (priceChange >= -0.5) return '#546e7a' // 회색 (±0.5%)
+  if (priceChange >= -2) return '#e53935'   // 빨강 (-0.5~2%)
+  if (priceChange >= -5) return '#c62828'   // 크림슨 (-2~5%)
+  return '#b71c1c'                           // 짙은 빨강 (< -5%)
 }
 
 // 시가총액을 억원 단위로 포맷
@@ -73,31 +73,22 @@ function buildChartOption(data: object[]): EChartsOption {
         roam: false,
         nodeClick: 'zoomToNode',
         breadcrumb: {
-          show: true,
-          top: 0,
-          itemStyle: { color: '#2d2d44' },
-          textStyle: { color: '#e5e7eb' },
+          show: false,
         },
         label: {
           show: true,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter: (params: any) => {
+            if (!params.name) return ''
             const d = params.data as { price_change?: number }
-            const pct = d.price_change !== undefined ? d.price_change.toFixed(2) : '0.00'
-            return `{name|${params.name}}\n{pct|${Number(pct) >= 0 ? '+' : ''}${pct}%}`
+            const pct = d?.price_change !== undefined ? d.price_change.toFixed(1) : '0.0'
+            const sign = Number(pct) >= 0 ? '+' : ''
+            return `${params.name}\n${sign}${pct}%`
           },
-          rich: {
-            name: {
-              color: '#e5e7eb',
-              fontSize: 11,
-              lineHeight: 16,
-            },
-            pct: {
-              color: '#e5e7eb',
-              fontSize: 10,
-              lineHeight: 14,
-            },
-          },
+          color: '#e5e7eb',
+          fontSize: 11,
+          lineHeight: 16,
+          fontWeight: 500,
         },
         upperLabel: {
           show: true,
@@ -109,16 +100,16 @@ function buildChartOption(data: object[]): EChartsOption {
         levels: [
           {
             // 루트 레벨
-            itemStyle: { borderColor: '#2d2d44', borderWidth: 2, gapWidth: 2 },
+            itemStyle: { borderColor: '#1a1a2e', borderWidth: 1, gapWidth: 1 },
           },
           {
             // 섹터 레벨
-            itemStyle: { borderColor: '#2d2d44', borderWidth: 1, gapWidth: 1 },
+            itemStyle: { borderColor: '#1a1a2e', borderWidth: 1, gapWidth: 1 },
             upperLabel: { show: true },
           },
           {
             // 종목 레벨
-            itemStyle: { borderColor: '#1a1a2e', borderWidth: 0.5, gapWidth: 0.5 },
+            itemStyle: { borderColor: 'rgba(26, 26, 46, 0.6)', borderWidth: 0.5, gapWidth: 0.5 },
             label: { show: true },
           },
         ],
@@ -128,13 +119,13 @@ function buildChartOption(data: object[]): EChartsOption {
       type: 'piecewise',
       show: true,
       pieces: [
-        { min: 5, color: '#006400', label: '> +5%' },
-        { min: 2, max: 5, color: '#228B22', label: '+2~5%' },
-        { min: 0.5, max: 2, color: '#90EE90', label: '+0.5~2%' },
-        { min: -0.5, max: 0.5, color: '#808080', label: '±0.5%' },
-        { min: -2, max: -0.5, color: '#FFB6C1', label: '-0.5~2%' },
-        { min: -5, max: -2, color: '#DC143C', label: '-2~5%' },
-        { max: -5, color: '#8B0000', label: '< -5%' },
+        { min: 5, color: '#1b5e20', label: '> +5%' },
+        { min: 2, max: 5, color: '#2e7d32', label: '+2~5%' },
+        { min: 0.5, max: 2, color: '#4caf50', label: '+0.5~2%' },
+        { min: -0.5, max: 0.5, color: '#546e7a', label: '±0.5%' },
+        { min: -2, max: -0.5, color: '#e53935', label: '-0.5~2%' },
+        { min: -5, max: -2, color: '#c62828', label: '-2~5%' },
+        { max: -5, color: '#b71c1c', label: '< -5%' },
       ],
       textStyle: { color: '#9ca3af' },
       orient: 'horizontal',

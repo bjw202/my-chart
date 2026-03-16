@@ -7,6 +7,7 @@ interface StockTableProps {
   stageFilter: number | null
   sectorFilter: string | null
   onStockSelect: (code: string) => void
+  onSelectAll?: (codes: string[]) => void
   selectedStocks: Set<string>
 }
 
@@ -64,6 +65,7 @@ export function StockTable({
   stageFilter,
   sectorFilter,
   onStockSelect,
+  onSelectAll,
   selectedStocks,
 }: StockTableProps): ReactElement {
   const [sortKey, setSortKey] = useState<SortKey>('rs_12m')
@@ -101,12 +103,36 @@ export function StockTable({
     return sortDir === 'asc' ? ' ▲' : ' ▼'
   }
 
+  // 전체선택 상태 계산
+  const allSelected = sorted.length > 0 && sorted.every((c) => selectedStocks.has(c.code))
+  const someSelected = sorted.some((c) => selectedStocks.has(c.code))
+
+  const handleSelectAll = () => {
+    if (onSelectAll) {
+      if (allSelected) {
+        onSelectAll([])  // 전체 해제
+      } else {
+        onSelectAll(sorted.map((c) => c.code))  // 전체 선택
+      }
+    }
+  }
+
   return (
     <div className="stock-table-wrapper">
       <table className="stock-table">
         <thead>
           <tr>
-            <th style={{ width: 32 }}></th>
+            <th style={{ width: 32 }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected && !allSelected
+                }}
+                onChange={handleSelectAll}
+                aria-label="Select all"
+              />
+            </th>
             <th onClick={() => handleSort('name')}>
               Name{renderSortIndicator('name')}
             </th>

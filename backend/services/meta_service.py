@@ -52,6 +52,18 @@ _INDEX_DDLS = [
 ]
 
 
+def _normalize_sector(value) -> str:
+    """섹터가 없거나 유효하지 않으면 '기타' 반환"""
+    if value is None:
+        return "기타"
+    if isinstance(value, float) and math.isnan(value):
+        return "기타"
+    s = str(value).strip()
+    if s in ("", "-", "nan", "NaN", "None"):
+        return "기타"
+    return s
+
+
 def _business_days_since(target: datetime.date) -> int:
     """Count business (Mon–Fri) days between target and today."""
     today = datetime.date.today()
@@ -155,8 +167,8 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
         sector_by_name[str(srow["Name"])] = {
             "code": str(srow["Code"]).zfill(6),
             "market": str(srow["Market"]),
-            "sector_major": srow.get("산업명(대)"),
-            "sector_minor": srow.get("산업명(중)"),
+            "sector_major": _normalize_sector(srow.get("산업명(대)")),
+            "sector_minor": _normalize_sector(srow.get("산업명(중)")),
             "product": srow.get("주요제품"),
         }
 

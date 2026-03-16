@@ -45,6 +45,16 @@ export function StockExplorer(): ReactElement {
     })
   }
 
+  const handleSelectAll = (codes: string[]) => {
+    if (codes.length === 0) {
+      // 전체 해제
+      setSelectedStocks(new Set())
+    } else {
+      // 전체 선택
+      setSelectedStocks(new Set(codes))
+    }
+  }
+
   const handleViewCharts = () => {
     navigateToTab('chart-grid', { stockCodes: [...selectedStocks] })
   }
@@ -146,6 +156,7 @@ export function StockExplorer(): ReactElement {
         stageFilter={stageFilter}
         sectorFilter={sectorFilter}
         onStockSelect={handleStockSelect}
+        onSelectAll={handleSelectAll}
         selectedStocks={selectedStocks}
       />
     </div>

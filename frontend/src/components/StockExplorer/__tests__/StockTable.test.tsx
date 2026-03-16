@@ -164,7 +164,8 @@ describe('StockTable', () => {
     )
 
     const checkboxes = screen.getAllByRole('checkbox')
-    await user.click(checkboxes[0])
+    // checkboxes[0] is header "select all", checkboxes[1] is first stock row
+    await user.click(checkboxes[1])
 
     expect(onStockSelect).toHaveBeenCalledWith('005930')
   })
@@ -181,9 +182,10 @@ describe('StockTable', () => {
     )
 
     const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
-    // First checkbox corresponds to 005930 (삼성전자)
-    expect(checkboxes[0].checked).toBe(true)
-    expect(checkboxes[1].checked).toBe(false)
+    // First checkbox is header "select all", second is 005930 (삼성전자)
+    expect(checkboxes[0].checked).toBe(false) // header checkbox (not all selected)
+    expect(checkboxes[1].checked).toBe(true)  // 삼성전자 selected
+    expect(checkboxes[2].checked).toBe(false) // other stock not selected
   })
 
   it('should display RS rating with correct value', () => {

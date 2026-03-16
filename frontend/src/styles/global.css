@@ -1892,7 +1892,7 @@ html, body, #root {
 .mini-heatmap-cell-return { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.9); }
 
 /* Weekly highlights */
-.weekly-highlights { flex: 2; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.weekly-highlights { flex: 0 0 200px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
 .weekly-highlights-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
 .weekly-highlights-section { margin-bottom: 12px; }
 .weekly-highlights-section h4 { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
@@ -2162,7 +2162,7 @@ html, body, #root {
    ======================================== */
 
 /* 히트맵 컨테이너: mini/treemap 전환 래퍼 */
-.heatmap-container { flex: 3; display: flex; flex-direction: column; gap: 8px; }
+.heatmap-container { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
 /* 뷰 전환 토글 버튼 (period-toggle 스타일 재사용) */
 .heatmap-toggle { display: flex; gap: 4px; }

@@ -49,11 +49,13 @@ vi.mock('../../../contexts/MarketContext', () => ({
 // Mock TabContext — default: no crossTabParams
 let mockCrossTabParams: { sectorName?: string } | null = null
 const mockClearCrossTabParams = vi.fn()
+const mockNavigateToTab = vi.fn()
 
 vi.mock('../../../contexts/TabContext', () => ({
   useTab: () => ({
     crossTabParams: mockCrossTabParams,
     clearCrossTabParams: mockClearCrossTabParams,
+    navigateToTab: mockNavigateToTab,
   }),
 }))
 

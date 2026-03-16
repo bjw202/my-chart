@@ -134,8 +134,8 @@ def get_market_overview(weekly_db_path: str) -> MarketOverviewResponse:
     # Determine cycle
     cycle_result = determine_cycle(kospi_breadth, kospi_data)
 
-    # Compute breadth history (12 weeks)
-    history = compute_breadth_history(weekly_db_path, "KOSPI", weeks=12)
+    # Compute breadth history (52 weeks = 1 year)
+    history = compute_breadth_history(weekly_db_path, "KOSPI", weeks=52)
     for h in history:
         h.breadth_score = compute_breadth_composite(h)
 
