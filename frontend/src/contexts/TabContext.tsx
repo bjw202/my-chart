@@ -5,6 +5,7 @@ interface TabContextValue {
   activeTab: TabId
   setActiveTab: (tab: TabId) => void
   navigateToTab: (tab: TabId, params?: CrossTabParams) => void
+  setCrossTabParams: (params: CrossTabParams) => void
   crossTabParams: CrossTabParams | null
   clearCrossTabParams: () => void
 }
@@ -29,7 +30,7 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
   }, [])
 
   return (
-    <TabContext.Provider value={{ activeTab, setActiveTab, navigateToTab, crossTabParams, clearCrossTabParams }}>
+    <TabContext.Provider value={{ activeTab, setActiveTab, navigateToTab, setCrossTabParams, crossTabParams, clearCrossTabParams }}>
       {children}
     </TabContext.Provider>
   )

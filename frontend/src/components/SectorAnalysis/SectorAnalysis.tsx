@@ -46,7 +46,7 @@ function getSortValue(sector: SectorRankItem, field: string): number {
 
 export function SectorAnalysis(): ReactElement {
   const { sectorRanking } = useMarket()
-  const { crossTabParams, clearCrossTabParams, navigateToTab } = useTab()
+  const { crossTabParams, clearCrossTabParams, setCrossTabParams } = useTab()
 
   // 서브 탭 상태 (로컬 상태 — context 불필요)
   const [subTab, setSubTab] = useState<SubTab>('table')
@@ -157,7 +157,7 @@ export function SectorAnalysis(): ReactElement {
             onSort={handleSort}
             onSectorClick={(name) => {
               setSelectedSector(name)
-              navigateToTab('stock-explorer', { sectorName: name })
+              setCrossTabParams({ sectorName: name })
             }}
             selectedSector={selectedSector}
           />
