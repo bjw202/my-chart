@@ -170,7 +170,6 @@ def get_rrg_data(weekly_db_path: str) -> RRGResponse:
 
     # KOSPI 종가 시계열 (트레일 기간과 동일)
     from backend.schemas.sector_advanced import KospiPoint
-    import sqlite3
     kospi_points: list[KospiPoint] = []
     try:
         conn = sqlite3.connect(weekly_db_path, check_same_thread=False)

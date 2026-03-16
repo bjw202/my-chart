@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 from collections import defaultdict
 
@@ -11,8 +10,6 @@ from backend.schemas.sector import (
     SubSectorItem,
     TopStockItem,
 )
-
-logger = logging.getLogger(__name__)
 
 # 섹터당 반환할 상위 종목 수
 _TOP_STOCKS_LIMIT = 5

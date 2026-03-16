@@ -29,11 +29,6 @@ def _get_latest_date(db_path: str) -> str | None:
         conn.close()
 
 
-def _get_sector_for_stock(name: str, sector_map: dict[str, str]) -> str:
-    """Get sector for a stock name, defaulting to 'Unknown'."""
-    return sector_map.get(name, "Unknown")
-
-
 def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
     """Compute stage distribution and entry candidates.
 

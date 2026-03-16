@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 
 from backend.deps import get_db_conn
 from backend.schemas.chart import CandleBar, ChartResponse, MAOverlays, MAPoint, VolumeBar
-
-logger = logging.getLogger(__name__)
 
 
 def get_chart_data(code: str, daily_db_path: str) -> ChartResponse:

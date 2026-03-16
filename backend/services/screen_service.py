@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 from collections import defaultdict
 
@@ -13,8 +12,6 @@ from backend.schemas.screen import (
     SectorGroup,
     StockItem,
 )
-
-logger = logging.getLogger(__name__)
 
 # Maps Pydantic Literal indicator names to actual stock_meta column names.
 # Column names are hardcoded here (not from user input) to prevent SQL injection.

@@ -63,8 +63,6 @@ async def db_status() -> EventSourceResponse:
 @router.get("/db/last-updated", response_model=LastUpdated)
 async def last_updated() -> LastUpdated:
     """Return the timestamp of the last successful DB update and current DB file sizes."""
-    from backend.services.progress_store import get_progress as _gp
-
     # Derive last_updated and latest_data_date from the daily DB
     last_ts: str | None = None
     latest_date: str | None = None
