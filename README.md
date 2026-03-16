@@ -148,7 +148,13 @@ pytest tests/ -q
 ## 설정
 
 ### Input 디렉토리
-주식 정보는 `Input/sectormap.xlsx`에서 로드합니다:
+
+| 파일 | 출처 | 용도 |
+|------|------|------|
+| `sectormap.xlsx` | [세종데이터](https://www.sejongdata.com/) | 종목코드, 종목명, 시장(KOSPI/KOSDAQ), 섹터 분류(산업명 대/중, 주요제품) |
+| `basic_data.xlsx` | [KRX 정보데이터시스템](https://data.krx.co.kr/) | 상장주식수 (시가총액 계산에 사용: 종가 x 상장주식수) |
+| `sectormap_original.xlsx` | 세종데이터 (원본) | 백업용 원본 파일 (코드에서 직접 사용하지 않음) |
+
 - KOSPI 주식 (~833개)
 - KOSDAQ 주식 (~1,719개)
 - 섹터 분류 정보
