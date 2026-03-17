@@ -89,11 +89,11 @@ export function SectorBubbleChart({ sectors, onSectorClick }: Props): ReactEleme
         show: false,
         dimension: 3,
         pieces: [
-          { lt: -3, color: '#DC2626' },       // 강한 음수: red-600
-          { gte: -3, lt: -1, color: '#F87171' }, // 약한 음수: red-400
+          { lt: -3, color: '#1565C0' },       // 강한 음수: blue-800
+          { gte: -3, lt: -1, color: '#42A5F5' }, // 약한 음수: blue-400
           { gte: -1, lt: 1, color: '#9CA3AF' },  // 중립: gray-400
-          { gte: 1, lt: 3, color: '#4ADE80' },   // 약한 양수: green-400
-          { gte: 3, color: '#16A34A' },           // 강한 양수: green-600
+          { gte: 1, lt: 3, color: '#EF5350' },   // 약한 양수: red-400
+          { gte: 3, color: '#D32F2F' },           // 강한 양수: red-700
         ],
       },
       series: [

@@ -241,9 +241,9 @@ function SectionHealthIndicators({ data }: { data: HealthIndicators }): React.Re
 // ── Section 3: B/S 재분류 (Stacked Bar Chart) ────────────────────────────────
 
 const BS_COLORS: Record<string, string> = {
-  '신용조달': '#ef5350',
-  '외부차입': '#ff7043',
-  '주주몫': '#26a69a',
+  '신용조달': '#42a5f5',
+  '외부차입': '#5c6bc0',
+  '주주몫': '#ef5350',
   '비지배주주지분': '#66bb6a',
   '설비투자': '#42a5f5',
   '운전자산': '#5c6bc0',
@@ -593,7 +593,7 @@ function CCCTimeline({ data }: { data: ActivityRatios }): React.ReactElement | n
   const recPct = (recDays / totalSpan) * 100
   const payPct = (payDays / totalSpan) * 100
 
-  const cccColor = ccc < 0 ? 'var(--analysis-positive-color, #26a69a)' : ccc > 60 ? 'var(--analysis-negative-color, #ef5350)' : 'var(--analysis-muted-color, #78909c)'
+  const cccColor = ccc < 0 ? 'var(--analysis-positive-color, #ef5350)' : ccc > 60 ? 'var(--analysis-negative-color, #42a5f5)' : 'var(--analysis-muted-color, #78909c)'
 
   let interpretation: string
   if (ccc < 0) {

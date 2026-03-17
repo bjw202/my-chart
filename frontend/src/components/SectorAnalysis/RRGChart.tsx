@@ -276,7 +276,7 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
   }, [onSectorClick])
 
   if (loading) return <div className="rrg-chart-container"><div className="rrg-chart-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: 'var(--text-muted)' }}>RRG 데이터 로딩 중...</span></div></div>
-  if (error) return <div className="rrg-chart-container"><div className="rrg-chart-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: 'var(--negative)' }}>오류: {error}</span></div></div>
+  if (error) return <div className="rrg-chart-container"><div className="rrg-chart-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: 'var(--error)' }}>오류: {error}</span></div></div>
   if (!data || data.sectors.length === 0) return <div className="rrg-chart-container"><div className="rrg-chart-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: 'var(--text-muted)' }}>RRG 데이터가 없습니다.</span></div></div>
 
   const option = buildOption(data.sectors)

@@ -11,17 +11,17 @@ export interface MiniHeatmapProps {
   onSectorClick: (sectorName: string) => void
 }
 
-// Map a return percentage to a heatmap background color (green = positive, red = negative)
+// 한국식: 양수 = red, 음수 = blue
 // Clamp range is ±15 to accommodate real API data where sector returns can exceed 16%
 function getHeatmapColor(returnPct: number): string {
   const clamped = Math.max(-15, Math.min(15, returnPct))
   const normalized = clamped / 15 // -1 to 1
   if (normalized >= 0) {
-    const lightness = 25 - normalized * 12 // 25% to 13% (darker = stronger green)
-    return `hsl(152, 60%, ${lightness}%)`
-  } else {
-    const lightness = 25 + normalized * 12 // 25% to 13% (darker = stronger red)
+    const lightness = 25 - normalized * 12 // 25% to 13% (darker = stronger red)
     return `hsl(4, 70%, ${lightness}%)`
+  } else {
+    const lightness = 25 + normalized * 12 // 25% to 13% (darker = stronger blue)
+    return `hsl(211, 80%, ${lightness}%)`
   }
 }
 

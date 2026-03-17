@@ -16,8 +16,9 @@
   --text-muted: #6b7280;
   --accent: #3b82f6;
   --accent-hover: #2563eb;
-  --positive: #26a69a;
-  --negative: #ef5350;
+  --positive: #ef5350;
+  --negative: #42a5f5;
+  --error: #ef5350;
   --tab-bar-height: 40px;
   --context-bar-height: 28px;
   --filter-bar-height: 60px;
@@ -102,7 +103,7 @@ html, body, #root {
 }
 
 .context-bar-phase--bull {
-  background: rgba(38, 166, 154, 0.18);
+  background: rgba(239, 83, 80, 0.18);
   color: var(--positive);
 }
 
@@ -112,7 +113,7 @@ html, body, #root {
 }
 
 .context-bar-phase--bear {
-  background: rgba(239, 83, 80, 0.18);
+  background: rgba(66, 165, 245, 0.18);
   color: var(--negative);
 }
 
@@ -494,7 +495,7 @@ html, body, #root {
   padding: 0 2px;
 }
 
-.pattern-remove-btn:hover { color: var(--negative); }
+.pattern-remove-btn:hover { color: var(--error); }
 
 .pattern-add-btn {
   background: transparent;
@@ -632,7 +633,7 @@ html, body, #root {
   overflow: hidden;
 }
 
-.db-update-error { color: var(--negative); font-size: 11px; }
+.db-update-error { color: var(--error); font-size: 11px; }
 .db-latest-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 
 /* Main content area */
@@ -744,7 +745,7 @@ html, body, #root {
 .chart-cell-check-btn--on {
   color: var(--positive);
   border-color: var(--positive);
-  background: rgba(38, 166, 154, 0.15);
+  background: rgba(239, 83, 80, 0.15);
 }
 
 .chart-cell-fs-btn {
@@ -839,7 +840,7 @@ html, body, #root {
 }
 .price-range-label.price-range--positive {
   color: var(--positive);
-  background: rgba(38, 166, 154, 0.15);
+  background: rgba(239, 83, 80, 0.15);
 }
 .price-range-label.price-range--negative {
   color: var(--negative);
@@ -978,7 +979,7 @@ html, body, #root {
   line-height: 1;
 }
 
-.watchlist-remove-btn:hover { color: var(--negative); }
+.watchlist-remove-btn:hover { color: var(--error); }
 
 .stock-list-body {
   flex: 1;
@@ -1149,7 +1150,7 @@ html, body, #root {
 
 .error-details {
   font-size: 11px;
-  color: var(--negative);
+  color: var(--error);
   background: rgba(239, 83, 80, 0.1);
   padding: 8px 12px;
   border-radius: 4px;
@@ -1301,7 +1302,7 @@ html, body, #root {
 
 .analysis-state-error {
   font-size: 13px;
-  color: var(--negative);
+  color: var(--error);
   max-width: 400px;
   text-align: center;
 }
@@ -1414,7 +1415,7 @@ html, body, #root {
 }
 
 .analysis-badge--ok {
-  background: rgba(38, 166, 154, 0.18);
+  background: rgba(239, 83, 80, 0.18);
   color: var(--positive);
 }
 
@@ -1425,7 +1426,7 @@ html, body, #root {
 
 .analysis-badge--danger {
   background: rgba(239, 83, 80, 0.18);
-  color: var(--negative);
+  color: var(--error);
 }
 
 /* Color utilities for tables — specificity must beat .analysis-table td */
@@ -1635,8 +1636,8 @@ html, body, #root {
 }
 
 .analysis-wf-bar--add {
-  background: rgba(38, 166, 154, 0.6);
-  border: 1px solid rgba(38, 166, 154, 0.7);
+  background: rgba(239, 83, 80, 0.6);
+  border: 1px solid rgba(239, 83, 80, 0.7);
 }
 
 .analysis-wf-bar--sub {
@@ -1673,7 +1674,7 @@ html, body, #root {
 }
 
 .analysis-trend-badge--up {
-  background: rgba(38, 166, 154, 0.18);
+  background: rgba(239, 83, 80, 0.18);
   color: var(--positive);
 }
 
@@ -1683,7 +1684,7 @@ html, body, #root {
 }
 
 .analysis-trend-badge--down {
-  background: rgba(239, 83, 80, 0.18);
+  background: rgba(66, 165, 245, 0.18);
   color: var(--negative);
 }
 
@@ -1707,7 +1708,7 @@ html, body, #root {
 
 .analysis-question--ok { border-left: 3px solid var(--positive); }
 .analysis-question--warn { border-left: 3px solid #ffd166; }
-.analysis-question--danger { border-left: 3px solid var(--negative); }
+.analysis-question--danger { border-left: 3px solid var(--error); }
 
 .analysis-question-icon {
   flex-shrink: 0;
@@ -1722,9 +1723,9 @@ html, body, #root {
   margin-top: 1px;
 }
 
-.analysis-question-icon--ok { background: rgba(38, 166, 154, 0.2); color: var(--positive); }
+.analysis-question-icon--ok { background: rgba(239, 83, 80, 0.2); color: var(--positive); }
 .analysis-question-icon--warn { background: rgba(255, 209, 102, 0.2); color: #ffd166; }
-.analysis-question-icon--danger { background: rgba(239, 83, 80, 0.2); color: var(--negative); }
+.analysis-question-icon--danger { background: rgba(239, 83, 80, 0.2); color: var(--error); }
 
 .analysis-question-body {
   display: flex;
@@ -1752,9 +1753,9 @@ html, body, #root {
   font-weight: 700;
 }
 
-.analysis-verdict--ok { background: rgba(38, 166, 154, 0.2); color: var(--positive); }
+.analysis-verdict--ok { background: rgba(239, 83, 80, 0.2); color: var(--positive); }
 .analysis-verdict--warn { background: rgba(255, 209, 102, 0.2); color: #ffd166; }
-.analysis-verdict--danger { background: rgba(239, 83, 80, 0.2); color: var(--negative); }
+.analysis-verdict--danger { background: rgba(239, 83, 80, 0.2); color: var(--error); }
 
 /* ── Section 8: CCC Timeline ──────────────────────────────────────────── */
 
@@ -1862,9 +1863,9 @@ html, body, #root {
 .market-phase-card-change { font-size: 14px; font-weight: 500; }
 .market-phase-card-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .phase-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.phase-badge--bull { background: rgba(38,166,154,0.2); color: #26a69a; }
+.phase-badge--bull { background: rgba(239,83,80,0.2); color: #ef5350; }
 .phase-badge--sideways { background: rgba(245,158,11,0.2); color: #f59e0b; }
-.phase-badge--bear { background: rgba(239,83,80,0.2); color: #ef5350; }
+.phase-badge--bear { background: rgba(66,165,245,0.2); color: #42a5f5; }
 .choppy-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; background: rgba(245,158,11,0.15); color: #f59e0b; margin-left: 8px; }
 
 /* Breadth chart redesign */
@@ -1953,7 +1954,7 @@ html, body, #root {
 .stock-explorer-toolbar-left { display: flex; align-items: center; gap: 8px; }
 .stock-explorer-toolbar-right { display: flex; gap: 8px; align-items: center; }
 .stock-explorer-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
-.stock-explorer-error { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--negative); font-size: 14px; }
+.stock-explorer-error { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--error); font-size: 14px; }
 .stock-explorer-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
 .selected-count { font-size: 12px; color: var(--text-muted); }
 .view-charts-btn { background: var(--accent); color: #fff; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; }
@@ -1965,18 +1966,18 @@ html, body, #root {
 .stage-distribution-segment:hover { opacity: 0.85; }
 .stage-distribution-segment.active { outline: 2px solid var(--accent); outline-offset: -2px; }
 .stage-segment--s1 { background: #6b7280; }
-.stage-segment--s2 { background: #26a69a; }
+.stage-segment--s2 { background: #ef5350; }
 .stage-segment--s3 { background: #f59e0b; }
-.stage-segment--s4 { background: #ef5350; }
+.stage-segment--s4 { background: #42a5f5; }
 
 /* Stage legend descriptions */
 .stage-legend { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
 .stage-legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-muted); }
 .stage-legend-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .stage-dot--s1 { background: #6b7280; }
-.stage-dot--s2 { background: #26a69a; }
+.stage-dot--s2 { background: #ef5350; }
 .stage-dot--s3 { background: #f59e0b; }
-.stage-dot--s4 { background: #ef5350; }
+.stage-dot--s4 { background: #42a5f5; }
 
 /* Key checklist dots */
 .checklist-cell { white-space: nowrap; }
@@ -2125,7 +2126,7 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: var(--negative);
+  color: var(--error);
   font-size: 13px;
 }
 
@@ -2147,11 +2148,11 @@ html, body, #root {
 /* Stage badges */
 .stage-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
 .stage-badge--s1 { background: rgba(107,114,128,0.2); color: #9ca3af; }
-.stage-badge--s2 { background: rgba(38,166,154,0.2); color: #26a69a; }
-.stage-badge--s2-strong { background: rgba(38,166,154,0.2); color: #26a69a; border: 1.5px solid #26a69a; }
-.stage-badge--s2-entry { background: rgba(38,166,154,0.3); color: #26a69a; border: 1.5px solid #26a69a; }
+.stage-badge--s2 { background: rgba(239,83,80,0.2); color: #ef5350; }
+.stage-badge--s2-strong { background: rgba(239,83,80,0.2); color: #ef5350; border: 1.5px solid #ef5350; }
+.stage-badge--s2-entry { background: rgba(239,83,80,0.3); color: #ef5350; border: 1.5px solid #ef5350; }
 .stage-badge--s3 { background: rgba(245,158,11,0.2); color: #f59e0b; }
-.stage-badge--s4 { background: rgba(239,83,80,0.2); color: #ef5350; }
+.stage-badge--s4 { background: rgba(66,165,245,0.2); color: #42a5f5; }
 .entry-star { color: #f59e0b; margin-left: 2px; }
 
 /* Sector filter chip */
@@ -2176,7 +2177,7 @@ html, body, #root {
 .treemap-heatmap-title { font-size: 13px; color: var(--text-secondary); }
 .treemap-heatmap-body { flex: 1; min-height: 400px; width: 100%; }
 .treemap-heatmap-state { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 400px; color: var(--text-muted); font-size: 13px; }
-.treemap-heatmap-error { color: var(--negative); }
+.treemap-heatmap-error { color: var(--error); }
 .sector-filter-chip button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; font-size: 14px; }
 
 /* ========================================
@@ -2200,4 +2201,4 @@ html, body, #root {
 
 /* 로딩 / 에러 상태 */
 .bump-loading { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 300px; color: var(--text-muted); font-size: 13px; }
-.bump-error { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 300px; color: var(--negative); font-size: 13px; }
+.bump-error { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 300px; color: var(--error); font-size: 13px; }

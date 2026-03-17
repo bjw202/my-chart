@@ -12,12 +12,12 @@ interface Props {
   onStockClick?: (stockName: string) => void
 }
 
-// Weinstein Stage 색상 매핑
+// Weinstein Stage 색상 매핑 (한국식: 상승=red, 하락=blue)
 const STAGE_COLORS: Record<number, string> = {
   1: '#EAB308', // yellow-500: 바닥 구간 (Base)
-  2: '#22C55E', // green-500: 상승 구간 (Advance)
+  2: '#EF5350', // red-400: 상승 구간 (Advance)
   3: '#F97316', // orange-500: 천장 구간 (Top)
-  4: '#EF4444', // red-500: 하락 구간 (Decline)
+  4: '#42A5F5', // blue-400: 하락 구간 (Decline)
 }
 const DEFAULT_COLOR = '#6B7280' // gray-500: stage 미분류
 

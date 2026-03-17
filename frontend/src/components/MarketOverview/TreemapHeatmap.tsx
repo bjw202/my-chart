@@ -20,15 +20,15 @@ const PERIOD_OPTIONS = [
   { label: '3M', value: '3m' },
 ] as const
 
-// price_change 값을 기반으로 트리맵 색상 결정
+// 한국식: 양수 = red, 음수 = blue
 function getPriceChangeColor(priceChange: number): string {
-  if (priceChange > 5) return '#1b5e20'      // 짙은 초록 (> +5%)
-  if (priceChange > 2) return '#2e7d32'      // 숲 초록 (+2~5%)
-  if (priceChange > 0.5) return '#4caf50'   // 초록 (+0.5~2%)
+  if (priceChange > 5) return '#b71c1c'      // 짙은 빨강 (> +5%)
+  if (priceChange > 2) return '#d32f2f'      // 크림슨 (+2~5%)
+  if (priceChange > 0.5) return '#ef5350'   // 빨강 (+0.5~2%)
   if (priceChange >= -0.5) return '#546e7a' // 회색 (±0.5%)
-  if (priceChange >= -2) return '#e53935'   // 빨강 (-0.5~2%)
-  if (priceChange >= -5) return '#c62828'   // 크림슨 (-2~5%)
-  return '#b71c1c'                           // 짙은 빨강 (< -5%)
+  if (priceChange >= -2) return '#42a5f5'   // 파랑 (-0.5~2%)
+  if (priceChange >= -5) return '#1e88e5'   // 진파랑 (-2~5%)
+  return '#1565c0'                           // 짙은 파랑 (< -5%)
 }
 
 // 시가총액을 억원 단위로 포맷
@@ -119,13 +119,13 @@ function buildChartOption(data: object[]): EChartsOption {
       type: 'piecewise',
       show: true,
       pieces: [
-        { min: 5, color: '#1b5e20', label: '> +5%' },
-        { min: 2, max: 5, color: '#2e7d32', label: '+2~5%' },
-        { min: 0.5, max: 2, color: '#4caf50', label: '+0.5~2%' },
+        { min: 5, color: '#b71c1c', label: '> +5%' },
+        { min: 2, max: 5, color: '#d32f2f', label: '+2~5%' },
+        { min: 0.5, max: 2, color: '#ef5350', label: '+0.5~2%' },
         { min: -0.5, max: 0.5, color: '#546e7a', label: '±0.5%' },
-        { min: -2, max: -0.5, color: '#e53935', label: '-0.5~2%' },
-        { min: -5, max: -2, color: '#c62828', label: '-2~5%' },
-        { max: -5, color: '#b71c1c', label: '< -5%' },
+        { min: -2, max: -0.5, color: '#42a5f5', label: '-0.5~2%' },
+        { min: -5, max: -2, color: '#1e88e5', label: '-2~5%' },
+        { max: -5, color: '#1565c0', label: '< -5%' },
       ],
       textStyle: { color: '#9ca3af' },
       orient: 'horizontal',
