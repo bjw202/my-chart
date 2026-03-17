@@ -4,6 +4,8 @@ import type { MarketOverviewResponse, SectorRankingResponse } from '../types/mar
 
 // Cache TTL: 1 hour in milliseconds
 const CACHE_TTL_MS = 60 * 60 * 1000
+// 백엔드 미응답 시 재시도 설정 (2초, 4초, 8초)
+export const RETRY_DELAYS_MS = [2000, 4000, 8000]
 
 interface MarketContextValue {
   overview: MarketOverviewResponse | null
@@ -26,7 +28,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }): Rea
   // Track last fetch timestamp for 1-hour cache TTL
   const lastFetchRef = useRef<number>(0)
 
-  const fetchAll = useCallback(async (force = false) => {
+  const fetchAll = useCallback(async (force = false, retryCount = 0) => {
     const now = Date.now()
     // Skip if within cache TTL and not forced
     if (!force && lastFetchRef.current > 0 && now - lastFetchRef.current < CACHE_TTL_MS) {
@@ -34,6 +36,9 @@ export function MarketProvider({ children }: { children: React.ReactNode }): Rea
     }
     setLoading(true)
     setError(null)
+
+    let shouldRetry = false
+
     try {
       // Fetch both endpoints in parallel; settle independently so one failure
       // does not block the other from providing data to the UI.
@@ -49,13 +54,26 @@ export function MarketProvider({ children }: { children: React.ReactNode }): Rea
       }
       // Only set error if both failed
       if (overviewResult.status === 'rejected' && rankingResult.status === 'rejected') {
-        setError(overviewResult.reason instanceof Error ? overviewResult.reason.message : 'Failed to fetch market data')
+        if (retryCount < RETRY_DELAYS_MS.length) {
+          shouldRetry = true
+        } else {
+          setError(overviewResult.reason instanceof Error ? overviewResult.reason.message : 'Failed to fetch market data')
+        }
       } else {
         lastFetchRef.current = Date.now()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch market data')
-    } finally {
+      if (retryCount < RETRY_DELAYS_MS.length) {
+        shouldRetry = true
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch market data')
+      }
+    }
+
+    // 백엔드 미응답 시 자동 재시도 (최대 3회, 2/4/8초 간격)
+    if (shouldRetry) {
+      setTimeout(() => void fetchAll(true, retryCount + 1), RETRY_DELAYS_MS[retryCount])
+    } else {
       setLoading(false)
     }
   }, [])

@@ -6,6 +6,9 @@ import type { StageOverviewResponse } from '../../types/stage'
 import { StageDistributionBar } from './StageDistributionBar'
 import { StockTable } from './StockTable'
 
+// 백엔드 미응답 시 재시도 설정 (2초, 4초, 8초)
+export const RETRY_DELAYS_MS = [2000, 4000, 8000]
+
 // @MX:NOTE: [AUTO] StockExplorer is the container for SPEC-TOPDOWN-001E Stock Explorer tab
 // Fetches /api/stage/overview, manages stage/sector filters, and handles cross-tab navigation
 
@@ -19,10 +22,28 @@ export function StockExplorer(): ReactElement {
   const [selectedStocks, setSelectedStocks] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    fetchStageOverview()
-      .then(setData)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
+    let cancelled = false
+    const fetchWithRetry = (retryCount: number) => {
+      fetchStageOverview()
+        .then((result) => {
+          if (!cancelled) {
+            setData(result)
+            setLoading(false)
+          }
+        })
+        .catch((e: Error) => {
+          if (cancelled) return
+          // 백엔드 미응답 시 자동 재시도 (최대 3회, 2/4/8초 간격)
+          if (retryCount < RETRY_DELAYS_MS.length) {
+            setTimeout(() => fetchWithRetry(retryCount + 1), RETRY_DELAYS_MS[retryCount])
+            return
+          }
+          setError(e.message)
+          setLoading(false)
+        })
+    }
+    fetchWithRetry(0)
+    return () => { cancelled = true }
   }, [])
 
   // Apply sector filter from cross-tab navigation (e.g. Sector Analysis tab)

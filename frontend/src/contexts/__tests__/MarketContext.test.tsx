@@ -8,7 +8,7 @@ vi.mock('../../api/market', () => ({
 }))
 
 import { fetchMarketOverview, fetchSectorRanking } from '../../api/market'
-import { MarketProvider, useMarket } from '../MarketContext'
+import { MarketProvider, useMarket, RETRY_DELAYS_MS } from '../MarketContext'
 import type { MarketOverviewResponse, SectorRankingResponse } from '../../types/market'
 
 const mockOverview: MarketOverviewResponse = {
@@ -40,9 +40,18 @@ function TestConsumer(): React.ReactElement {
   )
 }
 
+// 테스트에서 재시도 지연을 0으로 설정
+const originalDelays = [...RETRY_DELAYS_MS]
+
 describe('MarketProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // 재시도 지연을 0ms로 설정하여 테스트 속도 향상
+    RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, 0, 0, 0)
+  })
+
+  afterEach(() => {
+    RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, ...originalDelays)
   })
 
   it('should fetch data in parallel on mount', async () => {
@@ -77,7 +86,7 @@ describe('MarketProvider', () => {
     expect(screen.getByTestId('loading').textContent).toBe('true')
   })
 
-  it('should handle fetch error gracefully', async () => {
+  it('should handle fetch error gracefully after retries', async () => {
     vi.mocked(fetchMarketOverview).mockRejectedValue(new Error('API error'))
     vi.mocked(fetchSectorRanking).mockRejectedValue(new Error('API error'))
 
@@ -87,10 +96,13 @@ describe('MarketProvider', () => {
       </MarketProvider>
     )
 
+    // 재시도 지연 0ms이므로 빠르게 완료됨
     await waitFor(() => {
       expect(screen.getByTestId('error').textContent).not.toBe('none')
     })
     expect(screen.getByTestId('loading').textContent).toBe('false')
+    // 초기 1회 + 재시도 3회 = 총 4회 호출
+    expect(fetchMarketOverview).toHaveBeenCalledTimes(4)
   })
 
   it('should refresh data when refresh is called', async () => {

@@ -1,5 +1,5 @@
 // RED: Tests for ContextBar component
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('../../api/market', () => ({
@@ -8,7 +8,7 @@ vi.mock('../../api/market', () => ({
 }))
 
 import { fetchMarketOverview, fetchSectorRanking } from '../../api/market'
-import { MarketProvider } from '../../contexts/MarketContext'
+import { MarketProvider, RETRY_DELAYS_MS } from '../../contexts/MarketContext'
 import { ContextBar } from './ContextBar'
 import type { MarketOverviewResponse, SectorRankingResponse } from '../../types/market'
 
@@ -68,9 +68,16 @@ function renderContextBar() {
   )
 }
 
+const originalDelays = [...RETRY_DELAYS_MS]
+
 describe('ContextBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, 0, 0, 0)
+  })
+
+  afterEach(() => {
+    RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, ...originalDelays)
   })
 
   it('should show loading state while fetching', () => {

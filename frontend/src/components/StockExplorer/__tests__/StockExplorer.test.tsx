@@ -23,7 +23,7 @@ vi.mock('../../../contexts/TabContext', () => ({
 }))
 
 import { fetchStageOverview } from '../../../api/stage'
-import { StockExplorer } from '../StockExplorer'
+import { StockExplorer, RETRY_DELAYS_MS } from '../StockExplorer'
 
 const mockStageData: StageOverviewResponse = {
   distribution: { stage1: 120, stage2: 85, stage3: 45, stage4: 30, total: 280 },
@@ -62,11 +62,18 @@ const mockStageData: StageOverviewResponse = {
   ],
 }
 
+const originalDelays = [...RETRY_DELAYS_MS]
+
 describe('StockExplorer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCrossTabParams = null
     vi.mocked(fetchStageOverview).mockResolvedValue(mockStageData)
+    RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, 0, 0, 0)
+  })
+
+  afterEach(() => {
+    RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, ...originalDelays)
   })
 
   it('should fetch stage overview on mount', async () => {
@@ -103,14 +110,17 @@ describe('StockExplorer', () => {
     })
   })
 
-  it('should show error message if fetch fails', async () => {
+  it('should show error message if fetch fails after retries', async () => {
     vi.mocked(fetchStageOverview).mockRejectedValue(new Error('Failed to fetch'))
 
     render(<StockExplorer />)
 
+    // 재시도 지연 0ms이므로 빠르게 완료됨
     await waitFor(() => {
       expect(screen.getByText(/failed to fetch/i)).toBeInTheDocument()
     })
+    // 초기 1회 + 재시도 3회 = 총 4회 호출
+    expect(fetchStageOverview).toHaveBeenCalledTimes(4)
   })
 
   it('should apply sector filter from crossTabParams', async () => {
