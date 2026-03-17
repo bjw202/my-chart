@@ -113,10 +113,10 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
 
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#ef5350',
-      downColor: '#42a5f5',
+      downColor: '#1565ef',
       borderVisible: false,
       wickUpColor: '#ef5350',
-      wickDownColor: '#42a5f5',
+      wickDownColor: '#1565ef',
     })
 
     const volumeSeries = chart.addHistogramSeries({
@@ -169,7 +169,7 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
             value: v.value,
             color: (() => {
               const candle = data.candles.find((c) => c.time === v.time)
-              return candle && candle.close >= candle.open ? '#ef535055' : '#42a5f555'
+              return candle && candle.close >= candle.open ? '#ef535055' : '#1565ef55'
             })(),
           }))
         )
