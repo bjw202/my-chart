@@ -216,69 +216,190 @@ LOCKED ──[% / M / ESC]──> IDLE
 
 ## AI 기업 분석 (Perplexity 통합)
 
-차트 셀 오른쪽 툴바의 **AI 버튼**을 클릭하면 Perplexity API를 통해 실시간 AI 스윙 트레이더 리포트를 생성합니다. `SPEC-AI-REPORT-001` 참조.
+차트 셀 오른쪽 툴바의 **AI 버튼**을 클릭하면 Perplexity API를 통해 실시간 AI 스윙 트레이더 리포트를 생성합니다.
 
-### AI 엔진 구성
+- **SPEC**: [`SPEC-AI-REPORT-001`](.moai/specs/SPEC-AI-REPORT-001/spec.md) (현재 v1.1.6)
+- **서비스 구현**: [`backend/services/ai_report_service.py`](backend/services/ai_report_service.py)
+- **라우터**: [`backend/routers/ai_report.py`](backend/routers/ai_report.py)
+- **프롬프트 템플릿(canonical)**: [`backend/prompts/perplexity_prompt.md`](backend/prompts/perplexity_prompt.md)
 
-| 항목 | 값 |
-|------|-----|
-| **제공자** | Perplexity (`api.perplexity.ai/chat/completions`) |
-| **모델** | `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought) |
-| **검색 컨텍스트** | `search_context_size: "high"` (공간(Spaces) 수준 검색) |
-| **최신성** | `search_recency_filter: "month"` (최근 30일 소스 우선) |
-| **도메인 필터** | 최소 SNS 블랙리스트만 (instagram/x/twitter/facebook/reddit) |
-| **temperature** | 0.2 (재현성) |
-| **max_tokens** | 12,000 (reasoning + 리포트 본문) |
-| **스트리밍** | SSE (`stream: true`) |
+### 1. Perplexity API 호출 파라미터 (v1.1.6)
 
-### 시스템 프롬프트 (한국 애널리스트 6원칙)
+엔드포인트: `POST https://api.perplexity.ai/chat/completions` (SSE 스트리밍)
 
-모든 AI 분석은 다음 원칙을 강제합니다 (`backend/services/ai_report_service.py:SYSTEM_PROMPT`):
+| 파라미터 | 값 | 역할 |
+|---------|---|-----|
+| `model` | `sonar-reasoning-pro` | DeepSeek R1 기반 Chain-of-Thought 추론 모델 |
+| `stream` | `true` | SSE 실시간 스트리밍 (event-stream) |
+| `temperature` | `0.2` | 재현성 확보 (낮은 랜덤성) |
+| `max_tokens` | `12000` | 내부 `<think>` 추론 블록 + 최종 리포트 동시 생성 공간 |
+| `web_search_options.search_context_size` | `"high"` | 공간(Spaces) 수준의 검색 컨텍스트 확보 (품질 1차 레버) |
+| `search_recency_filter` | `"month"` | 최근 30일 소스 우선 |
+| `search_domain_filter` | `["-instagram.com", "-x.com", "-twitter.com", "-facebook.com", "-reddit.com"]` | SNS만 제외, 블로그/유튜브/공시/일간지 모두 허용 (공간 전략 일치) |
+| `return_related_questions` | `true` | 다중 패스 리서치 활성화 |
+| `messages` | `[{role: system, ...}, {role: user, ...}]` | system = 애널리스트 페르소나, user = 7단계 리포트 구조 요청 |
 
-1. 각 표 뒤에 1-2문단 서술형 인과 분석 필수
-2. 모든 수치·주장에 `[N]` 형식 출처 인용 필수
-3. 톱티어 2건 교차확인 = 확정, 단일 출처 = `[루머]`
-4. 기대(내러티브) vs 팩트(실적/공시) 명시적 구분
-5. 출처 우선순위: DART/KRX 공시 > 주요 일간지 > IR·분석 플랫폼
-6. 금지: 추상어 단독 사용, 매매권유, 출처 없는 수치, 근거 없는 전망
+**HTTP 타임아웃**: 180초 (high context는 응답 시간이 길어질 수 있음)
 
-### 사용자 분석 프롬프트
+### 2. 시스템 프롬프트 (system role, v1.1.6 전문)
 
-7단계 구조의 고정 프롬프트 (`docs/perplexity-prompt.md`):
+`backend/services/ai_report_service.py`의 `SYSTEM_PROMPT` 상수:
 
-1. **🔥 Executive Summary** — 방향·핵심테마·주목이유 Top3·7일 주가·핵심리스크
-2. **📦 0단계: 사업 본질** — 주력제품·매출구성·주요고객·밸류체인·시장지위
-3. **⚙️ 1단계: 최신 이벤트** — 최근 7일 ±5% 이슈표, 교차확인 표기
-4. **💬 2단계: 시장 심리** — 키워드 빈도, 긍부정 비율, 기대 vs 팩트
-5. **📈 3단계: 실적·밸류·수급·테크니컬** — 분기매출/밸류/수급/MA·RSI·ATR
-6. **📅 5단계: Catalyst** — 이벤트 캘린더, 전주 대비 변화
-7. **⚠️ 6단계: 리스크** — 리스크표, 모니터링지표
+```markdown
+당신은 한국 주식시장 전문 스윙 트레이딩 애널리스트입니다.
 
-프롬프트는 사용자 지정(fixed)이며 시스템이 편집하지 않습니다 (NFR-004 프롬프트 무결성).
+# 검색 전략 (필수 준수)
 
-### 환경 변수 설정
+대형주(시가총액 상위, 통신/금융/화학/자동차 등 전통 산업군)는 정보가
+여러 소스에 분산되어 있습니다. 데이터가 부족하다고 느껴지면 다음 순서로
+**추가 검색 관점을 능동적으로 동원**하세요:
 
-`.env` 파일에 Perplexity API 키를 설정합니다:
+1. 재무 데이터: DART 정기공시, 증권사 리포트(SK증권/미래에셋/하나/NH/메리츠 등),
+   wisereport, fnguide, buffettlab
+2. 배당/주주환원: 배당 정책 기사, 주주총회 공시, 배당수익률 비교 리포트
+3. 수급 데이터: GSIFN IR, 외국인/기관 순매수 보도, 공매도 잔고(KRX),
+   투자 블로그의 일일 집계
+4. 테크니컬: 알파스퀘어, 네이버 증권, 다음 금융, Investing.com의 실시간 차트
+5. 최신 이벤트: 장중 기사(news.nate, hankyung, mk, biz.chosun), 52주 신고가/저가,
+   VI 발동
+6. 산업 동향: 경쟁사 비교(동종 업종), 테마 관련 기사, 증권사 업종 리포트
 
-```bash
-PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+→ "검색 결과 부재" 단독 결론은 금지. 단일 소스라도 유용하면 인용하되
+   [루머]/[단일출처]로 명시.
+
+# 작성 원칙
+
+1. 각 표 뒤에는 반드시 1-2문단의 서술형 인과 분석을 추가하세요.
+2. 모든 수치·주장에는 [1], [2] 형식의 출처 인용을 반드시 부여하세요.
+3. 톱티어 2건 이상 교차 확인된 뉴스만 '확정'으로 분류하고,
+   단일 출처는 [루머] 또는 [단일출처]로 명시하세요.
+4. 기대(내러티브) vs 팩트(실적/공시) 패턴을 명시적으로 구분하세요.
+5. 출처 우선순위: DART/KRX 공시 > 주요 일간지 > 증권사 리포트 >
+   IR·분석 플랫폼 > 투자 블로그.
+6. 금지: 추상어("좋은/나쁜/강한" 단독 사용), 매매권유, 출처 없는 수치,
+   근거 없는 전망.
+7. 데이터 부족 시에도 찾아낸 범위에서 최대한 구체적 수치를 제시하고,
+   누락된 항목은 표 안에서 "미공개" 같은 짧은 라벨로만 표시하세요.
+   절대 "데이터 부재" 같은 안내 문구로 섹션 전체를 대체하지 마세요.
+8. 표 컬럼은 항상 6개 유지: 날짜(KST), 유형, 헤드라인, 출처,
+   주가반응/영향, 교차확인.
 ```
 
-API 키는 [Perplexity API 대시보드](https://www.perplexity.ai/settings/api)에서 발급받을 수 있습니다.
+### 3. 사용자 프롬프트 (user role, canonical 템플릿)
 
-### 리포트 저장
+`backend/prompts/perplexity_prompt.md`의 7단계 구조 (`〈종목명〉` 플레이스홀더만 런타임 치환):
 
-분석이 완료되면 자동으로 마크다운 파일로 저장됩니다:
+```markdown
+# 한국 상장기업 〈종목명〉 스윙 트레이더 리포트
+
+최우선: 최근 7일 주가 핵심 모멘텀 포착. KOSPI/KOSDAQ/KRX/KST 기준.
+수치 중심, 한국어 작성.
+
+## 🔥 Executive Summary
+[상승/하락/횡보] | 핵심테마 | 주목이유 Top3 | 7일주가(%) | 핵심리스크
+(200-300자, 수치중심, 추상어 금지)
+
+## 📦 0단계: 사업 본질
+- 주력제품/매출구성/주요고객/밸류체인/시장지위 표
+- 기술차별점·진입장벽 | 산업연계 인과관계(예: HBM↑→수주+30%)
+- 영업이익률·현금흐름
+
+## ⚙️ 1단계: 최신 이벤트
+최근 7일(72h 집중) ±5% 이상 이슈표:
+  날짜(KST)/유형/헤드라인/출처/URL/주가반응/교차확인
+톱티어2건+=확정, 단일출처=[루머], "관계자"언급=[루머]
+
+## 💬 2단계: 시장 심리
+최근 25일 키워드빈도표(급등/수주/실적/호재/악재/공매도)
+긍부정비율 | 기대vs팩트 패턴
+
+## 📈 3단계: 실적·밸류·수급·테크니컬
+- 실적: 분기매출/영업익/이익률/컨센서스/일회성
+- 밸류: PER업종비교+경쟁사
+- 수급: 5일외국인/거래대금/공매도잔고
+- 기술: MA정배열/RSI/ATR/VWAP
+
+## 📅 5단계: Catalyst
+이벤트캘린더(날짜/이벤트/유형/영향도/시급성)
+전주 대비 변화(추가/소멸/수급/기술/심리)
+
+## ⚠️ 6단계: 리스크
+리스크표(유형/확률/영향범위/모니터링지표)
+금지: 추상어·근거없는전망·매매권유
+
+## 🧠 출력 규칙
+Markdown+표+소제목 | 수치구간표현 | 인과관계명확 | 출처[1][2]표기
+금지: 추상어·근거없는전망·출처없는수치·매매권유
+```
+
+**프롬프트 무결성 (NFR-004)**: `backend/prompts/perplexity_prompt.md`는 시스템 자산입니다. 변경 시 코드 리뷰 필수. 서버 시작 시 `〈종목명〉` 플레이스홀더 존재를 fail-fast로 검증합니다 (`backend/main.py::lifespan()`).
+
+### 4. 환경 변수 설정
+
+`.env` 파일에 다음을 설정합니다 (프로젝트 루트):
+
+```bash
+# 필수
+PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 선택 (비용 폭주 방지, 기본값 사용 권장)
+AI_REPORT_DAILY_QUOTA=50   # 하루 최대 분석 횟수 (기본 50)
+AI_REPORT_BURST_LIMIT=3    # 분당 최대 요청 수 (기본 3)
+```
+
+- API 키는 [Perplexity API 대시보드](https://www.perplexity.ai/settings/api)에서 발급
+- 쿼터 초과 시 HTTP 429 반환 (자정 기준 KST 리셋)
+
+### 5. 스트리밍 응답 처리
+
+**백엔드** (`ai_report_service.py::stream_perplexity()`):
+1. Perplexity SSE 응답을 라인 단위로 파싱
+2. `sonar-reasoning-pro`의 `<think>...</think>` 블록은 버퍼 기반 상태머신으로 필터링 (사용자 노출 차단)
+3. 최종 리포트 마크다운만 클라이언트에 yield
+4. 스트림 완료 시 전체 내용을 파일로 자동 저장
+
+**프론트엔드** (`frontend/src/api/aiReport.ts::createAiReportStream()`):
+1. `fetch()` + `ReadableStream`으로 SSE 수신 (POST 지원)
+2. CRLF/LF 혼합 대응 (`split(/\r\n|\r|\n/)`)
+3. 빈 줄 = 이벤트 경계, 여러 `data:` 라인은 `\n`으로 조인 (SSE 스펙)
+4. `event: done` 수신 시 완료, `event: error` 수신 시 에러 핸들러 호출
+5. `AbortController`로 모달 close 시 즉시 중단 가능
+
+### 6. 리포트 자동 저장
+
+분석 완료 시 마크다운 파일로 자동 저장:
 
 ```
 backend/reports/{종목명}/{YYYY-MM-DD}.md
 backend/reports/{종목명}/{YYYY-MM-DD}_2.md  # 같은 날 재분석
+backend/reports/{종목명}/{YYYY-MM-DD}_3.md
 ```
 
-- 같은 날 재분석 시 `_2`, `_3` 시퀀스 번호 자동 부여 (기존 파일 유지)
-- 모달의 **히스토리** 탭에서 과거 분석 목록 조회 및 재열람 가능
+**저장 경로 안전성** (v1.1.4 CRITICAL 보안 대응):
 
-### 호출 비용
+- `_sanitize_name()`: 종목명을 파일시스템 안전 문자열로 변환
+  - NFKC 유니코드 정규화
+  - 금지 문자(`/\:*?"<>|`) + 제어 문자(`\x00-\x1f`) 제거
+  - 경로 조작 시퀀스(`..`) → `_` 치환
+  - Windows 예약명(CON, NUL, COM1-9, LPT1-9) `_` 접두사
+  - 길이 100자 제한, 빈 문자열은 "report" 폴백
+- `get_report_content()`: filename을 `^\d{4}-\d{2}-\d{2}(_\d+)?\.md$` 정규식으로 엄격 검증 + `resolve()` 후 보관 디렉토리 이탈 체크 (이중 방어)
+
+`backend/reports/`는 `.gitignore` 처리되어 사용자 데이터로 분류.
+
+### 7. 모델 계층 및 도달도
+
+v1.1.6 기준 실측 품질 (공간(Spaces) 대비 %):
+
+| 종목 유형 | 예시 | 도달도 | 비고 |
+|----------|------|-------|------|
+| 중소형 테마주 | 대한광통신 (010170) | **~75%** | 뉴스 집중, 단일 검색 충분 |
+| 대형주 (일반) | 현대차 (005380) | **~65%** | 글로벌 이슈 양호 |
+| 대형 전통산업 | SK텔레콤 (017670) | **~60-65%** | v1.1.5에서 v1.1.6으로 2배 개선 |
+
+공간(Spaces) 대비 100% 도달은 내부적으로 `sonar-deep-research`(비동기 멀티패스) 필요 → Stage 3 옵션 (별도 SPEC 분리 대상, 비용 3-5배 증가).
+
+### 8. 호출 비용
 
 Perplexity API `sonar-reasoning-pro` 기준 (2025-2026 요율):
 
@@ -289,24 +410,42 @@ Perplexity API `sonar-reasoning-pro` 기준 (2025-2026 요율):
 | 검색 요청 (high context) | ~$14 / 1K |
 | **1회 분석 예상 비용** | **약 $0.05 (₩70)** |
 
-하루 20건 분석 시 월 약 $30 (₩42,000) 수준.
+하루 20건 분석 시 월 약 $30 (₩42,000) 수준. `AI_REPORT_DAILY_QUOTA` 환경변수로 일일 한도 설정 가능.
 
-### 응답 시간
+### 9. 응답 시간
 
 - 첫 청크 도달: ~3-5초
-- 전체 완료: ~40-60초 (모델·쿼리 복잡도에 따라 변동)
+- 전체 완료: ~40-60초 (대형주 품질 강화로 v1.1.6부터 약간 증가)
 - 타임아웃: 180초
 
-### 에러 처리
+### 10. 에러 처리
 
 | 상황 | HTTP | 동작 |
 |------|------|------|
 | API 키 미설정 | 503 | "AI 분석 서비스를 사용할 수 없습니다" |
 | 잘못된 종목코드 | 404 | "종목을 찾을 수 없습니다" |
-| 동시 분석 요청 | 429 | "이미 분석이 진행 중입니다" |
+| 동시 분석 요청 (같은 종목) | 429 | "이미 분석이 진행 중입니다" |
+| **일일 쿼터 초과** | 429 | "일일 쿼터 초과. 내일 다시 시도해 주세요." |
+| **분당 버스트 초과** | 429 | "분당 요청 한도 초과. N초 후 다시 시도해 주세요." |
 | Perplexity 장애 | SSE error | 재시도 버튼 표시 |
+| 서버 시작 시 프롬프트 파일 이상 | — | **서버 시작 중단** (fail-fast) |
 
-### FS vs AI 버튼 역할 구분
+### 11. SPEC 버전 히스토리
+
+`SPEC-AI-REPORT-001` 주요 변경:
+
+| 버전 | 핵심 변경 |
+|------|---------|
+| 1.0.0 | 초기 SPEC: sonar-pro 모델, 기본 설정, 2탭 모달, 파일 저장 |
+| 1.1.0 | 품질 개선: `search_context_size: high`, 도메인 필터, 시스템 프롬프트 강화 |
+| 1.1.1 | 버그 수정: `search_domain_filter` 최대 20개 제한 준수 |
+| 1.1.2 | 도메인 전략 반전: whitelist 폐기 → 최소 SNS 블랙리스트만 (공간 전략 일치) |
+| 1.1.3 | 모델 전환: `sonar-pro` → `sonar-reasoning-pro`, `<think>` 블록 스트리밍 필터 |
+| 1.1.4 | CRITICAL 보안: 경로 조작 방지, rate limiting(50/일+3/분), 회귀 테스트 26건 |
+| 1.1.5 | 프롬프트 자산 이전: `docs/` → `backend/prompts/`, `@lru_cache`, fail-fast 검증 |
+| 1.1.6 | 대형주 품질 격차: SYSTEM_PROMPT에 "검색 전략" 6관점 추가, SK텔레콤 도달도 30%→60-65% |
+
+### 12. FS vs AI 버튼 역할 구분
 
 | 구분 | FS (FnGuide) | AI (Perplexity) |
 |------|-------------|-----------------|
@@ -317,6 +456,26 @@ Perplexity API `sonar-reasoning-pro` 기준 (2025-2026 요율):
 | 용도 | 펀더멘털 검증 | 모멘텀·테마·촉매 파악 |
 
 두 기능은 상호 보완적입니다. FS로 정량 재무를 확인하고, AI로 최신 시장 심리와 촉매를 파악합니다.
+
+### 13. 엔드포인트 요약
+
+| 메서드 | 엔드포인트 | 설명 | 응답 |
+|-------|----------|------|------|
+| POST | `/api/ai-report/{code}` | AI 리포트 생성 (SSE 스트리밍) | `text/event-stream` |
+| GET | `/api/ai-report/{code}/history` | 저장된 분석 이력 목록 | `{items: HistoryItem[]}` |
+| GET | `/api/ai-report/{code}/{filename}` | 저장된 분석 파일 조회 | `{content, filename, date}` |
+
+### 14. 테스트
+
+```bash
+# 회귀 테스트 (30건)
+pytest backend/tests/test_ai_report_service.py -v
+
+# 라이브 테스트 스크립트
+python3 scripts/test_v113_service.py       # 서비스 직접 호출
+python3 scripts/test_v116_sktelecom.py     # SK텔레콤 품질 검증
+python3 scripts/test_perplexity.py v11 120 # API 파라미터 튜닝
+```
 
 ## 라이선스
 
