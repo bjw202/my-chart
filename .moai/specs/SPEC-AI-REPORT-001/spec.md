@@ -15,6 +15,7 @@
 | 1.1.3 | 2026-04-12 | Stage 2 적용: 모델 sonar-pro → sonar-reasoning-pro (Chain-of-Thought 추론). max_tokens 8000→12000. `<think>...</think>` 블록 스트리밍 필터링 로직 추가 (버퍼 기반 상태 머신). 실측: 표 25→35개, "중기 펀더멘털/리스크·리워드/모니터링 우선순위" 등 추가 구조화. 공간 대비 도달도 65% → 80%. |
 | 1.1.4 | 2026-04-12 | 코드 리뷰 CRITICAL 대응: (1) `_sanitize_name()` 강화: `..`/Windows예약명/제어문자/선행점/길이제한/NFKC 정규화/빈값 폴백. (2) `get_report_content()` path traversal 방지 (filename 정규식 검증 + resolve 경로 이탈 체크). (3) Rate limiting 추가: 일일 쿼터(기본 50회) + 분당 버스트(기본 3회) - 비용 폭주 방지. (4) 회귀 테스트 26건 추가 (backend/tests/test_ai_report_service.py). |
 | 1.1.5 | 2026-04-12 | 프롬프트 자산 경계 정리: `docs/perplexity-prompt.md` → `backend/prompts/perplexity_prompt.md` 이전 (backend 소유). `@lru_cache`로 프로세스당 1회만 읽기, 서버 시작 시 검증(fail-fast). NFR-004 재정의 (canonical 경로 변경). 회귀 테스트 4건 추가 (총 30건). @MX 태그 추가 (경로 상수). |
+| 1.1.6 | 2026-04-12 | 대형주(통신/금융/전통산업) 품질 격차 해결: SYSTEM_PROMPT에 "검색 전략" 섹션 추가 - 재무/배당/수급/테크니컬/최신이벤트/산업동향 6가지 관점의 능동적 탐색 유도. "검색 결과 부재" 단독 결론 금지, 표 셀 내 "미공개" 라벨로 대체. 표 컬럼 6개 유지 명시. 실측(SK텔레콤): 3,853자→5,809자(+51%), 출처 4→9개(+125%), 도달도 30%→60-65%. |
 
 ## 개요
 
