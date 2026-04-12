@@ -32,6 +32,9 @@ interface AiReportModalProps {
 
 // ── 컴포넌트 ────────────────────────────────────────────────────────────────
 
+// @MX:NOTE: [AUTO] v1.1.4 - 5-state UI 상태 머신(idle/streaming/done/error/loading-history).
+// useAiReport 훅의 status와 완전 동기. 신규 상태 추가 시 useAiReport의 AiReportStatus 타입도
+// 함께 업데이트 필요. 탭 전환(analysis/history) 시 historyLoaded 플래그로 중복 로드 방지.
 export function AiReportModal({
   code,
   companyName,

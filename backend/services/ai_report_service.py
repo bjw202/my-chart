@@ -18,7 +18,8 @@ from my_chart.registry import _name
 logger = logging.getLogger(__name__)
 
 # 현재 진행 중인 분석 요청을 추적하는 집합 (종목 코드)
-# @MX:NOTE: [AUTO] 동일 종목 중복 요청 방지용 모듈 레벨 상태 (단일 프로세스 가정)
+# @MX:WARN: [AUTO] v1.1.4 - 모듈 레벨 가변 전역 상태. 멀티 워커 환경에서 일관성 보장 불가.
+# @MX:REASON: 로컬 단일 프로세스 uvicorn 전제. 프로덕션 멀티워커 전환 시 Redis로 교체 필요.
 _active_analyses: set[str] = set()
 
 # @MX:NOTE: [AUTO] v1.1.4 - Rate limiting: 일일 쿼터 + 분당 버스트 방지 (CRITICAL 보안)
@@ -37,6 +38,9 @@ class RateLimitError(Exception):
     """Rate limit 초과 예외. HTTP 429로 변환됨."""
 
 
+# @MX:ANCHOR: [AUTO] v1.1.4 - 비용 폭주 방지 게이트. fan_in >= 2 (router + tests).
+# @MX:REASON: Perplexity API 호출 전 모든 경로가 이 함수를 통과해야 하는 invariant.
+# 일일 쿼터/분당 버스트 제한을 강제하며, 제거/우회 시 비용 통제 불가.
 def check_rate_limit() -> None:
     """AI 리포트 요청의 rate limit 검사. 위반 시 RateLimitError 발생.
 
@@ -166,6 +170,9 @@ def load_prompt(stock_name: str) -> str:
     return template.replace("〈종목명〉", stock_name)
 
 
+# @MX:ANCHOR: [AUTO] v1.1.4 - Perplexity 스트리밍 핵심 진입점. fan_in >= 2.
+# @MX:REASON: 라우터 SSE 핸들러에서 호출. <think> 필터 버퍼 상태머신(in_think_block)은
+# 변경 시 스트리밍 출력에 직접 영향. sonar-reasoning-pro 모델 계약 유지 필수.
 async def stream_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
     """Perplexity API를 통해 종목 분석 리포트를 스트리밍 생성.
 
@@ -310,6 +317,9 @@ async def stream_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
         logger.info("리포트 저장 완료: %s / %s", stock_name, filename)
 
 
+# @MX:ANCHOR: [AUTO] v1.1.4 - 경로 조작 방지 보안 게이트. fan_in = 3.
+# @MX:REASON: save_report, get_history, get_report_content에서 모두 사용되는 유일한 정규화 경로.
+# 우회 시 path traversal / 파일시스템 손상 / Windows 예약명 충돌 발생. 7단계 처리 순서 변경 금지.
 def _sanitize_name(stock_name: str) -> str:
     """파일시스템 안전 문자열로 변환. 경로 조작 공격 방지.
 
@@ -356,6 +366,9 @@ def _sanitize_name(stock_name: str) -> str:
     return safe
 
 
+# @MX:ANCHOR: [AUTO] v1.1.4 - 리포트 영속화 진입점. fan_in >= 2 (stream_perplexity + tests).
+# @MX:REASON: 동일 날짜 시퀀스 충돌 해결 로직(seq 증가)이 파일명 규칙을 결정.
+# 변경 시 get_history / get_report_content의 파일명 파싱과 일관성 유지 필요.
 def save_report(stock_name: str, content: str) -> str:
     """분석 리포트를 파일로 저장.
 
@@ -426,6 +439,9 @@ def get_history(stock_name: str) -> list[dict[str, str]]:
     return items
 
 
+# @MX:ANCHOR: [AUTO] v1.1.4 - 외부 입력(filename) path traversal 방지 게이트. fan_in >= 2.
+# @MX:REASON: API 엔드포인트 /api/ai-report/{code}/{filename}이 직접 호출. filename 정규식 검증 +
+# resolve() 후 보관 디렉토리 이탈 체크의 2중 방어를 제거하면 임의 파일 읽기 취약점 발생.
 def get_report_content(stock_name: str, filename: str) -> str | None:
     """저장된 리포트 내용 조회.
 
@@ -436,8 +452,7 @@ def get_report_content(stock_name: str, filename: str) -> str | None:
     Returns:
         리포트 마크다운 내용, 파일이 없거나 안전하지 않은 경로면 None.
     """
-    # @MX:NOTE: [AUTO] v1.1.4 - path traversal 방지 (filename은 외부 입력)
-    # YYYY-MM-DD.md 또는 YYYY-MM-DD_N.md 형식만 허용
+    # v1.1.4 - YYYY-MM-DD.md 또는 YYYY-MM-DD_N.md 형식만 허용
     if not re.match(r"^\d{4}-\d{2}-\d{2}(_\d+)?\.md$", filename):
         logger.warning("잘못된 파일명 형식 거부: %s", filename)
         return None

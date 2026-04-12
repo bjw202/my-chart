@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 _CODE_PATTERN = re.compile(r"^\d{6}$")
 
 
+# @MX:ANCHOR: [AUTO] v1.1.4 - AI 리포트 생성 공개 엔드포인트. 외부 HTTP 진입점.
+# @MX:REASON: 순서 있는 가드 체인(코드 형식 → 종목 존재 → API 키 → 중복 → rate limit)이
+# 비용 통제와 보안의 기본. 순서 변경/우회 시 Perplexity 과금 폭주 또는 잘못된 호출 발생.
 @router.post("/ai-report/{code}")
 async def generate_report(code: str) -> EventSourceResponse:
     """Perplexity API를 통해 종목 분석 리포트를 SSE 스트리밍으로 생성.

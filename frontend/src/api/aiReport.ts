@@ -23,6 +23,9 @@ export async function fetchAiReportContent(
  *
  * EventSource 대신 fetch API 사용 (POST 지원).
  */
+// @MX:ANCHOR: [AUTO] v1.1.4 - 프론트엔드 SSE 스트리밍 유일한 클라이언트. fan_in >= 1.
+// @MX:REASON: CRLF/LF 혼합 처리, 이벤트 경계(빈 줄), multi-line data: 조인은 SSE 스펙 필수.
+// 이 3개 규칙 중 하나라도 어기면 마크다운이 공백 분리/개행 손실 상태로 렌더링됨(v1.1.1 버그 경험).
 export function createAiReportStream(
   code: string,
   onChunk: (text: string) => void,
