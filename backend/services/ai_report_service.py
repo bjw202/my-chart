@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator
@@ -20,11 +21,86 @@ logger = logging.getLogger(__name__)
 # @MX:NOTE: [AUTO] 동일 종목 중복 요청 방지용 모듈 레벨 상태 (단일 프로세스 가정)
 _active_analyses: set[str] = set()
 
+# @MX:NOTE: [AUTO] v1.1.4 - Rate limiting: 일일 쿼터 + 분당 버스트 방지 (CRITICAL 보안)
+# Perplexity API 비용 폭주 방지. 단일 프로세스 로컬 앱 전제 (멀티워커면 Redis 권장).
+_daily_call_count: int = 0
+_daily_reset_date: str = ""
+_recent_call_timestamps: list[float] = []
+
+# 환경변수 기반 제한 (기본값은 개인 사용 기준)
+AI_REPORT_DAILY_QUOTA = int(os.environ.get("AI_REPORT_DAILY_QUOTA", "50"))
+AI_REPORT_BURST_LIMIT = int(os.environ.get("AI_REPORT_BURST_LIMIT", "3"))  # 분당 최대
+AI_REPORT_BURST_WINDOW_SEC = 60
+
+
+class RateLimitError(Exception):
+    """Rate limit 초과 예외. HTTP 429로 변환됨."""
+
+
+def check_rate_limit() -> None:
+    """AI 리포트 요청의 rate limit 검사. 위반 시 RateLimitError 발생.
+
+    일일 쿼터와 분당 버스트 제한을 동시에 검사. 검사 통과 시 카운터 증가.
+
+    Raises:
+        RateLimitError: 쿼터 초과 또는 분당 버스트 초과.
+    """
+    import time
+
+    global _daily_call_count, _daily_reset_date, _recent_call_timestamps
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # 일일 카운터 자정 리셋
+    if _daily_reset_date != today:
+        _daily_call_count = 0
+        _daily_reset_date = today
+        logger.info("일일 AI 리포트 쿼터 리셋: %s", today)
+
+    # 일일 쿼터 초과 검사
+    if _daily_call_count >= AI_REPORT_DAILY_QUOTA:
+        raise RateLimitError(
+            f"일일 쿼터 초과 ({AI_REPORT_DAILY_QUOTA}회). 내일 다시 시도해 주세요."
+        )
+
+    # 분당 버스트 검사: 윈도우 밖 타임스탬프 제거
+    now = time.time()
+    cutoff = now - AI_REPORT_BURST_WINDOW_SEC
+    _recent_call_timestamps = [t for t in _recent_call_timestamps if t > cutoff]
+
+    if len(_recent_call_timestamps) >= AI_REPORT_BURST_LIMIT:
+        oldest = _recent_call_timestamps[0]
+        wait_sec = int(AI_REPORT_BURST_WINDOW_SEC - (now - oldest))
+        raise RateLimitError(
+            f"분당 요청 한도 초과 ({AI_REPORT_BURST_LIMIT}회/분). "
+            f"{wait_sec}초 후 다시 시도해 주세요."
+        )
+
+    # 통과: 카운터 증가
+    _daily_call_count += 1
+    _recent_call_timestamps.append(now)
+    logger.info(
+        "rate limit 통과: daily=%d/%d, burst=%d/%d",
+        _daily_call_count, AI_REPORT_DAILY_QUOTA,
+        len(_recent_call_timestamps), AI_REPORT_BURST_LIMIT,
+    )
+
 # 리포트 저장 기본 경로
 _REPORTS_BASE = Path(__file__).parent.parent / "reports"
 
-# 파일명에 사용 불가한 문자 패턴
-_UNSAFE_CHARS = re.compile(r'[/\\:*?"<>|]')
+# @MX:NOTE: [AUTO] v1.1.4 - 파일 경로 안전성 강화 (CRITICAL 보안)
+# 기본 파일시스템 금지 문자 + 경로 조작 문자 + 제어 문자
+_UNSAFE_CHARS = re.compile(r'[/\\:*?"<>|\x00-\x1f\x7f]')
+
+# Windows 예약 파일명 (macOS/Linux에서도 호환성 위해 차단)
+_WINDOWS_RESERVED_NAMES = frozenset({
+    "con", "prn", "aux", "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+})
+
+# 파일명 최대 길이 (대부분 파일시스템의 안전 한도)
+_MAX_FILENAME_LENGTH = 100
 
 # @MX:NOTE: [AUTO] v1.1.0 - 한국 금융 애널리스트 시스템 프롬프트 (공간(Spaces) 품질 근접용)
 # SPEC-AI-REPORT-001 NFR-006(서술 품질), NFR-008(소스 품질 관리) 강제
@@ -235,15 +311,49 @@ async def stream_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
 
 
 def _sanitize_name(stock_name: str) -> str:
-    """파일시스템 안전 문자열로 변환.
+    """파일시스템 안전 문자열로 변환. 경로 조작 공격 방지.
+
+    다음을 차단/정리:
+    - 금지 문자 (/ \\ : * ? " < > |)
+    - 제어 문자 (\\x00-\\x1f, \\x7f)
+    - 경로 조작: `..`, 선행/후행 점
+    - Windows 예약명 (CON, NUL, COM1-9, LPT1-9 등)
+    - 공백 / 선행·후행 공백
+    - 길이 100자 초과
+    - 빈 문자열 (→ "report" 폴백)
 
     Args:
         stock_name: 원본 종목명.
 
     Returns:
-        파일명에 사용 가능한 문자열.
+        파일명에 사용 가능한 문자열 (경로 조작 불가).
     """
-    return _UNSAFE_CHARS.sub("", stock_name)
+    # 1) Unicode 정규화 (NFKC: 전각/반각, 합성문자 통일)
+    safe = unicodedata.normalize("NFKC", stock_name)
+
+    # 2) 금지 문자 + 제어 문자 제거
+    safe = _UNSAFE_CHARS.sub("", safe)
+
+    # 3) 경로 조작 제거: `..` → "_" 치환, 모든 `.` 시퀀스 단일화
+    safe = re.sub(r"\.{2,}", "_", safe)
+
+    # 4) 선행·후행 점·공백·밑줄 제거
+    safe = safe.strip(". _\t")
+
+    # 5) Windows 예약명 차단 (확장자 앞부분만 검사)
+    stem = safe.split(".", 1)[0].lower()
+    if stem in _WINDOWS_RESERVED_NAMES:
+        safe = f"_{safe}"
+
+    # 6) 길이 제한 (앞에서 자르기)
+    if len(safe) > _MAX_FILENAME_LENGTH:
+        safe = safe[:_MAX_FILENAME_LENGTH]
+
+    # 7) 빈 문자열 폴백
+    if not safe:
+        safe = "report"
+
+    return safe
 
 
 def save_report(stock_name: str, content: str) -> str:
@@ -321,15 +431,29 @@ def get_report_content(stock_name: str, filename: str) -> str | None:
 
     Args:
         stock_name: 종목명.
-        filename: 조회할 파일명 (예: "2026-04-12.md").
+        filename: 조회할 파일명 (예: "2026-04-12.md"). 외부 입력이므로 검증 필수.
 
     Returns:
-        리포트 마크다운 내용, 파일이 없으면 None.
+        리포트 마크다운 내용, 파일이 없거나 안전하지 않은 경로면 None.
     """
-    safe_name = _sanitize_name(stock_name)
-    target = _REPORTS_BASE / safe_name / filename
+    # @MX:NOTE: [AUTO] v1.1.4 - path traversal 방지 (filename은 외부 입력)
+    # YYYY-MM-DD.md 또는 YYYY-MM-DD_N.md 형식만 허용
+    if not re.match(r"^\d{4}-\d{2}-\d{2}(_\d+)?\.md$", filename):
+        logger.warning("잘못된 파일명 형식 거부: %s", filename)
+        return None
 
-    if not target.exists():
+    safe_name = _sanitize_name(stock_name)
+    safe_dir = (_REPORTS_BASE / safe_name).resolve()
+    target = (safe_dir / filename).resolve()
+
+    # resolve 후 보관 디렉토리 밖을 참조하면 거부
+    try:
+        target.relative_to(_REPORTS_BASE.resolve())
+    except ValueError:
+        logger.warning("경로 이탈 차단: %s", target)
+        return None
+
+    if not target.exists() or not target.is_file():
         return None
 
     return target.read_text(encoding="utf-8")

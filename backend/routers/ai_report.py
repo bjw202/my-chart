@@ -12,6 +12,8 @@ from sse_starlette.sse import EventSourceResponse
 from backend.schemas.ai_report import HistoryItem, HistoryResponse, ReportContentResponse
 from backend.services.ai_report_service import (
     _active_analyses,
+    RateLimitError,
+    check_rate_limit,
     get_history,
     get_report_content,
     get_stock_name,
@@ -66,6 +68,15 @@ async def generate_report(code: str) -> EventSourceResponse:
             status_code=429,
             detail={"error": "already_running", "detail": f"{stock_name}({code}) 분석이 이미 진행 중입니다."},
         )
+
+    # @MX:NOTE: [AUTO] v1.1.4 - 비용 폭주 방지 rate limit (일일 쿼터 + 분당 버스트)
+    try:
+        check_rate_limit()
+    except RateLimitError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "rate_limit", "detail": str(exc)},
+        ) from exc
 
     async def event_generator():
         """SSE 이벤트 제너레이터: 스트리밍 청크를 클라이언트에 전달."""
