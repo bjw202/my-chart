@@ -36,6 +36,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     get_stock_registry()
     get_sector_registry()
     logger.info("Registries loaded. Server ready.")
+
+    # v1.1.5: AI Report 프롬프트 템플릿 검증 (fail-fast)
+    # 파일 부재/플레이스홀더 부재 시 서버 시작 즉시 중단 → 첫 요청 500 회피
+    try:
+        from backend.services.ai_report_service import _load_prompt_template
+
+        template = _load_prompt_template()
+        logger.info("AI Report 프롬프트 로드 완료 (%d chars)", len(template))
+    except (FileNotFoundError, ValueError) as e:
+        logger.error("AI Report 프롬프트 검증 실패: %s", e)
+        raise
+
     yield
     logger.info("Server shutting down.")
 

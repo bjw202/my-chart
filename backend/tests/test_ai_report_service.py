@@ -206,6 +206,29 @@ class TestLoadPrompt:
         assert "🔥" in result  # Executive Summary 마커
         assert "0단계" in result
 
+    def test_template_path_points_to_backend(self, service_module):
+        """v1.1.5: 프롬프트 경로가 backend/prompts/로 이전되었는지 확인."""
+        assert "backend" in str(service_module._PROMPT_TEMPLATE_PATH)
+        assert "prompts" in str(service_module._PROMPT_TEMPLATE_PATH)
+        assert service_module._PROMPT_TEMPLATE_PATH.name == "perplexity_prompt.md"
+
+    def test_template_file_exists(self, service_module):
+        """Canonical 프롬프트 파일이 실제로 존재."""
+        assert service_module._PROMPT_TEMPLATE_PATH.is_file()
+
+    def test_template_has_placeholder(self, service_module):
+        """v1.1.5: 템플릿에 〈종목명〉 플레이스홀더가 반드시 존재 (계약)."""
+        template = service_module._load_prompt_template()
+        assert "〈종목명〉" in template
+
+    def test_template_cached(self, service_module):
+        """lru_cache로 프로세스당 1회만 읽음."""
+        # 첫 호출 → 캐시됨
+        t1 = service_module._load_prompt_template()
+        # 두 번째 호출 → 캐시된 동일 객체 (is 동치)
+        t2 = service_module._load_prompt_template()
+        assert t1 is t2
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Rate limiting (CRITICAL 보안)

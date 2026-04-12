@@ -14,6 +14,7 @@
 | 1.1.2 | 2026-04-12 | 품질 개선: whitelist 접근 폐기. 공간(Spaces) 출처 역분석 결과 blog.naver.com/tistory/youtube까지 적극 인용됨 → whitelist가 품질 저해 원인. 최소 블랙리스트(5 SNS)로 변경. NFR-008 재정의: whitelist 대신 시스템 프롬프트 원칙으로 소스 우선순위 유도. |
 | 1.1.3 | 2026-04-12 | Stage 2 적용: 모델 sonar-pro → sonar-reasoning-pro (Chain-of-Thought 추론). max_tokens 8000→12000. `<think>...</think>` 블록 스트리밍 필터링 로직 추가 (버퍼 기반 상태 머신). 실측: 표 25→35개, "중기 펀더멘털/리스크·리워드/모니터링 우선순위" 등 추가 구조화. 공간 대비 도달도 65% → 80%. |
 | 1.1.4 | 2026-04-12 | 코드 리뷰 CRITICAL 대응: (1) `_sanitize_name()` 강화: `..`/Windows예약명/제어문자/선행점/길이제한/NFKC 정규화/빈값 폴백. (2) `get_report_content()` path traversal 방지 (filename 정규식 검증 + resolve 경로 이탈 체크). (3) Rate limiting 추가: 일일 쿼터(기본 50회) + 분당 버스트(기본 3회) - 비용 폭주 방지. (4) 회귀 테스트 26건 추가 (backend/tests/test_ai_report_service.py). |
+| 1.1.5 | 2026-04-12 | 프롬프트 자산 경계 정리: `docs/perplexity-prompt.md` → `backend/prompts/perplexity_prompt.md` 이전 (backend 소유). `@lru_cache`로 프로세스당 1회만 읽기, 서버 시작 시 검증(fail-fast). NFR-004 재정의 (canonical 경로 변경). 회귀 테스트 4건 추가 (총 30건). @MX 태그 추가 (경로 상수). |
 
 ## 개요
 
@@ -85,7 +86,13 @@ The backend **shall** sanitize stock names used in file paths to remove or repla
 
 ### NFR-004: 프롬프트 무결성
 
-The system **shall** use the prompt from `docs/perplexity-prompt.md` as-is, only replacing the `〈종목명〉` placeholder with the actual stock name. No other modifications to the prompt are permitted.
+The system **shall** use the prompt from `backend/prompts/perplexity_prompt.md` (canonical 경로) as-is, only replacing the `〈종목명〉` placeholder with the actual stock name. No other modifications to the prompt are permitted.
+
+The prompt file is considered a **system asset** owned by the backend package. Changes require code review and updates to the SPEC HISTORY.
+
+**Startup validation**: `backend/main.py::lifespan()` MUST load and validate the prompt template at server startup (fail-fast). Missing file or missing `〈종목명〉` placeholder MUST prevent server startup.
+
+(v1.1.5: Moved from `docs/perplexity-prompt.md` — `docs/`는 사용자 스크래치 공간으로 런타임 의존 부적절. `backend/prompts/`로 이전하여 시스템 자산 경계 명확화.)
 
 ### NFR-005: 출처 밀도
 

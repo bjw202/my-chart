@@ -8,6 +8,7 @@ import os
 import re
 import unicodedata
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -155,6 +156,35 @@ def get_stock_name(code: str) -> str | None:
     return name
 
 
+# @MX:NOTE: [AUTO] v1.1.5 - Canonical 프롬프트 파일 경로 (backend 소유)
+# 이전: docs/perplexity-prompt.md (사용자 스크래치 폴더, 런타임 의존 취약)
+# 현재: backend/prompts/perplexity_prompt.md (시스템 자산, 코드와 함께 배포)
+_PROMPT_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "perplexity_prompt.md"
+
+
+@lru_cache(maxsize=1)
+def _load_prompt_template() -> str:
+    """프롬프트 템플릿을 프로세스당 1회 읽어 캐시. 서버 재시작으로만 무효화.
+
+    Returns:
+        Raw 템플릿 문자열 (〈종목명〉 플레이스홀더 포함).
+
+    Raises:
+        FileNotFoundError: 프롬프트 파일 없음.
+        ValueError: 〈종목명〉 플레이스홀더 부재 (계약 위반).
+    """
+    if not _PROMPT_TEMPLATE_PATH.is_file():
+        raise FileNotFoundError(
+            f"프롬프트 파일을 찾을 수 없습니다: {_PROMPT_TEMPLATE_PATH}"
+        )
+    template = _PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
+    if "〈종목명〉" not in template:
+        raise ValueError(
+            f"프롬프트 템플릿에 〈종목명〉 플레이스홀더가 없습니다: {_PROMPT_TEMPLATE_PATH}"
+        )
+    return template
+
+
 def load_prompt(stock_name: str) -> str:
     """Perplexity 분석 프롬프트 로드 및 종목명 치환.
 
@@ -164,10 +194,8 @@ def load_prompt(stock_name: str) -> str:
     Returns:
         종목명이 반영된 프롬프트 문자열.
     """
-    prompt_path = Path(__file__).parent.parent.parent / "docs" / "perplexity-prompt.md"
-    template = prompt_path.read_text(encoding="utf-8")
     # 〈종목명〉 플레이스홀더를 실제 종목명으로 치환 (한국어 겹낫표)
-    return template.replace("〈종목명〉", stock_name)
+    return _load_prompt_template().replace("〈종목명〉", stock_name)
 
 
 # @MX:ANCHOR: [AUTO] v1.1.4 - Perplexity 스트리밍 핵심 진입점. fan_in >= 2.
