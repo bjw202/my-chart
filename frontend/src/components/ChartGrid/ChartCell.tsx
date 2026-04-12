@@ -9,6 +9,8 @@ import { usePriceRangeMeasure } from '../../hooks/usePriceRangeMeasure'
 import { PriceRangeOverlay } from './PriceRangeOverlay'
 import { useAnalysis } from '../../hooks/useAnalysis'
 import { AnalysisModal } from '../AnalysisModal'
+import { useAiReport } from '../../hooks/useAiReport'
+import { AiReportModal } from '../AiReportModal'
 
 // 시가총액(원 단위)을 간결하게 포맷
 function formatMarketCap(capWon: number): string {
@@ -69,6 +71,34 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
   const handleRetryAnalysis = useCallback(() => {
     loadAnalysis(stock.code)
   }, [stock.code, loadAnalysis])
+
+  // AI 리포트
+  const aiReport = useAiReport()
+  const [aiModalOpen, setAiModalOpen] = useState(false)
+
+  const handleOpenAiReport = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setAiModalOpen(true)
+    aiReport.startStream(stock.code)
+  }, [stock.code, aiReport])
+
+  const handleCloseAiReport = useCallback(() => {
+    setAiModalOpen(false)
+    aiReport.abort()
+    aiReport.reset()
+  }, [aiReport])
+
+  const handleRetryAiReport = useCallback(() => {
+    aiReport.startStream(stock.code)
+  }, [stock.code, aiReport])
+
+  const handleLoadAiHistory = useCallback(() => {
+    aiReport.loadHistory(stock.code)
+  }, [stock.code, aiReport])
+
+  const handleSelectAiHistory = useCallback((filename: string) => {
+    aiReport.loadSavedReport(stock.code, filename)
+  }, [stock.code, aiReport])
 
   const { phase, result, toggleMeasure, reset: resetMeasure } = usePriceRangeMeasure(
     chartApi,
@@ -342,6 +372,13 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
         >
           TR
         </button>
+        <button
+          className={`chart-cell-ai-btn${aiReport.status === 'streaming' ? ' chart-cell-ai-btn--active' : ''}`}
+          onClick={handleOpenAiReport}
+          title="AI 기업 분석"
+        >
+          AI
+        </button>
       </div>
 
       <div className="chart-cell-canvas-wrap">
@@ -378,6 +415,21 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           errorMessage={analysisState.status === 'error' ? analysisState.message : ''}
           onClose={handleCloseAnalysis}
           onRetry={handleRetryAnalysis}
+        />
+      )}
+
+      {aiModalOpen && aiReport.status !== 'idle' && (
+        <AiReportModal
+          code={stock.code}
+          companyName={stock.name}
+          status={aiReport.status}
+          markdown={aiReport.markdown}
+          errorMessage={aiReport.errorMessage}
+          history={aiReport.history}
+          onClose={handleCloseAiReport}
+          onRetry={handleRetryAiReport}
+          onLoadHistory={handleLoadAiHistory}
+          onSelectHistory={handleSelectAiHistory}
         />
       )}
     </div>

@@ -42,8 +42,9 @@
 
 - **fastapi** - Web framework
 - **uvicorn** - ASGI server
-- **sse-starlette** - Server-Sent Events for DB update progress streaming
+- **sse-starlette** - Server-Sent Events (DB 업데이트 진행률 + AI 리포트 스트리밍)
 - **pydantic** - Data validation (bundled with FastAPI)
+- **httpx** - Async HTTP client for Perplexity API streaming (v1.1.0+)
 
 ### fnguide Package Dependencies
 
@@ -59,6 +60,15 @@
 - **lightweight-charts** - TradingView chart library
 - **react-window** - Virtualized rendering
 - **axios** or **fetch** - HTTP client for API calls
+- **react-markdown** + **remark-gfm** - AI 리포트 마크다운 렌더링 (GFM 테이블 지원, v1.1.0+)
+
+### External AI Service
+
+- **Perplexity API** (`api.perplexity.ai/chat/completions`) - AI 기업 분석 리포트 생성
+  - 모델: `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought)
+  - 인증: `PERPLEXITY_API_KEY` 환경변수 (`.env`)
+  - 스트리밍: SSE, `httpx.AsyncClient.stream()`
+  - 비용: 건당 ~$0.05 (2025-2026 요율 기준)
 
 ## Platform Requirements
 

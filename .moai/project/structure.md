@@ -38,19 +38,25 @@ kr-stock-screener/
 │   │   ├── db.py               # POST /api/db/update, GET /api/db/status, /last-updated
 │   │   ├── screen.py           # POST /api/screen
 │   │   ├── sectors.py          # GET /api/sectors
-│   │   └── analysis.py         # GET /api/analysis/{code}
+│   │   ├── analysis.py         # GET /api/analysis/{code} (FnGuide S-RIM 대시보드)
+│   │   └── ai_report.py        # POST/GET /api/ai-report/{code}* (Perplexity AI 분석)
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── chart.py            # ChartDataResponse, OHLCV models
 │   │   ├── screen.py           # ScreenRequest, ScreenResponse, FilterCondition
 │   │   ├── db.py               # UpdateStatus, LastUpdated
-│   │   └── analysis.py         # AnalysisResponse, ActivityRatiosSchema, etc.
+│   │   ├── analysis.py         # AnalysisResponse, ActivityRatiosSchema, etc.
+│   │   └── ai_report.py        # HistoryItem, HistoryResponse, ReportContentResponse
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── chart_service.py    # Bridges my_chart.price/db -> API response
 │   │   ├── screen_service.py   # Bridges my_chart.screening -> filtered results
 │   │   ├── db_service.py       # Bridges my_chart.db -> update orchestration
-│   │   └── sector_service.py   # Bridges my_chart.registry -> sector data
+│   │   ├── sector_service.py   # Bridges my_chart.registry -> sector data
+│   │   ├── analysis_service.py # FnGuide dashboard 래퍼 (TTL cache 5분)
+│   │   └── ai_report_service.py # Perplexity API 스트리밍 + 파일 저장 (SPEC-AI-REPORT-001)
+│   ├── reports/                # AI 분석 리포트 저장소 (종목명별 폴더)
+│   │   └── {종목명}/{YYYY-MM-DD}.md
 │   └── deps.py                 # Shared dependencies (DB connections, registry)
 │
 ├── frontend/                    # React + Vite + TypeScript
@@ -68,7 +74,8 @@ kr-stock-screener/
 │       │   ├── screen.ts       # Screen filter API
 │       │   ├── db.ts           # DB update API
 │       │   ├── sectors.ts      # Sector list API
-│       │   └── analysis.ts     # Financial analysis API
+│       │   ├── analysis.ts     # Financial analysis API (FS)
+│       │   └── aiReport.ts     # AI report SSE streaming + history (AI)
 │       ├── components/
 │       │   ├── FilterBar/      # Top filter area
 │       │   │   ├── FilterBar.tsx
@@ -88,19 +95,22 @@ kr-stock-screener/
 │       │   │   ├── SectorGroup.tsx     # Collapsible sector header + stocks
 │       │   │   ├── StockItem.tsx
 │       │   │   └── useStockNavigation.ts  # Keyboard navigation hook
-│       │   ├── AnalysisModal.tsx  # S-RIM financial analysis modal (8 sections)
+│       │   ├── AnalysisModal.tsx  # S-RIM financial analysis modal (8 sections, FS 버튼)
+│       │   ├── AiReportModal.tsx  # AI analysis modal (분석결과/히스토리 2탭, AI 버튼)
 │       │   └── StatusBar/      # Bottom status bar
 │       │       └── StatusBar.tsx
 │       ├── hooks/
 │       │   ├── useScrollSync.ts        # Chart <-> StockList sync
 │       │   ├── useScreenResults.ts     # Filter state + API call
 │       │   ├── useDbUpdate.ts          # SSE-based update progress
-│       │   └── useAnalysis.ts          # Financial analysis data fetching
+│       │   ├── useAnalysis.ts          # Financial analysis data fetching
+│       │   └── useAiReport.ts          # AI report SSE streaming + history hook
 │       ├── types/
 │       │   ├── stock.ts
 │       │   ├── filter.ts
 │       │   ├── chart.ts
-│       │   └── analysis.ts            # Financial analysis TypeScript interfaces
+│       │   ├── analysis.ts            # Financial analysis TypeScript interfaces
+│       │   └── aiReport.ts            # AI report TypeScript interfaces
 │       └── styles/
 │           └── global.css
 │

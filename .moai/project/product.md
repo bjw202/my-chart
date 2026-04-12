@@ -24,7 +24,7 @@
 
 7. **Technical Pattern Builder** - Condition builder UI for constructing custom technical patterns: `[Indicator A] [Operator] [Indicator B or Constant] [x Multiplier]`. Supports price, MA(10/20/50/100/200) as indicators with >, <, >=, <=, and proximity(%) operators. Up to 3 patterns combinable with AND/OR
 
-8. **Financial Analysis Modal** - Comprehensive S-RIM financial dashboard accessible per stock via FS button. Modal header displays company name, code, sector (산업명(대)), and primary product (주요제품). 8-section analysis covering:
+8. **Financial Analysis Modal (FS Button)** - Comprehensive S-RIM financial dashboard accessible per stock via FS button. Modal header displays company name, code, sector (산업명(대)), and primary product (주요제품). 8-section analysis covering:
    - Section 1: 사업 실적 (Business Performance) — 매출/영업이익/순이익 추이, YoY 성장률, 이익률, 이익의 질
    - Section 2: 건전성 지표 (Health Indicators) — 부채비율, 유동비율, 이자보상배율 등 재무 건전성
    - Section 3: 자본 구조 (Balance Sheet) — 조달(부채/자본) vs 운용(자산) 시각화
@@ -33,6 +33,15 @@
    - Section 6: 활동성 비율 (Activity Ratios) — 매출채권/재고/매입채무 회전율, CCC 타임라인 그래픽
    - Section 7: 추세 신호 (Trend Signals) — 주요 재무 추세 방향 시그널
    - Section 8: 5대 질문 (Five Questions) — 종합 투자 체크리스트 (양호/보통/주의)
+
+9. **AI Company Analysis (AI Button)** - Perplexity API 기반 실시간 AI 스윙 트레이더 리포트. SPEC-AI-REPORT-001 (v1.1.3 기준). AI 버튼을 클릭하면 사전 정의된 7단계 애널리스트 프롬프트(`docs/perplexity-prompt.md`)로 Perplexity에 질의하고, SSE로 실시간 마크다운 스트리밍 + 자동 저장.
+   - **모델**: `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought 추론)
+   - **검색 품질**: `search_context_size: "high"` + `search_recency_filter: "month"` + 최소 SNS 블랙리스트 (공간(Spaces) 품질 근접 전략)
+   - **시스템 프롬프트**: 한국 애널리스트 6원칙 강제 (인과 분석 필수, [N] 인용 필수, 교차확인 구분, 기대 vs 팩트, DART/KRX 우선, 추상어 금지)
+   - **UI**: 2탭 모달 (분석 결과 / 히스토리), 마크다운 실시간 렌더링, 복사 버튼, ESC/backdrop 닫기
+   - **저장**: `backend/reports/{종목명}/{YYYY-MM-DD}.md` (동일 날짜는 `_N` 시퀀스)
+   - **엔드포인트**: POST `/api/ai-report/{code}`, GET `/api/ai-report/{code}/history`, GET `/api/ai-report/{code}/{filename}`
+   - **비용**: 건당 ~$0.05 (sonar-reasoning-pro, high context 기준)
 
 ## Target Users
 
@@ -101,6 +110,9 @@ The following `my_chart` package functions serve as the backend data layer:
 | GET | `/api/chart/{code}` | Stock chart data (OHLCV + MA) |
 | GET | `/api/sectors` | Sector list for filter dropdown |
 | GET | `/api/analysis/{code}` | Comprehensive financial analysis (8-section S-RIM dashboard) |
+| POST | `/api/ai-report/{code}` | AI 종목 분석 리포트 생성 (Perplexity SSE 스트리밍) |
+| GET | `/api/ai-report/{code}/history` | 저장된 AI 분석 이력 목록 |
+| GET | `/api/ai-report/{code}/{filename}` | 저장된 AI 분석 파일 조회 |
 
 ## Market Coverage
 

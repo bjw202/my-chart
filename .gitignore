@@ -224,3 +224,7 @@ Output/*.db-shm
 .cache/
 2026-*.txt
 my_chart_home_v5-10_noterin.py
+
+# AI report outputs (user data)
+backend/reports/
+

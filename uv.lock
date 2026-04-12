@@ -571,6 +571,7 @@ dependencies = [
     { name = "cachetools" },
     { name = "curl-cffi" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "lxml" },
     { name = "matplotlib" },
     { name = "mplfinance" },
@@ -591,7 +592,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
@@ -610,7 +610,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=7.0.5" },
     { name = "curl-cffi", specifier = ">=0.5" },
     { name = "fastapi", specifier = ">=0.115.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "lxml", specifier = ">=4.9" },
     { name = "matplotlib", specifier = ">=3.5" },
     { name = "mplfinance", specifier = ">=0.12" },
