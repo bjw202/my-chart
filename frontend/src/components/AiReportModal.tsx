@@ -32,6 +32,11 @@ interface AiReportModalProps {
    * 기존 ChartCell의 () => void 호출부와 호환 (mode 생략 시 모달 내 선택 모드 사용).
    */
   onRetry: (mode?: AiReportMode) => void
+  /**
+   * SPEC-AI-REPORT-002 v1.0.3: 사용자가 모드 선택 후 명시적으로 분석을 시작할 때 호출.
+   * idle 상태에서만 표시되는 "분석 시작" 버튼이 트리거. 미제공 시 idle 분기는 안내 메시지만 표시.
+   */
+  onStart?: (mode: AiReportMode) => void
   onLoadHistory: () => void
   onSelectHistory: (filename: string) => void
 }
@@ -51,6 +56,7 @@ export function AiReportModal({
   history,
   onClose,
   onRetry,
+  onStart,
   onLoadHistory,
   onSelectHistory,
 }: AiReportModalProps): React.ReactElement {
@@ -250,10 +256,34 @@ export function AiReportModal({
                 </div>
               )}
 
-              {/* 초기 / idle 상태 */}
+              {/* 초기 / idle 상태 — SPEC-AI-REPORT-002 v1.0.3: 모드 선택 후 명시적 시작 */}
               {status === 'idle' && (
-                <div className="ai-report-state-center">
-                  <span className="ai-report-state-text">AI 분석을 시작하려면 AI 버튼을 클릭하세요.</span>
+                <div className="ai-report-idle-launcher">
+                  <h3 className="ai-report-idle-title">분석 모드를 선택하세요</h3>
+                  <p className="ai-report-idle-desc">
+                    상단 토글에서 빠른 분석 또는 심층 분석을 고른 뒤 아래 버튼으로 시작합니다.
+                  </p>
+                  <ul className="ai-report-idle-modes">
+                    <li>
+                      <strong>빠른 분석</strong> — Perplexity 단일 소스, 약 1-2분
+                    </li>
+                    <li>
+                      <strong>심층 분석</strong> — 5개 소스(Perplexity·Brave·Tavily·Naver·YouTube) 합성, 수분 소요
+                      <br />
+                      <span className="ai-report-idle-hint">
+                        💡 빠른 분석을 먼저 한 뒤 심층 분석을 누르면 같은 종목의 Perplexity 결과를 재사용합니다 (10분 내).
+                      </span>
+                    </li>
+                  </ul>
+                  {onStart && (
+                    <button
+                      className="ai-report-start-btn"
+                      onClick={() => onStart(mode)}
+                      type="button"
+                    >
+                      {mode === 'deep' ? '심층 분석 시작' : '빠른 분석 시작'}
+                    </button>
+                  )}
                 </div>
               )}
             </>

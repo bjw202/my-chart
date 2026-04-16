@@ -211,6 +211,23 @@ async def _collect_perplexity(
     client: httpx.AsyncClient | None = None,
 ) -> SourceResult:
     # curl 명령 구조 참조: docs/deep-research/skill.md §2
+    # SPEC-AI-REPORT-002 v1.0.3: 시나리오 C(빠른→심층) 비용 절감 — 빠른 분석에서 캐시한
+    # full markdown이 신선(TTL 10분)하면 HTTP 호출 스킵하고 그것을 perplexity 결과로 사용.
+    # Lazy import: 테스트 격리 환경에서 stub 누락 시 silent skip → 일반 호출 흐름 유지.
+    cached: str | None = None
+    try:
+        from backend.services.perplexity_cache import get as _cache_get
+        cached = _cache_get(code)
+    except ImportError:
+        cached = None
+    if cached:
+        return SourceResult(
+            name="perplexity",
+            success=True,
+            data={"content": cached, "citations": []},  # citations은 캐시에 별도 저장 X (재호출 시만 확보)
+            duration_ms=0,
+        )
+
     api_key = os.getenv("PERPLEXITY_API_KEY")
     if not api_key:
         return SourceResult(

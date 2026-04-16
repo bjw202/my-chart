@@ -76,11 +76,13 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
   const aiReport = useAiReport()
   const [aiModalOpen, setAiModalOpen] = useState(false)
 
+  // SPEC-AI-REPORT-002 v1.0.3: AI 버튼 클릭 시 즉시 분석 시작하지 않고
+  // idle 상태로 모달만 열어 사용자가 모드(빠른/심층)를 명시적으로 선택 후 시작 버튼 누르도록 변경.
   const handleOpenAiReport = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     setAiModalOpen(true)
-    aiReport.startStream(stock.code)
-  }, [stock.code, aiReport])
+    aiReport.reset()  // 이전 결과 클리어 + status='idle'
+  }, [aiReport])
 
   const handleCloseAiReport = useCallback(() => {
     setAiModalOpen(false)
@@ -88,8 +90,12 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
     aiReport.reset()
   }, [aiReport])
 
-  const handleRetryAiReport = useCallback(() => {
-    aiReport.startStream(stock.code)
+  const handleStartAiReport = useCallback((mode: 'perplexity' | 'deep') => {
+    aiReport.startStream(stock.code, mode)
+  }, [stock.code, aiReport])
+
+  const handleRetryAiReport = useCallback((mode?: 'perplexity' | 'deep') => {
+    aiReport.startStream(stock.code, mode ?? 'perplexity')
   }, [stock.code, aiReport])
 
   const handleLoadAiHistory = useCallback(() => {
@@ -418,7 +424,7 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
         />
       )}
 
-      {aiModalOpen && aiReport.status !== 'idle' && (
+      {aiModalOpen && (
         <AiReportModal
           code={stock.code}
           companyName={stock.name}
@@ -427,6 +433,7 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           errorMessage={aiReport.errorMessage}
           history={aiReport.history}
           onClose={handleCloseAiReport}
+          onStart={handleStartAiReport}
           onRetry={handleRetryAiReport}
           onLoadHistory={handleLoadAiHistory}
           onSelectHistory={handleSelectAiHistory}

@@ -26,6 +26,8 @@ from backend.services.deep_research_service import (
     check_deep_rate_limit,
     stream_deep_analysis,
 )
+# perplexity_cache는 함수 내부에서 lazy import: backend.services.__init__ cascade
+# (db_service → my_chart.db) 회피를 위해 module-level import는 사용하지 않음.
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -105,12 +107,30 @@ async def _handle_perplexity_mode(code: str, stock_name: str) -> EventSourceResp
             detail={"error": "rate_limit", "detail": str(exc)},
         ) from exc
 
+    # Lazy import (테스트 격리용): backend.services.__init__의 cascade import 회피.
+    # 테스트에서 stub이 없으면 silent skip — 캐시 누락은 기능 영향 없음 (Deep mode가 단지 재호출).
+    try:
+        from backend.services.perplexity_cache import put as _cache_put
+    except ImportError:
+        _cache_put = lambda *a, **k: None  # noqa: E731
+
     async def event_generator():
-        """SSE 이벤트 제너레이터: 스트리밍 청크를 클라이언트에 전달."""
+        """SSE 이벤트 제너레이터: 스트리밍 청크를 클라이언트에 전달.
+
+        SPEC-AI-REPORT-002 v1.0.3: 종료 시 full markdown을 perplexity_cache에 저장하여
+        같은 종목의 deep mode 호출이 재사용할 수 있도록 한다 (시나리오 C 비용 절감).
+        """
         _active_analyses.add(code)
+        accumulated: list[str] = []  # 캐시용 합본
         try:
             async for chunk in stream_perplexity(stock_name):
+                accumulated.append(chunk)
                 yield {"data": chunk}
+
+            # 빠른 분석 종료 → perplexity 캐시에 저장 (TTL 10분, deep mode 재사용용)
+            full_markdown = "".join(accumulated)
+            if full_markdown:
+                _cache_put(code, full_markdown)
 
             # 스트리밍 완료 이벤트 전송
             yield {"event": "done", "data": ""}
