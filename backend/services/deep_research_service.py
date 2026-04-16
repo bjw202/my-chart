@@ -201,6 +201,11 @@ async def stream_deep_analysis(
         asyncio.CancelledError: 클라이언트 연결 끊김 (재발생).
     """
     staging_dir: Path | None = None
+    full_markdown_parts: list[str] = []
+    # NFR-006 관찰성: end-to-end 소요시간 측정
+    import time as _time
+    _t_start = _time.monotonic()
+    _outcome = "unknown"
 
     # Phase 1: 중복 분석 차단
     if code in _active_deep_analyses:
@@ -209,6 +214,12 @@ async def stream_deep_analysis(
 
     # Phase 1a: 활성 세트 등록
     _active_deep_analyses.add(code)
+    logger.info(
+        "딥 리서치 시작: code=%s, stock_name=%s, model=%s",
+        code,
+        stock_name,
+        model or os.getenv("AI_REPORT_DEEP_MODEL", "sonnet"),
+    )
 
     try:
         # Phase 2: 소스 수집
@@ -244,8 +255,6 @@ async def stream_deep_analysis(
         yield {"event": "phase", "data": json.dumps({"phase": "synthesizing"})}
 
         # Phase 4a: 스트리밍 합성
-        full_markdown_parts: list[str] = []
-
         try:
             async for event in stream_claude_synthesis(
                 cwd=staging_dir,
@@ -260,12 +269,16 @@ async def stream_deep_analysis(
                     full_markdown = "".join(full_markdown_parts)
                     if full_markdown:
                         save_report(stock_name, full_markdown)
+                    _outcome = "done"
                     yield {"event": "done", "data": ""}
                 elif isinstance(event, ErrorSignal):
+                    _outcome = "error"
                     yield {"event": "error", "data": event.message}
         except asyncio.TimeoutError:
+            _outcome = "timeout"
             yield {"event": "error", "data": _MSG_TIMEOUT}
         except asyncio.CancelledError:
+            _outcome = "cancelled"
             logger.info("딥 리서치 스트리밍 취소됨 (CancelledError): code=%s", code)
             raise  # CancelledError는 삼키지 않고 재발생
 
@@ -275,6 +288,15 @@ async def stream_deep_analysis(
         if staging_dir is not None:
             shutil.rmtree(staging_dir, ignore_errors=True)
             logger.debug("스테이징 디렉토리 정리: %s", staging_dir)
+        # NFR-006: end-to-end 소요시간 로깅
+        _duration = _time.monotonic() - _t_start
+        logger.info(
+            "딥 리서치 종료: code=%s, outcome=%s, duration=%.2fs, chars=%d",
+            code,
+            _outcome,
+            _duration,
+            sum(len(p) for p in full_markdown_parts),
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
