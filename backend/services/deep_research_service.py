@@ -247,9 +247,24 @@ async def stream_deep_analysis(
             "opus" if deep_model_env == "opus" else None
         )
 
+        # 사용자 프롬프트: 종목 식별 + 명시적 Read 지시 + 학습 데이터 의존 차단.
+        # 단순 "@summary.md 먼저 읽고..."는 Claude가 종종 Read tool을 무시하고 학습 데이터로
+        # 직답하는 경향이 있어, 종목 코드 + 5개 파일을 명시적으로 모두 열도록 지시한다.
         user_prompt = (
-            "@summary.md 먼저 읽고, sources/ 하위 파일 전체를 교차 검증하여 "
-            "한국 스윙 트레이딩 리포트 마크다운을 생성하라."
+            f"종목: {stock_name}({code}) — 한국 KOSPI/KOSDAQ 상장 종목 코드 {code}.\n\n"
+            "지시:\n"
+            "1) 먼저 Read tool로 ./summary.md를 읽고 어떤 소스가 성공했는지 확인하라.\n"
+            "2) 다음 5개 파일을 Read tool로 모두 열어라 (존재하는 파일만):\n"
+            "   - sources/perplexity.md\n"
+            "   - sources/brave.json\n"
+            "   - sources/tavily.json\n"
+            "   - sources/naver.json\n"
+            "   - sources/youtube.json\n"
+            "3) 위 파일들의 내용만 사용해 한국 스윙 트레이딩 딥 리서치 리포트를 마크다운으로 생성하라.\n"
+            "4) 당신의 사전 학습 지식을 사용하지 마라. \"학습 범위 벗어남\" / \"실시간 데이터 미접근\" / "
+            "\"기업 식별 불가\" 같은 면책 사유로 리포트 작성을 거부하지 마라. "
+            f"종목 코드 {code}는 위 파일에서 검증할 수 있다.\n"
+            "5) 시스템 프롬프트의 출력 섹션 구조를 따르라."
         )
 
         yield {"event": "phase", "data": json.dumps({"phase": "synthesizing"})}

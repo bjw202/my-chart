@@ -427,7 +427,9 @@ async def _collect_naver(
             error_message="NAVER_CLIENT_ID/SECRET 환경변수 미설정",
         )
 
-    korean_query = f"{stock_name} 주식 분석"
+    # 종목 식별 모호성 회피: "{회사명} {6자리코드}" 패턴으로 동명이인 회사 결과 배제
+    # (예: "우리로" → "우리은행/우리금융/우리이앤엘" 결과 섞임 방지)
+    korean_query = f"{stock_name} {code} 주식"
     params = {"query": korean_query, "display": 10}
     headers = {
         "X-Naver-Client-Id": client_id,
@@ -493,7 +495,8 @@ async def _collect_youtube(
             error_message="YOUTUBE_API_KEY 환경변수 미설정",
         )
 
-    query = f"{stock_name} 주식 분석"
+    # 종목 식별 모호성 회피: 회사명 + 종목 코드 둘 다 포함 (Naver와 동일 이유)
+    query = f"{stock_name} {code} 주식 분석"
     params = {
         "part": "snippet",
         "q": query,
