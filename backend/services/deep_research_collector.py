@@ -549,13 +549,31 @@ async def _collect_youtube(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+# 소스별 권장 타임아웃 (초). docs/search.sh 레퍼런스 기준:
+#   - perplexity sonar-reasoning-pro: 30~90s 응답이 정상 (search.sh: --max-time 120)
+#   - tavily advanced: 60~120s (search.sh: --max-time 60~120)
+#   - brave/naver/youtube: 단순 검색 API, ~3-5s 응답
+_DEFAULT_TIMEOUTS: dict[str, float] = {
+    "perplexity": 120.0,
+    "tavily": 90.0,
+    "brave": 15.0,
+    "naver": 15.0,
+    "youtube": 15.0,
+}
+
+# httpx.AsyncClient 기본 타임아웃: connect는 짧게, read는 source별 timeout이 wait_for로 잡으므로
+# 충분히 길게 설정 (asyncio.wait_for가 외부에서 자른다).
+_DEFAULT_HTTPX_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=10.0, pool=10.0)
+
+
 # @MX:ANCHOR collect_all_sources — fan_in >= 2 (orchestrator + tests). Invariant: gate_passed == (successful_sources >= 2). asyncio.gather(return_exceptions=True)가 소스별 실패를 개별 포착.
 # @MX:REASON SPEC-AI-REPORT-002 FR-002: 5개 소스를 병렬 수집하며, 개별 소스 실패가 전체 파이프라인을 중단시켜서는 안 된다.
 async def collect_all_sources(
     code: str,
     stock_name: str,
     *,
-    timeout_per_source: float = 10.0,
+    timeout_per_source: float | None = None,
+    timeouts: dict[str, float] | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> CollectionResult:
     """5개 검색 API를 asyncio.gather로 병렬 수집한다.
@@ -563,7 +581,10 @@ async def collect_all_sources(
     Args:
         code: 종목 코드 (예: "005930")
         stock_name: 종목명 (예: "삼성전자")
-        timeout_per_source: 소스별 타임아웃 (초, 기본 10초)
+        timeout_per_source: 모든 소스에 동일하게 적용할 단일 timeout. None이면 source별 기본값
+            사용. 테스트 호환을 위해 유지 (기존 시그니처).
+        timeouts: source별 timeout override. {"perplexity": 60.0, ...} 형식. timeout_per_source
+            보다 우선 적용된다.
         client: 테스트 주입용 httpx.AsyncClient
 
     Returns:
@@ -571,43 +592,38 @@ async def collect_all_sources(
     """
     started_at = datetime.now(timezone.utc)
 
-    # 공용 client 사용 시 context manager 없이 직접 전달
-    if client is not None:
-        tasks = [
-            asyncio.wait_for(_collect_perplexity(code, stock_name, client=client), timeout=timeout_per_source),
-            asyncio.wait_for(_collect_brave(code, stock_name, client=client), timeout=timeout_per_source),
-            asyncio.wait_for(_collect_tavily(code, stock_name, client=client), timeout=timeout_per_source),
-            asyncio.wait_for(_collect_naver(code, stock_name, client=client), timeout=timeout_per_source),
-            asyncio.wait_for(_collect_youtube(code, stock_name, client=client), timeout=timeout_per_source),
+    # 효과적 timeout 계산: 기본값 → timeout_per_source 단일값 → timeouts dict override
+    effective_timeouts = dict(_DEFAULT_TIMEOUTS)
+    if timeout_per_source is not None:
+        effective_timeouts = {k: timeout_per_source for k in effective_timeouts}
+    if timeouts:
+        effective_timeouts.update(timeouts)
+
+    source_names = ["perplexity", "brave", "tavily", "naver", "youtube"]
+    collectors = {
+        "perplexity": _collect_perplexity,
+        "brave": _collect_brave,
+        "tavily": _collect_tavily,
+        "naver": _collect_naver,
+        "youtube": _collect_youtube,
+    }
+
+    def _build_tasks(c: httpx.AsyncClient) -> list:
+        return [
+            asyncio.wait_for(
+                collectors[name](code, stock_name, client=c),
+                timeout=effective_timeouts[name],
+            )
+            for name in source_names
         ]
-        source_names = ["perplexity", "brave", "tavily", "naver", "youtube"]
-        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    if client is not None:
+        raw_results = await asyncio.gather(*_build_tasks(client), return_exceptions=True)
     else:
-        async with httpx.AsyncClient() as shared_client:
-            tasks = [
-                asyncio.wait_for(
-                    _collect_perplexity(code, stock_name, client=shared_client),
-                    timeout=timeout_per_source,
-                ),
-                asyncio.wait_for(
-                    _collect_brave(code, stock_name, client=shared_client),
-                    timeout=timeout_per_source,
-                ),
-                asyncio.wait_for(
-                    _collect_tavily(code, stock_name, client=shared_client),
-                    timeout=timeout_per_source,
-                ),
-                asyncio.wait_for(
-                    _collect_naver(code, stock_name, client=shared_client),
-                    timeout=timeout_per_source,
-                ),
-                asyncio.wait_for(
-                    _collect_youtube(code, stock_name, client=shared_client),
-                    timeout=timeout_per_source,
-                ),
-            ]
-            source_names = ["perplexity", "brave", "tavily", "naver", "youtube"]
-            raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+        async with httpx.AsyncClient(timeout=_DEFAULT_HTTPX_TIMEOUT) as shared_client:
+            raw_results = await asyncio.gather(
+                *_build_tasks(shared_client), return_exceptions=True
+            )
 
     sources: dict[str, SourceResult] = {}
     for name, raw in zip(source_names, raw_results):
@@ -619,7 +635,7 @@ async def collect_all_sources(
                 success=False,
                 data=None,
                 error_type="timeout",
-                error_message=f"asyncio.wait_for timeout ({timeout_per_source}s)",
+                error_message=f"asyncio.wait_for timeout ({effective_timeouts[name]}s)",
             )
         elif isinstance(raw, BaseException):
             sources[name] = SourceResult(

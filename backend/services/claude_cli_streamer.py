@@ -11,6 +11,7 @@ SPEC-AI-REPORT-002 Phase A (FR-004, FR-005, FR-007, ER-004, ER-005)
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from dataclasses import dataclass
@@ -165,32 +166,57 @@ async def stream_claude_synthesis(
     if _cmd_override is not None:
         argv = _cmd_override
     else:
+        # Claude CLI 2.1.x는 --cwd 옵션이 없음. subprocess의 cwd= kwarg로 작업 디렉토리를
+        # 설정하고, --add-dir로 도구(Read/Grep/Glob)의 접근 허용 디렉토리를 명시한다.
+        # --permission-mode bypassPermissions: 헤드리스 환경에서 도구 권한 프롬프트 회피.
         argv = [
             "claude",
             "-p", prompt,
-            "--cwd", str(cwd),
+            "--add-dir", str(cwd),
             "--append-system-prompt", system_prompt,
             "--allowedTools", "Read,Grep,Glob",
+            "--permission-mode", "bypassPermissions",
             "--output-format", "stream-json",
             "--verbose",
         ]
+        # SPEC-AI-REPORT-002 #2: 기본 Sonnet, AI_REPORT_DEEP_MODEL=opus 시 Opus.
+        # model 인자를 명시하지 않으면 claude CLI default(claude-opus-4-6[1m])가 적용되어
+        # SPEC 위반 + Opus가 Sonnet보다 overload될 확률이 높아진다.
         if model == "opus":
             argv += ["--model", "claude-opus-4-6"]
+        else:
+            argv += ["--model", "claude-sonnet-4-6"]
 
     proc: asyncio.subprocess.Process | None = None
+    stderr_drain_task: asyncio.Task | None = None
+
+    async def _drain_stderr(stream: asyncio.StreamReader) -> None:
+        """stderr 라인을 logger.warning으로 흘려 진단 가시성 확보."""
+        try:
+            async for raw_line in stream:
+                line = raw_line.decode("utf-8", errors="replace").rstrip()
+                if line:
+                    logger.warning("[claude-cli stderr] %s", line[:500])
+        except Exception:  # noqa: BLE001
+            pass
 
     try:
+        # cwd= kwarg는 _cmd_override 여부와 무관하게 항상 적용 (실제 운영 + 테스트 모두)
         proc = await asyncio.create_subprocess_exec(
             *argv,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(cwd) if _cmd_override else None,
+            cwd=str(cwd),
         )
 
         if _proc_spy is not None:
             _proc_spy.append(proc)
 
         assert proc.stdout is not None
+        assert proc.stderr is not None
+
+        # stderr 백그라운드 드레인 (로깅만, 본 흐름 차단 X)
+        stderr_drain_task = asyncio.create_task(_drain_stderr(proc.stderr))
 
         async def _read_lines() -> AsyncGenerator[StreamEvent, None]:
             """stdout 라인 스트리밍 및 이벤트 파싱."""
@@ -214,9 +240,24 @@ async def stream_claude_synthesis(
             logger.error("Claude CLI 타임아웃: %s초 초과", timeout)
             yield ErrorSignal(message=error_msg)
 
+        # stdout이 자연 종료되면 returncode 확인. 비정상 종료 시 ErrorSignal 발행
+        # (이전 버전은 stdout 빈 채로 종료되어도 silent하게 generator만 끝났음).
+        await proc.wait()
+        if proc.returncode is not None and proc.returncode != 0:
+            error_msg = (
+                f"Claude CLI 비정상 종료 (exit={proc.returncode}). "
+                "stderr 로그를 확인하거나 빠른 분석을 사용해 주세요."
+            )
+            logger.error("Claude CLI 비정상 종료: returncode=%s", proc.returncode)
+            yield ErrorSignal(message=error_msg)
+
     except asyncio.CancelledError:
         logger.info("Claude CLI 스트리밍 취소됨 (CancelledError)")
         raise  # CancelledError는 삼키지 않음
     finally:
         if proc is not None:
             await _terminate_proc(proc)
+        if stderr_drain_task is not None and not stderr_drain_task.done():
+            stderr_drain_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await stderr_drain_task
