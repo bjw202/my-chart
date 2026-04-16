@@ -208,6 +208,15 @@ export function AiReportModal({
                 </div>
               )}
 
+              {/* 완료 후: 선택한 모드(빠른/심층)로 다시 분석 (SPEC-AI-REPORT-002 v1.0.1 UI 보완) */}
+              {status === 'done' && markdown && (
+                <div className="ai-report-rerun">
+                  <button className="ai-report-retry-btn" onClick={() => onRetry(mode)}>
+                    {mode === 'deep' ? '심층 분석으로 다시 시도' : '빠른 분석으로 다시 시도'}
+                  </button>
+                </div>
+              )}
+
               {/* 스트리밍 중 타이핑 인디케이터 */}
               {status === 'streaming' && (
                 <div className="ai-report-typing">
