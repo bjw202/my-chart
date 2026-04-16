@@ -5,6 +5,7 @@ import {
   createAiReportStream,
   fetchAiReportHistory,
   fetchAiReportContent,
+  type AiReportMode,
 } from '../api/aiReport'
 import type { AiReportStatus, HistoryItem } from '../types/aiReport'
 
@@ -17,8 +18,8 @@ interface UseAiReportReturn {
   errorMessage: string
   /** 히스토리 목록 */
   history: HistoryItem[]
-  /** 스트리밍 시작 */
-  startStream: (code: string) => void
+  /** 스트리밍 시작 (mode 생략 시 'perplexity' 기본값) */
+  startStream: (code: string, mode?: AiReportMode) => void
   /** 스트리밍 중단 및 상태 초기화 */
   abort: () => void
   /** 히스토리 목록 로드 */
@@ -38,7 +39,8 @@ export function useAiReport(): UseAiReportReturn {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const abortRef = useRef<AbortController | null>(null)
 
-  const startStream = useCallback((code: string) => {
+  // SPEC-AI-REPORT-002 D5: mode 파라미터 추가 (기본값 'perplexity', 기존 호출부 호환 유지)
+  const startStream = useCallback((code: string, mode: AiReportMode = 'perplexity') => {
     // 이전 스트림이 있으면 중단
     if (abortRef.current) {
       abortRef.current.abort()
@@ -65,6 +67,7 @@ export function useAiReport(): UseAiReportReturn {
         setStatus('error')
         abortRef.current = null
       },
+      mode,
     )
 
     abortRef.current = controller

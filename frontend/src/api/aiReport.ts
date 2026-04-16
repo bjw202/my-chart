@@ -18,6 +18,9 @@ export async function fetchAiReportContent(
   return res.data
 }
 
+// SPEC-AI-REPORT-002: 분석 모드 타입 정의 (FR-011, D6)
+export type AiReportMode = 'perplexity' | 'deep'
+
 /**
  * SSE 스트리밍으로 AI 리포트 생성.
  *
@@ -31,12 +34,14 @@ export function createAiReportStream(
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (message: string) => void,
+  mode: AiReportMode = 'perplexity',
 ): AbortController {
   const controller = new AbortController()
 
   ;(async () => {
     try {
-      const response = await fetch(`/api/ai-report/${code}`, {
+      const url = `/api/ai-report/${encodeURIComponent(code)}?mode=${encodeURIComponent(mode)}`
+      const response = await fetch(url, {
         method: 'POST',
         signal: controller.signal,
       })

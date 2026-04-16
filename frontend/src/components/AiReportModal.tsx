@@ -4,12 +4,14 @@
  * Perplexity API SSE 스트리밍을 실시간 마크다운으로 렌더링하고,
  * 히스토리 탭에서 이전 분석을 조회할 수 있다.
  * AnalysisModal 패턴(portal + ESC + backdrop) 동일 적용.
+ * SPEC-AI-REPORT-002 D4: 헤더에 2단 모드 토글(빠른 분석 / 심층 분석) 추가.
  */
 import React, { useEffect, useCallback, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AiReportStatus, HistoryItem } from '../types/aiReport'
+import type { AiReportMode } from '../api/aiReport'
 
 // ── 탭 타입 ─────────────────────────────────────────────────────────────────
 
@@ -25,16 +27,21 @@ interface AiReportModalProps {
   errorMessage: string
   history: HistoryItem[]
   onClose: () => void
-  onRetry: () => void
+  /**
+   * 스트림 재시작 콜백. mode 인자를 받아 해당 모드로 분석 시작.
+   * 기존 ChartCell의 () => void 호출부와 호환 (mode 생략 시 모달 내 선택 모드 사용).
+   */
+  onRetry: (mode?: AiReportMode) => void
   onLoadHistory: () => void
   onSelectHistory: (filename: string) => void
 }
 
 // ── 컴포넌트 ────────────────────────────────────────────────────────────────
 
-// @MX:NOTE: [AUTO] v1.1.4 - 5-state UI 상태 머신(idle/streaming/done/error/loading-history).
+// @MX:NOTE: [AUTO] v1.1.4+D4 - 5-state UI 상태 머신(idle/streaming/done/error/loading-history).
 // useAiReport 훅의 status와 완전 동기. 신규 상태 추가 시 useAiReport의 AiReportStatus 타입도
 // 함께 업데이트 필요. 탭 전환(analysis/history) 시 historyLoaded 플래그로 중복 로드 방지.
+// SPEC-AI-REPORT-002 D4: mode 상태 추가 — 스트리밍 중 토글 비활성화.
 export function AiReportModal({
   code,
   companyName,
@@ -51,6 +58,8 @@ export function AiReportModal({
   const [activeTab, setActiveTab] = useState<TabType>('result')
   const [copied, setCopied] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  // SPEC-AI-REPORT-002 FR-011: 2단 모드 선택 상태 ('perplexity' 기본값)
+  const [mode, setMode] = useState<AiReportMode>('perplexity')
 
   // ESC 키로 모달 닫기
   useEffect(() => {
@@ -128,6 +137,33 @@ export function AiReportModal({
             </div>
             <div className="ai-report-date">{today}</div>
           </div>
+          {/* SPEC-AI-REPORT-002 FR-011: 2단 모드 토글 — 스트리밍 중 비활성화 */}
+          <div
+            className="ai-report-mode-selector"
+            role="tablist"
+            aria-label="분석 모드"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'perplexity'}
+              className={`ai-report-mode-btn${mode === 'perplexity' ? ' active' : ''}`}
+              onClick={() => setMode('perplexity')}
+              disabled={status === 'streaming'}
+            >
+              빠른 분석
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'deep'}
+              className={`ai-report-mode-btn${mode === 'deep' ? ' active' : ''}`}
+              onClick={() => setMode('deep')}
+              disabled={status === 'streaming'}
+            >
+              심층 분석 (~90초)
+            </button>
+          </div>
           <div className="ai-report-actions">
             {/* 복사 버튼: 분석 완료 후에만 표시 */}
             {status === 'done' && markdown && (
@@ -198,7 +234,7 @@ export function AiReportModal({
                   )}
                   <div className="ai-report-error">
                     <span className="ai-report-error-text">{errorMessage}</span>
-                    <button className="ai-report-retry-btn" onClick={onRetry}>
+                    <button className="ai-report-retry-btn" onClick={() => onRetry(mode)}>
                       다시 시도
                     </button>
                   </div>

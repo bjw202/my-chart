@@ -2261,6 +2261,46 @@ html, body, #root {
 .ai-report-subtitle { font-size: 12px; color: #a78bfa; font-weight: 600; }
 .ai-report-date { font-size: 11px; color: var(--text-muted); }
 
+/* SPEC-AI-REPORT-002 FR-011: 2단 모드 토글 (빠른 분석 / 심층 분석) */
+.ai-report-mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ai-report-mode-btn {
+  padding: 6px 14px;
+  min-height: 36px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.ai-report-mode-btn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+.ai-report-mode-btn:hover:not(:disabled) {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+.ai-report-mode-btn.active {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+  font-weight: 600;
+}
+.ai-report-mode-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .ai-report-actions { display: flex; align-items: center; gap: 8px; }
 
 .ai-report-copy-btn {
