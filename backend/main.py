@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -19,6 +20,10 @@ from backend.routers.market import router as market_router
 from backend.routers.screen import router as screen_router
 from backend.routers.sectors import router as sectors_router
 from backend.routers.stage import router as stage_router
+from backend.services.deep_research_service import (
+    _cleanup_stale_staging_dirs,
+    _load_synthesis_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except (FileNotFoundError, ValueError) as e:
         logger.error("AI Report 프롬프트 검증 실패: %s", e)
         raise
+
+    # @MX:NOTE Deep-mode lifespan block — claude binary optional, synthesis prompt required. /tmp cleanup is best-effort.
+    # v1.2.0 Phase D3: Deep 분석 모드 가용성 게이트 (NFR-008)
+    # claude CLI 없으면 경고만 (Perplexity 모드는 정상 운영)
+    if shutil.which("claude") is None:
+        logger.warning("claude CLI 미설치: Deep 분석 모드 비활성화. Perplexity 모드는 정상 운영.")
+
+    # Deep 합성 프롬프트 fail-fast (FR-010): 파일 없으면 서버 시작 즉시 중단
+    try:
+        _load_synthesis_prompt()
+        logger.info("Deep Research 합성 프롬프트 로드 완료")
+    except (FileNotFoundError, ValueError) as e:
+        logger.error("합성 프롬프트 검증 실패: %s", e)
+        raise
+
+    # /tmp 스테이징 디렉토리 정리 (FR-013): 7일 초과 디렉토리 삭제 (best-effort)
+    try:
+        deleted = _cleanup_stale_staging_dirs(max_age_days=7)
+        if deleted > 0:
+            logger.info("오래된 staging 디렉토리 %d개 정리 완료", deleted)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("staging 디렉토리 정리 실패 (무시): %s", e)
 
     yield
     logger.info("Server shutting down.")

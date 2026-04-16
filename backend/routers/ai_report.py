@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
 from backend.schemas.ai_report import HistoryItem, HistoryResponse, ReportContentResponse
@@ -19,6 +20,12 @@ from backend.services.ai_report_service import (
     get_stock_name,
     stream_perplexity,
 )
+from backend.services.deep_research_service import (
+    _active_deep_analyses,
+    DeepRateLimitError,
+    check_deep_rate_limit,
+    stream_deep_analysis,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -26,14 +33,18 @@ logger = logging.getLogger(__name__)
 _CODE_PATTERN = re.compile(r"^\d{6}$")
 
 
-# @MX:ANCHOR: [AUTO] v1.1.4 - AI 리포트 생성 공개 엔드포인트. 외부 HTTP 진입점.
-# @MX:REASON: 순서 있는 가드 체인(코드 형식 → 종목 존재 → API 키 → 중복 → rate limit)이
-# 비용 통제와 보안의 기본. 순서 변경/우회 시 Perplexity 과금 폭주 또는 잘못된 호출 발생.
+# @MX:ANCHOR generate_report — fan_in >= 2 (HTTP 클라이언트 + 테스트). 외부 HTTP 진입점.
+# @MX:REASON: Invariant: guard chain ordering (code → stock → api-key/binary → duplicate → rate-limit) applies to both modes.
+# Mode switches ONLY after all guards pass. 순서 변경/우회 시 과금 폭주 또는 잘못된 호출 발생.
 @router.post("/ai-report/{code}")
-async def generate_report(code: str) -> EventSourceResponse:
-    """Perplexity API를 통해 종목 분석 리포트를 SSE 스트리밍으로 생성.
+async def generate_report(
+    code: str,
+    mode: str = Query("perplexity", pattern="^(perplexity|deep)$"),
+) -> EventSourceResponse:
+    """종목 분석 리포트를 SSE 스트리밍으로 생성.
 
     - **code**: 6자리 KRX 종목 코드 (예: "005930")
+    - **mode**: 분석 모드. "perplexity"(기본) 또는 "deep"
 
     스트리밍 완료 시 리포트 자동 저장.
 
@@ -42,17 +53,19 @@ async def generate_report(code: str) -> EventSourceResponse:
     - done: 스트리밍 완료
     - error: 오류 발생
 
-    Returns 422 if code format is invalid.
+    Returns 422 if code format is invalid or mode is not 'perplexity'/'deep'.
     Returns 404 if stock not found in registry.
-    Returns 503 if PERPLEXITY_API_KEY is not set.
-    Returns 429 if same stock is already being analyzed.
+    Returns 503 if required binary/key is missing.
+    Returns 429 if rate limit exceeded or analysis already in progress.
     """
+    # ── 공통 가드 1: 코드 형식 검증 (두 모드 모두 적용) ──
     if not _CODE_PATTERN.match(code):
         raise HTTPException(
             status_code=422,
             detail={"error": "invalid_code", "detail": "종목 코드는 6자리 숫자여야 합니다."},
         )
 
+    # ── 공통 가드 2: 종목 존재 여부 검증 (두 모드 모두 적용) ──
     stock_name = get_stock_name(code)
     if stock_name is None:
         raise HTTPException(
@@ -60,12 +73,23 @@ async def generate_report(code: str) -> EventSourceResponse:
             detail={"error": "not_found", "detail": f"종목 코드 {code}를 찾을 수 없습니다."},
         )
 
+    # ── 모드별 분기 ──
+    if mode == "deep":
+        return await _handle_deep_mode(code, stock_name)
+    else:
+        return await _handle_perplexity_mode(code, stock_name)
+
+
+async def _handle_perplexity_mode(code: str, stock_name: str) -> EventSourceResponse:
+    """Perplexity 모드 처리: API 키 체크 → 중복 체크 → rate limit → 스트리밍."""
+    # Perplexity API 키 체크
     if not os.environ.get("PERPLEXITY_API_KEY"):
         raise HTTPException(
             status_code=503,
             detail={"error": "api_key_missing", "detail": "PERPLEXITY_API_KEY가 설정되지 않았습니다."},
         )
 
+    # 중복 분석 체크 (Perplexity 전용)
     if code in _active_analyses:
         raise HTTPException(
             status_code=429,
@@ -104,6 +128,34 @@ async def generate_report(code: str) -> EventSourceResponse:
             _active_analyses.discard(code)
 
     return EventSourceResponse(event_generator())
+
+
+async def _handle_deep_mode(code: str, stock_name: str) -> EventSourceResponse:
+    """Deep 분석 모드 처리: claude CLI 체크 → 중복 체크 → rate limit → 스트리밍."""
+    # claude CLI 체크
+    if shutil.which("claude") is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "claude_cli_missing", "detail": "claude CLI가 설치되지 않아 Deep 분석을 사용할 수 없습니다. Perplexity 모드를 사용하세요."},
+        )
+
+    # 중복 분석 체크 (Deep 전용)
+    if code in _active_deep_analyses:
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "deep_already_running", "detail": f"{stock_name}({code}) 심층 분석이 이미 진행 중입니다."},
+        )
+
+    # Deep rate limit 체크
+    try:
+        check_deep_rate_limit()
+    except DeepRateLimitError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "deep_rate_limit", "detail": str(exc)},
+        ) from exc
+
+    return EventSourceResponse(stream_deep_analysis(code, stock_name))
 
 
 @router.get("/ai-report/{code}/history", response_model=HistoryResponse)
