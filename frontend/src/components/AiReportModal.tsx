@@ -161,7 +161,7 @@ export function AiReportModal({
               onClick={() => setMode('deep')}
               disabled={status === 'streaming'}
             >
-              심층 분석 (~90초)
+              심층 분석 (수분 소요)
             </button>
           </div>
           <div className="ai-report-actions">

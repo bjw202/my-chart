@@ -141,7 +141,7 @@ async def stream_claude_synthesis(
     prompt: str,
     system_prompt: str,
     model: str | None = None,
-    timeout: float = 180.0,
+    timeout: float = 600.0,
     _cmd_override: list[str] | None = None,
     _proc_spy: list[asyncio.subprocess.Process] | None = None,
 ) -> AsyncGenerator[StreamEvent, None]:
@@ -152,7 +152,8 @@ async def stream_claude_synthesis(
         prompt: 사용자 프롬프트 (-p 인자).
         system_prompt: 시스템 프롬프트 (--append-system-prompt 인자).
         model: "opus"이면 --model claude-opus-4-6 추가. None이면 기본 Sonnet.
-        timeout: 전체 합성 타임아웃 (초). 기본값 180초.
+        timeout: 전체 합성 타임아웃 (초). 기본값 600초 (10분). 사용자 결정에 따라 깊은 분석은
+            오래 걸릴 수 있어 NFR-002의 90초 평균/180초 hard timeout을 600초로 확장.
         _cmd_override: 테스트용 명령어 오버라이드 (실제 claude 바이너리 대체).
         _proc_spy: 테스트용 프로세스 레퍼런스 수집 리스트.
 
