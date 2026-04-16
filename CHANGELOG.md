@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-AI-REPORT-002)
+
+- **AI 리포트 심층 분석 모드 (Deep Research Synthesis)** (SPEC-AI-REPORT-002 v1.0.3)
+  - 새 엔드포인트 파라미터: `POST /api/ai-report/{code}?mode=deep`
+  - 5-소스 병렬 수집: Perplexity sonar-reasoning-pro + Brave + Tavily + Naver + YouTube
+  - `/tmp/analysis_<code>_<uuid>/` 격리 staging 디렉토리
+  - Claude Code CLI 헤드리스 합성 (subprocess, OAuth 세션, default Sonnet)
+  - SSE stream-json → SSE 어댑터 (data/done/error/phase 이벤트)
+  - 자동 리포트 저장: `backend/reports/<stock_name>/<date>.md`
+  - 신규 모듈:
+    - `backend/services/deep_research_collector.py` — 5-소스 병렬 수집 + 스테이징
+    - `backend/services/claude_cli_streamer.py` — CLI subprocess + stream-json 파서
+    - `backend/services/deep_research_service.py` — 오케스트레이션 + Deep rate limit
+    - `backend/services/perplexity_cache.py` — TTL 10분 메모리 캐시 (시나리오 C 비용 절감)
+    - `backend/prompts/stock_synthesis_prompt.md` — 합성 시스템 프롬프트 (절대규칙 A/B/C)
+- **프론트엔드 2단 모드 토글 + 명시적 시작 버튼**
+  - 헤더: "빠른 분석" / "심층 분석 (수분 소요)" 토글 (ARIA tablist)
+  - AI 버튼 클릭 시 idle 상태로 모달 오픈, 사용자가 모드 선택 후 "분석 시작" 버튼 클릭
+  - 빠른 → 심층 시 같은 종목의 Perplexity 결과 캐시 재사용 (TTL 10분)
+  - done 상태에서 "심층 분석으로 다시 시도" / "빠른 분석으로 다시 시도" 모드 라벨 버튼
+  - 캐시 재사용 힌트 표시
+- **신규 환경변수**:
+  - `BRAVE_API_KEY`, `TAVILY_API_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `YOUTUBE_API_KEY`
+  - `AI_REPORT_DEEP_DAILY_QUOTA` (default 15)
+  - `AI_REPORT_DEEP_BURST_LIMIT` (default 1)
+  - `AI_REPORT_DEEP_MODEL` (default sonnet, "opus"로 변경 가능)
+- **Playwright e2e 테스트**: `frontend/e2e/ai-report-deep.spec.ts` (4 시나리오)
+- **테스트 추가**: 백엔드 95개 (Phase A 20 + B 39 + C 22 + D 14), 프론트 7개 (모달 토글 + retry)
+
+### Changed (SPEC-AI-REPORT-002)
+
+- `backend/routers/ai_report.py`: `mode: str = Query("perplexity", pattern="^(perplexity|deep)$")` 파라미터 추가, 가드 체인 분기
+- `backend/main.py` lifespan: `shutil.which("claude")` 체크 (warning) + `_load_synthesis_prompt()` fail-fast + `/tmp` 7일 초과 staging 디렉토리 정리
+- `frontend/src/components/AiReportModal.tsx`: 모달 헤더 토글 + idle 상태 launcher + done 상태 retry 버튼
+- `frontend/src/hooks/useAiReport.ts`: `startStream(code, mode='perplexity')` 시그니처 확장
+- `frontend/src/api/aiReport.ts`: URL에 `?mode=${mode}` 추가
+- `frontend/src/components/ChartGrid/ChartCell.tsx`: AI 버튼 클릭 시 즉시 시작 X → idle 상태 모달 오픈
+
+### Fixed (SPEC-AI-REPORT-002)
+
+- v1.0.1: Claude CLI timeout 180s → 600s (10분) — Sonnet 5-소스 합성에 180s 부족 (FR-007/NFR-002 완화)
+- v1.0.1: Claude CLI 인자 보정 — `--cwd` 옵션은 CLI 2.1.110에 없음. `--add-dir` + subprocess `cwd=` kwarg + `--permission-mode bypassPermissions` + `--model claude-sonnet-4-6` 명시
+- v1.0.1: collector source별 timeout — perplexity 120s, tavily 90s, brave/naver/youtube 15s (이전 일괄 10s는 Perplexity가 항상 timeout)
+- v1.0.2: Naver/YouTube query에 종목 코드 포함 (예: "우리로" → "우리은행/우리금융" 결과 섞임 방지)
+- v1.0.2: 학습 데이터 면책 차단 — synthesis prompt 절대 규칙 A/B/C (사전 학습 지식 사용 금지, "보고서 작성 불가" 면책 금지, 종목 코드 신뢰)
+- v1.0.3: 시나리오 C 비용 절감 — Perplexity 캐시 재사용 (HTTP 호출 0)
+- e2e UX 버그: AiReportModal done 상태에서 retry 버튼 누락 → done && markdown 분기에 추가
+
+### Notes (SPEC-AI-REPORT-002)
+
+- 검증 종목: **대한광통신 (010170)** — 풀 합성 3분 9초, 11.8KB 리포트 정상 생성
+- 검증 종목: **우리로 (046970)** — 동명이인 모호 케이스, 면책 차단 후 14.7KB 리포트 정상 생성
+- 회귀: SPEC-001 30 테스트 모두 통과 (AC-017 byte-identical contract preserved)
+- 알려진 이슈: `test_sector_advanced.py` 5건 — 다른 테스트 파일의 SimpleNamespace 스텁이 my_chart.registry를 덮어쓸 때 발생, SPEC-002 코드와 무관
+
 ## [1.1.0] - 2026-03-08
 
 ### Added

@@ -477,6 +477,179 @@ python3 scripts/test_v116_sktelecom.py     # SK텔레콤 품질 검증
 python3 scripts/test_perplexity.py v11 120 # API 파라미터 튜닝
 ```
 
+## AI 기업 분석 v2: Deep Research (SPEC-AI-REPORT-002)
+
+기존 Perplexity 단일 소스의 한계를 보완하기 위해 **Deep Research** 모드를 추가했습니다. 5개 검색 API를 병렬로 수집하고 Claude Code CLI로 합성한 정보 공간(Spaces) 수준의 심층 리포트를 제공합니다.
+
+### 개요
+
+- **5-소스 병렬 수집**: Perplexity sonar-reasoning-pro + Brave Search + Tavily + Naver + YouTube
+- **Claude CLI 헤드리스 합성**: `/tmp` 격리 환경에서 subprocess 실행 (기본 Sonnet, `AI_REPORT_DEEP_MODEL=opus` 가능)
+- **SSE 스트리밍**: stream-json 파서를 통한 실시간 프론트엔드 전달
+- **2단 모드 토글**: 모달에서 "빠른 분석(Perplexity)" / "심층 분석(Deep, 수분 소요)" 선택
+- **Perplexity 캐시 재사용**: 빠른 모드 후 심층 모드 시 HTTP 호출 0 (비용 절감)
+
+### 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  프론트엔드                                                  │
+│  - AI 버튼 클릭                                              │
+│  - 모달에서 "빠른" / "심층" 토글                             │
+│  - "분석 시작" 버튼 (명시적)                               │
+└────────────────┬────────────────────────────────────────────┘
+                 │ POST /api/ai-report/{code}?mode=deep
+                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│  라우터 (backend/routers/ai_report.py)                      │
+│  - mode 파라미터 분기                                       │
+│  - guard 체인 (코드 형식 → 종목 존재 → API key → 중복 → rate limit)
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│  deep_research_collector.py                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌────────┐  ┌────────┐ │
+│  │ Perplexity  │  │    Brave    │  │ Tavily │  │ Naver  │ │
+│  │  (120s)     │  │   (15s)     │  │ (90s)  │  │ (15s)  │ │
+│  └────────┬────┘  └──────┬──────┘  └───┬────┘  └───┬────┘ │
+│           │               │              │           │      │
+│  ┌────────┴───────────────┴──────────────┴───────────┴────┐ │
+│  │         asyncio.gather (병렬 수집)                     │ │
+│  │         ≥2/5 sources 필터링                           │ │
+│  └───────────────────────┬──────────────────────────────┘ │
+│                          │                                 │
+│  /tmp/analysis_<code>_<uuid>/  스테이징 디렉토리         │
+│  ├─ summary.md (stock metadata + collection status)       │
+│  └─ sources/                                             │
+│      ├─ perplexity.md                                    │
+│      ├─ brave.json                                       │
+│      ├─ tavily.json                                      │
+│      ├─ naver.json                                       │
+│      └─ youtube.json                                     │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│  claude_cli_streamer.py (subprocess)                        │
+│                                                             │
+│  claude -p "@summary.md" ... --output-format stream-json   │
+│  ├─ synthesis prompt로 6컬럼 표 + 교차검증 마크다운        │
+│  └─ stream-json 라인 → SSE 이벤트 어댑터                  │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│  SSE 스트림 → 프론트엔드                                    │
+│  ├─ data: <markdown chunk>                                │
+│  ├─ event: done                                           │
+│  └─ event: error (if any)                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 사용 흐름 (사용자 관점)
+
+1. **AI 버튼 클릭** → 모달 오픈 (idle 상태, "분석 시작" 버튼 비활성)
+2. **모드 선택**:
+   - "빠른 분석" (기본): Perplexity 단일 API 사용 (~40-60초)
+   - "심층 분석 (수분 소요)": 5-소스 병렬 + Claude 합성 (~3-5분)
+3. **"분석 시작" 버튼 클릭** → 스트리밍 시작
+4. **시나리오 C (캐시 재사용)**:
+   - "빠른 분석" 완료 → Perplexity 결과 TTL 10분 메모리 캐시
+   - 같은 종목의 "심층 분석" 선택 → "캐시된 결과 재사용" 힌트 표시
+   - Perplexity HTTP 호출 0, 비용 절감
+
+### 엔드포인트 업데이트
+
+| 메서드 | 엔드포인트 | 쿼리 파라미터 | 설명 | 응답 |
+|--------|-----------|--------------|------|------|
+| POST | `/api/ai-report/{code}` | `mode=perplexity` (기본) | 빠른 분석 (Perplexity 단일 API) | `text/event-stream` |
+| POST | `/api/ai-report/{code}` | `mode=deep` | 심층 분석 (5-소스 병렬 + Claude 합성) | `text/event-stream` |
+| GET | `/api/ai-report/{code}/history` | — | 분석 히스토리 (기존 유지) | `[{filename, date, created_at}]` |
+| GET | `/api/ai-report/{code}/{filename}` | — | 저장된 분석 조회 (기존 유지) | `{content, filename, date}` |
+
+### 신규 환경변수 (Deep 모드)
+
+```bash
+# Deep 모드 검색 API 키 (필수)
+BRAVE_API_KEY=
+TAVILY_API_KEY=
+NAVER_CLIENT_ID=
+NAVER_CLIENT_SECRET=
+YOUTUBE_API_KEY=
+
+# Deep 모드 운영 옵션 (선택, 기본값 사용 가능)
+AI_REPORT_DEEP_DAILY_QUOTA=15        # 하루 최대 Deep 분석 횟수
+AI_REPORT_DEEP_BURST_LIMIT=1         # 분당 최대 Deep 요청 수
+AI_REPORT_DEEP_MODEL=sonnet          # 합성 모델 (sonnet 또는 opus)
+```
+
+기존 환경변수 (`PERPLEXITY_API_KEY`, `AI_REPORT_DAILY_QUOTA`, `AI_REPORT_BURST_LIMIT`)는 변경 없음.
+
+### 의존성
+
+**Deep 모드 활성화 필수**:
+- Claude Code CLI 설치: `pip install --upgrade claude-code`
+  - 없으면 Deep 모드는 HTTP 503 `claude_cli_missing` 반환
+  - Perplexity 모드는 정상 작동
+
+**dev 의존성 추가**:
+- `pytest-asyncio` — async 테스트 지원
+
+### 에러 처리
+
+| 상황 | HTTP | 응답 |
+|------|------|------|
+| API 키 미설정 (Perplexity/검색 API) | 503 | "AI 분석 서비스를 사용할 수 없습니다" |
+| 잘못된 종목코드 | 404 | "종목을 찾을 수 없습니다" |
+| 동시 분석 요청 (같은 종목, 같은 모드) | 429 | "이미 분석이 진행 중입니다" |
+| **Deep 일일 쿼터 초과** | 429 | "심층 분석 일일 쿼터 초과. 내일 다시 시도해 주세요." |
+| **Deep 분당 burst 초과** | 429 | "심층 분석 분당 한도 초과. N초 후 다시 시도해 주세요." |
+| Deep 모드: Claude CLI 미설치 | 503 | "서버에 Claude CLI가 설치되지 않아 심층 분석을 사용할 수 없습니다" |
+| Deep 모드: 소스 수집 실패 (0-1/5) | 502 | "수집 실패: {N}/5 소스만 성공하여 합성 품질을 보장할 수 없습니다" |
+| Deep 모드: Claude CLI 타임아웃 (10분) | 504 | "합성 시간 초과 (600초). 다시 시도하거나 빠른 분석을 사용해 주세요." |
+| Perplexity/검색 API 장애 | SSE error | 재시도 버튼 표시 |
+
+### FS vs AI 버튼 역할 구분
+
+| 구분 | FS (FnGuide) | AI 빠른 | AI 심층 |
+|------|-------------|--------|--------|
+| 데이터 출처 | FnGuide 크롤링 | Perplexity API | 5-소스 병렬 (Perplexity+Brave+Tavily+Naver+YouTube) |
+| 분석 방식 | S-RIM 정량 | Perplexity AI | Claude CLI 합성 (Sonnet/Opus) |
+| 비용 | 무료 | ~$0.05/건 | ~$0.10-0.30/건 (5 API + Claude) |
+| 응답 시간 | 1-3초 | 40-90초 | 3-5분 (캐시 hit 시 1초) |
+| 용도 | 펀더멘털 검증 | 모멘텀·테마·촉매 | 6컬럼 표 + 교차 검증 + 리스크 분석 |
+
+### 테스트
+
+```bash
+# SPEC-001 회귀 테스트 (기존 유지)
+pytest backend/tests/test_ai_report_service.py -v
+
+# SPEC-002 Deep 파이프라인 테스트
+pytest backend/tests/test_claude_cli_streamer.py -v
+pytest backend/tests/test_deep_research_collector.py -v
+pytest backend/tests/test_deep_research_service.py -v
+pytest backend/tests/test_ai_report_router_deep_mode.py -v
+
+# 프론트엔드
+cd frontend && npm test -- --run
+
+# Playwright e2e (Deep 모드 시나리오)
+cd frontend && npx playwright test e2e/ai-report-deep.spec.ts
+```
+
+### SPEC 버전 히스토리
+
+| 버전 | 핵심 변경 |
+|------|---------|
+| 1.0.0 | 초기 SPEC: 5-소스 병렬 + Claude CLI 합성 + 2단 토글 |
+| 1.0.1 | Claude CLI timeout 600s, 인자 보정 (--cwd→--add-dir), source별 timeout, sonnet 명시 |
+| 1.0.2 | Naver/YouTube에 종목 코드, synthesis prompt 절대규칙 (학습 데이터/면책 차단) |
+| 1.0.3 | 명시적 모드 선택 UX, Perplexity 캐시 재사용 (시나리오 C) |
+
+---
+
 ## 라이선스
 
 Private - 로컬 전용.
