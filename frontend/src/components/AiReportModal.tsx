@@ -10,8 +10,9 @@ import React, { useEffect, useCallback, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { AiReportStatus, HistoryItem } from '../types/aiReport'
+import type { AiReportStatus, DeepProgress, HistoryItem } from '../types/aiReport'
 import type { AiReportMode } from '../api/aiReport'
+import { ProgressPanel } from './ProgressPanel'
 
 // ── 탭 타입 ─────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,11 @@ interface AiReportModalProps {
   markdown: string
   errorMessage: string
   history: HistoryItem[]
+  /**
+   * SPEC-AI-REPORT-002 v1.0.4: 심층 분석 진행 상태.
+   * 미제공 시 ProgressPanel을 렌더하지 않음 (backward compat — 테스트 호환).
+   */
+  progress?: DeepProgress
   onClose: () => void
   /**
    * 스트림 재시작 콜백. mode 인자를 받아 해당 모드로 분석 시작.
@@ -54,6 +60,7 @@ export function AiReportModal({
   markdown,
   errorMessage,
   history,
+  progress,
   onClose,
   onRetry,
   onStart,
@@ -207,6 +214,15 @@ export function AiReportModal({
         <div className="ai-report-body" ref={scrollRef}>
           {activeTab === 'result' && (
             <>
+              {/* SPEC-AI-REPORT-002 v1.0.4: 심층 분석 진행 상태 패널.
+                  딥 모드에서 streaming/done 상태일 때 본문 위에 노출.
+                  progress가 제공되지 않으면 렌더하지 않음 (빠른 분석 + legacy 호출). */}
+              {progress &&
+                mode === 'deep' &&
+                (status === 'streaming' || status === 'done') && (
+                  <ProgressPanel progress={progress} />
+                )}
+
               {/* 스트리밍 / 완료: 마크다운 렌더링 */}
               {(status === 'streaming' || status === 'done') && markdown && (
                 <div className="ai-report-content">

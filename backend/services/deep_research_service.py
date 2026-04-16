@@ -33,6 +33,7 @@ from backend.services.claude_cli_streamer import (
 )
 from backend.services.deep_research_collector import (
     CollectionResult,
+    SourceResult,
     collect_all_sources,
     create_staging_directory,
 )
@@ -142,6 +143,36 @@ def check_deep_rate_limit(now: datetime | None = None) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-002 v1.0.4: 진행 상태 패널용 카운트 계산
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _source_count(result: SourceResult) -> int:
+    """source_done phase event의 count 필드 값 계산.
+
+    - perplexity: content 문자 수 (cache hit 시에도 동일)
+    - brave/naver/youtube: 정규화된 리스트 길이
+    - tavily: results 리스트 길이
+
+    실패 또는 데이터 없음이면 0 반환.
+    """
+    if not result.success or result.data is None:
+        return 0
+    data = result.data
+    if isinstance(data, list):
+        return len(data)
+    if isinstance(data, dict):
+        # tavily
+        if "results" in data and isinstance(data["results"], list):
+            return len(data["results"])
+        # perplexity
+        if "content" in data:
+            content = data.get("content") or ""
+            return len(content)
+    return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 합성 프롬프트 로더
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -222,12 +253,70 @@ async def stream_deep_analysis(
     )
 
     try:
-        # Phase 2: 소스 수집
+        # Phase 2: 소스 수집 (SPEC-AI-REPORT-002 v1.0.4 per-source progress)
+        # collect_all_sources를 task로 실행하면서 progress_callback이 asyncio.Queue에 phase
+        # 이벤트를 put → 메인 async generator는 queue를 소비해서 yield. SENTINEL이 오면 종료.
+        # 기존 "collecting" 이벤트는 backward compat 용으로 유지.
         yield {"event": "phase", "data": json.dumps({"phase": "collecting"})}
-        result: CollectionResult = await collect_all_sources(code, stock_name)
+
+        event_queue: asyncio.Queue = asyncio.Queue()
+        _SENTINEL = object()
+
+        async def _progress_cb(evt: dict) -> None:
+            phase_name = evt.get("phase")
+            if phase_name == "source_start":
+                await event_queue.put(
+                    {
+                        "event": "phase",
+                        "data": json.dumps(
+                            {"phase": "source_start", "source": evt["source"]}
+                        ),
+                    }
+                )
+            elif phase_name == "source_done":
+                src: SourceResult = evt["result"]
+                payload: dict = {
+                    "phase": "source_done",
+                    "source": src.name,
+                    "success": src.success,
+                    "duration_ms": src.duration_ms,
+                    "count": _source_count(src),
+                    "cached": src.cached,
+                }
+                if not src.success:
+                    payload["error"] = src.error_type or "error"
+                await event_queue.put(
+                    {"event": "phase", "data": json.dumps(payload)}
+                )
+
+        async def _runner() -> CollectionResult:
+            try:
+                return await collect_all_sources(
+                    code, stock_name, progress_callback=_progress_cb
+                )
+            finally:
+                await event_queue.put(_SENTINEL)
+
+        collect_task: asyncio.Task[CollectionResult] = asyncio.create_task(_runner())
+
+        while True:
+            item = await event_queue.get()
+            if item is _SENTINEL:
+                break
+            yield item
+
+        # collect_task 결과 수령 (예외는 재발생, 정상이면 CollectionResult)
+        result: CollectionResult = await collect_task
 
         n_success = sum(1 for s in result.sources.values() if s.success)
         total = len(result.sources)
+
+        yield {
+            "event": "phase",
+            "data": json.dumps(
+                {"phase": "collecting_done", "successful": n_success, "total": total}
+            ),
+        }
 
         if not result.gate_passed:
             yield {
@@ -239,6 +328,7 @@ async def stream_deep_analysis(
         # Phase 3: 스테이징 디렉토리 생성
         yield {"event": "phase", "data": json.dumps({"phase": "staging"})}
         staging_dir = create_staging_directory(code, result)
+        yield {"event": "phase", "data": json.dumps({"phase": "staging_done"})}
 
         # Phase 4: 합성 프롬프트 로드
         system_prompt = _load_synthesis_prompt()
@@ -267,9 +357,21 @@ async def stream_deep_analysis(
             "5) 시스템 프롬프트의 출력 섹션 구조를 따르라."
         )
 
+        # 기존 "synthesizing" phase는 backward compat 용으로 유지.
+        # 신규 "synthesis_start"는 모델 정보 포함 — 프론트 진행 상태 패널이 이 이벤트로 합성 단계 전환.
         yield {"event": "phase", "data": json.dumps({"phase": "synthesizing"})}
+        yield {
+            "event": "phase",
+            "data": json.dumps(
+                {
+                    "phase": "synthesis_start",
+                    "model": effective_model or deep_model_env or "sonnet",
+                }
+            ),
+        }
 
-        # Phase 4a: 스트리밍 합성
+        # Phase 4a: 스트리밍 합성 (첫 청크 도착 시 synthesis_first_chunk phase 이벤트 발행)
+        first_chunk_sent = False
         try:
             async for event in stream_claude_synthesis(
                 cwd=staging_dir,
@@ -278,6 +380,12 @@ async def stream_deep_analysis(
                 model=effective_model,
             ):
                 if isinstance(event, TextDelta):
+                    if not first_chunk_sent:
+                        yield {
+                            "event": "phase",
+                            "data": json.dumps({"phase": "synthesis_first_chunk"}),
+                        }
+                        first_chunk_sent = True
                     full_markdown_parts.append(event.text)
                     yield {"data": event.text}
                 elif isinstance(event, DoneSignal):

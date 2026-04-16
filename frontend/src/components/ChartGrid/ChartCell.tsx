@@ -432,6 +432,7 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           markdown={aiReport.markdown}
           errorMessage={aiReport.errorMessage}
           history={aiReport.history}
+          progress={aiReport.progress}
           onClose={handleCloseAiReport}
           onStart={handleStartAiReport}
           onRetry={handleRetryAiReport}

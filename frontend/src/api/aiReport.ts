@@ -1,7 +1,11 @@
 /** AI 리포트 API 클라이언트: SSE 스트리밍 + 히스토리 조회. */
 
 import client from './client'
-import type { HistoryResponse, ReportContentResponse } from '../types/aiReport'
+import type {
+  HistoryResponse,
+  PhaseEvent,
+  ReportContentResponse,
+} from '../types/aiReport'
 
 /** 저장된 리포트 히스토리 조회. */
 export async function fetchAiReportHistory(code: string): Promise<HistoryResponse> {
@@ -26,15 +30,20 @@ export type AiReportMode = 'perplexity' | 'deep'
  *
  * EventSource 대신 fetch API 사용 (POST 지원).
  */
+/** SPEC-AI-REPORT-002 v1.0.4: 진행 상태 패널용 phase 이벤트 콜백. */
+export type OnPhase = (event: PhaseEvent) => void
+
 // @MX:ANCHOR: [AUTO] v1.1.4 - 프론트엔드 SSE 스트리밍 유일한 클라이언트. fan_in >= 1.
 // @MX:REASON: CRLF/LF 혼합 처리, 이벤트 경계(빈 줄), multi-line data: 조인은 SSE 스펙 필수.
 // 이 3개 규칙 중 하나라도 어기면 마크다운이 공백 분리/개행 손실 상태로 렌더링됨(v1.1.1 버그 경험).
+// v1.0.4: optional onPhase 콜백 추가 — 심층 분석 진행 상태 패널용. 미제공 시 phase 이벤트 무시.
 export function createAiReportStream(
   code: string,
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (message: string) => void,
   mode: AiReportMode = 'perplexity',
+  onPhase?: OnPhase,
 ): AbortController {
   const controller = new AbortController()
 
@@ -77,6 +86,19 @@ export function createAiReportStream(
         if (currentEvent === 'error') {
           onError(data || '스트리밍 중 오류가 발생했습니다.')
           return 'error'
+        }
+        // SPEC-AI-REPORT-002 v1.0.4: phase 이벤트는 onPhase 콜백이 있으면 JSON 파싱 후 전달.
+        // 파싱 실패는 silent ignore (호환성 유지: 이전 버전은 phase 이벤트 자체가 없었음).
+        if (currentEvent === 'phase') {
+          if (onPhase && data) {
+            try {
+              const payload = JSON.parse(data) as PhaseEvent
+              onPhase(payload)
+            } catch {
+              // malformed phase payload — ignore
+            }
+          }
+          return null
         }
         // 기본 이벤트 (message): 마크다운 청크
         if (data) {

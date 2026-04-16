@@ -17,6 +17,7 @@ import os
 import re
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +41,10 @@ class SourceResult:
     error_type: str | None = None  # "timeout" | "http_error" | "missing_key" | "parse_error"
     error_message: str | None = None
     duration_ms: int = 0
+    # SPEC-AI-REPORT-002 v1.0.4: 캐시 재사용 여부 플래그.
+    # 진행 상태 패널에서 "캐시 재사용 (0ms)" 표시 + 실제 HTTP 호출과 구분.
+    # Perplexity만 cache hit 경로를 가지며 나머지 소스는 항상 False.
+    cached: bool = False
 
 
 @dataclass(frozen=True)
@@ -226,6 +231,7 @@ async def _collect_perplexity(
             success=True,
             data={"content": cached, "citations": []},  # citations은 캐시에 별도 저장 X (재호출 시만 확보)
             duration_ms=0,
+            cached=True,
         )
 
     api_key = os.getenv("PERPLEXITY_API_KEY")
@@ -585,9 +591,74 @@ _DEFAULT_TIMEOUTS: dict[str, float] = {
 # 충분히 길게 설정 (asyncio.wait_for가 외부에서 자른다).
 _DEFAULT_HTTPX_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=10.0, pool=10.0)
 
+# SPEC-AI-REPORT-002 v1.0.4: 소스명 순서 (진행 상태 패널 표시 순 고정).
+# collect_all_sources 내부와 _collect_one_source helper가 공유.
+SOURCE_NAMES: tuple[str, ...] = ("perplexity", "brave", "tavily", "naver", "youtube")
 
-# @MX:ANCHOR collect_all_sources — fan_in >= 2 (orchestrator + tests). Invariant: gate_passed == (successful_sources >= 2). asyncio.gather(return_exceptions=True)가 소스별 실패를 개별 포착.
-# @MX:REASON SPEC-AI-REPORT-002 FR-002: 5개 소스를 병렬 수집하며, 개별 소스 실패가 전체 파이프라인을 중단시켜서는 안 된다.
+
+# @MX:ANCHOR _collect_one_source — fan_in >= 2 (collect_all_sources, stream_deep_analysis).
+# @MX:REASON SPEC-AI-REPORT-002 v1.0.4: 진행 상태 패널을 위해 소스별 개별 수집 + timeout wrapper 통합.
+#            collector 함수는 모듈 attribute lookup으로 런타임 resolve — monkeypatch 호환성 보장.
+async def _collect_one_source(
+    name: str,
+    code: str,
+    stock_name: str,
+    *,
+    client: httpx.AsyncClient | None = None,
+    timeout: float | None = None,
+) -> SourceResult:
+    """단일 소스를 수집한다. timeout 초과 또는 예외 발생 시 실패 SourceResult를 반환한다.
+
+    Args:
+        name: 소스 이름 (SOURCE_NAMES 중 하나).
+        code: 종목 코드.
+        stock_name: 종목명.
+        client: 테스트 주입용 httpx.AsyncClient.
+        timeout: 단일 호출 timeout (초). None이면 _DEFAULT_TIMEOUTS[name].
+
+    Returns:
+        SourceResult — 성공/실패 정보 + duration_ms + cached(perplexity cache hit 시 True).
+    """
+    if name not in SOURCE_NAMES:
+        raise ValueError(f"알 수 없는 소스: {name}")
+
+    # 런타임에 모듈 globals로 resolve — pytest monkeypatch.setattr(_MOD, "_collect_xxx", ...)
+    # 호환성 유지. globals()는 "이 함수가 정의된 모듈 인스턴스"의 __dict__를 반환하므로,
+    # test helper가 sys.modules를 다른 인스턴스로 덮어써도 원본 인스턴스의 mock이 호출된다.
+    collector_fn = globals()[f"_collect_{name}"]
+
+    effective_timeout = timeout if timeout is not None else _DEFAULT_TIMEOUTS[name]
+    start = time.monotonic()
+    try:
+        return await asyncio.wait_for(
+            collector_fn(code, stock_name, client=client),
+            timeout=effective_timeout,
+        )
+    except asyncio.TimeoutError:
+        return SourceResult(
+            name=name,
+            success=False,
+            data=None,
+            error_type="timeout",
+            error_message=f"asyncio.wait_for timeout ({effective_timeout}s)",
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return SourceResult(
+            name=name,
+            success=False,
+            data=None,
+            error_type="http_error",
+            error_message=str(exc),
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+
+ProgressCallback = Callable[[dict], Awaitable[None]]
+
+
+# @MX:ANCHOR collect_all_sources — fan_in >= 2 (orchestrator + tests). Invariant: gate_passed == (successful_sources >= 2). progress_callback이 주어지면 소스별 시작/완료 이벤트를 실시간 emit.
+# @MX:REASON SPEC-AI-REPORT-002 FR-002/v1.0.4: 5개 소스를 병렬 수집하며, 개별 소스 실패가 전체 파이프라인을 중단시켜서는 안 된다. progress_callback으로 실시간 진행 상황 전달 (None이면 기존 동작 유지).
 async def collect_all_sources(
     code: str,
     stock_name: str,
@@ -595,8 +666,9 @@ async def collect_all_sources(
     timeout_per_source: float | None = None,
     timeouts: dict[str, float] | None = None,
     client: httpx.AsyncClient | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> CollectionResult:
-    """5개 검색 API를 asyncio.gather로 병렬 수집한다.
+    """5개 검색 API를 병렬 수집한다.
 
     Args:
         code: 종목 코드 (예: "005930")
@@ -606,6 +678,9 @@ async def collect_all_sources(
         timeouts: source별 timeout override. {"perplexity": 60.0, ...} 형식. timeout_per_source
             보다 우선 적용된다.
         client: 테스트 주입용 httpx.AsyncClient
+        progress_callback: SPEC-AI-REPORT-002 v1.0.4 — 실시간 진행 이벤트 콜백. 소스 시작 시
+            `{"phase": "source_start", "source": name}`, 소스 완료 시
+            `{"phase": "source_done", "result": SourceResult}`를 await 호출. None이면 기존 동작.
 
     Returns:
         CollectionResult — gate_passed == (성공 소스 수 >= 2)
@@ -619,61 +694,56 @@ async def collect_all_sources(
     if timeouts:
         effective_timeouts.update(timeouts)
 
-    source_names = ["perplexity", "brave", "tavily", "naver", "youtube"]
-    collectors = {
-        "perplexity": _collect_perplexity,
-        "brave": _collect_brave,
-        "tavily": _collect_tavily,
-        "naver": _collect_naver,
-        "youtube": _collect_youtube,
-    }
+    async def _run(c: httpx.AsyncClient) -> dict[str, SourceResult]:
+        # 5개 source_start 이벤트 — task 생성 직전 순서대로 emit.
+        if progress_callback is not None:
+            for name in SOURCE_NAMES:
+                await progress_callback({"phase": "source_start", "source": name})
 
-    def _build_tasks(c: httpx.AsyncClient) -> list:
-        return [
-            asyncio.wait_for(
-                collectors[name](code, stock_name, client=c),
-                timeout=effective_timeouts[name],
+        task_to_name: dict[asyncio.Task, str] = {
+            asyncio.create_task(
+                _collect_one_source(
+                    name,
+                    code,
+                    stock_name,
+                    client=c,
+                    timeout=effective_timeouts[name],
+                )
+            ): name
+            for name in SOURCE_NAMES
+        }
+
+        collected: dict[str, SourceResult] = {}
+        pending: set[asyncio.Task] = set(task_to_name.keys())
+        while pending:
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
             )
-            for name in source_names
-        ]
+            for t in done:
+                tname = task_to_name[t]
+                exc = t.exception()
+                if exc is not None:
+                    src = SourceResult(
+                        name=tname,
+                        success=False,
+                        data=None,
+                        error_type="http_error",
+                        error_message=str(exc),
+                    )
+                else:
+                    src = t.result()
+                collected[tname] = src
+                if progress_callback is not None:
+                    await progress_callback(
+                        {"phase": "source_done", "result": src}
+                    )
+        return collected
 
     if client is not None:
-        raw_results = await asyncio.gather(*_build_tasks(client), return_exceptions=True)
+        sources = await _run(client)
     else:
         async with httpx.AsyncClient(timeout=_DEFAULT_HTTPX_TIMEOUT) as shared_client:
-            raw_results = await asyncio.gather(
-                *_build_tasks(shared_client), return_exceptions=True
-            )
-
-    sources: dict[str, SourceResult] = {}
-    for name, raw in zip(source_names, raw_results):
-        if isinstance(raw, SourceResult):
-            sources[name] = raw
-        elif isinstance(raw, asyncio.TimeoutError):
-            sources[name] = SourceResult(
-                name=name,
-                success=False,
-                data=None,
-                error_type="timeout",
-                error_message=f"asyncio.wait_for timeout ({effective_timeouts[name]}s)",
-            )
-        elif isinstance(raw, BaseException):
-            sources[name] = SourceResult(
-                name=name,
-                success=False,
-                data=None,
-                error_type="http_error",
-                error_message=str(raw),
-            )
-        else:
-            # None (예외적인 케이스)
-            sources[name] = SourceResult(
-                name=name,
-                success=False,
-                data=None,
-                error_type="http_error",
-                error_message="알 수 없는 오류",
-            )
+            sources = await _run(shared_client)
 
     completed_at = datetime.now(timezone.utc)
     result = CollectionResult.build(

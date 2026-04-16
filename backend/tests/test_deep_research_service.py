@@ -194,7 +194,7 @@ async def test_orchestrate_full_success_5_of_5(tmp_path, monkeypatch, synthesis_
     """AC-004, AC-007: 5/5 소스 성공 → SSE 이벤트 순서 확인 + save_report 호출."""
     collection_result = _make_collection_result(5)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -238,7 +238,7 @@ async def test_orchestrate_partial_sources_3_of_5(tmp_path, monkeypatch, synthes
     """AC-004: 3/5 소스 성공 → gate 통과, 합성 진행, done 이벤트."""
     collection_result = _make_collection_result(3)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -271,7 +271,7 @@ async def test_orchestrate_below_minimum_1_of_5(monkeypatch, synthesis_prompt_fi
     """AC-004: 1/5 소스 성공 → gate 실패, error 이벤트, stream_claude_synthesis 미호출."""
     collection_result = _make_collection_result(1)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     mock_streamer = MagicMock()
@@ -298,7 +298,7 @@ async def test_orchestrate_all_sources_fail(monkeypatch, synthesis_prompt_file):
     """AC-004: 0/5 소스 성공 → error 이벤트 + 502 힌트 포함."""
     collection_result = _make_collection_result(0)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     mock_streamer = MagicMock()
@@ -329,7 +329,7 @@ async def test_orchestrate_cli_timeout(tmp_path, monkeypatch, synthesis_prompt_f
     staging_dir = tmp_path / "staging_timeout"
     staging_dir.mkdir()
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -368,7 +368,7 @@ async def test_orchestrate_client_disconnect_cancelled(tmp_path, monkeypatch, sy
     staging_dir = tmp_path / "staging_cancel"
     staging_dir.mkdir()
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -400,7 +400,7 @@ async def test_report_saved_on_done(tmp_path, monkeypatch, synthesis_prompt_file
     """AC-011: DoneSignal 수신 시 save_report 정확히 1회 호출, 전체 마크다운 전달."""
     collection_result = _make_collection_result(5)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -439,7 +439,7 @@ async def test_report_not_saved_on_error(tmp_path, monkeypatch, synthesis_prompt
     """AC-011: 소스 수집 실패 경로에서 save_report 미호출."""
     collection_result = _make_collection_result(0)  # gate 실패
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     mock_save = MagicMock()
@@ -544,7 +544,7 @@ async def test_active_analysis_released_on_success(tmp_path, monkeypatch, synthe
     """AC-008: 스트림 완료 후 _active_deep_analyses에서 코드 제거."""
     collection_result = _make_collection_result(5)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -577,7 +577,7 @@ async def test_active_analysis_released_on_exception(tmp_path, monkeypatch, synt
     staging_dir = tmp_path / "staging_exc"
     staging_dir.mkdir()
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -635,7 +635,7 @@ async def test_opus_model_flag_passed_when_env_set(tmp_path, monkeypatch, synthe
 
     collection_result = _make_collection_result(5)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -670,7 +670,7 @@ async def test_default_model_when_env_not_set(tmp_path, monkeypatch, synthesis_p
 
     collection_result = _make_collection_result(5)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):
@@ -718,7 +718,7 @@ async def test_streamer_error_signal_propagated(tmp_path, monkeypatch, synthesis
     """ErrorSignal 이벤트가 SSE error로 변환됨."""
     collection_result = _make_collection_result(5)
 
-    async def mock_collect(code, stock_name):
+    async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
     def mock_staging(code, result, **kwargs):

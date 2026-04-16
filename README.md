@@ -647,6 +647,7 @@ cd frontend && npx playwright test e2e/ai-report-deep.spec.ts
 | 1.0.1 | Claude CLI timeout 600s, 인자 보정 (--cwd→--add-dir), source별 timeout, sonnet 명시 |
 | 1.0.2 | Naver/YouTube에 종목 코드, synthesis prompt 절대규칙 (학습 데이터/면책 차단) |
 | 1.0.3 | 명시적 모드 선택 UX, Perplexity 캐시 재사용 (시나리오 C) |
+| 1.0.4 | 심층 분석 진행 상태 패널 (per-source SSE `event: phase`, 5소스 + 합성 단계 실시간 시각화, 캐시 재사용 라벨) |
 
 ---
 

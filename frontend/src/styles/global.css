@@ -2540,6 +2540,116 @@ html, body, #root {
 }
 .ai-report-start-btn:hover { background: rgba(167, 139, 250, 0.4); }
 
+/* SPEC-AI-REPORT-002 v1.0.4: 심층 분석 진행 상태 패널 */
+.ai-report-progress-panel {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: rgba(167, 139, 250, 0.06);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.ai-report-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.15);
+}
+.ai-report-progress-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ai-report-progress-summary {
+  font-size: 11px;
+  color: #a78bfa;
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-report-progress-sources {
+  list-style: none;
+  margin: 0 0 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-report-progress-source {
+  display: grid;
+  grid-template-columns: 20px 90px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  transition: opacity 0.15s;
+}
+.ai-report-progress-source--pending { opacity: 0.55; }
+.ai-report-progress-source--running { color: var(--text-primary); }
+.ai-report-progress-source--done { color: var(--text-secondary); }
+.ai-report-progress-source--failed { color: #ef5350; }
+
+.ai-report-progress-icon {
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+.ai-report-progress-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ai-report-progress-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.ai-report-progress-duration {
+  min-width: 48px;
+  color: var(--text-muted);
+}
+.ai-report-progress-count {
+  color: var(--text-muted);
+}
+.ai-report-progress-cached {
+  color: #22d3ee;
+  font-weight: 600;
+}
+.ai-report-progress-hint {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.ai-report-progress-error {
+  color: #ef5350;
+  font-size: 11px;
+}
+
+.ai-report-progress-synthesis {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(167, 139, 250, 0.2);
+}
+.ai-report-progress-synth-icon { font-size: 14px; }
+.ai-report-progress-synth-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ai-report-progress-synth-model {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.ai-report-progress-synth-state {
+  margin-left: auto;
+}
+
 /* done 상태에서 모드 변경 후 재분석 버튼 컨테이너 */
 .ai-report-rerun {
   display: flex;

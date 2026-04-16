@@ -166,4 +166,35 @@ describe('AiReportModal — 2단 모드 토글', () => {
     const tabs = screen.getAllByRole('tab')
     expect(tabs).toHaveLength(2)
   })
+
+  // ── SPEC-AI-REPORT-002 v1.0.4: ProgressPanel 통합 ────────────────────────
+  // Progress Panel 자체의 렌더링 로직은 ProgressPanel.test.tsx에서 검증한다.
+  // 여기서는 AiReportModal이 "언제 Panel을 숨기는가"만 확인한다.
+
+  it('progress가 없으면 ProgressPanel을 렌더하지 않는다 (legacy 호환)', () => {
+    // 빠른 분석 + streaming 상태 — progress 미제공
+    const { container } = render(
+      <AiReportModal {...makeProps({ status: 'streaming', markdown: '# 분석 중' })} />,
+    )
+    expect(container.querySelector('.ai-report-progress-panel')).not.toBeInTheDocument()
+  })
+
+  it('deep 모드가 아닐 때(빠른 분석)는 progress가 있어도 패널을 렌더하지 않는다', () => {
+    const progress = {
+      sources: {
+        perplexity: { state: 'running' as const },
+        brave: { state: 'pending' as const },
+        tavily: { state: 'pending' as const },
+        naver: { state: 'pending' as const },
+        youtube: { state: 'pending' as const },
+      },
+      synthesis: { state: 'idle' as const },
+      collectingDone: false,
+    }
+    const { container } = render(
+      <AiReportModal {...makeProps({ status: 'streaming', progress })} />,
+    )
+    // 기본 모드 = perplexity(빠른 분석), 토글 클릭 없음
+    expect(container.querySelector('.ai-report-progress-panel')).not.toBeInTheDocument()
+  })
 })
