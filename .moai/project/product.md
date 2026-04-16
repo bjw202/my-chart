@@ -34,14 +34,22 @@
    - Section 7: 추세 신호 (Trend Signals) — 주요 재무 추세 방향 시그널
    - Section 8: 5대 질문 (Five Questions) — 종합 투자 체크리스트 (양호/보통/주의)
 
-9. **AI Company Analysis (AI Button)** - Perplexity API 기반 실시간 AI 스윙 트레이더 리포트. SPEC-AI-REPORT-001 (v1.1.3 기준). AI 버튼을 클릭하면 사전 정의된 7단계 애널리스트 프롬프트(`docs/perplexity-prompt.md`)로 Perplexity에 질의하고, SSE로 실시간 마크다운 스트리밍 + 자동 저장.
-   - **모델**: `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought 추론)
-   - **검색 품질**: `search_context_size: "high"` + `search_recency_filter: "month"` + 최소 SNS 블랙리스트 (공간(Spaces) 품질 근접 전략)
-   - **시스템 프롬프트**: 한국 애널리스트 6원칙 강제 (인과 분석 필수, [N] 인용 필수, 교차확인 구분, 기대 vs 팩트, DART/KRX 우선, 추상어 금지)
-   - **UI**: 2탭 모달 (분석 결과 / 히스토리), 마크다운 실시간 렌더링, 복사 버튼, ESC/backdrop 닫기
+9. **AI Company Analysis (AI Button)** - 2-모드 AI 리포트 시스템. SPEC-AI-REPORT-001 (빠른 분석) + SPEC-AI-REPORT-002 (심층 분석, v1.0.5 기준). AI 버튼 클릭 → 모달 오픈 → 모드 선택 → "분석 시작" 명시적 클릭 후 SSE 스트리밍.
+   - **빠른 분석 (Perplexity 단일 소스, ~40-90초, ~$0.05/건)**
+     - 모델: `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought 추론)
+     - 검색 품질: `search_context_size: "high"` + `search_recency_filter: "month"` + 최소 SNS 블랙리스트
+     - 시스템 프롬프트: 한국 애널리스트 6원칙 (인과 분석 필수, [N] 인용 필수, 교차확인 구분, 기대 vs 팩트, DART/KRX 우선, 추상어 금지)
+   - **심층 분석 (5-소스 병렬 + Claude CLI 합성, ~3-5분, ~$0.10-0.30/건)**
+     - 수집 소스: Perplexity(sonar-reasoning-pro) + Brave Search + Tavily(advanced) + Naver(웹) + YouTube (asyncio 병렬, 최소 2/5 성공 게이트)
+     - 스테이징: `/tmp/analysis_{code}_{ts}_{uuid8}/` 격리 디렉토리에 `summary.md` + `sources/*.json|md` 저장
+     - 합성: Claude Code CLI subprocess (기본 `claude-sonnet-4-6`, `AI_REPORT_DEEP_MODEL=opus`로 스위칭 가능), `--permission-mode bypassPermissions --add-dir`로 스테이징 dir 접근
+     - Rate limit: Deep 전용 독립 쿼터 (`AI_REPORT_DEEP_DAILY_QUOTA=15`, `AI_REPORT_DEEP_BURST_LIMIT=1`)
+     - 캐시 재사용 (v1.0.3): 빠른 분석 후 10분 내 같은 종목 심층 분석 시 Perplexity HTTP 호출 스킵 (메모리 TTL 캐시)
+   - **진행 상태 패널 (v1.0.4)**: 심층 분석 모달에 per-source 실시간 진행 UI. `event: phase` SSE 이벤트(`source_start`/`source_done`/`collecting_done`/`staging_done`/`synthesis_start`/`synthesis_first_chunk`) 기반, 5소스 아이콘(⏸/⏳/✅/❌) + duration + count + 캐시 재사용 라벨 + Claude 합성 단계(idle/waiting/streaming) 표시
+   - **안정화 (v1.0.5)**: Claude CLI subprocess `StreamReader` limit 64KB → 4MB (LimitOverrunError 방지), 합성 중 미처리 예외를 `event: error`로 변환해 프론트 전달, `logging.basicConfig(INFO)`로 `.dev-server.log` 가시화
+   - **UI**: 2탭 모달 (분석 결과 / 히스토리), 모드 토글 (빠른/심층), idle 상태 "분석 시작" 버튼, 마크다운 실시간 렌더링, 복사 버튼, ESC/backdrop 닫기
    - **저장**: `backend/reports/{종목명}/{YYYY-MM-DD}.md` (동일 날짜는 `_N` 시퀀스)
-   - **엔드포인트**: POST `/api/ai-report/{code}`, GET `/api/ai-report/{code}/history`, GET `/api/ai-report/{code}/{filename}`
-   - **비용**: 건당 ~$0.05 (sonar-reasoning-pro, high context 기준)
+   - **엔드포인트**: POST `/api/ai-report/{code}?mode=perplexity|deep`, GET `/api/ai-report/{code}/history`, GET `/api/ai-report/{code}/{filename}`
 
 ## Target Users
 

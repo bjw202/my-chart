@@ -64,3 +64,36 @@ a8451bf feat(deep-research): SPEC-AI-REPORT-002 Phase B 5-source collector
 ```
 
 ### Status: READY FOR /moai sync
+
+### Post-release Patches (v1.0.1 ~ v1.0.5)
+
+Phase 초기 release 이후 실사용 중 발견된 이슈 대응 및 UX/진단 개선이 누적되었다. 각 패치는 별도 commit + 회귀 검증을 수반했다.
+
+| 버전 | commit | 주제 | 핵심 변경 |
+|---|---|---|---|
+| 1.0.1 | `293ba55` | Claude CLI 안정화 | timeout 180s → 600s (Sonnet 5-소스 합성용), `--cwd` → `--add-dir` + subprocess `cwd=`, `--permission-mode bypassPermissions`, `--model claude-sonnet-4-6` 명시. source별 timeout 세분화 (perplexity 120s / tavily 90s / 나머지 15s) |
+| 1.0.2 | `da15772` | 종목 식별 모호성 | Naver/YouTube 검색 query에 `{stock_name} {6자리 코드}` 포함해 동명이인 회사 결과 배제. synthesis prompt 절대규칙 A/B/C 추가 (사전 학습 지식 사용 금지, "보고서 작성 불가" 면책 금지, 종목 코드 신뢰) |
+| 1.0.3 | `f119302` | 명시적 모드 선택 UX + 캐시 | AI 버튼 즉시 시작 제거 → idle 모달 + "분석 시작" 버튼. `perplexity_cache.py` (메모리 TTL 10분 캐시) — 빠른 분석 → 같은 종목 심층 분석 시 Perplexity HTTP 호출 0 (시나리오 C 비용 절감) |
+| 1.0.4 | `a7c8ad6` | 진행 상태 패널 | `collect_all_sources`에 `progress_callback` 추가, `asyncio.wait(FIRST_COMPLETED)`로 완료 순 이벤트 emit. 신규 phase 이벤트(`source_start`/`source_done`/`collecting_done`/`staging_done`/`synthesis_start`/`synthesis_first_chunk`), `SourceResult.cached` 필드, `<ProgressPanel>` 컴포넌트. 테스트 +13 (ProgressPanel 11 + AiReportModal 렌더 조건 2) |
+| 1.0.5 | `6c12c8f` | 안정화 + 진단성 | Claude CLI `create_subprocess_exec(limit=4MB)` (기본 64KB로는 긴 stream-json에서 `LimitOverrunError`). `stream_deep_analysis`에 broad `except Exception`으로 미처리 예외를 `event: error`로 변환 (이전엔 연결 끊김 → "대기 중" 고착). `logging.basicConfig(INFO)`로 애플리케이션 로그를 `.dev-server.log`에 노출 |
+
+### Post-release Commits
+
+```
+6c12c8f fix(deep-research): SPEC-AI-REPORT-002 v1.0.5 — 합성 단계 LimitOverrunError + 예외 방어
+a7c8ad6 feat(progress-panel): SPEC-AI-REPORT-002 v1.0.4 — 심층 분석 진행 상태 패널
+cd79885 docs(spec): SPEC-AI-REPORT-002 미추적 SPEC 산출물 + 다음 세션 인계 문서 추가
+425cf57 docs(spec): SPEC-AI-REPORT-002 sync — README/CHANGELOG/.env.example 동기화
+f119302 feat(deep-research): SPEC-AI-REPORT-002 v1.0.3 — 명시적 모드 선택 + Perplexity 재사용
+da15772 fix(deep-research): SPEC-AI-REPORT-002 v1.0.2 — 종목 식별 모호성 + 학습데이터 면책 차단
+c06d716 feat(e2e): SPEC-AI-REPORT-002 Playwright e2e + done 상태 retry 버튼 추가
+293ba55 fix(deep-research): SPEC-AI-REPORT-002 v1.0.1 — Claude CLI timeout 600s 확장
+```
+
+### Regression Summary (v1.0.5 기준)
+
+- Backend deep-research + claude_cli_streamer: **81/81 PASS**
+- Frontend: **216/216 PASS** (신규 13개 ProgressPanel/AiReportModal 포함, 기존 203 + 13)
+- 알려진 이슈: `test_sector_advanced.py` 5건 — sector 모듈 sys.modules 오염 (SPEC-AI-REPORT-002와 무관)
+
+### Status: POST-RELEASE PATCHES MERGED TO MAIN

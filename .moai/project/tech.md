@@ -62,13 +62,47 @@
 - **axios** or **fetch** - HTTP client for API calls
 - **react-markdown** + **remark-gfm** - AI 리포트 마크다운 렌더링 (GFM 테이블 지원, v1.1.0+)
 
-### External AI Service
+### External AI Services
+
+**빠른 분석 (SPEC-AI-REPORT-001)**
 
 - **Perplexity API** (`api.perplexity.ai/chat/completions`) - AI 기업 분석 리포트 생성
   - 모델: `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought)
   - 인증: `PERPLEXITY_API_KEY` 환경변수 (`.env`)
   - 스트리밍: SSE, `httpx.AsyncClient.stream()`
   - 비용: 건당 ~$0.05 (2025-2026 요율 기준)
+  - `<think>` 블록 제거: 스트리밍 단계의 filter 또는 `_strip_think_blocks()` 유틸리티
+
+**심층 분석 (SPEC-AI-REPORT-002, v1.0.5 기준)**
+
+5개 검색 API 병렬 수집 + Claude Code CLI 합성:
+
+- **Perplexity**: 위와 동일 (`sonar-reasoning-pro`) — timeout 120s, 메모리 TTL 10분 캐시 (시나리오 C)
+- **Brave Search API** (`api.search.brave.com/res/v1/web/search`) — 웹 검색 20건, timeout 15s, 인증 `BRAVE_API_KEY`
+- **Tavily API** (`api.tavily.com/search`) — `search_depth=advanced`, `include_answer=advanced`, timeout 90s, 인증 `TAVILY_API_KEY`
+- **Naver OpenAPI** (`openapi.naver.com/v1/search/webkr.json`) — 한국어 웹 검색 10건, timeout 15s, 인증 `NAVER_CLIENT_ID` + `NAVER_CLIENT_SECRET`
+- **YouTube Data API v3** (`googleapis.com/youtube/v3/search`) — 관련 영상 10건, timeout 15s, 인증 `YOUTUBE_API_KEY`
+- **Claude Code CLI** — 합성 subprocess, 기본 `claude-sonnet-4-6` (env `AI_REPORT_DEEP_MODEL=opus`로 교체 가능), timeout 600s, `--output-format stream-json --permission-mode bypassPermissions --add-dir {staging}`
+  - subprocess StreamReader limit **4MB** (v1.0.5) — 이전 64KB에서 상향해 긴 stream-json 라인 `LimitOverrunError` 해소
+  - 인증: Claude CLI OAuth 세션 (별도 API 키 불필요, 로컬 계정 사용)
+
+**데이터 흐름**
+
+```
+router → deep_research_service.stream_deep_analysis
+  └─ collect_all_sources (asyncio.wait FIRST_COMPLETED, progress_callback emit per source)
+      ├─ _collect_one_source("perplexity"/"brave"/"tavily"/"naver"/"youtube") ×5
+      └─ 2/5 미만 성공 시 수집 실패 (HTTP 502 상응)
+  └─ create_staging_directory → /tmp/analysis_{code}_{ts}_{uuid8}/
+  └─ stream_claude_synthesis → subprocess → stream-json 파서 → TextDelta/DoneSignal/ErrorSignal
+  └─ SSE 어댑터: event:phase / data:{markdown chunk} / event:done / event:error
+```
+
+**Rate limiting**: Deep 전용 독립 카운터 (`AI_REPORT_DEEP_DAILY_QUOTA=15`, `AI_REPORT_DEEP_BURST_LIMIT=1`, 분당 윈도우 60s) — Perplexity 쿼터와 분리
+
+**진행 상태 패널 (v1.0.4)**: `PhaseEvent` 타입 (discriminated union) + `DeepProgress` 상태 → `<ProgressPanel>` 컴포넌트. 5소스 + 합성 단계의 pending/running/done/failed 전환을 실시간 SSE로 반영, 캐시 재사용(`SourceResult.cached`) 표시.
+
+**로깅 (v1.0.5)**: `backend/main.py`에서 `logging.basicConfig(level=INFO)` → `.dev-server.log`에 애플리케이션 로그(`backend.services.deep_research_service`, `deep_research_collector`) 표시
 
 ## Platform Requirements
 
