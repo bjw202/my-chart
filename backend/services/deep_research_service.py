@@ -404,6 +404,21 @@ async def stream_deep_analysis(
             _outcome = "cancelled"
             logger.info("딥 리서치 스트리밍 취소됨 (CancelledError): code=%s", code)
             raise  # CancelledError는 삼키지 않고 재발생
+        except Exception as exc:  # noqa: BLE001
+            # SPEC-AI-REPORT-002 v1.0.5: 합성 단계 미처리 예외(LimitOverrunError 등) 방어.
+            # 이전에는 async generator 밖으로 예외가 전파되면서 sse_starlette TaskGroup이
+            # 500으로 처리했고, 프론트는 `event: error` 이벤트 없이 연결이 끊겨 "대기중"
+            # 상태로 보였다. 여기서 명시적으로 error 이벤트 yield → 프론트가 onError 호출.
+            _outcome = "error"
+            logger.exception(
+                "딥 리서치 합성 중 예외: code=%s, exc_type=%s",
+                code,
+                type(exc).__name__,
+            )
+            yield {
+                "event": "error",
+                "data": f"합성 중 오류가 발생했습니다: {type(exc).__name__}: {exc}",
+            }
 
     finally:
         # Phase 5: 정리 (성공/실패/취소 모두)

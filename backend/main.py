@@ -7,6 +7,15 @@ import shutil
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+# SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+# uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+# basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+# 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

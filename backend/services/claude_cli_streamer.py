@@ -203,11 +203,17 @@ async def stream_claude_synthesis(
 
     try:
         # cwd= kwarg는 _cmd_override 여부와 무관하게 항상 적용 (실제 운영 + 테스트 모두)
+        # SPEC-AI-REPORT-002 v1.0.5: limit 64KB → 4MB로 상향.
+        # Claude CLI stream-json은 한 줄이 64KB를 초과하는 경우가 있으며 (도구 호출 결과,
+        # 긴 assistant 메시지 등) 이때 asyncio.StreamReader가 LimitOverrunError 발생 →
+        # 합성 단계가 예외로 중단되면서 프론트에 error 이벤트도 전달되지 않아
+        # "대기 중" 상태로 멈춰 보이는 현상이 발생했다.
         proc = await asyncio.create_subprocess_exec(
             *argv,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(cwd),
+            limit=4 * 1024 * 1024,
         )
 
         if _proc_spy is not None:
