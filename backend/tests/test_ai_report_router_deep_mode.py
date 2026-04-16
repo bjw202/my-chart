@@ -55,12 +55,20 @@ _config_stub = types.SimpleNamespace(
     DEFAULT_DB_DAILY="daily.db",
     DEFAULT_DB_WEEKLY="weekly.db",
 )
-_my_chart_mod = types.ModuleType("my_chart")
-
 # 테스트 파일 로드 시점에 스텁 등록 (backend.main import 전에 필요)
-# my_chart를 패키지로 등록 + 하위 모듈 스텁
-_my_chart_mod.__path__ = []  # 패키지로 인식되게 함
-sys.modules.setdefault("my_chart", _my_chart_mod)
+# 다만 실 my_chart 패키지가 import 가능하면 __path__를 빈 배열로 두지 말고 실제 경로로
+# 세팅해야 이후 실행되는 test_sector_advanced.py 등이 my_chart.analysis 등 서브패키지를
+# 정상 import할 수 있다.
+_project_root = Path(__file__).resolve().parent.parent.parent
+_my_chart_pkg_path = _project_root / "my_chart"
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+_existing_my_chart = sys.modules.get("my_chart")
+if _existing_my_chart is None or not hasattr(_existing_my_chart, "__path__") or not _existing_my_chart.__path__:
+    _my_chart_mod = types.ModuleType("my_chart")
+    _my_chart_mod.__path__ = [str(_my_chart_pkg_path)] if _my_chart_pkg_path.is_dir() else []
+    sys.modules["my_chart"] = _my_chart_mod
 sys.modules["my_chart.registry"] = _registry_stub
 sys.modules["my_chart.config"] = _config_stub
 # db_service가 임포트하는 my_chart 하위 모듈 스텁

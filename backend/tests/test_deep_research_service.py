@@ -66,14 +66,30 @@ _collector_mod = _load_module(_COLLECTOR_PATH, "backend.services.deep_research_c
 # streamer 모듈 로드
 _streamer_mod = _load_module(_STREAMER_PATH, "backend.services.claude_cli_streamer")
 
-# ai_report_service: my_chart.registry를 요구하므로 스텁 등록 필요
+# ai_report_service: my_chart.registry를 요구하므로 실 패키지 import를 우선 시도하고
+# 실패 시에만 스텁 등록. 무조건 스텁하면 test_sector_advanced.py 등 다른 테스트가
+# my_chart.registry에서 `get_sector_registry` 등 심볼을 찾지 못해 실패한다.
 def _load_ai_report():
-    """ai_report_service를 my_chart 스텁과 함께 로드."""
-    # my_chart.registry 스텁
-    registry_stub = types.ModuleType("my_chart.registry")
-    registry_stub._name = lambda code: "삼성전자"  # type: ignore[attr-defined]
-    sys.modules.setdefault("my_chart", types.ModuleType("my_chart"))
-    sys.modules["my_chart.registry"] = registry_stub
+    """ai_report_service를 my_chart.registry와 함께 로드."""
+    # 프로젝트 루트(my_chart/ 패키지 부모 디렉토리)를 sys.path에 추가
+    project_root = Path(__file__).resolve().parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+    try:
+        # 실 패키지 시도
+        import my_chart.registry  # type: ignore[import-not-found]  # noqa: F401
+    except Exception:
+        # 실 패키지 로드 실패 시에만 스텁 등록 (ai_report_service가 _name을 요구)
+        registry_stub = types.ModuleType("my_chart.registry")
+        registry_stub._name = lambda code: "삼성전자"  # type: ignore[attr-defined]
+        existing = sys.modules.get("my_chart")
+        if existing is None or not hasattr(existing, "__path__"):
+            my_chart_pkg_path = project_root / "my_chart"
+            stub = types.ModuleType("my_chart")
+            stub.__path__ = [str(my_chart_pkg_path)] if my_chart_pkg_path.is_dir() else []  # type: ignore[attr-defined]
+            sys.modules["my_chart"] = stub
+        sys.modules["my_chart.registry"] = registry_stub
 
     module_name = "backend.services.ai_report_service"
     spec = importlib.util.spec_from_file_location(module_name, _AI_REPORT_PATH)
