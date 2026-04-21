@@ -13,6 +13,7 @@ from backend.schemas.screen import (
     SectorGroup,
     StockItem,
 )
+from backend.services.meta_service import _MINERVINI_META_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -39,21 +40,9 @@ _OPERATOR_SQL: dict[str, str] = {
 }
 
 
-# @MX:NOTE: [AUTO] research.md §2.1의 8조건을 SQL WHERE 식으로 직역한 상수 빌더.
-# @MX:NOTE: 파라미터 바인딩이 필요 없는 순수 상수 식이므로 SQL injection 표면은 증가하지 않음.
+# @MX:NOTE: 순수 상수 SQL이므로 파라미터 바인딩/이스케이프 불필요 — SQL injection 표면 없음.
 def _build_minervini_where() -> str:
-    """Minervini Trend Template 8조건 AND 결합 WHERE 절을 반환한다 (REQ-MIN-005).
-
-    각 조건은 stock_meta 컬럼 기준:
-    T1: close > sma150 AND close > sma200
-    T2: sma150 > sma200
-    T3: sma200 > sma200_20d_ago
-    T4: sma50 > sma150 AND sma50 > sma200
-    T5: close > sma50
-    T6: close >= low52w * 1.25
-    T7: close >= high52w * 0.75 AND close <= high52w
-    T8: rs_12m >= 70
-    """
+    """research.md §2.1 Minervini 8조건 strict-gate WHERE 식을 반환."""
     return (
         "("
         "close > sma150 AND close > sma200"              # T1
@@ -69,13 +58,9 @@ def _build_minervini_where() -> str:
 
 
 def _minervini_columns_available(conn: sqlite3.Connection) -> bool:
-    """stock_meta에 Minervini 필수 컬럼이 모두 존재하는지 확인한다 (REQ-MIN-007).
-
-    컬럼 존재 여부를 PRAGMA로 선검사하여 불필요한 OperationalError를 방지한다.
-    """
+    """Minervini 필수 컬럼이 stock_meta에 모두 존재하는지 PRAGMA로 선검사 (REQ-MIN-007)."""
     existing = {row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()}
-    required = {"sma150", "low52w", "sma200_20d_ago"}
-    return required.issubset(existing)
+    return set(_MINERVINI_META_COLS).issubset(existing)
 
 
 def _build_where(req: ScreenRequest) -> tuple[str, list[object]]:
@@ -147,8 +132,9 @@ def _build_where(req: ScreenRequest) -> tuple[str, list[object]]:
     return where_sql, params
 
 
-# @MX:ANCHOR: [AUTO] 사용자-facing 스크리닝 엔트리포인트 (fan_in >= 3)
-# @MX:REASON: router, 테스트, 향후 preset service가 모두 이 함수를 직접 호출. 변경 시 광범위한 영향 발생
+# @MX:ANCHOR: 사용자-facing 스크리닝 엔트리포인트 (fan_in >= 3)
+# @MX:REASON: strict-gate invariant — minervini_trend_template=True로 반환된 모든 행은 반드시
+#             8조건을 모두 통과하고 trend_template_score=8을 갖는다. 이 계약이 깨지면 FE 필터 시맨틱이 깨짐.
 def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
     """Execute the screen filter against stock_meta and return sector-grouped results.
 
@@ -179,8 +165,8 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
             else:
                 where_sql = f"{where_sql} AND {minervini_clause}"
 
-        # trend_template_score: minervini=True면 상수 8, 아니면 NULL
-        score_expr = "CASE WHEN 1=1 THEN 8 ELSE NULL END" if use_minervini else "NULL"
+        # trend_template_score: strict gate이므로 통과 행은 항상 8, 아니면 NULL
+        score_expr = "8" if use_minervini else "NULL"
 
         query = f"""
             SELECT code, name, market, market_cap, sector_major, sector_minor, product,
@@ -193,13 +179,11 @@ def screen_stocks(req: ScreenRequest, daily_db_path: str) -> ScreenResponse:
 
         try:
             rows = conn.execute(query, params).fetchall()
-        except sqlite3.OperationalError:
-            # 백업 방어: PRAGMA 검사를 통과했더라도 OperationalError 발생 시 빈 응답
+        except sqlite3.OperationalError as exc:
+            # 백업 방어: PRAGMA 가드 통과 후 race condition 등으로 OperationalError 발생 시
+            # minervini 경로는 빈 응답으로 격리하여 500을 막는다. 메시지는 실제 예외 원인을 담는다.
             if use_minervini:
-                logger.warning(
-                    "[minervini] required columns missing; "
-                    "delete DB files and re-run db-update pipeline"
-                )
+                logger.warning("[minervini] unexpected OperationalError after PRAGMA guard: %s", exc)
                 return ScreenResponse(total=0, sectors=[])
             raise
     finally:

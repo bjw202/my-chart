@@ -89,28 +89,11 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
 
 
 def _compute_minervini_indicators(df: "pd.DataFrame") -> "pd.DataFrame":
-    """Minervini Trend Template에 필요한 신규 지표를 계산하여 DataFrame에 추가한다.
-
-    REQ-MIN-001: SMA150 — 150일 단순이평 (min_periods=150)
-    REQ-MIN-002: HIGH_52W — 250 거래일 rolling max(High), LOW_52W — rolling min(Low)
-    REQ-MIN-003: SMA200_20D_AGO — SMA200의 20 거래일 shift
-
-    Args:
-        df: Close, High, Low, SMA200 컬럼을 포함한 종목별 DataFrame.
-
-    Returns:
-        SMA150, HIGH_52W, LOW_52W, SMA200_20D_AGO 컬럼이 추가된 DataFrame.
-    """
-    # SMA150: 150일 단순이평 (거래일 150일 미만이면 NaN)
+    """SMA150 / HIGH_52W / LOW_52W / SMA200_20D_AGO 를 df에 추가해 반환 (research.md §2.1)."""
     df["SMA150"] = df["Close"].rolling(window=150, min_periods=150).mean()
-
-    # HIGH_52W / LOW_52W: 250 거래일 rolling max/min (min_periods=250)
     df["HIGH_52W"] = df["High"].rolling(window=250, min_periods=250).max()
     df["LOW_52W"] = df["Low"].rolling(window=250, min_periods=250).min()
-
-    # SMA200_20D_AGO: SMA200의 정확히 20 거래일 전 값
     df["SMA200_20D_AGO"] = df["SMA200"].shift(20)
-
     return df
 
 

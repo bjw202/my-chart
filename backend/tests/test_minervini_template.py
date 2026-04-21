@@ -622,8 +622,6 @@ class TestGroupC_ScreenService:
         assert len(all_items) > 0, "결과가 비어 있음 (S9가 통과해야 함)"
         for item in all_items:
             assert item.trend_template_score == 8, f"{item.code}의 score={item.trend_template_score}"
-            # 0~7 범위 값은 존재하지 않아야 함
-            assert item.trend_template_score not in range(0, 8)
 
     def test_trend_template_score_none_when_flag_off(self, tmp_path: pytest.TempPathFactory):
         """minervini_trend_template=False/None → trend_template_score == None."""
