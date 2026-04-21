@@ -28,12 +28,33 @@ export interface ScreenRequest {
   chg_1w_min: number | null
   chg_1m_min: number | null
   chg_3m_min: number | null
-  patterns: PatternCondition[] // max 3
+  patterns: PatternCondition[] // max 5
   pattern_logic: 'AND' | 'OR'
   rs_min: number | null
   markets: MarketName[]
   sectors: string[]
   codes: string[] // Stock codes to filter by (from cross-tab navigation)
+  minervini_trend_template?: boolean | null
+}
+
+export interface StockItem {
+  code: string
+  name: string
+  market: string
+  market_cap?: number | null
+  sector_major?: string | null
+  sector_minor?: string | null
+  product?: string | null
+  close?: number | null
+  change_1d?: number | null
+  rs_12m?: number | null
+  ema10?: number | null
+  ema20?: number | null
+  sma50?: number | null
+  sma100?: number | null
+  sma200?: number | null
+  /** Minervini Trend Template 통과 시 항상 8, 플래그 꺼짐 시 null */
+  trend_template_score?: number | null
 }
 
 export const DEFAULT_SCREEN_REQUEST: ScreenRequest = {
@@ -48,4 +69,5 @@ export const DEFAULT_SCREEN_REQUEST: ScreenRequest = {
   markets: [],
   sectors: [],
   codes: [],
+  minervini_trend_template: null,
 }

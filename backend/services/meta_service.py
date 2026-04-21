@@ -41,9 +41,16 @@ CREATE TABLE IF NOT EXISTS stock_meta (
     sma10_w REAL,
     sma20_w REAL,
     sma40_w REAL,
-    last_updated TEXT
+    last_updated TEXT,
+    sma150 REAL,
+    low52w REAL,
+    sma200_20d_ago REAL
 )
 """
+
+# REQ-MIN-008: Minervini 신규 컬럼 목록 (stock_meta)
+# 멱등 ALTER로 레거시 DB에 누락된 컬럼만 추가
+_MINERVINI_META_COLS = ("sma150", "low52w", "sma200_20d_ago")
 
 _INDEX_DDLS = [
     "CREATE INDEX IF NOT EXISTS idx_meta_sector ON stock_meta(sector_major)",
@@ -95,11 +102,29 @@ def rebuild_stock_meta(daily_db_path: str, weekly_db_path: str) -> None:
         conn.close()
 
 
+def _ensure_meta_minervini_columns(conn: sqlite3.Connection) -> None:
+    """REQ-MIN-008: stock_meta에 Minervini 신규 컬럼이 없으면 멱등 ALTER로 추가한다.
+
+    Defense path: 레거시 DB에 신규 컬럼이 없을 때만 ALTER 실행.
+    Primary path(새 DB): CREATE TABLE에 이미 포함되므로 ALTER가 실행되지 않는다.
+    """
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()}
+    for col in _MINERVINI_META_COLS:
+        if col not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE stock_meta ADD COLUMN {col} REAL")
+            except sqlite3.OperationalError:
+                pass  # 동시 실행 등으로 이미 추가된 경우
+
+
 def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
     # Ensure stock_meta table exists
     conn.execute(_STOCK_META_DDL)
     for ddl in _INDEX_DDLS:
         conn.execute(ddl)
+
+    # REQ-MIN-008: 레거시 DB 방어 — 누락된 Minervini 컬럼 멱등 추가
+    _ensure_meta_minervini_columns(conn)
 
     # --- Latest daily date ---
     row = conn.execute(
@@ -122,14 +147,33 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
         )
         # Continue building stock_meta with whatever data we have
 
-    # --- Load daily snapshot ---
-    daily_rows = conn.execute(
-        """SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W
-           FROM stock_prices
-           WHERE Date = ?""",
-        (latest_daily_date,),
-    ).fetchall()
-    # daily_by_name: Name -> (Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W)
+    # --- Load daily snapshot (REQ-MIN-004: SMA150, HIGH_52W→high52w, LOW_52W, SMA200_20D_AGO 포함) ---
+    # Defense path: 레거시 stock_prices에 신규 컬럼이 없을 경우를 방어
+    daily_price_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(stock_prices)").fetchall()
+    }
+    has_minervini_price_cols = all(
+        c in daily_price_cols for c in ("SMA150", "LOW_52W", "SMA200_20D_AGO")
+    )
+
+    if has_minervini_price_cols:
+        daily_rows = conn.execute(
+            """SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W,
+                      SMA150, LOW_52W, SMA200_20D_AGO
+               FROM stock_prices
+               WHERE Date = ?""",
+            (latest_daily_date,),
+        ).fetchall()
+    else:
+        # 레거시 경로: 신규 컬럼 없이 기존 컬럼만 조회
+        daily_rows = conn.execute(
+            """SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W
+               FROM stock_prices
+               WHERE Date = ?""",
+            (latest_daily_date,),
+        ).fetchall()
+    # daily_by_name: Name -> (Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W
+    #                         [, SMA150, LOW_52W, SMA200_20D_AGO] — 신규 컬럼 있으면 포함)
     daily_by_name: dict[str, tuple] = {r[0]: r[1:] for r in daily_rows}
 
     # --- Attach weekly DB and load weekly snapshot ---
@@ -226,7 +270,9 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             # No daily data → skip (delisted, newly listed, or missing)
             continue
 
-        d = daily_by_name[name]   # (Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W)
+        # d 인덱스: (Close[0], Change[1], EMA10[2], EMA20[3], SMA50[4], SMA100[5],
+        #            SMA200[6], High52W[7], SMA150[8], LOW_52W[9], SMA200_20D_AGO[10])
+        d = daily_by_name[name]
         w = weekly_by_name.get(name)  # (CHG_1W, CHG_1M, CHG_3M, SMA10, SMA20, SMA40) or None
         code = sector_info["code"]
 
@@ -245,7 +291,7 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             d[4],   # sma50
             d[5],   # sma100
             d[6],   # sma200
-            d[7],   # high52w
+            d[7],   # high52w (기존 컬럼, HIGH_52W(window=250)로 갱신)
             w[0] if w else None,  # chg_1w
             w[1] if w else None,  # chg_1m
             w[2] if w else None,  # chg_3m
@@ -254,12 +300,15 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             w[4] if w else None,  # sma20_w
             w[5] if w else None,  # sma40_w
             now_str,
+            d[8] if len(d) > 8 else None,   # sma150 (REQ-MIN-001)
+            d[9] if len(d) > 9 else None,   # low52w (REQ-MIN-002)
+            d[10] if len(d) > 10 else None, # sma200_20d_ago (REQ-MIN-003)
         ))
 
     conn.execute("DELETE FROM stock_meta")
     conn.executemany(
         """INSERT OR REPLACE INTO stock_meta
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         rows_to_insert,
     )
     conn.commit()

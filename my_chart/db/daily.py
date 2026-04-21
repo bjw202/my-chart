@@ -38,6 +38,7 @@ _DAILY_COLS = (
     "FromEMA10", "FromEMA20", "FromSMA50", "FromSMA200",
     "Range", "ADR20",
     "RS_Line",
+    "SMA150", "LOW_52W", "SMA200_20D_AGO",
 )
 
 
@@ -64,6 +65,9 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
             FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
             Range REAL, ADR20 REAL,
             RS_Line REAL,
+            SMA150 REAL,
+            LOW_52W REAL,
+            SMA200_20D_AGO REAL,
             PRIMARY KEY (Name, Date)
         )"""
     )
@@ -73,17 +77,41 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_daily_date ON stock_prices(Date)"
     )
-    # Migrate existing tables that lack SMA100 column
-    try:
-        conn.execute("ALTER TABLE stock_prices ADD COLUMN SMA100 REAL")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    # RS_Line 컬럼 마이그레이션
-    try:
-        conn.execute("ALTER TABLE stock_prices ADD COLUMN RS_Line REAL")
-    except sqlite3.OperationalError:
-        pass  # 컬럼이 이미 존재하는 경우
+    # 기존 테이블에 누락된 컬럼 멱등 추가 (PRAGMA 기반 guard)
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(stock_prices)").fetchall()}
+    for col in ("SMA100", "RS_Line", "SMA150", "LOW_52W", "SMA200_20D_AGO"):
+        if col not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE stock_prices ADD COLUMN {col} REAL")
+            except sqlite3.OperationalError:
+                pass  # 동시 실행 등으로 이미 추가된 경우
     conn.commit()
+
+
+def _compute_minervini_indicators(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Minervini Trend Template에 필요한 신규 지표를 계산하여 DataFrame에 추가한다.
+
+    REQ-MIN-001: SMA150 — 150일 단순이평 (min_periods=150)
+    REQ-MIN-002: HIGH_52W — 250 거래일 rolling max(High), LOW_52W — rolling min(Low)
+    REQ-MIN-003: SMA200_20D_AGO — SMA200의 20 거래일 shift
+
+    Args:
+        df: Close, High, Low, SMA200 컬럼을 포함한 종목별 DataFrame.
+
+    Returns:
+        SMA150, HIGH_52W, LOW_52W, SMA200_20D_AGO 컬럼이 추가된 DataFrame.
+    """
+    # SMA150: 150일 단순이평 (거래일 150일 미만이면 NaN)
+    df["SMA150"] = df["Close"].rolling(window=150, min_periods=150).mean()
+
+    # HIGH_52W / LOW_52W: 250 거래일 rolling max/min (min_periods=250)
+    df["HIGH_52W"] = df["High"].rolling(window=250, min_periods=250).max()
+    df["LOW_52W"] = df["Low"].rolling(window=250, min_periods=250).min()
+
+    # SMA200_20D_AGO: SMA200의 정확히 20 거래일 전 값
+    df["SMA200_20D_AGO"] = df["SMA200"].shift(20)
+
+    return df
 
 
 def _sanitize_ohlc(price: pd.DataFrame) -> pd.DataFrame:
@@ -129,7 +157,11 @@ def _fetch_daily_stock(
         price["HLC"] = (price["High"] + price["Low"] + price["Close"]) / 3
         # @MX:NOTE: [AUTO] Convert volume to 억원 (100M KRW) units for readability
         price["VolumeWon"] = price["HLC"] * price["Volume"] / 1_0000_0000
-        price["High_52w"] = price["High"].rolling(window=252).max()
+        # High_52w: 기존 컬럼 유지 (stock_prices.High52W — 레거시 호환)
+        # Minervini Trend Template 신규 지표 계산 (REQ-MIN-001/002/003)
+        price = _compute_minervini_indicators(price)
+        # High_52w는 HIGH_52W(window=250)로 교체됨. 레거시 High52W 컬럼값으로 유지
+        price["High_52w"] = price["HIGH_52W"]
         price["FromEMA10(%)"] = (price["Close"] - price["EMA10"]) / price["EMA10"] * 100
         price["FromEMA20(%)"] = (price["Close"] - price["EMA20"]) / price["EMA20"] * 100
         price["FromSMA50(%)"] = (price["Close"] - price["SMA50"]) / price["SMA50"] * 100
@@ -150,12 +182,20 @@ def _fetch_daily_stock(
             # pandas-stubs에서 row[key]의 반환 타입이 Any로 좁혀지지 않으므로
             # Any로 명시적 캐스팅 후 float() 호출
             r: Any = row
+
+            def _to_float_or_none(val: Any) -> float | None:
+                """NaN/None → None, 그 외 → float 변환."""
+                if val is None:
+                    return None
+                try:
+                    f = float(val)
+                    return None if f != f else f  # NaN != NaN
+                except (TypeError, ValueError):
+                    return None
+
             # RS_Line: NaN → None (SQLite NULL)
-            rs_raw: float | None = r["RS_Line"]
-            if rs_raw is None:
-                rs_line_value: float | None = None
-            else:
-                rs_line_value = None if rs_raw != rs_raw else rs_raw  # NaN != NaN
+            rs_line_value: float | None = _to_float_or_none(r["RS_Line"])
+
             rows.append((
                 company,
                 index.strftime("%Y-%m-%d"),  # type: ignore[union-attr]
@@ -164,7 +204,7 @@ def _fetch_daily_stock(
                 float(r["Low"]),
                 float(r["Close"]),
                 float(r["Change(%)"]),
-                float(r["High_52w"]),
+                _to_float_or_none(r["High_52w"]),  # High52W: NaN→None
                 float(r["Volume"]),
                 float(r["Volume20MA"]),
                 float(r["VolumeWon"]),
@@ -184,6 +224,9 @@ def _fetch_daily_stock(
                 float(r["Range"]),
                 float(r["ADR20"]),
                 rs_line_value,
+                _to_float_or_none(r["SMA150"]),         # REQ-MIN-001
+                _to_float_or_none(r["LOW_52W"]),         # REQ-MIN-002
+                _to_float_or_none(r["SMA200_20D_AGO"]),  # REQ-MIN-003
             ))
 
         time.sleep(API_THROTTLE_SLEEP)
