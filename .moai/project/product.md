@@ -34,7 +34,9 @@
    - Section 7: 추세 신호 (Trend Signals) — 주요 재무 추세 방향 시그널
    - Section 8: 5대 질문 (Five Questions) — 종합 투자 체크리스트 (양호/보통/주의)
 
-9. **AI Company Analysis (AI Button)** - 2-모드 AI 리포트 시스템. SPEC-AI-REPORT-001 (빠른 분석) + SPEC-AI-REPORT-002 (심층 분석, v1.0.5 기준). AI 버튼 클릭 → 모달 오픈 → 모드 선택 → "분석 시작" 명시적 클릭 후 SSE 스트리밍.
+10. **Minervini Trend Template Screener** - Mark Minervini 의 Stage 2 상승 추세 8조건을 **strict gate** 로 평가하는 백엔드 스크리너 (SPEC-MINERVINI-001 v1.0.3). `POST /api/screen { "minervini_trend_template": true }` 요청 시 서버사이드 SQL WHERE 에서 8조건 전체를 AND 결합으로 평가하며, 결과 집합의 모든 종목은 정의상 8조건을 모두 통과한다 (`StockItem.trend_template_score` 필드가 고정 `8` 로 반환). 8조건: (T1) close > SMA150 && SMA200, (T2) SMA150 > SMA200, (T3) SMA200 > 20 거래일 전 SMA200, (T4) SMA50 > SMA150 && SMA200, (T5) close > SMA50, (T6) close ≥ 52주 저점 × 1.25, (T7) 52주 고점 × 0.75 ≤ close ≤ 52주 고점, (T8) 12개월 RS ≥ 70. 일봉 파이프라인은 `SMA150`, `LOW_52W`, `SMA200_20D_AGO` 를 precompute 하고 `High52W` 는 250 거래일 rolling 으로 정제. 레거시 DB 에서 신규 컬럼이 누락되면 HTTP 200 + empty 응답으로 격리되어 기존 필터에는 영향이 없다 (defense-in-depth). UI (칩, 토글, 프리셋) 는 SPEC-PRESET-001 의 범위이며 본 기능은 데이터 계층과 평가 엔진까지 다룬다.
+
+11. **AI Company Analysis (AI Button)** - 2-모드 AI 리포트 시스템. SPEC-AI-REPORT-001 (빠른 분석) + SPEC-AI-REPORT-002 (심층 분석, v1.0.5 기준). AI 버튼 클릭 → 모달 오픈 → 모드 선택 → "분석 시작" 명시적 클릭 후 SSE 스트리밍.
    - **빠른 분석 (Perplexity 단일 소스, ~40-90초, ~$0.05/건)**
      - 모델: `sonar-reasoning-pro` (DeepSeek R1 기반 Chain-of-Thought 추론)
      - 검색 품질: `search_context_size: "high"` + `search_recency_filter: "month"` + 최소 SNS 블랙리스트
