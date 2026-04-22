@@ -28,6 +28,9 @@ const DEFAULT_PATTERN: PatternCondition = {
   multiplier: 1.0,
 }
 
+// SPEC-PRESET-001 REQ-PST-008: 패턴 한도. 백엔드 patterns.max_length=5와 동기화.
+const MAX_PATTERNS = 5
+
 export function PatternBuilder({
   patterns,
   patternLogic,
@@ -35,7 +38,7 @@ export function PatternBuilder({
   onLogicChange,
 }: PatternBuilderProps): React.ReactElement {
   const addPattern = (): void => {
-    if (patterns.length < 3) {
+    if (patterns.length < MAX_PATTERNS) {
       onPatternsChange([...patterns, { ...DEFAULT_PATTERN }])
     }
   }
@@ -120,7 +123,7 @@ export function PatternBuilder({
         </div>
       ))}
 
-      {patterns.length < 3 && (
+      {patterns.length < MAX_PATTERNS && (
         <button type="button" className="pattern-add-btn" onClick={addPattern}>
           + 조건 추가
         </button>

@@ -57,6 +57,19 @@ export interface StockItem {
   trend_template_score?: number | null
 }
 
+// @MX:NOTE: [AUTO] Preset 타입 — 프리셋 레지스트리의 단일 진실 원천(SSOT) 단위
+// @MX:SPEC: SPEC-PRESET-001 REQ-PST-001
+export type PresetId = 'minervini_full' | 'breakout_init' | 'stage1_accumulation'
+
+export interface Preset {
+  id: PresetId
+  label: string
+  description: string
+  /** 네이티브 title 속성 전용 안내 문구. 미지정 시 description을 fallback으로 사용한다 (REQ-PST-012). */
+  tooltip?: string
+  patch: Partial<ScreenRequest>
+}
+
 export const DEFAULT_SCREEN_REQUEST: ScreenRequest = {
   market_cap_min: null,
   chg_1d_min: null,
