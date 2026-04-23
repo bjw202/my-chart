@@ -6,12 +6,28 @@
 
 ## Step 1 — Codex CLI runner 어댑터
 
-- [ ] `backend/services/codex_cli_runner.py` 작성
-- [ ] `backend/tests/test_codex_cli_runner.py` 작성 (6개 케이스 이상)
-- [ ] `pytest backend/tests/test_codex_cli_runner.py` 통과
-- [ ] 기존 파이프라인 무손상 확인
+- [x] `backend/services/codex_cli_runner.py` 작성
+- [x] `backend/tests/test_codex_cli_runner.py` 작성 (6개 케이스 이상)
+- [x] `pytest backend/tests/test_codex_cli_runner.py` 통과
+- [x] 기존 파이프라인 무손상 확인
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과** (2026-04-23, 브랜치 `feature/SPEC-AI-REPORT-003-codex-replacement`):
+- 신규 테스트: `backend/tests/test_codex_cli_runner.py` 6/6 PASSED (1.39s)
+  - test_run_codex_success_writes_md: output_path 에 markdown 기록 + success=True 계약
+  - test_run_codex_timeout: 1초 타임아웃에 10초 sleep → error_type='timeout', 파일 미생성
+  - test_run_codex_empty_output: exit 0 + 파일 미작성 → error_type='empty_output'
+  - test_run_codex_binary_missing: FileNotFoundError → error_type='binary_missing'
+  - test_run_codex_nonzero_exit: stderr + exit=7 → error_type='exit_error', stderr tail 포함
+  - test_run_codex_cancelled: asyncio.Task.cancel() → CancelledError re-raise + 프로세스 정리
+- 회귀 스모크 (기존 파이프라인 무손상):
+  - `pytest backend/tests/test_claude_cli_streamer.py test_deep_research_collector.py test_ai_report_service.py` → 89/89 PASSED (34.99s)
+- 코드 설계 포인트:
+  - `_PROC_GRACE_PERIOD_SEC=15.0` + terminate→kill 2단계 정리 (claude_cli_streamer 패턴 복제)
+  - stderr 마지막 50 라인 tail buffer 보관 (진단용)
+  - 에러 분류: binary_missing / auth / timeout / empty_output / exit_error
+  - @MX:ANCHOR + @MX:WARN 태그 추가 (fan_in Step 3/4 완료 후 ≥3 도달 예정)
+- 격리 테스트 로드: `importlib.util.spec_from_file_location` 로 `backend/services/__init__.py` cascade import 회피
+- 미완료 사항: 없음. Step 2 (Codex 프롬프트 템플릿) 착수 대기 중.
 
 ---
 
