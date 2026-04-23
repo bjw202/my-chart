@@ -281,3 +281,180 @@ class TestGetStockName:
 
     def test_invalid_code_returns_none(self, service_module):
         assert service_module.get_stock_name("999999") is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-003 Step 4 — stream_codex_fast
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _load_codex_runner_into_sys_modules():
+    """codex_cli_runner 를 사전 로드해 service_module 의 lazy import 대비."""
+    import importlib.util
+    codex_path = Path(__file__).parent.parent / "services" / "codex_cli_runner.py"
+    module_name = "backend.services.codex_cli_runner"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(module_name, codex_path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture
+def codex_mod():
+    return _load_codex_runner_into_sys_modules()
+
+
+def _make_codex_result(
+    codex_mod, *, success, error_type=None, error_message=None, char_count=0, output_path=None
+):
+    return codex_mod.CodexResult(
+        success=success,
+        output_path=output_path,
+        char_count=char_count,
+        error_type=error_type,
+        error_message=error_message,
+        duration_ms=50,
+    )
+
+
+class TestStreamCodexFast:
+    """Codex Fast Mode SSE 스트림 계약 (SPEC-AI-REPORT-003 FR-001/FR-004)."""
+
+    @pytest.mark.asyncio
+    async def test_yields_chunks_and_done_on_success(self, service_module, codex_mod, monkeypatch):
+        """성공 시 시작 phase → markdown 청크 여러 개 → done 이벤트 순서로 yield."""
+        async def fake_run(**kwargs):
+            markdown = "# 헤더\n" + "가나다라마" * 100  # 500자 내외
+            kwargs["output_path"].write_text(markdown, encoding="utf-8")
+            return _make_codex_result(
+                codex_mod, success=True, char_count=len(markdown), output_path=kwargs["output_path"]
+            )
+
+        monkeypatch.setattr(codex_mod, "run_codex_research", fake_run)
+
+        events = []
+        async for evt in service_module.stream_codex_fast("Samsung SDI", "006400"):
+            events.append(evt)
+
+        phase_events = [e for e in events if e.get("event") == "phase"]
+        data_events = [e for e in events if "data" in e and not e.get("event")]
+        done_events = [e for e in events if e.get("event") == "done"]
+
+        assert len(phase_events) >= 1, "시작 phase 이벤트 없음"
+        assert any(
+            "codex_fast_start" in (e.get("data") or "") for e in phase_events
+        ), "codex_fast_start phase 이벤트 미검출"
+        assert len(data_events) >= 1, "markdown 청크 이벤트 없음"
+        assert len(done_events) == 1, "done 이벤트 정확히 1개 필요"
+
+        total = "".join(e["data"] for e in data_events)
+        assert "# 헤더" in total
+
+    @pytest.mark.asyncio
+    async def test_emits_error_on_codex_failure(self, service_module, codex_mod, monkeypatch):
+        """Codex 실패 시 error 이벤트 yield, data 이벤트 없음."""
+        async def fake_run(**kwargs):
+            return _make_codex_result(
+                codex_mod,
+                success=False,
+                error_type="timeout",
+                error_message="Codex 타임아웃 (600초)",
+                output_path=kwargs["output_path"],
+            )
+
+        monkeypatch.setattr(codex_mod, "run_codex_research", fake_run)
+
+        events = []
+        async for evt in service_module.stream_codex_fast("Samsung SDI", "006400"):
+            events.append(evt)
+
+        error_events = [e for e in events if e.get("event") == "error"]
+        data_events = [e for e in events if "data" in e and not e.get("event")]
+
+        assert len(error_events) == 1, "error 이벤트 정확히 1개 필요"
+        assert "timeout" in error_events[0]["data"]
+        assert len(data_events) == 0, "실패 시 markdown 청크 없어야 함"
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_emitted_during_long_run(self, service_module, codex_mod, monkeypatch):
+        """Codex subprocess 가 heartbeat 주기보다 오래 걸리면 progress phase 이벤트 yield."""
+        monkeypatch.setattr(service_module, "_CODEX_FAST_HEARTBEAT_SEC", 0.1)
+
+        async def fake_run(**kwargs):
+            import asyncio
+            await asyncio.sleep(0.35)  # heartbeat 2~3회 emit 기대
+            kwargs["output_path"].write_text("# 완료", encoding="utf-8")
+            return _make_codex_result(
+                codex_mod, success=True, char_count=5, output_path=kwargs["output_path"]
+            )
+
+        monkeypatch.setattr(codex_mod, "run_codex_research", fake_run)
+
+        events = []
+        async for evt in service_module.stream_codex_fast("Samsung SDI", "006400"):
+            events.append(evt)
+
+        progress_phases = [
+            e for e in events
+            if e.get("event") == "phase" and "codex_fast_progress" in (e.get("data") or "")
+        ]
+        assert len(progress_phases) >= 1, "heartbeat progress phase 이벤트 미검출"
+
+    @pytest.mark.asyncio
+    async def test_save_report_called_on_success(self, service_module, codex_mod, monkeypatch):
+        """성공 시 save_report 가 markdown 전체 내용과 함께 호출됨."""
+        save_calls = []
+
+        def fake_save(stock_name, content):
+            save_calls.append((stock_name, content))
+            return "2026-04-23.md"
+
+        async def fake_run(**kwargs):
+            markdown = "# 최종 리포트\n본문"
+            kwargs["output_path"].write_text(markdown, encoding="utf-8")
+            return _make_codex_result(
+                codex_mod, success=True, char_count=len(markdown), output_path=kwargs["output_path"]
+            )
+
+        monkeypatch.setattr(codex_mod, "run_codex_research", fake_run)
+        monkeypatch.setattr(service_module, "save_report", fake_save)
+
+        async for _ in service_module.stream_codex_fast("Samsung SDI", "006400"):
+            pass
+
+        assert len(save_calls) == 1
+        assert save_calls[0][0] == "Samsung SDI"
+        assert "# 최종 리포트" in save_calls[0][1]
+
+    @pytest.mark.asyncio
+    async def test_prompt_error_yields_error_event_no_subprocess(
+        self, service_module, codex_mod, monkeypatch
+    ):
+        """load_codex_prompt 가 실패하면 subprocess 호출 없이 즉시 error 이벤트."""
+        run_call_count = 0
+
+        async def fake_run(**kwargs):
+            nonlocal run_call_count
+            run_call_count += 1
+            return _make_codex_result(
+                codex_mod, success=True, output_path=kwargs["output_path"]
+            )
+
+        def fake_load_prompt(**kwargs):
+            raise FileNotFoundError("템플릿 없음")
+
+        monkeypatch.setattr(codex_mod, "run_codex_research", fake_run)
+        monkeypatch.setattr(codex_mod, "load_codex_prompt", fake_load_prompt)
+
+        events = []
+        async for evt in service_module.stream_codex_fast("Samsung SDI", "006400"):
+            events.append(evt)
+
+        error_events = [e for e in events if e.get("event") == "error"]
+        assert len(error_events) == 1
+        assert "프롬프트 로드 실패" in error_events[0]["data"]
+        assert run_call_count == 0, "프롬프트 실패 시 codex 호출되어서는 안 됨"

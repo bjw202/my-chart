@@ -364,6 +364,174 @@ async def stream_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
         logger.info("리포트 저장 완료: %s / %s", stock_name, filename)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-003 Step 4: Fast Mode Codex 전환 + 30s heartbeat
+# ─────────────────────────────────────────────────────────────────────────────
+
+# heartbeat 주기 (NFR: 사용자 대기 UX) — 30s 간격으로 phase 이벤트 emit
+_CODEX_FAST_HEARTBEAT_SEC: float = 30.0
+
+# 완료 시 markdown 청크 크기 (SSE data 이벤트 단위)
+_CODEX_FAST_CHUNK_SIZE: int = 256
+
+# heartbeat 이벤트 메시지 순환 — Codex 내부 단계 추정에 기반한 사용자 친화 표현
+_CODEX_FAST_HEARTBEAT_MESSAGES: tuple[str, ...] = (
+    "웹 검색 진행 중",
+    "자료 교차 검증 중",
+    "시장 데이터 분석 중",
+    "리포트 작성 중",
+    "최종 검수 진행 중",
+)
+
+
+# @MX:ANCHOR stream_codex_fast — SPEC-AI-REPORT-003 FR-001/FR-004. fan_in >= 2 (router + tests).
+# @MX:REASON Codex CLI non-streaming 한계를 30s heartbeat SSE 로 UX 보완. 라우터 계약:
+#             yield dict (SSE 이벤트) — 상위 스트리밍 핸들러가 EventSourceResponse 로 변환.
+#             전체 응답 종료 시 save_report 로 영속화 (stream_perplexity 호환 계약 유지).
+async def stream_codex_fast(
+    stock_name: str,
+    code: str,
+) -> AsyncGenerator[dict, None]:
+    """Codex CLI 를 비스트리밍 서브프로세스로 실행하고 30s heartbeat + 완료 시 청크 스트림.
+
+    SPEC-AI-REPORT-003 FR-001 / FR-004. Codex 는 non-streaming 이므로 heartbeat SSE 로
+    UX 연속성을 보완하고, 완료 시 markdown 을 256자 청크로 분할해 순차 yield 한다.
+
+    Args:
+        stock_name: 종목명 (예: "삼성전자").
+        code: 종목 코드 (예: "005930").
+
+    Yields:
+        - {"event": "phase", "data": json-str} — phase 이벤트 (시작/heartbeat)
+        - {"data": str} — markdown 청크 (256자 단위)
+        - {"event": "done", "data": ""} — 정상 완료
+        - {"event": "error", "data": str} — 실패
+
+    Note:
+        save_report 는 정상 완료 직전에 자동 호출 (stream_perplexity 와 계약 동일).
+    """
+    import asyncio
+    import json
+    import tempfile
+    from pathlib import Path
+
+    # Lazy import — codex_cli_runner 는 독립 모듈이지만 순환 import 방지 및
+    # 테스트 격리 환경 (importlib.util.spec_from_file_location) 호환을 위해 지연 로드
+    from backend.services.codex_cli_runner import (
+        load_codex_prompt,
+        run_codex_research,
+    )
+
+    # 시작 phase 이벤트
+    yield {
+        "event": "phase",
+        "data": json.dumps({"phase": "codex_fast_start"}),
+    }
+
+    # 프롬프트 로드 — 실패 시 즉시 error 이벤트 (재시도 없음)
+    try:
+        prompt = load_codex_prompt(code=code, stock_name=stock_name)
+    except (FileNotFoundError, ValueError) as exc:
+        logger.error("Codex 프롬프트 로드 실패 [%s]: %s", code, exc)
+        yield {
+            "event": "error",
+            "data": f"Codex 프롬프트 로드 실패: {exc}",
+        }
+        return
+
+    # 임시 디렉토리에 output 파일 경로 준비
+    with tempfile.TemporaryDirectory(prefix=f"fast_{code}_") as tmp_dir:
+        output_path = Path(tmp_dir) / "codex.md"
+
+        # Codex 호출을 background task 로 시작 → heartbeat 루프에서 완료 대기
+        codex_task: asyncio.Task = asyncio.create_task(
+            run_codex_research(
+                code=code,
+                stock_name=stock_name,
+                output_path=output_path,
+                prompt=prompt,
+            )
+        )
+
+        try:
+            msg_idx = 0
+            while not codex_task.done():
+                try:
+                    # heartbeat 간격 만큼 대기 — shield 로 timeout 에도 codex_task 유지
+                    await asyncio.wait_for(
+                        asyncio.shield(codex_task),
+                        timeout=_CODEX_FAST_HEARTBEAT_SEC,
+                    )
+                    break  # codex 완료 (정상/에러 모두 여기서 break)
+                except asyncio.TimeoutError:
+                    # 아직 진행 중 — heartbeat phase 이벤트 emit
+                    message = _CODEX_FAST_HEARTBEAT_MESSAGES[
+                        msg_idx % len(_CODEX_FAST_HEARTBEAT_MESSAGES)
+                    ]
+                    msg_idx += 1
+                    yield {
+                        "event": "phase",
+                        "data": json.dumps(
+                            {"phase": "codex_fast_progress", "message": message}
+                        ),
+                    }
+
+            codex_result = await codex_task
+
+        except asyncio.CancelledError:
+            # 상위 요청 취소 — codex_task 정리 후 re-raise
+            codex_task.cancel()
+            try:
+                await codex_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            logger.info("Codex Fast Mode 취소됨 (CancelledError): code=%s", code)
+            raise
+
+        if not codex_result.success:
+            logger.error(
+                "Codex Fast Mode 실패 [%s]: %s — %s",
+                code,
+                codex_result.error_type,
+                codex_result.error_message,
+            )
+            yield {
+                "event": "error",
+                "data": (
+                    f"Codex 호출 실패 ({codex_result.error_type}): "
+                    f"{codex_result.error_message}"
+                ),
+            }
+            return
+
+        # 마크다운 읽어서 검증 → 저장 → 청크 스트리밍
+        try:
+            markdown = output_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.error("Codex output 파일 읽기 실패 [%s]: %s", code, exc)
+            yield {"event": "error", "data": f"Codex output 파일 읽기 실패: {exc}"}
+            return
+
+        if not markdown.strip():
+            yield {"event": "error", "data": "Codex 응답이 비어 있습니다"}
+            return
+
+        # 리포트 영속화 (stream_perplexity 와 동일한 save_report 계약)
+        filename = save_report(stock_name, markdown)
+        logger.info(
+            "Codex Fast 리포트 저장: %s / %s (%d chars)",
+            stock_name,
+            filename,
+            len(markdown),
+        )
+
+        # 256자 청크로 분할해 SSE data 이벤트 발행
+        for i in range(0, len(markdown), _CODEX_FAST_CHUNK_SIZE):
+            yield {"data": markdown[i : i + _CODEX_FAST_CHUNK_SIZE]}
+
+        yield {"event": "done", "data": ""}
+
+
 # @MX:ANCHOR: [AUTO] v1.1.4 - 경로 조작 방지 보안 게이트. fan_in = 3.
 # @MX:REASON: save_report, get_history, get_report_content에서 모두 사용되는 유일한 정규화 경로.
 # 우회 시 path traversal / 파일시스템 손상 / Windows 예약명 충돌 발생. 7단계 처리 순서 변경 금지.
