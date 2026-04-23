@@ -829,42 +829,57 @@ def _build_summary_md(code: str, stock_name: str, result: CollectionResult) -> s
 
 # @MX:ANCHOR create_staging_directory — fan_in >= 2 (orchestrator + tests). Invariant: UUID8 suffix, /tmp path safety check, 실패 소스는 JSON 파일 생성 안 함.
 # @MX:REASON SPEC-AI-REPORT-002 FR-003: 스테이징 디렉토리 경로 탈출 방지 + 소스별 파일 선택적 생성.
-def create_staging_directory(
-    code: str,
-    result: CollectionResult,
-    *,
-    base_dir: Path = Path("/tmp"),
-) -> Path:
-    """스테이징 디렉토리를 생성하고 수집 결과를 파일로 저장한다.
+# /tmp 경로 안전성 검사용 차단 목록 (NFR-005).
+# 허용: /tmp, /tmp 하위, macOS /private/tmp, 시스템 임시 디렉토리.
+# 거부: /usr, /etc, /bin, /sbin, /lib, /root, /home, /var (tmp 제외).
+_BLOCKED_ROOTS: frozenset[str] = frozenset(
+    {"/usr", "/etc", "/bin", "/sbin", "/lib", "/root", "/home"}
+)
 
-    디렉토리 이름 형식: analysis_<code>_<ISO8601-UTC>_<uuid8>/
 
-    Args:
-        code: 종목 코드
-        result: CollectionResult (소스별 수집 결과)
-        base_dir: 기본 디렉토리 (기본 /tmp; 테스트 시 tmp_path 전달)
-
-    Returns:
-        생성된 스테이징 디렉토리 Path
+def _assert_safe_base_dir(base_dir: Path) -> Path:
+    """base_dir 가 시스템 경로로 탈출하지 않는지 검증하고 resolved Path 반환.
 
     Raises:
-        ValueError: base_dir가 /tmp 외부를 가리키는 경우
+        ValueError: base_dir 가 _BLOCKED_ROOTS 에 포함되거나 그 하위인 경우.
     """
-    # /tmp 경로 안전성 검사 (NFR-005)
-    # 위험한 시스템 경로를 차단한다 (경로 탈출 방지).
-    # 허용: /tmp, /tmp 하위, macOS /private/tmp, 시스템 임시 디렉토리.
-    # 거부: /usr, /etc, /bin, /sbin, /lib, /root, /home, /var (tmp 제외).
-    _BLOCKED_ROOTS = {"/usr", "/etc", "/bin", "/sbin", "/lib", "/root", "/home"}
     resolved = base_dir.resolve()
     resolved_str = str(resolved)
-    # 차단 목록의 경로이거나 그 하위인 경우 거부
     for blocked in _BLOCKED_ROOTS:
         if resolved_str == blocked or resolved_str.startswith(blocked + "/"):
             raise ValueError(
                 f"base_dir '{base_dir}' resolved to '{resolved}' which is outside /tmp"
             )
+    return resolved
 
-    # UUID8 생성 및 디렉토리 이름 조합
+
+# @MX:ANCHOR prepare_staging_directory — fan_in >= 2 (service.py collect 전 + create_staging_directory wrapper).
+# @MX:REASON SPEC-AI-REPORT-003 FR-006: Codex --output-last-message 가 호출 시점에 경로 존재를 요구하므로
+#            staging 생성은 collect 이전 (prepare) 과 이후 (finalize) 로 분리되어야 한다.
+def prepare_staging_directory(
+    code: str,
+    *,
+    base_dir: Path = Path("/tmp"),
+) -> Path:
+    """스테이징 디렉토리와 `sources/` 하위 디렉토리를 **선행** 생성한다.
+
+    Codex CLI 의 `--output-last-message` 인자는 호출 시점에 경로가 존재해야 하므로,
+    SPEC-AI-REPORT-003 이후 staging 생성은 collect 이전 (prepare) 과 이후 (finalize) 로
+    분리된다. 이 함수는 경로 안전 검사 + 디렉토리 생성만 수행하고, summary.md 나
+    소스 파일 작성은 `finalize_staging_directory` 에서 수행한다.
+
+    Args:
+        code: 종목 코드.
+        base_dir: 기본 디렉토리 (기본 /tmp; 테스트 시 tmp_path 전달).
+
+    Returns:
+        생성된 staging 디렉토리 Path. `<staging>/sources/` 는 이미 존재함.
+
+    Raises:
+        ValueError: base_dir 가 /tmp 외부를 가리키는 경우.
+    """
+    resolved = _assert_safe_base_dir(base_dir)
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     uuid8 = uuid.uuid4().hex[:8]
     dir_name = f"analysis_{code}_{ts}_{uuid8}"
@@ -872,13 +887,44 @@ def create_staging_directory(
     sources_dir = staging_dir / "sources"
     sources_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.info("스테이징 디렉토리 선행 생성: %s", staging_dir)
+    return staging_dir
+
+
+# @MX:ANCHOR finalize_staging_directory — fan_in >= 2 (service.py collect 후 + create_staging_directory wrapper).
+# @MX:REASON SPEC-AI-REPORT-003 FR-006: summary.md 와 JSON 소스 파일은 collect 완료 후에만 기록.
+#            Codex 는 이미 staging/sources/codex.md 를 직접 썼으므로 여기서는 덮어쓰지 않는다.
+def finalize_staging_directory(
+    staging_dir: Path,
+    code: str,
+    stock_name: str,
+    result: CollectionResult,
+) -> None:
+    """prepare 로 생성된 staging 디렉토리에 summary.md + 성공 소스 파일을 기록한다.
+
+    Codex 가 이미 `staging/sources/codex.md` 를 직접 기록한 경우, 그 파일은 덮어쓰지
+    않는다 (codex 의 SourceResult.data 는 markdown_path 정보만 담고 있으며, 이 함수는
+    codex 소스에 대해 파일 쓰기를 스킵한다).
+
+    Args:
+        staging_dir: prepare_staging_directory 반환값.
+        code: 종목 코드.
+        stock_name: 종목명.
+        result: CollectionResult.
+    """
+    sources_dir = staging_dir / "sources"
+
     # summary.md 작성
-    summary_content = _build_summary_md(code, result.stock_name, result)
+    summary_content = _build_summary_md(code, stock_name, result)
     (staging_dir / "summary.md").write_text(summary_content, encoding="utf-8")
 
-    # 소스별 파일 작성 (성공 소스만)
+    # 소스별 파일 작성 (성공 소스만). codex 는 subprocess 가 이미 직접 기록했으므로 스킵.
     for src_key, src_result in result.sources.items():
         if not src_result.success or src_result.data is None:
+            continue
+
+        if src_key == "codex":
+            # codex 는 subprocess 가 이미 sources/codex.md 를 직접 기록함. 덮어쓰지 않음.
             continue
 
         if src_key == "perplexity":
@@ -907,8 +953,38 @@ def create_staging_directory(
             )
 
     logger.info(
-        "스테이징 디렉토리 생성: %s (성공소스=%d/5)",
+        "스테이징 디렉토리 finalize 완료: %s (성공소스=%d/%d)",
         staging_dir,
         sum(1 for s in result.sources.values() if s.success),
+        len(result.sources),
     )
+
+
+# @MX:ANCHOR create_staging_directory — fan_in >= 2 (orchestrator + tests).
+# @MX:REASON SPEC-AI-REPORT-003 이후 prepare + finalize 를 순차 호출하는 얇은 wrapper 로 유지.
+#            기존 호출자 (테스트 포함) 시그니처 호환성 보장.
+def create_staging_directory(
+    code: str,
+    result: CollectionResult,
+    *,
+    base_dir: Path = Path("/tmp"),
+) -> Path:
+    """스테이징 디렉토리를 생성하고 수집 결과를 파일로 저장한다 (wrapper).
+
+    SPEC-AI-REPORT-003 이후 `prepare_staging_directory` + `finalize_staging_directory`
+    두 함수를 순차 호출하는 얇은 래퍼. 기존 호출자 시그니처 유지.
+
+    Args:
+        code: 종목 코드.
+        result: CollectionResult.
+        base_dir: 기본 디렉토리.
+
+    Returns:
+        생성된 staging 디렉토리 Path.
+
+    Raises:
+        ValueError: base_dir 가 /tmp 외부를 가리키는 경우.
+    """
+    staging_dir = prepare_staging_directory(code, base_dir=base_dir)
+    finalize_staging_directory(staging_dir, code, result.stock_name, result)
     return staging_dir
