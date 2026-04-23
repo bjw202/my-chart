@@ -194,40 +194,9 @@ class TestSaveReport:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class TestLoadPrompt:
-    def test_replaces_placeholder(self, service_module):
-        result = service_module.load_prompt("삼성전자")
-        assert "삼성전자" in result
-        assert "〈종목명〉" not in result  # placeholder 모두 치환됨
-
-    def test_preserves_other_content(self, service_module):
-        """프롬프트 템플릿의 다른 마커들은 유지."""
-        result = service_module.load_prompt("현대차")
-        assert "🔥" in result  # Executive Summary 마커
-        assert "0단계" in result
-
-    def test_template_path_points_to_backend(self, service_module):
-        """v1.1.5: 프롬프트 경로가 backend/prompts/로 이전되었는지 확인."""
-        assert "backend" in str(service_module._PROMPT_TEMPLATE_PATH)
-        assert "prompts" in str(service_module._PROMPT_TEMPLATE_PATH)
-        assert service_module._PROMPT_TEMPLATE_PATH.name == "perplexity_prompt.md"
-
-    def test_template_file_exists(self, service_module):
-        """Canonical 프롬프트 파일이 실제로 존재."""
-        assert service_module._PROMPT_TEMPLATE_PATH.is_file()
-
-    def test_template_has_placeholder(self, service_module):
-        """v1.1.5: 템플릿에 〈종목명〉 플레이스홀더가 반드시 존재 (계약)."""
-        template = service_module._load_prompt_template()
-        assert "〈종목명〉" in template
-
-    def test_template_cached(self, service_module):
-        """lru_cache로 프로세스당 1회만 읽음."""
-        # 첫 호출 → 캐시됨
-        t1 = service_module._load_prompt_template()
-        # 두 번째 호출 → 캐시된 동일 객체 (is 동치)
-        t2 = service_module._load_prompt_template()
-        assert t1 is t2
+# SPEC-AI-REPORT-003: TestLoadPrompt 제거됨 — load_prompt / _load_prompt_template /
+# _PROMPT_TEMPLATE_PATH / SYSTEM_PROMPT / SEARCH_DOMAIN_FILTER 가 전부 삭제됨.
+# Codex 프롬프트 로더 테스트는 test_codex_cli_runner.py::test_load_codex_prompt_* 참고.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -289,12 +258,17 @@ class TestGetStockName:
 
 
 def _load_codex_runner_into_sys_modules():
-    """codex_cli_runner 를 사전 로드해 service_module 의 lazy import 대비."""
+    """codex_cli_runner 를 실 모듈로 로드해 sys.modules 에 등록.
+
+    주의: 다른 테스트 파일이 stub 을 sys.modules 에 심어둔 상태면 cached 반환 시
+    run_codex_research/CodexResult 가 누락되므로, 실 모듈이 아닌 경우 강제 재로드한다.
+    """
     import importlib.util
     codex_path = Path(__file__).parent.parent / "services" / "codex_cli_runner.py"
     module_name = "backend.services.codex_cli_runner"
-    if module_name in sys.modules:
-        return sys.modules[module_name]
+    existing = sys.modules.get(module_name)
+    if existing is not None and hasattr(existing, "run_codex_research"):
+        return existing
     spec = importlib.util.spec_from_file_location(module_name, codex_path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)

@@ -837,15 +837,15 @@ async def test_collect_all_sources_no_client(monkeypatch):
 
 
 def _load_codex_runner_module():
-    """codex_cli_runner 모듈을 격리 로드하고 sys.modules 에 등록.
+    """codex_cli_runner 실 모듈을 sys.modules 에 등록 (stub 이 있으면 강제 재로드).
 
-    _collect_codex 의 lazy import 가 `backend.services.codex_cli_runner` 를 찾을 때
-    이 모듈 인스턴스를 가져가도록 보장한다. 이후 monkeypatch.setattr 로
-    run_codex_research 를 교체 가능.
+    다른 테스트 파일이 부분 stub 을 sys.modules 에 심어둔 경우 run_codex_research /
+    CodexResult 가 누락돼 monkeypatch 가 실패한다. 실 모듈이 아닌 경우 덮어쓴다.
     """
     codex_module_name = "backend.services.codex_cli_runner"
-    if codex_module_name in sys.modules:
-        return sys.modules[codex_module_name]
+    existing = sys.modules.get(codex_module_name)
+    if existing is not None and hasattr(existing, "run_codex_research"):
+        return existing
 
     codex_path = Path(__file__).parent.parent / "services" / "codex_cli_runner.py"
     spec = importlib.util.spec_from_file_location(codex_module_name, codex_path)

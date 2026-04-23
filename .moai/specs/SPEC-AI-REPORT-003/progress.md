@@ -101,16 +101,40 @@
 
 ## Step 4 — Fast Mode Codex 전환
 
-- [ ] `stream_codex_fast` 함수 신규
-- [ ] 30초 단위 heartbeat 구현
-- [ ] markdown 청크 분할 스트리밍
-- [ ] `stream_perplexity` 제거
-- [ ] 라우터에서 `codex` 바이너리 체크 추가
-- [ ] `test_ai_report_service.py` 갱신
-- [ ] `test_ai_report_router_deep_mode.py` Codex stub 교체
-- [ ] 모든 테스트 통과
+- [x] `stream_codex_fast` 함수 신규 (4a)
+- [x] 30초 단위 heartbeat 구현 (`_CODEX_FAST_HEARTBEAT_SEC = 30.0`, 5개 메시지 rotation)
+- [x] markdown 청크 분할 스트리밍 (`_CODEX_FAST_CHUNK_SIZE = 256`)
+- [x] `stream_perplexity` 제거 (4b)
+- [x] `SYSTEM_PROMPT`, `SEARCH_DOMAIN_FILTER`, `load_prompt`, `_load_prompt_template`, `_PROMPT_TEMPLATE_PATH` 제거
+- [x] 라우터에서 `codex` 바이너리 체크 추가 (PERPLEXITY_API_KEY 체크 제거)
+- [x] `mode=fast` 신설 (default), `mode=perplexity` 는 deprecated alias → fast 로 라우팅
+- [x] `main.py` lifespan 에서 `_load_prompt_template` 호출 제거 → `load_codex_prompt` 검증으로 교체
+- [x] `test_ai_report_service.py` 갱신 (`TestLoadPrompt` 제거, `TestStreamCodexFast` 5개 추가)
+- [x] `test_ai_report_router_deep_mode.py` Codex stub 교체 (`TestFastModePathPreservation` + `test_fast_rate_limit_unaffected_by_deep_quota`)
+- [x] 모든 테스트 통과
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과** (2026-04-23, atomic 커밋 4a → 4b):
+
+### 4a: stream_codex_fast 신규
+- `stream_codex_fast(stock_name, code) -> AsyncGenerator[dict, None]` 추가
+- 30초 주기 heartbeat phase 이벤트 (`codex_fast_progress`, 5가지 메시지 rotation)
+- 완료 시 markdown 을 256자 청크로 분할 yield, save_report 로 영속화
+- `asyncio.shield` 로 heartbeat timeout 시 codex subprocess 보호, CancelledError re-raise
+- 에러 경로: prompt_error / codex_failure / empty_output → error 이벤트
+- 테스트 5개: yields_chunks_and_done / emits_error / heartbeat / save_report / prompt_error
+- 4a 단독 검증: 35/35 PASSED (stream_perplexity 는 아직 공존)
+
+### 4b: 라우터·main·테스트 스위치 + stream_perplexity 제거
+- 라우터 `generate_report`: mode 파라미터 `"fast"`(기본)/`"deep"`/`"perplexity"`(deprecated alias) 수용
+- `_handle_perplexity_mode` → `_handle_fast_mode` 로 대체 (codex CLI 체크 + rate limit + 중복 방지 유지)
+- `main.py` lifespan: `_load_prompt_template` → `load_codex_prompt` 검증, `codex` 바이너리 부재 시 warning
+- `ai_report_service.py` 에서 제거: `stream_perplexity`, `SYSTEM_PROMPT`, `SEARCH_DOMAIN_FILTER`, `_PROMPT_TEMPLATE_PATH`, `_load_prompt_template`, `load_prompt`, `import httpx`, `import json`, `lru_cache`
+- 테스트 갱신: `TestLoadPrompt` 제거, `TestPerplexityPathPreservation` → `TestFastModePathPreservation` (3 케이스), rate limit isolation 테스트 갱신
+- stub pollution 수정: `_load_codex_runner_into_sys_modules` 가 stub (run_codex_research 누락) 을 감지하면 실 모듈 재로드
+- 4b 최종 검증: 134/134 PASSED (ai_report_service + ai_report_router_deep_mode + codex_cli_runner + deep_research_collector + deep_research_service + claude_cli_streamer)
+
+### 미완료 사항
+없음. Step 5 (Perplexity 잔여 자산 — perplexity_cache.py, perplexity_prompt.md, .env.example) 착수 대기 중.
 
 ---
 

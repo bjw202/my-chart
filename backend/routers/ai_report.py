@@ -18,7 +18,7 @@ from backend.services.ai_report_service import (
     get_history,
     get_report_content,
     get_stock_name,
-    stream_perplexity,
+    stream_codex_fast,
 )
 from backend.services.deep_research_service import (
     _active_deep_analyses,
@@ -26,8 +26,6 @@ from backend.services.deep_research_service import (
     check_deep_rate_limit,
     stream_deep_analysis,
 )
-# perplexity_cache는 함수 내부에서 lazy import: backend.services.__init__ cascade
-# (db_service → my_chart.db) 회피를 위해 module-level import는 사용하지 않음.
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -36,28 +34,29 @@ _CODE_PATTERN = re.compile(r"^\d{6}$")
 
 
 # @MX:ANCHOR generate_report — fan_in >= 2 (HTTP 클라이언트 + 테스트). 외부 HTTP 진입점.
-# @MX:REASON: Invariant: guard chain ordering (code → stock → api-key/binary → duplicate → rate-limit) applies to both modes.
-# Mode switches ONLY after all guards pass. 순서 변경/우회 시 과금 폭주 또는 잘못된 호출 발생.
+# @MX:REASON: Invariant: guard chain ordering (code → stock → binary → duplicate → rate-limit) applies to both modes.
+#             SPEC-AI-REPORT-003: mode=fast (Codex) + mode=deep. "perplexity" 는 backward-compat 알리아스 → fast.
 @router.post("/ai-report/{code}")
 async def generate_report(
     code: str,
-    mode: str = Query("perplexity", pattern="^(perplexity|deep)$"),
+    mode: str = Query("fast", pattern="^(fast|deep|perplexity)$"),
 ) -> EventSourceResponse:
     """종목 분석 리포트를 SSE 스트리밍으로 생성.
 
     - **code**: 6자리 KRX 종목 코드 (예: "005930")
-    - **mode**: 분석 모드. "perplexity"(기본) 또는 "deep"
+    - **mode**: 분석 모드. "fast"(기본, Codex 기반) 또는 "deep" 또는 "perplexity"(deprecated alias → fast).
 
     스트리밍 완료 시 리포트 자동 저장.
 
     SSE 이벤트 타입:
+    - phase: 단계 진행 알림 (Fast Mode heartbeat 포함)
     - (기본): 마크다운 텍스트 청크
     - done: 스트리밍 완료
     - error: 오류 발생
 
-    Returns 422 if code format is invalid or mode is not 'perplexity'/'deep'.
+    Returns 422 if code format is invalid or mode is not 'fast'/'deep'/'perplexity'.
     Returns 404 if stock not found in registry.
-    Returns 503 if required binary/key is missing.
+    Returns 503 if required binary is missing.
     Returns 429 if rate limit exceeded or analysis already in progress.
     """
     # ── 공통 가드 1: 코드 형식 검증 (두 모드 모두 적용) ──
@@ -75,30 +74,41 @@ async def generate_report(
             detail={"error": "not_found", "detail": f"종목 코드 {code}를 찾을 수 없습니다."},
         )
 
-    # ── 모드별 분기 ──
+    # ── 모드별 분기 (SPEC-AI-REPORT-003: perplexity → fast 알리아스) ──
     if mode == "deep":
         return await _handle_deep_mode(code, stock_name)
-    else:
-        return await _handle_perplexity_mode(code, stock_name)
+    # mode == "fast" 또는 "perplexity" (deprecated)
+    if mode == "perplexity":
+        logger.info(
+            "mode='perplexity' 는 SPEC-AI-REPORT-003 에서 deprecated. 'fast' 로 라우팅됨 [code=%s]",
+            code,
+        )
+    return await _handle_fast_mode(code, stock_name)
 
 
-async def _handle_perplexity_mode(code: str, stock_name: str) -> EventSourceResponse:
-    """Perplexity 모드 처리: API 키 체크 → 중복 체크 → rate limit → 스트리밍."""
-    # Perplexity API 키 체크
-    if not os.environ.get("PERPLEXITY_API_KEY"):
+async def _handle_fast_mode(code: str, stock_name: str) -> EventSourceResponse:
+    """Fast Mode 처리 (SPEC-AI-REPORT-003): codex CLI 체크 → 중복 체크 → rate limit → 스트리밍."""
+    # codex CLI 체크 (SPEC-AI-REPORT-003 NFR-001)
+    if shutil.which("codex") is None:
         raise HTTPException(
             status_code=503,
-            detail={"error": "api_key_missing", "detail": "PERPLEXITY_API_KEY가 설정되지 않았습니다."},
+            detail={
+                "error": "codex_cli_missing",
+                "detail": (
+                    "codex CLI가 설치되지 않아 Fast 분석을 사용할 수 없습니다. "
+                    "`codex login` 으로 인증하고 PATH 에 바이너리를 추가하세요."
+                ),
+            },
         )
 
-    # 중복 분석 체크 (Perplexity 전용)
+    # 중복 분석 체크 (Fast Mode 전용)
     if code in _active_analyses:
         raise HTTPException(
             status_code=429,
             detail={"error": "already_running", "detail": f"{stock_name}({code}) 분석이 이미 진행 중입니다."},
         )
 
-    # @MX:NOTE: [AUTO] v1.1.4 - 비용 폭주 방지 rate limit (일일 쿼터 + 분당 버스트)
+    # @MX:NOTE: ChatGPT 구독 쿼터 보호 rate limit (SPEC-AI-REPORT-003 NFR-002).
     try:
         check_rate_limit()
     except RateLimitError as exc:
@@ -107,44 +117,16 @@ async def _handle_perplexity_mode(code: str, stock_name: str) -> EventSourceResp
             detail={"error": "rate_limit", "detail": str(exc)},
         ) from exc
 
-    # Lazy import (테스트 격리용): backend.services.__init__의 cascade import 회피.
-    # 테스트에서 stub이 없으면 silent skip — 캐시 누락은 기능 영향 없음 (Deep mode가 단지 재호출).
-    try:
-        from backend.services.perplexity_cache import put as _cache_put
-    except ImportError:
-        _cache_put = lambda *a, **k: None  # noqa: E731
-
     async def event_generator():
-        """SSE 이벤트 제너레이터: 스트리밍 청크를 클라이언트에 전달.
-
-        SPEC-AI-REPORT-002 v1.0.3: 종료 시 full markdown을 perplexity_cache에 저장하여
-        같은 종목의 deep mode 호출이 재사용할 수 있도록 한다 (시나리오 C 비용 절감).
-        """
+        """SSE 이벤트 제너레이터: stream_codex_fast 이벤트를 클라이언트에 전달."""
         _active_analyses.add(code)
-        accumulated: list[str] = []  # 캐시용 합본
         try:
-            async for chunk in stream_perplexity(stock_name):
-                accumulated.append(chunk)
-                yield {"data": chunk}
-
-            # 빠른 분석 종료 → perplexity 캐시에 저장 (TTL 10분, deep mode 재사용용)
-            full_markdown = "".join(accumulated)
-            if full_markdown:
-                _cache_put(code, full_markdown)
-
-            # 스트리밍 완료 이벤트 전송
-            yield {"event": "done", "data": ""}
-
-        except EnvironmentError as exc:
-            logger.error("환경변수 오류: %s", exc)
-            yield {"event": "error", "data": str(exc)}
-
-        except Exception as exc:
+            async for event in stream_codex_fast(stock_name, code):
+                yield event
+        except Exception as exc:  # noqa: BLE001
             logger.error("리포트 생성 오류 [%s]: %s", code, exc)
             yield {"event": "error", "data": f"리포트 생성 중 오류가 발생했습니다: {exc}"}
-
         finally:
-            # 완료 또는 오류 시 항상 active 상태 해제
             _active_analyses.discard(code)
 
     return EventSourceResponse(event_generator())
