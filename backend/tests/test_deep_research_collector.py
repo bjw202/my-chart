@@ -891,3 +891,225 @@ async def test_collect_all_sources_no_client(monkeypatch):
     result = await collect_all_sources("005930", "삼성전자")
     assert isinstance(result, CollectionResult)
     assert result.sources["perplexity"].success is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-003 Step 3b — _collect_codex 테스트
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _load_codex_runner_module():
+    """codex_cli_runner 모듈을 격리 로드하고 sys.modules 에 등록.
+
+    _collect_codex 의 lazy import 가 `backend.services.codex_cli_runner` 를 찾을 때
+    이 모듈 인스턴스를 가져가도록 보장한다. 이후 monkeypatch.setattr 로
+    run_codex_research 를 교체 가능.
+    """
+    codex_module_name = "backend.services.codex_cli_runner"
+    if codex_module_name in sys.modules:
+        return sys.modules[codex_module_name]
+
+    codex_path = Path(__file__).parent.parent / "services" / "codex_cli_runner.py"
+    spec = importlib.util.spec_from_file_location(codex_module_name, codex_path)
+    assert spec and spec.loader, f"codex_cli_runner 로드 실패: {codex_path}"
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[codex_module_name] = mod
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
+
+
+@pytest.fixture()
+def codex_runner_mod():
+    """codex_cli_runner 모듈 인스턴스 픽스처."""
+    return _load_codex_runner_module()
+
+
+def _make_codex_result(
+    runner_mod,
+    *,
+    success: bool,
+    error_type: str | None = None,
+    error_message: str | None = None,
+    char_count: int = 0,
+    output_path: Path | None = None,
+):
+    """CodexResult 인스턴스 생성 헬퍼 (격리 로드된 runner 모듈의 dataclass 사용)."""
+    return runner_mod.CodexResult(
+        success=success,
+        output_path=output_path,
+        char_count=char_count,
+        error_type=error_type,
+        error_message=error_message,
+        duration_ms=100,
+    )
+
+
+@pytest.mark.asyncio
+async def test_collect_codex_success(codex_runner_mod, monkeypatch, tmp_path):
+    """run_codex_research 가 성공을 반환하면 SourceResult(success=True) + markdown_path."""
+    sources_dir = tmp_path / "sources"
+    sources_dir.mkdir()
+
+    async def fake_run(**kwargs):
+        # 실제 subprocess 대신 fake 가 output_path 에 파일 생성
+        kwargs["output_path"].write_text("# Codex 결과\n내용 내용", encoding="utf-8")
+        return _make_codex_result(
+            codex_runner_mod,
+            success=True,
+            char_count=kwargs["output_path"].stat().st_size,
+            output_path=kwargs["output_path"],
+        )
+
+    monkeypatch.setattr(codex_runner_mod, "run_codex_research", fake_run)
+
+    result = await _MOD._collect_codex(
+        "006400", "Samsung SDI", staging_sources_dir=sources_dir
+    )
+
+    assert result.name == "codex"
+    assert result.success is True
+    assert isinstance(result.data, dict)
+    assert result.data["markdown_path"] == str(sources_dir / "codex.md")
+    assert result.data["char_count"] > 0
+    assert result.error_type is None
+    assert (sources_dir / "codex.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_collect_codex_timeout_retry_fails(codex_runner_mod, monkeypatch, tmp_path):
+    """타임아웃이 두 번 연속 발생하면 SourceResult(success=False, error_type='timeout')."""
+    sources_dir = tmp_path / "sources"
+    sources_dir.mkdir()
+
+    call_count = 0
+
+    async def fake_run(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        return _make_codex_result(
+            codex_runner_mod,
+            success=False,
+            error_type="timeout",
+            error_message="Codex 타임아웃 (600초)",
+            output_path=kwargs["output_path"],
+        )
+
+    monkeypatch.setattr(codex_runner_mod, "run_codex_research", fake_run)
+
+    result = await _MOD._collect_codex(
+        "006400", "Samsung SDI", staging_sources_dir=sources_dir
+    )
+
+    assert call_count == 2  # 초기 + 1회 재시도
+    assert result.name == "codex"
+    assert result.success is False
+    assert result.error_type == "timeout"
+
+
+@pytest.mark.asyncio
+async def test_collect_codex_binary_missing(codex_runner_mod, monkeypatch, tmp_path):
+    """binary_missing 은 결정론적 실패 — 재시도 없음 (ER-001)."""
+    sources_dir = tmp_path / "sources"
+    sources_dir.mkdir()
+
+    call_count = 0
+
+    async def fake_run(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        return _make_codex_result(
+            codex_runner_mod,
+            success=False,
+            error_type="binary_missing",
+            error_message="Codex 바이너리를 찾을 수 없습니다",
+            output_path=kwargs["output_path"],
+        )
+
+    monkeypatch.setattr(codex_runner_mod, "run_codex_research", fake_run)
+
+    result = await _MOD._collect_codex(
+        "006400", "Samsung SDI", staging_sources_dir=sources_dir
+    )
+
+    assert call_count == 1  # 재시도 없음
+    assert result.success is False
+    assert result.error_type == "binary_missing"
+
+
+@pytest.mark.asyncio
+async def test_collect_codex_retry_succeeds(codex_runner_mod, monkeypatch, tmp_path):
+    """첫 호출 timeout, 두 번째 호출 성공 → SourceResult(success=True)."""
+    sources_dir = tmp_path / "sources"
+    sources_dir.mkdir()
+
+    call_count = 0
+
+    async def fake_run(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return _make_codex_result(
+                codex_runner_mod,
+                success=False,
+                error_type="timeout",
+                error_message="첫 호출 타임아웃",
+                output_path=kwargs["output_path"],
+            )
+        kwargs["output_path"].write_text("# 재시도 성공", encoding="utf-8")
+        return _make_codex_result(
+            codex_runner_mod,
+            success=True,
+            char_count=kwargs["output_path"].stat().st_size,
+            output_path=kwargs["output_path"],
+        )
+
+    monkeypatch.setattr(codex_runner_mod, "run_codex_research", fake_run)
+
+    result = await _MOD._collect_codex(
+        "006400", "Samsung SDI", staging_sources_dir=sources_dir
+    )
+
+    assert call_count == 2
+    assert result.success is True
+    assert result.data["markdown_path"] == str(sources_dir / "codex.md")
+    assert (sources_dir / "codex.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_collect_codex_auth_no_retry(codex_runner_mod, monkeypatch, tmp_path):
+    """auth 실패는 결정론적 — 재시도 금지 (ER-002)."""
+    sources_dir = tmp_path / "sources"
+    sources_dir.mkdir()
+
+    call_count = 0
+
+    async def fake_run(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        return _make_codex_result(
+            codex_runner_mod,
+            success=False,
+            error_type="auth",
+            error_message="not logged in",
+            output_path=kwargs["output_path"],
+        )
+
+    monkeypatch.setattr(codex_runner_mod, "run_codex_research", fake_run)
+
+    result = await _MOD._collect_codex(
+        "006400", "Samsung SDI", staging_sources_dir=sources_dir
+    )
+
+    assert call_count == 1  # 재시도 없음
+    assert result.error_type == "auth"
+
+
+@pytest.mark.asyncio
+async def test_collect_codex_without_staging_dir_fails_fast(tmp_path):
+    """staging_sources_dir 미전달 시 호출자 로직 오류로 즉시 실패."""
+    result = await _MOD._collect_codex(
+        "006400", "Samsung SDI", staging_sources_dir=None
+    )
+
+    assert result.success is False
+    assert result.error_type == "missing_staging_dir"

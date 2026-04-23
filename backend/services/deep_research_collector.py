@@ -298,6 +298,118 @@ async def _collect_perplexity(
         )
 
 
+# @MX:ANCHOR _collect_codex — SPEC-AI-REPORT-003 FR-002/FR-003.
+# @MX:REASON Codex CLI 호출 슬롯. 1회 재시도 (timeout/exit_error/empty_output) + 결정론적 실패 (binary_missing/auth) 재시도 금지.
+#            staging_sources_dir 에 직접 codex.md 를 기록하므로 finalize_staging_directory 는 이 파일을 덮어쓰지 않는다.
+async def _collect_codex(
+    code: str,
+    stock_name: str,
+    *,
+    client: httpx.AsyncClient | None = None,  # 미사용, _collect_one_source 시그니처 호환용
+    staging_sources_dir: Path | None = None,
+) -> SourceResult:
+    """Codex CLI 를 호출해 `staging_sources_dir/codex.md` 에 심층 리서치 마크다운을 생성.
+
+    FR-003 — 1회 재시도: 첫 호출이 timeout / exit_error / empty_output 로 실패하면 동일
+    프롬프트로 한 번 더 호출. `binary_missing` / `auth` 는 결정론적 실패로 재시도 금지.
+
+    Args:
+        code: 종목 코드.
+        stock_name: 종목명.
+        client: 미사용 (Codex 는 httpx 미사용). 시그니처는 `_collect_one_source` 호환용.
+        staging_sources_dir: `<staging>/sources/` 디렉토리. prepare_staging_directory 가
+            선행 생성한 경로. 이 함수는 `<staging_sources_dir>/codex.md` 를 생성한다.
+
+    Returns:
+        SourceResult(name="codex", success=..., data={"markdown_path": ..., "char_count": ...} | None)
+    """
+    if staging_sources_dir is None:
+        # 호출자 로직 오류 — collect_all_sources 가 staging_sources_dir 을 전달하지 않은 경우
+        return SourceResult(
+            name="codex",
+            success=False,
+            data=None,
+            error_type="missing_staging_dir",
+            error_message="codex 수집은 staging_sources_dir 인자가 필수입니다",
+        )
+
+    output_path = staging_sources_dir / "codex.md"
+
+    # Lazy import — 테스트 격리 환경에서 codex_cli_runner 미로드 대비
+    try:
+        from backend.services.codex_cli_runner import (
+            load_codex_prompt,
+            run_codex_research,
+        )
+    except ImportError as exc:
+        return SourceResult(
+            name="codex",
+            success=False,
+            data=None,
+            error_type="import_error",
+            error_message=f"codex_cli_runner import 실패: {exc}",
+        )
+
+    # 프롬프트 로드 실패 (템플릿 미존재 / malformed) 는 결정론적 실패 — 재시도 없음
+    try:
+        prompt = load_codex_prompt(code=code, stock_name=stock_name)
+    except (FileNotFoundError, ValueError) as exc:
+        return SourceResult(
+            name="codex",
+            success=False,
+            data=None,
+            error_type="prompt_error",
+            error_message=str(exc),
+        )
+
+    start = time.monotonic()
+    last_error_type: str | None = None
+    last_error_message: str | None = None
+
+    # FR-003: 최대 2회 시도 (최초 + 1회 재시도)
+    for _attempt in range(2):
+        # 이전 실패의 불완전 파일이 남아있으면 제거 → empty_output 오탐 방지
+        if output_path.exists():
+            try:
+                output_path.unlink()
+            except OSError:
+                pass
+
+        codex_result = await run_codex_research(
+            code=code,
+            stock_name=stock_name,
+            output_path=output_path,
+            prompt=prompt,
+        )
+
+        if codex_result.success:
+            return SourceResult(
+                name="codex",
+                success=True,
+                data={
+                    "markdown_path": str(output_path),
+                    "char_count": codex_result.char_count,
+                },
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
+        last_error_type = codex_result.error_type
+        last_error_message = codex_result.error_message
+
+        # ER-001 / ER-002: 결정론적 실패는 재시도 금지 (FR-003 두 번째 문장)
+        if codex_result.error_type in ("binary_missing", "auth"):
+            break
+
+    return SourceResult(
+        name="codex",
+        success=False,
+        data=None,
+        error_type=last_error_type or "unknown",
+        error_message=last_error_message,
+        duration_ms=int((time.monotonic() - start) * 1000),
+    )
+
+
 async def _collect_brave(
     code: str,
     stock_name: str,
