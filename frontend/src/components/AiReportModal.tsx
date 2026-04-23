@@ -1,7 +1,7 @@
 /**
  * AI 기업 분석 리포트 모달.
  *
- * Perplexity API SSE 스트리밍을 실시간 마크다운으로 렌더링하고,
+ * Codex CLI SSE 스트리밍(Fast) 또는 Claude 합성(Deep)을 실시간 마크다운으로 렌더링하고,
  * 히스토리 탭에서 이전 분석을 조회할 수 있다.
  * AnalysisModal 패턴(portal + ESC + backdrop) 동일 적용.
  * SPEC-AI-REPORT-002 D4: 헤더에 2단 모드 토글(빠른 분석 / 심층 분석) 추가.
@@ -71,8 +71,8 @@ export function AiReportModal({
   const [activeTab, setActiveTab] = useState<TabType>('result')
   const [copied, setCopied] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
-  // SPEC-AI-REPORT-002 FR-011: 2단 모드 선택 상태 ('perplexity' 기본값)
-  const [mode, setMode] = useState<AiReportMode>('perplexity')
+  // SPEC-AI-REPORT-002 FR-011: 2단 모드 선택 상태 ('fast' 기본값)
+  const [mode, setMode] = useState<AiReportMode>('fast')
 
   // ESC 키로 모달 닫기
   useEffect(() => {
@@ -159,9 +159,9 @@ export function AiReportModal({
             <button
               type="button"
               role="tab"
-              aria-selected={mode === 'perplexity'}
-              className={`ai-report-mode-btn${mode === 'perplexity' ? ' active' : ''}`}
-              onClick={() => setMode('perplexity')}
+              aria-selected={mode === 'fast'}
+              className={`ai-report-mode-btn${mode === 'fast' ? ' active' : ''}`}
+              onClick={() => setMode('fast')}
               disabled={status === 'streaming'}
             >
               빠른 분석
@@ -281,13 +281,13 @@ export function AiReportModal({
                   </p>
                   <ul className="ai-report-idle-modes">
                     <li>
-                      <strong>빠른 분석</strong> — Perplexity 단일 소스, 약 1-2분
+                      <strong>빠른 분석</strong> — Codex CLI 단일 호출, 약 2~9분 (진행 상태 실시간 표시)
                     </li>
                     <li>
-                      <strong>심층 분석</strong> — 5개 소스(Perplexity·Brave·Tavily·Naver·YouTube) 합성, 수분 소요
+                      <strong>심층 분석</strong> — 5개 소스(Codex·Brave·Tavily·Naver·YouTube) 합성, 수분 소요
                       <br />
                       <span className="ai-report-idle-hint">
-                        💡 빠른 분석을 먼저 한 뒤 심층 분석을 누르면 같은 종목의 Perplexity 결과를 재사용합니다 (10분 내).
+                        💡 Codex 는 ChatGPT 구독 쿼터를 사용합니다 (API 키 불필요).
                       </span>
                     </li>
                   </ul>

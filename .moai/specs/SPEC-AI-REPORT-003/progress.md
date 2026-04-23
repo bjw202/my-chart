@@ -179,14 +179,47 @@
 
 ## Step 6 — 합성 프롬프트·SSE·프론트엔드
 
-- [ ] `stock_synthesis_prompt.md` 의 `sources/perplexity.md` → `sources/codex.md`
-- [ ] `aiReport.ts::SourceName` 갱신
-- [ ] ProgressPanel 라벨 맵 갱신
-- [ ] Fast Mode 로딩 컴포넌트 heartbeat 메시지
-- [ ] TypeScript 컴파일 통과
-- [ ] 프론트엔드 테스트 통과
+- [x] `stock_synthesis_prompt.md` 의 `sources/perplexity.md` → `sources/codex.md` (6a)
+- [x] `aiReport.ts::SourceName` 갱신 (perplexity → codex)
+- [x] `aiReport.ts::PhaseEvent` 에 `codex_fast_start`, `codex_fast_progress`, `staging_prepared` 이벤트 추가
+- [x] `api/aiReport.ts::AiReportMode` 갱신 (perplexity → fast)
+- [x] ProgressPanel 라벨 맵 갱신 (Perplexity → "Codex 심층 리서치")
+- [x] ProgressPanel 소스 순서 배열 갱신 (orderedSources)
+- [x] formatCount 함수에서 codex 소스 char_count KB 표시 로직 유지
+- [x] `useAiReport.ts::SOURCE_NAMES` + startStream 기본값 `"fast"` 로 갱신
+- [x] `ChartCell.tsx` mode 타입 'perplexity' → 'fast'
+- [x] `AiReportModal.tsx` 기본 mode state = 'fast', 버튼 라벨/토글 상태 전환
+- [x] AiReportModal idle 설명 문구 갱신 (Codex CLI 2~9분, 구독 쿼터 안내)
+- [x] ProgressPanel.test.tsx: codex 기반 테스트로 전환, perplexity cache hit 테스트 제거
+- [x] AiReportModal.test.tsx: 'perplexity' → 'fast' (테스트 이름/assertion/mock)
+- [x] TypeScript 컴파일 통과
+- [x] 프론트엔드 관련 테스트 통과 (ProgressPanel + AiReportModal 19/19)
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과** (2026-04-23, atomic 커밋 6a → 6b):
+
+### 6a: 합성 프롬프트 (backend/prompts/stock_synthesis_prompt.md)
+- 역할 문구: "5개 외부 소스(Perplexity, Brave, ...)" → "5개 외부 소스(Codex, Brave, ...)"
+- 파일 목록: `sources/perplexity.md` → `sources/codex.md` (설명도 "Codex 심층 리서치 결과")
+- 종목 식별 섹션 파일 참조 갱신
+- 인용 레이블: `[codex]` 추가, Perplexity 전용 합성 규칙 제거
+
+### 6b: 프론트엔드
+- types/aiReport.ts: SourceName = 'codex' | ... (perplexity 제거), PhaseEvent 에 codex_fast_* 이벤트 3개 추가
+- api/aiReport.ts: AiReportMode = 'fast' | 'deep' (기본값 'fast')
+- hooks/useAiReport.ts: SOURCE_NAMES 에 codex 사용, startStream 기본값 fast
+- components/ProgressPanel.tsx: 라벨 "Codex 심층 리서치", orderedSources 갱신
+- components/AiReportModal.tsx: 기본 mode='fast', 설명 문구에 Codex CLI 특성 반영
+- components/ChartGrid/ChartCell.tsx: mode 타입 fast|deep
+- 테스트 갱신: ProgressPanel cache hit 테스트 제거 (Codex 는 cache hit 경로 없음)
+- TypeScript tsc --noEmit 통과 (에러 0건)
+- 관련 테스트 (ProgressPanel + AiReportModal) 19/19 PASSED
+
+### 사전 존재 실패 (범위 외)
+- ChartGrid.test.tsx 의 DEFAULT_SCREEN_REQUEST 관련 테스트 1건 (SPEC-PRESET-001 영역, 본 SPEC 과 무관)
+- e2e/ai-report-deep.spec.ts (Playwright 서버 기동 필요)
+
+### 미완료 사항
+없음. Step 7 (전체 회귀 + 커버리지) 및 Step 8 (실 Codex 스모크) 착수 대기 중.
 
 ---
 
