@@ -33,11 +33,25 @@
 
 ## Step 2 — Codex 프롬프트 템플릿
 
-- [ ] `backend/prompts/codex_prompt.md` 작성
-- [ ] 플레이스홀더 검증 로직 추가
-- [ ] `test_load_codex_prompt` 통과
+- [x] `backend/prompts/codex_prompt.md` 작성
+- [x] 플레이스홀더 검증 로직 추가
+- [x] `test_load_codex_prompt` 통과
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과** (2026-04-23):
+- 신규 파일: `backend/prompts/codex_prompt.md`
+  - 플레이스홀더: `〈종목명〉`, `〈종목코드〉`
+  - 섹션: Executive Summary → 사업 본질 → 최신 이벤트 → 시장 심리 → 실적·밸류·수급·테크니컬 → Catalyst → 리스크 → 스윙 진입·청산 관점 → 출력 규칙
+  - 출력 규칙: `[n]` 인용 + 참고문헌 섹션, 추상어·매매권유 금지
+- `codex_cli_runner.py` 확장:
+  - `_PROMPT_TEMPLATE_PATH`, `_REQUIRED_PLACEHOLDERS` 상수 추가
+  - `load_codex_prompt(code, stock_name) -> str` 함수 추가 (fail-fast 검증 3단계: 파일 존재 → 템플릿 플레이스홀더 포함 → 치환 후 잔존 없음)
+- 신규 테스트 3개 (`test_codex_cli_runner.py` 에 추가):
+  - `test_load_codex_prompt_substitutes_placeholders` — 정상 치환
+  - `test_load_codex_prompt_missing_file_raises` — 템플릿 미존재 → FileNotFoundError
+  - `test_load_codex_prompt_missing_placeholder_raises` — 템플릿 malformed → ValueError
+- Step 2 테스트 결과: 9/9 PASSED (1.40s)
+- 회귀 스모크: 89/89 PASSED (유지)
+- 미완료 사항: 없음. Step 3 (Deep Mode Codex 슬롯 교체 + staging 2단계) 착수 대기 중.
 
 ---
 

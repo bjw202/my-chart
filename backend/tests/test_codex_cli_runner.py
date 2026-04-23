@@ -223,3 +223,52 @@ async def test_run_codex_cancelled(runner, tmp_path: Path) -> None:
 
     # 파일은 생성되지 않았어야 함 (프로세스가 쓰기 전 취소됨)
     assert output_path.exists() is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 2 — Codex 프롬프트 템플릿 로더 (load_codex_prompt)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_load_codex_prompt_substitutes_placeholders(runner) -> None:
+    """load_codex_prompt() 가 〈종목명〉 / 〈종목코드〉 플레이스홀더를 치환한다."""
+    rendered = runner.load_codex_prompt(code="006400", stock_name="Samsung SDI")
+
+    assert "Samsung SDI" in rendered
+    assert "006400" in rendered
+    # 원본 플레이스홀더가 남아있지 않아야 함
+    assert "〈종목명〉" not in rendered
+    assert "〈종목코드〉" not in rendered
+    # 섹션 키워드 존재 검증 (plan.md 사양)
+    assert "Executive Summary" in rendered
+    assert "Catalyst" in rendered or "촉매" in rendered
+    assert "리스크" in rendered
+
+
+def test_load_codex_prompt_missing_file_raises(runner, monkeypatch, tmp_path: Path) -> None:
+    """템플릿 파일이 존재하지 않으면 FileNotFoundError 를 발생시킨다."""
+    # monkeypatch 로 runner 의 _PROMPT_TEMPLATE_PATH 를 존재하지 않는 경로로 교체
+    nonexistent = tmp_path / "nope_never_exists.md"
+    monkeypatch.setattr(runner, "_PROMPT_TEMPLATE_PATH", nonexistent)
+
+    with pytest.raises(FileNotFoundError):
+        runner.load_codex_prompt(code="006400", stock_name="Samsung SDI")
+
+
+def test_load_codex_prompt_missing_placeholder_raises(
+    runner, monkeypatch, tmp_path: Path
+) -> None:
+    """템플릿에 필수 플레이스홀더가 없으면 ValueError.
+
+    템플릿이 잘못 편집되어 〈종목명〉 또는 〈종목코드〉 가 누락된 경우, 로더는
+    치환 없이 원본을 반환하지 않고 ValueError 를 던져야 한다 (fail-fast).
+    """
+    broken_template = tmp_path / "broken_template.md"
+    broken_template.write_text(
+        "# 리포트\n종목 정보가 통째로 누락된 잘못된 템플릿\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(runner, "_PROMPT_TEMPLATE_PATH", broken_template)
+
+    with pytest.raises(ValueError):
+        runner.load_codex_prompt(code="006400", stock_name="Samsung SDI")

@@ -32,6 +32,16 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 프롬프트 템플릿 경로 및 플레이스홀더
+# ─────────────────────────────────────────────────────────────────────────────
+
+# backend/services/codex_cli_runner.py → backend/prompts/codex_prompt.md
+_PROMPT_TEMPLATE_PATH: Path = Path(__file__).resolve().parent.parent / "prompts" / "codex_prompt.md"
+
+# 치환 필요한 플레이스홀더 (fail-fast 검증 대상)
+_REQUIRED_PLACEHOLDERS: tuple[str, ...] = ("〈종목명〉", "〈종목코드〉")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 상수
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -145,7 +155,57 @@ def _is_auth_failure(stderr_lines: list[str]) -> bool:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 공개 API
+# 공개 API — 프롬프트 로더 (Step 2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def load_codex_prompt(*, code: str, stock_name: str) -> str:
+    """`codex_prompt.md` 템플릿을 로드하고 플레이스홀더를 치환한다.
+
+    Args:
+        code: 종목 코드 (예: "006400").
+        stock_name: 종목명 (예: "Samsung SDI").
+
+    Returns:
+        치환된 프롬프트 문자열. Fast Mode 와 Deep Mode 모두에서 동일 템플릿 사용.
+
+    Raises:
+        FileNotFoundError: 템플릿 파일이 존재하지 않음.
+        ValueError: 템플릿에 필수 플레이스홀더가 없거나, 치환 후에도 잔존하는 경우
+            (fail-fast — Codex 호출 전에 즉시 실패해 운영 리포트 품질 보호).
+    """
+    if not _PROMPT_TEMPLATE_PATH.exists():
+        raise FileNotFoundError(
+            f"Codex 프롬프트 템플릿 미존재: {_PROMPT_TEMPLATE_PATH}"
+        )
+
+    raw = _PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    # 1) 템플릿이 기대하는 플레이스홀더를 모두 포함하는지 선검증
+    missing = [p for p in _REQUIRED_PLACEHOLDERS if p not in raw]
+    if missing:
+        raise ValueError(
+            f"Codex 프롬프트 템플릿에 필수 플레이스홀더 누락: {missing} "
+            f"({_PROMPT_TEMPLATE_PATH})"
+        )
+
+    # 2) 치환
+    rendered = raw.replace("〈종목명〉", stock_name).replace("〈종목코드〉", code)
+
+    # 3) 치환 후에도 플레이스홀더가 잔존하면 실패 (사용자 입력이 플레이스홀더와
+    #    정확히 일치하는 방어적 경로 — 실전에서는 발생하지 않아야 정상)
+    for placeholder in _REQUIRED_PLACEHOLDERS:
+        if placeholder in rendered:
+            raise ValueError(
+                f"플레이스홀더 치환 실패: '{placeholder}' 가 여전히 남아있습니다. "
+                f"입력값이 플레이스홀더 문자열과 동일한지 확인하세요."
+            )
+
+    return rendered
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 공개 API — Codex CLI 호출
 # ─────────────────────────────────────────────────────────────────────────────
 
 
