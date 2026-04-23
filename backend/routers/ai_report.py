@@ -138,7 +138,7 @@ async def _handle_deep_mode(code: str, stock_name: str) -> EventSourceResponse:
     if shutil.which("claude") is None:
         raise HTTPException(
             status_code=503,
-            detail={"error": "claude_cli_missing", "detail": "claude CLI가 설치되지 않아 Deep 분석을 사용할 수 없습니다. Perplexity 모드를 사용하세요."},
+            detail={"error": "claude_cli_missing", "detail": "claude CLI가 설치되지 않아 Deep 분석을 사용할 수 없습니다. Fast 모드를 사용하세요."},
         )
 
     # 중복 분석 체크 (Deep 전용)

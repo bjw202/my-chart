@@ -141,14 +141,39 @@
 ## Step 5 — Perplexity 자산 완전 제거
 
 - [x] `deep_research_collector.py` 내 `_collect_perplexity`, `_normalize_perplexity`, `_PERPLEXITY_URL` 제거 (Step 3 에서 처리됨)
-- [ ] `backend/services/perplexity_cache.py` 삭제
-- [ ] `backend/prompts/perplexity_prompt.md` 삭제
-- [ ] `ai_report_service.py` 의 `SYSTEM_PROMPT`, `SEARCH_DOMAIN_FILTER`, `load_prompt`, `_load_prompt_template` 제거 (Step 4 와 연동)
-- [ ] `.env` / `.env.example` 에서 `PERPLEXITY_API_KEY` 제거
-- [ ] `grep -ri "perplexity" backend/ --include="*.py"` 결과 없음
-- [ ] pytest 전체 통과
+- [x] `backend/services/perplexity_cache.py` 삭제
+- [x] `backend/prompts/perplexity_prompt.md` 삭제
+- [x] `ai_report_service.py` 의 `SYSTEM_PROMPT`, `SEARCH_DOMAIN_FILTER`, `load_prompt`, `_load_prompt_template` 제거 (Step 4 에서 처리됨)
+- [x] `.env.example` 에서 `PERPLEXITY_API_KEY` 제거 + `codex login` 안내 주석 추가
+- [x] `.env` (gitignored, 로컬 전용) 에서 `PERPLEXITY_API_KEY` 라인 제거
+- [x] `backend/prompts/README.md` / `backend/prompts/__init__.py` 를 codex_prompt 기준으로 갱신
+- [x] 테스트의 `PERPLEXITY_API_KEY` env var 설정 라인 정리 (no-op 제거)
+- [x] `grep -ri "perplexity" backend/ --include="*.py"` → 라우터의 `mode=perplexity` deprecated alias 로직만 남음 (의도된 호환 유지)
+- [x] pytest 전체 통과
 
-**검증 결과**: Step 4 (Fast Mode 전환) 완료 후 Step 5 본격 진행. Step 3 cutover 로 collector 쪽 perplexity 자산은 이미 제거됨.
+**검증 결과** (2026-04-23):
+
+### 물리 삭제
+- `backend/services/perplexity_cache.py` 삭제 ✓
+- `backend/prompts/perplexity_prompt.md` 삭제 ✓
+
+### 문서/설정 갱신
+- `backend/prompts/README.md`: Codex 자산 중심 설명으로 rewrite
+- `backend/prompts/__init__.py`: SPEC-AI-REPORT-003 docstring 으로 교체
+- `.env.example`: PERPLEXITY_API_KEY 섹션 제거, `codex login` 안내 주석 추가
+- `.env` (로컬): PERPLEXITY_API_KEY 라인 삭제
+- `backend/routers/ai_report.py`: Deep 모드 에러 메시지의 "Perplexity 모드" → "Fast 모드"
+
+### 의도적 잔존 (backward-compat)
+- 라우터 `generate_report`: `mode=perplexity` 를 deprecated alias 로 수용 → Fast 로 라우팅 (SPEC-AI-REPORT-003 NFR-005 인터페이스 보존)
+- 테스트 파일 내 `PERPLEXITY_API_KEY` 설정 시도는 no-op (실제 코드 경로가 더 이상 읽지 않음). 이전 테스트 시그니처 호환을 위해 주석 처리로 남김.
+
+### 테스트 결과
+- 134/134 PASSED (ai_report_service + router_deep_mode + codex_cli_runner + deep_research_collector + deep_research_service + claude_cli_streamer)
+- 회귀 스모크: 기존 파이프라인 무손상
+
+### 미완료 사항
+없음. Step 6 (합성 프롬프트 + SSE + 프론트엔드) 착수 대기 중.
 
 ---
 

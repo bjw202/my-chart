@@ -173,10 +173,9 @@ def _make_router_app(
     service_mod와 deep_service_mod는 위 fixture로부터 주입된 격리 모듈.
     라우터 모듈을 직접 로드해 sys.modules에 없는 의존성을 스텁으로 대체.
     """
-    import os
-
-    os.environ["PERPLEXITY_API_KEY"] = api_key
-
+    # SPEC-AI-REPORT-003: api_key 파라미터는 더 이상 사용되지 않음 (Perplexity 자산 제거됨).
+    # api_key 인자는 하위 시그니처 호환을 위해 유지하되 환경변수에 쓰지 않는다.
+    _ = api_key  # noqa: F841
     _install_stubs()
 
     # 라우터가 import할 서비스 스텁 등록
@@ -314,7 +313,7 @@ class TestDeepModeRouting:
         """Deep mode 테스트용 앱 생성 헬퍼."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
 
         svc = _load_service_module("_test_svc_deep", _SERVICE_PATH)
@@ -379,7 +378,7 @@ class TestDeepModeRouting:
         """?mode=invalid → FastAPI Query 패턴 검증 실패로 422 반환."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_inv", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -423,7 +422,7 @@ class TestDeepModeRouting:
 
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_rl", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -507,7 +506,7 @@ class TestDeepModeRouting:
         """잘못된 형식 종목 코드(5자리)는 deep mode에서도 422 반환."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_gcp", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -538,7 +537,7 @@ class TestDeepModeRouting:
         """존재하지 않는 종목 코드는 deep mode에서도 404 반환."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_404", _SERVICE_PATH)
         svc._active_analyses.clear()

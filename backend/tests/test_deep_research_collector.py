@@ -77,8 +77,7 @@ _strip_think_blocks = _MOD._strip_think_blocks
 
 @pytest.fixture()
 def mock_env_all_keys(monkeypatch):
-    """모든 API 키 환경변수 설정."""
-    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
+    """Deep 모드 검색 API 키 환경변수 설정 (SPEC-AI-REPORT-003: Perplexity 제거됨)."""
     monkeypatch.setenv("BRAVE_API_KEY", "brave-test-key")
     monkeypatch.setenv("TAVILY_API_KEY", "tavily-test-key")
     monkeypatch.setenv("NAVER_CLIENT_ID", "naver-test-id")
@@ -305,8 +304,7 @@ async def test_source_http_error_counted_as_failure(mock_env_all_keys):
 async def test_missing_api_key_counted_as_failure(monkeypatch):
     """BRAVE_API_KEY 미설정 → 해당 소스 실패, error_type='missing_key', 예외 없음."""
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
-    # 다른 키는 설정
-    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
+    # 다른 키는 설정 (SPEC-AI-REPORT-003: Perplexity 제거됨)
     monkeypatch.setenv("TAVILY_API_KEY", "tavily-test-key")
     monkeypatch.setenv("NAVER_CLIENT_ID", "naver-test-id")
     monkeypatch.setenv("NAVER_CLIENT_SECRET", "naver-test-secret")
