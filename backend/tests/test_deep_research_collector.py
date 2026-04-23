@@ -181,33 +181,8 @@ def youtube_response_json():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_collect_perplexity_nonstreaming(
-    mock_env_all_keys, perplexity_response_json
-):
-    """Perplexity 비스트리밍 POST 요청 + think 블록 제거 검증."""
-    with respx.mock:
-        route = respx.post("https://api.perplexity.ai/chat/completions").respond(
-            json=perplexity_response_json,
-            status_code=200,
-        )
-        async with httpx.AsyncClient() as client:
-            result = await _MOD._collect_perplexity("005930", "삼성전자", client=client)
-
-    assert isinstance(result, SourceResult)
-    assert result.success is True
-    assert result.name == "perplexity"
-    # think 블록이 제거되었는지 확인
-    assert "<think>" not in str(result.data)
-    assert "삼성전자" in str(result.data)
-    # Authorization 헤더 검증
-    assert route.called
-    request = route.calls.last.request
-    assert request.headers.get("authorization") == "Bearer pplx-test-key"
-    # stream=False (non-streaming)
-    body = json.loads(request.content)
-    assert body.get("stream") is False or "stream" not in body or body.get("stream") is False
-    assert body.get("model") == "sonar-reasoning-pro"
+# SPEC-AI-REPORT-003: test_collect_perplexity_nonstreaming 제거됨 (Perplexity 완전 대체).
+# Codex 어댑터 테스트는 test_codex_cli_runner.py 및 SECTION 3b (test_collect_codex_*) 참고.
 
 
 @pytest.mark.asyncio
@@ -354,12 +329,13 @@ async def test_missing_api_key_counted_as_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_minimum_2_sources_gate_passes(monkeypatch, mock_env_all_keys):
-    """2/5 소스 성공 시 gate_passed=True."""
-    success_result = SourceResult(name="perplexity", success=True, data={"content": "ok"})
-    failure_result = SourceResult(name="x", success=False, data=None, error_type="timeout")
-
-    async def mock_perplexity(code, name, client=None):
-        return SourceResult(name="perplexity", success=True, data={"content": "ok"})
+    """2/5 소스 성공 시 gate_passed=True (SPEC-AI-REPORT-003: codex 슬롯)."""
+    async def mock_codex(code, name, client=None, staging_sources_dir=None):
+        return SourceResult(
+            name="codex",
+            success=True,
+            data={"markdown_path": "/tmp/fake/codex.md", "char_count": 100},
+        )
 
     async def mock_brave(code, name, client=None):
         return SourceResult(name="brave", success=True, data=[{"title": "t", "url": "u", "snippet": "s"}])
@@ -373,17 +349,17 @@ async def test_minimum_2_sources_gate_passes(monkeypatch, mock_env_all_keys):
     async def mock_youtube(code, name, client=None):
         return SourceResult(name="youtube", success=False, data=None, error_type="timeout")
 
-    monkeypatch.setattr(_MOD, "_collect_perplexity", mock_perplexity)
+    monkeypatch.setattr(_MOD, "_collect_codex", mock_codex)
     monkeypatch.setattr(_MOD, "_collect_brave", mock_brave)
     monkeypatch.setattr(_MOD, "_collect_tavily", mock_tavily)
     monkeypatch.setattr(_MOD, "_collect_naver", mock_naver)
     monkeypatch.setattr(_MOD, "_collect_youtube", mock_youtube)
 
-    result = await collect_all_sources("005930", "삼성전자")
+    result = await collect_all_sources("005930", "삼성전자", staging_sources_dir=Path("/tmp/fake"))
 
     assert isinstance(result, CollectionResult)
     assert result.gate_passed is True
-    assert result.sources["perplexity"].success is True
+    assert result.sources["codex"].success is True
     assert result.sources["brave"].success is True
     assert result.sources["tavily"].success is False
 
@@ -391,22 +367,26 @@ async def test_minimum_2_sources_gate_passes(monkeypatch, mock_env_all_keys):
 @pytest.mark.asyncio
 async def test_minimum_2_sources_gate_fails_at_one(monkeypatch, mock_env_all_keys):
     """1/5 소스 성공 시 gate_passed=False, ValueError는 발생하지 않음."""
-    async def mock_perplexity(code, name, client=None):
-        return SourceResult(name="perplexity", success=True, data={"content": "ok"})
+    async def mock_codex(code, name, client=None, staging_sources_dir=None):
+        return SourceResult(
+            name="codex",
+            success=True,
+            data={"markdown_path": "/tmp/fake/codex.md", "char_count": 50},
+        )
 
     async def mock_fail(source_name):
         async def inner(code, name, client=None):
             return SourceResult(name=source_name, success=False, data=None, error_type="timeout")
         return inner
 
-    monkeypatch.setattr(_MOD, "_collect_perplexity", mock_perplexity)
+    monkeypatch.setattr(_MOD, "_collect_codex", mock_codex)
     monkeypatch.setattr(_MOD, "_collect_brave", await mock_fail("brave"))
     monkeypatch.setattr(_MOD, "_collect_tavily", await mock_fail("tavily"))
     monkeypatch.setattr(_MOD, "_collect_naver", await mock_fail("naver"))
     monkeypatch.setattr(_MOD, "_collect_youtube", await mock_fail("youtube"))
 
     # ValueError가 발생하지 않아야 함 — gate check는 boolean만 반환
-    result = await collect_all_sources("005930", "삼성전자")
+    result = await collect_all_sources("005930", "삼성전자", staging_sources_dir=Path("/tmp/fake"))
 
     assert isinstance(result, CollectionResult)
     assert result.gate_passed is False
@@ -417,8 +397,12 @@ async def test_minimum_2_sources_gate_fails_at_one(monkeypatch, mock_env_all_key
 @pytest.mark.asyncio
 async def test_all_sources_succeed(monkeypatch, mock_env_all_keys):
     """5/5 소스 성공 시 gate_passed=True, 5개 소스 모두 존재."""
-    async def mock_perplexity(code, name, client=None):
-        return SourceResult(name="perplexity", success=True, data={"content": "ok"})
+    async def mock_codex(code, name, client=None, staging_sources_dir=None):
+        return SourceResult(
+            name="codex",
+            success=True,
+            data={"markdown_path": "/tmp/fake/codex.md", "char_count": 1000},
+        )
 
     async def mock_brave(code, name, client=None):
         return SourceResult(name="brave", success=True, data=[])
@@ -432,13 +416,13 @@ async def test_all_sources_succeed(monkeypatch, mock_env_all_keys):
     async def mock_youtube(code, name, client=None):
         return SourceResult(name="youtube", success=True, data=[])
 
-    monkeypatch.setattr(_MOD, "_collect_perplexity", mock_perplexity)
+    monkeypatch.setattr(_MOD, "_collect_codex", mock_codex)
     monkeypatch.setattr(_MOD, "_collect_brave", mock_brave)
     monkeypatch.setattr(_MOD, "_collect_tavily", mock_tavily)
     monkeypatch.setattr(_MOD, "_collect_naver", mock_naver)
     monkeypatch.setattr(_MOD, "_collect_youtube", mock_youtube)
 
-    result = await collect_all_sources("005930", "삼성전자")
+    result = await collect_all_sources("005930", "삼성전자", staging_sources_dir=Path("/tmp/fake"))
 
     assert result.gate_passed is True
     assert len(result.sources) == 5
@@ -452,21 +436,21 @@ async def test_all_sources_succeed(monkeypatch, mock_env_all_keys):
 
 def _make_collection_result(
     *,
-    perplexity_success: bool = True,
+    codex_success: bool = True,
     brave_success: bool = True,
     tavily_success: bool = True,
     naver_success: bool = True,
     youtube_success: bool = True,
 ) -> CollectionResult:
-    """테스트용 CollectionResult 생성 헬퍼."""
+    """테스트용 CollectionResult 생성 헬퍼 (SPEC-AI-REPORT-003: codex 슬롯)."""
     sources = {
-        "perplexity": SourceResult(
-            name="perplexity",
-            success=perplexity_success,
-            data={"content": "삼성전자 분석 <think>내부</think> 완료", "citations": []}
-            if perplexity_success
+        "codex": SourceResult(
+            name="codex",
+            success=codex_success,
+            data={"markdown_path": "/tmp/fake/codex.md", "char_count": 200}
+            if codex_success
             else None,
-            error_type=None if perplexity_success else "timeout",
+            error_type=None if codex_success else "timeout",
         ),
         "brave": SourceResult(
             name="brave",
@@ -557,8 +541,8 @@ def test_write_summary_md_table(tmp_path):
 
     content = summary_path.read_text(encoding="utf-8")
 
-    # 5개 소스 모두 테이블에 등록
-    for source in ("perplexity", "brave", "tavily", "naver", "youtube"):
+    # 5개 소스 모두 테이블에 등록 (SPEC-AI-REPORT-003: perplexity → codex)
+    for source in ("codex", "brave", "tavily", "naver", "youtube"):
         assert source in content.lower(), f"{source} 소스가 summary.md에 없음"
 
     # 성공 소스: ✅ 표시
@@ -571,30 +555,28 @@ def test_write_summary_md_table(tmp_path):
     assert "005930" in content or "삼성전자" in content
 
 
-def test_write_perplexity_md_think_stripped(tmp_path):
-    """sources/perplexity.md에 <think> 블록이 없어야 함."""
+# SPEC-AI-REPORT-003: test_write_perplexity_md_think_stripped 제거됨.
+# Codex 는 마크다운을 --output-last-message 경로에 직접 기록하므로, finalize 단계에서
+# codex.md 를 파이썬이 새로 쓰지 않는다 (덮어쓰기 방지). think 블록 처리 불필요.
+
+
+def test_finalize_skips_codex_md_write(tmp_path):
+    """SPEC-AI-REPORT-003 FR-006: finalize 는 codex.md 를 새로 작성하지 않는다.
+
+    Codex subprocess 가 --output-last-message 경로에 직접 마크다운을 쓴 후에는
+    finalize_staging_directory 가 해당 파일을 덮어쓰지 않아야 한다.
+    """
     result = _make_collection_result()
-    # perplexity data에 think 블록 주입
-    result.sources["perplexity"] = SourceResult(
-        name="perplexity",
-        success=True,
-        data={
-            "content": "<think>이 부분은 내부 추론입니다.</think>최종 답변입니다.",
-            "citations": [],
-        },
-    )
+    # Codex 성공 시 data 는 markdown_path 정보만 포함 (실제 파일은 subprocess 가 씀)
     staging_dir = create_staging_directory("005930", result, base_dir=tmp_path)
 
-    perplexity_md = staging_dir / "sources" / "perplexity.md"
-    assert perplexity_md.exists(), "perplexity.md가 생성되지 않음"
-
-    content = perplexity_md.read_text(encoding="utf-8")
-    # <think> 블록 완전 제거 확인
-    assert "<think>" not in content
-    assert "</think>" not in content
-    assert "이 부분은 내부 추론입니다." not in content
-    # 실제 내용은 남아 있어야 함
-    assert "최종 답변입니다." in content
+    # finalize 는 codex.md 를 새로 쓰지 않으므로 파일이 없어야 정상
+    # (단위 테스트에서는 subprocess 를 호출하지 않으므로 애초에 파일 미존재)
+    codex_md = staging_dir / "sources" / "codex.md"
+    assert not codex_md.exists(), (
+        "finalize_staging_directory 가 codex.md 를 새로 작성했음 — "
+        "subprocess 경로와 충돌 위험"
+    )
 
 
 def test_failed_source_json_omitted(tmp_path):
@@ -721,41 +703,14 @@ def test_strip_think_blocks_multiple():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_collect_perplexity_timeout(mock_env_all_keys):
-    """Perplexity httpx.TimeoutException → error_type='timeout'."""
-    with respx.mock:
-        respx.post("https://api.perplexity.ai/chat/completions").mock(
-            side_effect=httpx.TimeoutException("timeout")
-        )
-        async with httpx.AsyncClient() as client:
-            result = await _MOD._collect_perplexity("005930", "삼성전자", client=client)
-    assert result.success is False
-    assert result.error_type == "timeout"
-    assert result.name == "perplexity"
+# SPEC-AI-REPORT-003: test_collect_perplexity_{timeout,http_error} 제거됨.
+# Codex 어댑터의 타임아웃 / 비정상 종료 처리는 test_codex_cli_runner.py 및
+# test_collect_codex_{timeout_retry_fails,binary_missing,retry_succeeds} 에서 커버.
 
 
-@pytest.mark.asyncio
-async def test_collect_perplexity_http_error(mock_env_all_keys):
-    """Perplexity HTTP 500 → error_type='http_error'."""
-    with respx.mock:
-        respx.post("https://api.perplexity.ai/chat/completions").respond(
-            status_code=500, json={"error": "server error"}
-        )
-        async with httpx.AsyncClient() as client:
-            result = await _MOD._collect_perplexity("005930", "삼성전자", client=client)
-    assert result.success is False
-    assert result.error_type == "http_error"
-
-
-@pytest.mark.asyncio
-async def test_collect_perplexity_missing_key(monkeypatch):
-    """PERPLEXITY_API_KEY 미설정 → missing_key."""
-    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
-    async with httpx.AsyncClient() as client:
-        result = await _MOD._collect_perplexity("005930", "삼성전자", client=client)
-    assert result.success is False
-    assert result.error_type == "missing_key"
+# SPEC-AI-REPORT-003: test_collect_perplexity_missing_key 제거됨.
+# Codex 는 ChatGPT 구독 기반이라 API 키 개념이 없음 (`codex login` 으로 인증).
+# 바이너리/인증 실패 경로는 test_collect_codex_{binary_missing,auth_no_retry} 에서 커버.
 
 
 @pytest.mark.asyncio
@@ -845,52 +800,35 @@ def test_normalize_naver_empty():
     assert _normalize_naver({"items": []}) == []
 
 
-def test_normalize_perplexity_none():
-    """Perplexity 응답 없음 → 기본 구조."""
-    result = _MOD._normalize_perplexity(None)
-    assert result == {"content": None, "citations": []}
-
-
-def test_write_staging_with_citations(tmp_path):
-    """perplexity.md에 citations 섹션이 포함되어야 함."""
-    result = _make_collection_result()
-    # citations 있는 perplexity 데이터
-    result.sources["perplexity"] = SourceResult(
-        name="perplexity",
-        success=True,
-        data={
-            "content": "분석 결과입니다.",
-            "citations": ["https://citation1.com", "https://citation2.com"],
-        },
-    )
-    staging_dir = create_staging_directory("005930", result, base_dir=tmp_path)
-    perplexity_md = staging_dir / "sources" / "perplexity.md"
-    content = perplexity_md.read_text(encoding="utf-8")
-    assert "citation1.com" in content
-    assert "citation2.com" in content
+# SPEC-AI-REPORT-003: test_normalize_perplexity_none / test_write_staging_with_citations 제거됨.
+# _normalize_perplexity 함수 및 perplexity.md citations 블록 생성 기능은 삭제됨.
 
 
 @pytest.mark.asyncio
 async def test_collect_all_sources_no_client(monkeypatch):
-    """client=None 경우 내부 httpx.AsyncClient 생성 경로 검증."""
-    async def mock_perplexity(code, name, client=None):
-        return SourceResult(name="perplexity", success=True, data={"content": "ok", "citations": []})
+    """client=None 경우 내부 httpx.AsyncClient 생성 경로 검증 (SPEC-AI-REPORT-003: codex 슬롯)."""
+    async def mock_codex(code, name, client=None, staging_sources_dir=None):
+        return SourceResult(
+            name="codex",
+            success=True,
+            data={"markdown_path": "/tmp/fake/codex.md", "char_count": 100},
+        )
 
     async def mock_fail(src_name):
         async def inner(code, name, client=None):
             return SourceResult(name=src_name, success=False, data=None, error_type="missing_key")
         return inner
 
-    monkeypatch.setattr(_MOD, "_collect_perplexity", mock_perplexity)
+    monkeypatch.setattr(_MOD, "_collect_codex", mock_codex)
     monkeypatch.setattr(_MOD, "_collect_brave", await mock_fail("brave"))
     monkeypatch.setattr(_MOD, "_collect_tavily", await mock_fail("tavily"))
     monkeypatch.setattr(_MOD, "_collect_naver", await mock_fail("naver"))
     monkeypatch.setattr(_MOD, "_collect_youtube", await mock_fail("youtube"))
 
-    # client=None — 내부에서 AsyncClient 생성
-    result = await collect_all_sources("005930", "삼성전자")
+    # client=None — 내부에서 AsyncClient 생성. staging_sources_dir 은 codex 슬롯용.
+    result = await collect_all_sources("005930", "삼성전자", staging_sources_dir=Path("/tmp/fake"))
     assert isinstance(result, CollectionResult)
-    assert result.sources["perplexity"].success is True
+    assert result.sources["codex"].success is True
 
 
 # ─────────────────────────────────────────────────────────────────────────────

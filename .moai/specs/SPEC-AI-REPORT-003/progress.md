@@ -57,18 +57,45 @@
 
 ## Step 3 — Deep Mode Codex 슬롯 교체
 
-- [ ] `_collect_codex` 함수 신규
-- [ ] `SOURCE_NAMES` 갱신 (`perplexity` → `codex`)
-- [ ] `_DEFAULT_TIMEOUTS["codex"] = 600.0`
-- [ ] 1회 재시도 로직
-- [ ] `create_staging_directory` → `prepare` + `finalize` 2단계 분리
-- [ ] `deep_research_service.py` 3단계 호출 재배치
-- [ ] SSE phase 이벤트 이름 변경
-- [ ] 관련 테스트 갱신
-- [ ] `pytest backend/tests/test_deep_research_collector.py` 통과
-- [ ] `pytest backend/tests/test_deep_research_service.py` 통과
+- [x] `_collect_codex` 함수 신규
+- [x] `SOURCE_NAMES` 갱신 (`perplexity` → `codex`)
+- [x] `_DEFAULT_TIMEOUTS["codex"] = 600.0`
+- [x] 1회 재시도 로직 (timeout/exit_error/empty_output 재시도, binary_missing/auth 재시도 금지)
+- [x] `create_staging_directory` → `prepare_staging_directory` + `finalize_staging_directory` 2단계 분리
+- [x] `deep_research_service.py` 3단계 호출 재배치 (prepare → collect → finalize)
+- [x] SSE phase 이벤트 이름 변경 (`perplexity` → `codex`, staging 2-phase 이벤트 추가)
+- [x] 관련 테스트 갱신 (perplexity 전용 테스트 삭제 + codex 시나리오 추가)
+- [x] `pytest backend/tests/test_deep_research_collector.py` 통과
+- [x] `pytest backend/tests/test_deep_research_service.py` 통과
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과** (2026-04-23, atomic 커밋 3a → 3b → 3c+3d 순차 진행):
+
+### 3a: staging 2단계 분리
+- `prepare_staging_directory(code, base_dir)` + `finalize_staging_directory(staging_dir, code, stock_name, result)` 추가
+- `create_staging_directory` 는 두 함수의 thin wrapper 로 유지 (기존 시그니처 보존)
+- 3a 단독 검증: 70/70 PASSED
+
+### 3b: _collect_codex 추가 (perplexity 공존)
+- 신규: `_collect_codex(code, stock_name, *, staging_sources_dir)` with 1회 재시도 로직
+- Lazy import + fail-fast 에러 분류 (missing_staging_dir / import_error / prompt_error)
+- 테스트 6개 추가: success / timeout_retry_fails / binary_missing / retry_succeeds / auth_no_retry / without_staging_dir
+- 3b 단독 검증: 76/76 PASSED
+
+### 3c+3d: Perplexity → Codex 전면 cutover (3c/3d 통합 커밋)
+- 제거: `_PERPLEXITY_URL`, `_collect_perplexity`, `_normalize_perplexity`, 관련 테스트 6개
+- 갱신: `SOURCE_NAMES` = ("codex", "brave", "tavily", "naver", "youtube")
+- 갱신: `_DEFAULT_TIMEOUTS` (codex: 600.0, perplexity 제거)
+- 갱신: `_collect_one_source` — codex 전용 `staging_sources_dir` kwarg 전달
+- 갱신: `collect_all_sources` — `staging_sources_dir` 파라미터 추가
+- 갱신: `_build_summary_md` + `finalize_staging_directory` — perplexity 분기 삭제, 소스명 표 갱신
+- 갱신: `deep_research_service.py` — prepare → collect → finalize 3단계, user_prompt 의 `perplexity.md` → `codex.md`, `_source_count` 의 codex 분기 (data["char_count"])
+- 갱신: 4개 테스트 (`test_minimum_2_sources_gate_*`, `test_all_sources_succeed`, `test_collect_all_sources_no_client`) 를 codex mocks 로 전환
+- 신규: `test_finalize_skips_codex_md_write` (subprocess 경로와의 충돌 방지 검증)
+- 3c+3d 최종 검증: deep_research_* 70/70 + codex_cli_runner 9/9 = 79/79 PASSED (2.00s)
+- 광역 회귀: claude_cli_streamer + ai_report_service + ai_report_router_deep_mode 64/64 PASSED
+
+### 미완료 사항
+없음. Step 4 (Fast Mode Codex 전환 + heartbeat) 착수 대기 중.
 
 ---
 
@@ -89,14 +116,15 @@
 
 ## Step 5 — Perplexity 자산 완전 제거
 
+- [x] `deep_research_collector.py` 내 `_collect_perplexity`, `_normalize_perplexity`, `_PERPLEXITY_URL` 제거 (Step 3 에서 처리됨)
 - [ ] `backend/services/perplexity_cache.py` 삭제
 - [ ] `backend/prompts/perplexity_prompt.md` 삭제
-- [ ] `ai_report_service.py` 의 `SYSTEM_PROMPT`, `SEARCH_DOMAIN_FILTER`, `load_prompt`, `_load_prompt_template` 제거
+- [ ] `ai_report_service.py` 의 `SYSTEM_PROMPT`, `SEARCH_DOMAIN_FILTER`, `load_prompt`, `_load_prompt_template` 제거 (Step 4 와 연동)
 - [ ] `.env` / `.env.example` 에서 `PERPLEXITY_API_KEY` 제거
 - [ ] `grep -ri "perplexity" backend/ --include="*.py"` 결과 없음
 - [ ] pytest 전체 통과
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과**: Step 4 (Fast Mode 전환) 완료 후 Step 5 본격 진행. Step 3 cutover 로 collector 쪽 perplexity 자산은 이미 제거됨.
 
 ---
 
