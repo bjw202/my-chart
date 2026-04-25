@@ -516,6 +516,68 @@ html, body, #root {
   border-color: var(--accent-hover);
 }
 
+/* 호버 툴팁 패널 — native title 위에 풍부한 조건 정보 표시 */
+.preset-chip-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.preset-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  pointer-events: none;
+  white-space: normal;
+  /* 부드러운 등장 (즉시 표시되지만 시각적 jitter 완화) */
+  animation: preset-tooltip-fade 80ms ease-out;
+}
+
+@keyframes preset-tooltip-fade {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.preset-tooltip-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.preset-tooltip-desc {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.preset-tooltip-conditions {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.preset-tooltip-conditions-label {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.preset-tooltip-condition-line {
+  color: var(--text-secondary);
+  padding-left: 2px;
+}
+
 /* Pattern builder */
 .filter-group--pattern {
   flex-direction: row;
