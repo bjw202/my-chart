@@ -1,9 +1,9 @@
 ---
 id: SPEC-AI-REPORT-003
-version: 1.0.0
-status: Planned
+version: 1.0.1
+status: Implemented
 created: 2026-04-23
-updated: 2026-04-23
+updated: 2026-04-25
 author: MoAI (orchestrator)
 priority: High
 issue_number: null
@@ -17,6 +17,38 @@ lifecycle: spec-first
 | 버전 | 날짜 | 변경 내용 |
 |---|---|---|
 | 1.0.0 | 2026-04-23 | 초기 SPEC — Fast+Deep 양쪽 Perplexity API 완전 제거, Codex CLI 전면 대체 |
+| 1.0.1 | 2026-04-25 | 구현 완료 (Step 1~8, 14건 atomic 커밋). NFR-001 1회 재시도 시간 잠식 결함 발견 + 즉시 패치 (`_DEFAULT_TIMEOUTS["codex"] = 1200.0`). Fast Mode 8m44s 통과, Deep Mode 19분 end-to-end 통과 (codex 슬롯 timeout 후 4/5 gate 통과 → Claude 합성 완료). AC 11/12 통과 (AC-003 실증은 후속 deep mode 재스모크로 보완 권장). |
+
+## Implementation Notes (Level 1: spec-first 라이프사이클)
+
+### 누적 atomic 커밋 (브랜치 `feature/SPEC-AI-REPORT-003-codex-replacement`)
+
+1. `c2f211f` docs(spec): SPEC + 계획자료 추가
+2. `314bb79` feat(codex) Step 1: Codex CLI runner 어댑터 + 6개 단위 테스트
+3. `a5f08f2` feat(codex) Step 2: Codex 프롬프트 템플릿 + 로더 함수
+4. `3ae46c0` refactor(collector) Step 3a: staging 디렉토리 2단계 분리 (prepare + finalize)
+5. `73c790f` feat(collector) Step 3b: `_collect_codex` 신규 + 6 테스트 (perplexity 공존)
+6. `d308958` feat(deep) Step 3c+3d: Perplexity → Codex 전면 cutover
+7. `90173e8` feat(codex) Step 4a: `stream_codex_fast` + 30s heartbeat + 5 테스트
+8. `2b88d81` feat(codex) Step 4b: 라우터 스위치 + `stream_perplexity` 제거
+9. `1b341ee` chore(codex) Step 5: `perplexity_cache.py` + `perplexity_prompt.md` 삭제 + .env 정리
+10. `7615d4d` docs(prompts) Step 6a: 합성 프롬프트 `sources/codex.md` 참조 갱신
+11. `c0fca24` feat(frontend) Step 6b: SourceName/AiReportMode 타입 + UI 라벨 갱신
+12. `483d73c` docs(spec) Step 7: 전체 회귀 + 커버리지 최종 기록
+13. `50ce5f4` fix(collector): NFR-001 codex 1회 재시도 시간 잠식 결함 수정
+14. `b02b487` docs(spec) Step 8: 자동 스모크 결과 + AC 최종 마킹
+
+### 검증 요약
+
+- Backend 134/134 + Frontend 19/19 PASSED
+- TypeScript tsc --noEmit 에러 0건
+- 커버리지: codex_cli_runner 81%, deep_research_collector 89%, deep_research_service 84%, ai_report_service 82%
+- Step 8 자동 스모크: Fast Mode 8m44s 완전 통과, Deep Mode 19분 end-to-end 통과
+
+### 알려진 제약 / 후속 권장 작업
+
+- **AC-003 실증**: NFR-001 패치 (1200s) 후 Deep Mode 재스모크 미수행. 추가 ChatGPT 쿼터 1~2회 소비로 검증 가능.
+- **환경**: `pyproject.toml` 의 `setuptools>=82.0.1` 요구가 pykrx 의 `pkg_resources` 의존과 충돌. 스모크를 위해 setuptools 80.10.2 다운그레이드 필요했음. 후속 환경 정리 (pykrx 업그레이드 또는 setuptools<81 핀 고정) 권장.
 
 ---
 
