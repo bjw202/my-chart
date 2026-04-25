@@ -183,6 +183,13 @@ secret-*.*
 .moai/worktrees/
 
 # ===========================================
+# Evolution Telemetry (local-only usage data)
+# Learnings and new-skills are git-tracked for team sharing.
+# ===========================================
+.moai/evolution/telemetry/*.jsonl
+!.moai/evolution/telemetry/.gitkeep
+
+# ===========================================
 # Node.js (for docs/Nextra)
 # ===========================================
 node_modules/
@@ -224,7 +231,10 @@ Output/*.db-shm
 .cache/
 2026-*.txt
 my_chart_home_v5-10_noterin.py
-
-# AI report outputs (user data)
 backend/reports/
 
+# Local data outputs (large binary DB files; never commit)
+Output/
+
+# Playwright test results (auto-generated)
+frontend/test-results/
