@@ -103,15 +103,15 @@ export function FilterBar(): React.ReactElement {
 
   return (
     <header className="filter-bar">
-      {/* REQ-PST-002: PresetChips를 FilterBar 최상단에 배치 */}
-      <PresetChips
-        presets={FILTER_PRESETS}
-        activePresetId={activePresetId}
-        onApply={handlePresetApply}
-        onClear={handlePresetClear}
-      />
-
       <form className="filter-bar-form" onSubmit={handleApply}>
+        {/* REQ-PST-002: PresetChips를 필터 바 첫 자리에 — 다른 필터와 동일 flex 라인 공유 */}
+        <PresetChips
+          presets={FILTER_PRESETS}
+          activePresetId={activePresetId}
+          onApply={handlePresetApply}
+          onClear={handlePresetClear}
+        />
+
         <MarketCapFilter
           value={local.market_cap_min}
           onChange={(v) => update('market_cap_min', v)}

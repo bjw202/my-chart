@@ -456,31 +456,38 @@ html, body, #root {
 }
 
 /* SPEC-PRESET-001 REQ-PST-005/010/011: 프리셋 칩 바 (§6.6) */
+/* 부모 .filter-bar-form 이 overflow-x: auto + flex-wrap: nowrap 을 처리하므로
+   .preset-chips 는 자체 overflow 컨테이너를 만들지 않는다 — 다른 필터와 1라인 공유. */
 .preset-chips {
   display: flex;
-  gap: 8px;
-  padding: 6px 0;
-  overflow-x: auto;
+  gap: 6px;
+  flex-shrink: 0;
   scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  /* 스크롤바 숨김 (시각적 노이즈 최소화, 스크롤은 가능) */
-  scrollbar-width: none;
 }
 
-.preset-chips::-webkit-scrollbar { display: none; }
-
 .preset-chip {
-  min-height: 44px;  /* AC-11: 모바일 터치 영역 최소 44px */
-  padding: 8px 14px;
+  /* 데스크톱: 다른 필터 컨트롤(select padding 4px 8px)과 비슷한 컴팩트 크기 */
+  min-height: 28px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-secondary);
-  white-space: nowrap;  /* AC-11: 라벨 잘림 방지 */
+  white-space: nowrap;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
   scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* AC-11: 360~480px 모바일 뷰포트에서 터치 영역 최소 44px 보장 */
+@media (max-width: 480px) {
+  .preset-chip {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 12px;
+  }
 }
 
 .preset-chip:hover {
