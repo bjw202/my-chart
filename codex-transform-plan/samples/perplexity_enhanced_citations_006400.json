@@ -1,0 +1,32 @@
+{
+  "citations": [
+    "https://www.mk.co.kr/news/stock/12023846",
+    "https://kr.tradingview.com/symbols/KRX-018260/",
+    "https://www.hankyung.com/article/2026042275506",
+    "https://kr.investing.com/news/economy-news/article-1904164",
+    "https://www.mk.co.kr/news/stock/12023806",
+    "https://kr.investing.com/news/stock-market-news/article-1889373",
+    "https://kr.investing.com/news/stock-market-news/article-1905935",
+    "https://kr.investing.com/news/stock-market-news/article-1904456",
+    "https://www.hankyung.com/article/2026042168511",
+    "https://www.edaily.co.kr/News/Read?newsId=01869606645415792",
+    "https://v.daum.net/v/20260423070113377",
+    "https://antterminal.com/static/report.html",
+    "https://contents.premium.naver.com/1pro/01/contents/260422075900351eh",
+    "https://finance.finup.co.kr/Stock/121850",
+    "https://alphasquare.co.kr/home/stock-summary?code=006405"
+  ],
+  "usage": {
+    "prompt_tokens": 1070,
+    "completion_tokens": 5661,
+    "total_tokens": 6731,
+    "search_context_size": "high",
+    "cost": {
+      "input_tokens_cost": 0.00214,
+      "output_tokens_cost": 0.04529,
+      "request_cost": 0.014,
+      "total_cost": 0.06143
+    }
+  },
+  "duration_s": 212.2076690196991
+}

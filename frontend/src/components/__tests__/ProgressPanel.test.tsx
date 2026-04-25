@@ -1,8 +1,8 @@
 /**
- * SPEC-AI-REPORT-002 v1.0.4: ProgressPanel 단위 테스트.
+ * SPEC-AI-REPORT-003: ProgressPanel 단위 테스트.
  *
- * 5소스 상태별 아이콘 / duration 및 count 표시 / 캐시 재사용 라벨 /
- * 합성 단계 상태(idle/waiting/streaming)를 검증한다.
+ * 5소스 상태별 아이콘 / duration 및 count 표시 / 합성 단계 상태(idle/waiting/streaming)를 검증.
+ * perplexity 슬롯은 codex 슬롯으로 교체됨 (SPEC-AI-REPORT-003 FR-009).
  */
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
@@ -13,7 +13,7 @@ import type { DeepProgress } from '../../types/aiReport'
 function baseProgress(): DeepProgress {
   return {
     sources: {
-      perplexity: { state: 'pending' },
+      codex: { state: 'pending' },
       brave: { state: 'pending' },
       tavily: { state: 'pending' },
       naver: { state: 'pending' },
@@ -27,8 +27,8 @@ function baseProgress(): DeepProgress {
 describe('ProgressPanel — 진행 상태 시각화', () => {
   it('초기 상태에서 5개 소스를 pending(대기)으로 렌더링한다', () => {
     render(<ProgressPanel progress={baseProgress()} />)
-    // 모든 소스 이름 표시
-    expect(screen.getByText('Perplexity')).toBeInTheDocument()
+    // 모든 소스 이름 표시 (SPEC-AI-REPORT-003: perplexity → codex)
+    expect(screen.getByText('Codex 심층 리서치')).toBeInTheDocument()
     expect(screen.getByText('Brave')).toBeInTheDocument()
     expect(screen.getByText('Tavily')).toBeInTheDocument()
     expect(screen.getByText('Naver')).toBeInTheDocument()
@@ -54,20 +54,6 @@ describe('ProgressPanel — 진행 상태 시각화', () => {
     render(<ProgressPanel progress={progress} />)
     expect(screen.getByText('519ms')).toBeInTheDocument()
     expect(screen.getByText('18건')).toBeInTheDocument()
-  })
-
-  it('perplexity cache hit은 "캐시 재사용" 라벨을 보여준다', () => {
-    const progress = baseProgress()
-    progress.sources.perplexity = {
-      state: 'done',
-      durationMs: 0,
-      count: 1345,
-      cached: true,
-    }
-    render(<ProgressPanel progress={progress} />)
-    expect(screen.getByText('캐시 재사용')).toBeInTheDocument()
-    // cached 모드에서는 duration/count 대신 "캐시 재사용" 라벨만 노출
-    expect(screen.queryByText('0ms')).not.toBeInTheDocument()
   })
 
   it('failed 상태는 error 코드를 표시한다', () => {
@@ -105,9 +91,9 @@ describe('ProgressPanel — 진행 상태 시각화', () => {
     expect(screen.getByText(/생성 중/)).toBeInTheDocument()
   })
 
-  it('perplexity의 count는 KB 단위로 표시된다 (1000자 이상일 때)', () => {
+  it('codex의 count는 KB 단위로 표시된다 (1000자 이상일 때)', () => {
     const progress = baseProgress()
-    progress.sources.perplexity = {
+    progress.sources.codex = {
       state: 'done',
       durationMs: 12500,
       count: 5432,

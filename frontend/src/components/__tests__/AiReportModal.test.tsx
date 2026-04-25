@@ -56,7 +56,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
     vi.clearAllMocks()
   })
 
-  it('두 모드 버튼을 렌더링하고 기본값은 빠른 분석(perplexity)이다', () => {
+  it('두 모드 버튼을 렌더링하고 기본값은 빠른 분석(fast)이다', () => {
     render(<AiReportModal {...makeProps()} />)
 
     const fastBtn = screen.getByRole('tab', { name: '빠른 분석' })
@@ -138,7 +138,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
     expect(onRetry).toHaveBeenCalledWith('deep')
   })
 
-  it('빠른 분석(기본)으로 다시 시도 클릭 시 onRetry가 mode="perplexity"로 호출된다', () => {
+  it('빠른 분석(기본)으로 다시 시도 클릭 시 onRetry가 mode="fast"로 호출된다', () => {
     const onRetry = vi.fn()
     render(
       <AiReportModal
@@ -150,11 +150,11 @@ describe('AiReportModal — 2단 모드 토글', () => {
       />,
     )
 
-    // 기본 모드 유지 (perplexity)
+    // 기본 모드 유지 (fast — SPEC-AI-REPORT-003 Codex 기반)
     const retryBtn = screen.getByRole('button', { name: '다시 시도' })
     fireEvent.click(retryBtn)
 
-    expect(onRetry).toHaveBeenCalledWith('perplexity')
+    expect(onRetry).toHaveBeenCalledWith('fast')
   })
 
   it('role=tablist 컨테이너와 role=tab 버튼이 올바른 ARIA 구조를 갖는다', () => {
@@ -182,7 +182,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
   it('deep 모드가 아닐 때(빠른 분석)는 progress가 있어도 패널을 렌더하지 않는다', () => {
     const progress = {
       sources: {
-        perplexity: { state: 'running' as const },
+        codex: { state: 'running' as const },
         brave: { state: 'pending' as const },
         tavily: { state: 'pending' as const },
         naver: { state: 'pending' as const },
@@ -194,7 +194,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
     const { container } = render(
       <AiReportModal {...makeProps({ status: 'streaming', progress })} />,
     )
-    // 기본 모드 = perplexity(빠른 분석), 토글 클릭 없음
+    // 기본 모드 = fast(빠른 분석), 토글 클릭 없음
     expect(container.querySelector('.ai-report-progress-panel')).not.toBeInTheDocument()
   })
 })
