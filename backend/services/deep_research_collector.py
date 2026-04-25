@@ -586,12 +586,14 @@ async def _collect_youtube(
 
 
 # 소스별 권장 타임아웃 (초):
-#   - codex: 장시간 subprocess (plan.md NFR-001, 관측 2~9분) — 600s
+#   - codex: NFR-001 — 단일 호출 600s + 1회 재시도 600s = 최대 1200s.
+#            _collect_one_source 의 asyncio.wait_for 가 외부 timeout 을 강제하므로,
+#            여기 1200s 로 두어야 _collect_codex 내부의 1회 재시도 시간을 보장한다.
 #   - tavily advanced: 60~120s (search.sh: --max-time 60~120)
 #   - brave/naver/youtube: 단순 검색 API, ~3-5s 응답
 # SPEC-AI-REPORT-003: perplexity 키 제거, codex 추가.
 _DEFAULT_TIMEOUTS: dict[str, float] = {
-    "codex": 600.0,
+    "codex": 1200.0,
     "tavily": 90.0,
     "brave": 15.0,
     "naver": 15.0,
