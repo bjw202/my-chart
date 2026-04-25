@@ -264,32 +264,98 @@ Step 8 (실 Codex 스모크) 만 남음. 사용자가 `uvicorn backend.main:app 
 
 ## Step 8 — 실 Codex 스모크
 
-- [ ] Fast Mode end-to-end (`/api/ai-report/006400?mode=fast`) 정상 동작
-- [ ] Deep Mode end-to-end (`/api/ai-report/006400?mode=deep`) 정상 동작
-- [ ] `sources/codex.md` 생성 확인
-- [ ] 1회 재시도 경로 수동 검증
-- [ ] SSE heartbeat UX 사용자 체감 확인
+- [x] Fast Mode end-to-end (`/api/ai-report/006400?mode=fast`) 정상 동작
+- [x] Deep Mode end-to-end (`/api/ai-report/006400?mode=deep`) 정상 동작
+- [~] `sources/codex.md` 생성 확인 — Deep Mode 1차 시도에서 codex timeout (NFR-001 패치 후 재검증 권장)
+- [~] 1회 재시도 경로 수동 검증 — NFR-001 결함 발견 후 즉시 패치, 후속 deep mode 스모크 필요
+- [x] SSE heartbeat UX 사용자 체감 확인 (Fast Mode 30s 단위 phase 4가지 메시지 관찰)
 
-**검증 결과**: (Step 완료 시 기재)
+**검증 결과** (2026-04-25, MoAI 자동 스모크):
+
+### Fast Mode (`mode=fast`) — ✅ 완전 통과
+- 종목: 006400 (Samsung SDI)
+- 소요 시간: **8분 44초** (18:09:43 → 18:18:27 KST) — NFR-001 600s 한도 내 정상
+- SSE 통계:
+  - phase: 18 (codex_fast_start 1 + codex_fast_progress 17)
+  - data: 230 청크 (256자 단위)
+  - done: 1
+  - error: 0
+- heartbeat 메시지 4가지 관찰 (rotation):
+  - "웹 검색 진행 중", "자료 교차 검증 중", "시장 데이터 분석 중", "리포트 작성 중"
+- 출력 마크다운: 한국어 스윙 트레이더 리포트 형식, [1]~[18] Codex 자체 인용 + 실제 URL 포함
+- 저장: `backend/reports/삼성SDI/2026-04-25.md`
+
+### Deep Mode (`mode=deep`) — ✅ end-to-end 통과 (codex 슬롯 timeout, gate 통과)
+- 종목: 006400 (Samsung SDI)
+- 소요 시간: **약 19분** (18:18:27 → 18:37:24 KST)
+- SSE 통계:
+  - phase: 18 (staging → staging_prepared → collecting → 5 source_start → 5 source_done → collecting_done → staging_done → synthesizing → synthesis_start → synthesis_first_chunk)
+  - data: 223 청크 (Claude sonnet 합성)
+  - done: 1, error: 0
+- 5소스 결과:
+  - naver: 361ms ✓
+  - youtube: 712ms ✓
+  - brave: 815ms ✓
+  - tavily: 6541ms ✓
+  - **codex: 600008ms timeout ❌** (1회 시도, 재시도 미발동 — NFR-001 결함)
+- gate_passed: 4/5 ≥ 2 → 합성 진행 ✓
+- staging 디렉토리: `/tmp/analysis_006400_20260425T091847Z_b6e07cfb/sources/{brave,tavily,naver,youtube}.json` 4개 + summary.md 생성 ✓
+- 합성 결과: 한국어 마크다운, [brave]/[tavily]/[naver]/[youtube] 인용 + Codex 실패 limitations 섹션 표기
+- 저장: `backend/reports/삼성SDI/2026-04-25_2.md`
+
+### 발견된 결함 (즉시 패치 완료)
+
+**NFR-001 — 1회 재시도 시간 잠식 결함**
+
+증상: Deep Mode 의 codex 슬롯이 정확히 600s 만에 timeout 으로 실패하며 재시도 미발동.
+
+원인: `_collect_one_source` 가 `asyncio.wait_for(timeout=_DEFAULT_TIMEOUTS["codex"]=600.0)` 으로 외부에서 호출 시간을 600s 로 강제. `_collect_codex` 내부의 1회 재시도 (FR-003) 는 추가 600s 가 필요하나 외부 timeout 이 먼저 자르면서 재시도 미발동.
+
+NFR-001 명시: "Codex 단일 호출 타임아웃: **600초**, 1회 재시도 포함 최대 소요: **1200초**".
+
+수정: `_DEFAULT_TIMEOUTS["codex"] = 600.0` → `1200.0`. 단일 라인 패치로 외부 timeout 을 1200s 로 늘려 내부 재시도 시간을 보장. 단위 테스트 99/99 PASSED 회귀 무손상.
+
+**후속 검증 권장**: 패치 후 Deep Mode 스모크 1회 재실행하여 codex 600s 이상 + 1회 재시도 경로 실증 (추가 ChatGPT 쿼터 소비 발생).
+
+### Acceptance Criteria 최종 마킹
+
+- ✅ AC-001: Fast Mode Codex 전환 (8m44s, 30s heartbeat)
+- ✅ AC-002: Deep Mode Codex 슬롯 (5소스 병렬, codex 첫 슬롯)
+- ⚠️ AC-003: 1회 재시도 — NFR-001 결함 즉시 패치 완료, 후속 deep mode 스모크 권장
+- ✅ AC-004: Fast Mode heartbeat UX (30s 단위 phase 이벤트, 4가지 메시지 관찰)
+- ✅ AC-005: Perplexity 완전 제거 (Step 5)
+- ✅ AC-006: 스테이징 2단계 (`staging_prepared` 이벤트 + finalize 후 `staging_done`)
+- ✅ AC-007: 합성 프롬프트 갱신 (sources/codex.md 참조 + [brave]/[tavily]/[naver]/[youtube] 인용)
+- ✅ AC-008: 타임아웃 동작 (codex duration_ms=600008 정확 적용)
+- ✅ AC-009: 2개 이상 성공 게이트 (4/5 → gate_passed=true → 합성 진행)
+- ✅ AC-010: 프론트엔드 SourceName 갱신 (Step 6b, tsc 0 errors)
+- ✅ AC-011: 경로 안전 + 리포트 저장 (`backend/reports/삼성SDI/2026-04-25*.md`)
+- ✅ AC-012: 전체 테스트 스위트 (Backend 134/134 + Frontend 19/19, Step 7)
+
+### 미완료 사항
+- AC-003 1회 재시도 실증 검증 (NFR-001 패치 후 미검증). 다음 세션에서 Deep Mode 재스모크 또는 단위 테스트 추가로 보완 가능.
+
+### 미완료 수정 권장
+- (없음) 위 NFR-001 패치는 같은 세션에서 즉시 적용됨.
 
 ---
 
 ## 최종 Acceptance 검증
 
-AC-001 ~ AC-012 각 시나리오 검증:
+AC-001 ~ AC-012 각 시나리오 검증 (2026-04-25 MoAI 자동 스모크 완료):
 
-- [ ] AC-001: Fast Mode Codex 전환
-- [ ] AC-002: Deep Mode Codex 슬롯
-- [ ] AC-003: 1회 재시도 동작
-- [ ] AC-004: Fast Mode heartbeat UX
-- [ ] AC-005: Perplexity 완전 제거 (grep 결과)
-- [ ] AC-006: 스테이징 2단계 생성
-- [ ] AC-007: 합성 프롬프트 갱신
-- [ ] AC-008: 타임아웃 동작
-- [ ] AC-009: 2개 이상 성공 게이트
-- [ ] AC-010: 프론트엔드 SourceName 갱신
-- [ ] AC-011: 경로 안전
-- [ ] AC-012: 전체 테스트 스위트 통과
+- [x] AC-001: Fast Mode Codex 전환 (8m44s, 30s heartbeat 4가지 메시지 관찰)
+- [x] AC-002: Deep Mode Codex 슬롯 (5소스 병렬, codex 첫 슬롯)
+- [~] AC-003: 1회 재시도 동작 — NFR-001 결함 즉시 패치 완료, 후속 deep mode 실 스모크로 실증 검증 보완 필요
+- [x] AC-004: Fast Mode heartbeat UX (phase 18개)
+- [x] AC-005: Perplexity 완전 제거 (Step 5, 라우터 deprecated alias 제외)
+- [x] AC-006: 스테이징 2단계 생성 (`staging_prepared` + `staging_done` 이벤트 관찰)
+- [x] AC-007: 합성 프롬프트 갱신 (sources/codex.md 참조 + [brave/tavily/naver/youtube] 인용)
+- [x] AC-008: 타임아웃 동작 (codex duration_ms=600008 정확 적용 — 패치 후 1200s 까지 확장)
+- [x] AC-009: 2개 이상 성공 게이트 (4/5 → gate_passed=true)
+- [x] AC-010: 프론트엔드 SourceName 갱신 (tsc 0 errors)
+- [x] AC-011: 경로 안전 + 리포트 저장 (`backend/reports/삼성SDI/2026-04-25{,_2}.md`)
+- [x] AC-012: 전체 테스트 스위트 (Backend 134/134 + Frontend 19/19)
 
 ---
 
