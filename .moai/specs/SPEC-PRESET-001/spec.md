@@ -1,10 +1,10 @@
 ---
 id: SPEC-PRESET-001
 title: Filter Preset Chips (Frontend + Pattern Limit Expansion)
-version: 1.0.1
+version: 1.0.2
 status: planned
 created: 2026-04-21
-updated: 2026-04-21
+updated: 2026-04-26
 author: jw
 priority: P2
 tags: [frontend, react, typescript, vite, filter, preset, url-sync, tdd]
@@ -22,6 +22,7 @@ related:
 |------|------|--------|----------|
 | 1.0.0 | 2026-04-21 | jw | 초기 SPEC 작성 (research.md 2026-04-21 기반). v1 프리셋 3종 (minervini_full, breakout_init, stage1_accumulation) 고정, 칩 UI + 드리프트 감지 + URL 동기화 + patterns 한도 3→5 확장 |
 | 1.0.1 | 2026-04-21 | jw | patterns 완전 대체 확정 (A2 사용자 재승인), minervini_full DB 안내 툴팁 v1 포함 (REQ-PST-012 신설, AC-12 추가, R1 재정의, §10 out-of-scope #9 편입) |
+| 1.0.2 | 2026-04-26 | jw | REQ-PST-012 툴팁 정확 일치 문구 정정 — "52주 고저가" → "52주 저가(LOW_52W)" (HIGH_52W는 SPEC-MINERVINI-001 §1.4 line 61에 따라 이미 존재), "SMA200 추세" → "20일 전 SMA200(SMA200_20D_AGO)" (SPEC-MINERVINI-001 §1.4 line 56-58 신규 컬럼명 일치). REQ-PST-012 본문 / AC-12 본문 / B6 테스트 명세의 3곳 동시 갱신. 동반 변경: PresetChips 1라인 컴팩트화 + 호버 패널(formatPresetConditions) 추가. |
 
 ---
 
@@ -131,7 +132,7 @@ related:
 
 시스템은 **항상** `id === "minervini_full"` 인 프리셋 칩에 한해 다음 한국어 안내 문구를 네이티브 툴팁으로 노출해야 한다.
 
-- 툴팁 문구 (정확 일치): `"SMA150·52주 고저가·SMA200 추세 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요."`
+- 툴팁 문구 (정확 일치): `"SMA150 · 52주 저가(LOW_52W) · 20일 전 SMA200(SMA200_20D_AGO) 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요."`
 - 구현 방식: 칩 버튼 엘리먼트의 `title` 속성에 위 문구를 부여한다. v1 에서는 커스텀 팝오버/툴팁 컴포넌트를 도입하지 않는다 (네이티브 충분).
 - **WHEN** 칩의 `preset.id === "minervini_full"` 이면 **THEN** `title` 은 위 문구이다.
 - **WHEN** 칩의 `preset.id !== "minervini_full"` 이면 **THEN** `title` 은 해당 프리셋의 `description` 문자열이다 (기본 동작).
@@ -517,7 +518,7 @@ SPEC-MINERVINI-001 이 이미 동일 변경을 수행하는 경우, 본 SPEC 의
 - **Given** `PresetChips` 가 렌더링되어 있고 `minervini_full` 칩이 DOM 에 존재한다
 - **When** 사용자가 `minervini_full` 칩 위에 마우스를 호버한다 (또는 테스트에서 `title` 속성을 읽는다)
 - **Then** 네이티브 툴팁 (칩 버튼의 `title` 속성) 문자열이 정확히 다음과 일치한다:
-  `"SMA150·52주 고저가·SMA200 추세 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요."`
+  `"SMA150 · 52주 저가(LOW_52W) · 20일 전 SMA200(SMA200_20D_AGO) 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요."`
 - **And Given** `breakout_init` 또는 `stage1_accumulation` 칩이 렌더링되어 있다
 - **When** 사용자가 해당 칩 위에 호버한다 (또는 `title` 속성을 읽는다)
 - **Then** 네이티브 툴팁 문자열은 해당 프리셋의 `description` 필드 값과 정확히 일치한다 (DB 안내 문구가 **아니다**).
@@ -746,7 +747,7 @@ useEffect(() => {
 - **B4**: 활성 칩 하나는 `aria-pressed="true"`, 나머지는 `"false"`.
 - **B5**: Tab 순회 후 Enter 또는 Space 로 칩 활성화 가능 (`userEvent.keyboard`).
 - **B6 (v1.0.1 신설, REQ-PST-012)**: 툴팁 `title` 속성 분기 검증.
-  - `minervini_full` 칩의 `title` 은 정확히 `"SMA150·52주 고저가·SMA200 추세 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요."` 와 일치한다.
+  - `minervini_full` 칩의 `title` 은 정확히 `"SMA150 · 52주 저가(LOW_52W) · 20일 전 SMA200(SMA200_20D_AGO) 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요."` 와 일치한다.
   - `breakout_init` 칩의 `title` 은 `BREAKOUT_INIT.description` 과 일치한다.
   - `stage1_accumulation` 칩의 `title` 은 `STAGE1_ACCUMULATION.description` 과 일치한다.
   - 활성 상태로 전환해도 `title` 문자열은 변하지 않는다 (state-invariant assertion).

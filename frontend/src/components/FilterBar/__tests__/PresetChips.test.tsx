@@ -9,9 +9,9 @@ import type { Preset } from '../../../types/filter'
 // 테스트용 고정 프리셋 목록
 const TEST_PRESETS: readonly Preset[] = FILTER_PRESETS
 
-// REQ-PST-012에서 명시한 minervini_full 전용 title 문구 (정확 일치)
+// REQ-PST-012 v1.0.2 에서 명시한 minervini_full 전용 title 문구 (정확 일치)
 const MINERVINI_TOOLTIP =
-  'SMA150·52주 고저가·SMA200 추세 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요.'
+  'SMA150 · 52주 저가(LOW_52W) · 20일 전 SMA200(SMA200_20D_AGO) 컬럼이 필요합니다. DB 업데이트(파일 재생성)를 먼저 실행하세요.'
 
 describe('PresetChips 컴포넌트 (SPEC-PRESET-001)', () => {
   // B1: 3개 칩 버튼이 렌더되고 각각 올바른 라벨을 표시한다
