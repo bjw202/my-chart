@@ -7,7 +7,7 @@
 | SPEC ID | SPEC-NAVER-THEME-001 |
 | 제목 | Naver Finance Theme Analysis Module (Read-Only Add-On) |
 | 생성일 | 2026-05-01 |
-| 상태 | Approved |
+| 상태 | Implemented |
 | 우선순위 | High |
 | 담당 | expert-backend, expert-frontend, expert-testing |
 | Lifecycle | spec-anchored |
@@ -17,8 +17,9 @@
 
 ## HISTORY
 
-- 2026-05-01 v1.0.0: 초안 작성. EUC-KR 인코딩, `backend.services.naver_theme` 모듈 경로, V1 MVP 범위 (`/api/themes/snapshot`, `/api/themes/quick`) 확정.
+- 2026-05-01 v1.0.0 Implemented: /moai run --team RUN phase 완료. commit 12d81b1. 14개 AC 전체 PASS, 단위 테스트 51개, 커버리지 99%. 라이브 셀렉터 부정합 hotfix(`td a.tltle, td a[href*='code=']`) 포함. V2 핸드오프 노트는 v2-handoff.md 참조.
 - 2026-05-01 v1.0.0 Approved: 12건 결함 교정 (모듈 경로, 인코딩, 컬럼 매핑, theme_id 추출, V1 범위, inclusion_reason, DB mtime AC, 4탭 회귀 AC, 시간추정 제거, surgical mod 경계 AC, read-only URI, Draft 상태) 후 사용자 최종 승인. 잔존 progress.md/tasks.md 삭제. /moai run 진행 준비 완료.
+- 2026-05-01 v1.0.0: 초안 작성. EUC-KR 인코딩, `backend.services.naver_theme` 모듈 경로, V1 MVP 범위 (`/api/themes/snapshot`, `/api/themes/quick`) 확정.
 
 ---
 

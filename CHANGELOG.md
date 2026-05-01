@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-NAVER-THEME-001)
+
+- **네이버 금융 테마 분석 모듈** (SPEC-NAVER-THEME-001 v1.0.0)
+  - 신규 5번째 탭: **테마 분석** (Theme Analysis)
+  - 네이버 금융 테마 페이지(finance.naver.com/sise/theme.naver) read-only 크롤링
+  - 백엔드 모듈: `backend/services/naver_theme/` (config, crawler, parser, analyzer, db_join, service, schemas)
+    - 단일 진입점: `from backend.services.naver_theme import collect_and_analyze, ThemeAnalysisResult`
+    - EUC-KR 인코딩 강제 처리, SQLite read-only JOIN (`mode=ro`), 매너 크롤링(sleep ≥ 0.7s)
+  - 신규 REST API 엔드포인트:
+    - `GET /api/themes/snapshot?top_n=20&leaders_per_theme=3` — 5종 records list + metadata (~30s)
+    - `GET /api/themes/quick?top_n=20` — themes + strong_themes + metadata (≤10s)
+  - 테마 분석 결과 구조:
+    - `themes_df`: theme_id, theme_name, change_pct, change_pct_3d, up/flat/down_count, top_stocks_preview
+    - `strong_themes_df`: 위 + momentum_score, breadth_ratio
+    - `stocks_df`: theme_id, stock_code/name, inclusion_reason, price, change/_pct, volume, trade_value, market_cap, per/roe(NaN)
+    - `leaders_df`: 가중치 z-score(0.40/0.30/0.20/0.10) 기반 테마별 상위 K개
+    - `multi_theme_stocks_df`: 2개 이상 테마 등장 종목
+  - 신규 의존성 없음: 기존 requests, beautifulsoup4, lxml, pandas, numpy 활용 (REQ-NT-C-003)
+  - 기존 4탭 회귀 0건 (AC-12): surgical mod 9줄 추가 (≤10줄 제한, AC-14)
+  - 단위 테스트 51개, 커버리지 99%
+  - V2 핸드오프 노트: `.moai/specs/SPEC-NAVER-THEME-001/v2-handoff.md` (모바일 stock.naver.com 기반 SPEC 작성 용도)
+
 ### Changed (SPEC-AI-REPORT-003)
 
 - **AI 리포트 Fast/Deep 양쪽 모드를 Perplexity API 에서 Codex CLI 로 전면 전환** (SPEC-AI-REPORT-003 v1.0.1)

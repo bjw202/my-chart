@@ -80,10 +80,19 @@ KRX_PW=your_krx_password
 2. "DB 업데이트" 버튼을 클릭합니다 (\~2,570종목 수집, 5-30분 소요)
 3. 필터를 적용하고 차트 그리드를 탐색합니다
 
-## 주요 기능
+## 주요 기능 (5탭 구성)
 
+### 1. Market Overview (시장 개요)
+- 주가지수, 섹터별 성과 개요
+
+### 2. Sector Analysis (섹터 분석)
+- 섹터 성과 트래킹, 섹터별 주도주
+
+### 3. Stock Explorer (종목 검색)
 - **필터 시스템**: 시가총액, 기간수익률(1D/1W/1M/3M), 기술적 패턴 빌더, RS점수, 시장, 섹터 필터
-- **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선, 종가/KOSPI 비율), 마지막 캔들 5봉 여백
+
+### 4. Chart Grid (차트 그리드)
+- **차트**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선, 종가/KOSPI 비율), 마지막 캔들 5봉 여백
 - **차트 헤더**: 종목명 · 종목코드 · 섹터그룹(대&gt;중) · 등락률 · RS 점수 한눈에 표시
 - **등락폭 측정**: 차트 위 두 지점 클릭으로 가격 등락률(%) 표시, 연속 측정 지원 (측정 완료 후 클릭만으로 즉시 새 측정 시작), 셀별 독립 동작 (아래 상세 설명 참고)
 - **종목 리스트**: 섹터 그룹별 가상화 리스트, 키보드 네비게이션
@@ -92,6 +101,12 @@ KRX_PW=your_krx_password
 - **DB 업데이트**: SSE 기반 진행률 스트리밍, 백그라운드 일괄 업데이트, DB 기준 최종 날짜 표시
 - **재무 분석 (FS 버튼)**: FnGuide 크롤링 기반 S-RIM 8섹션 재무 대시보드 (사업실적·건전성·대차대조표·수익률분해·이익워터폴·활동성·추세신호·5개질문)
 - **AI 기업 분석 (AI 버튼)**: Perplexity API 기반 실시간 AI 스윙 트레이더 리포트. 공간(Spaces) 수준의 깊이 있는 분석 (SSE 스트리밍 + 자동 저장 + 히스토리 관리)
+
+### 5. Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001 V1
+- **테마 목록**: 네이버 금융 테마 실시간 수집, 강세 테마 상위 N개 추출
+- **테마 상세**: 테마별 주도주 (z-score 기반 가중치), 편입사유 호버 툴팁
+- **멀티테마 종목**: 2개 이상 테마에 동시 편입된 종목 분석
+- **빠른 조회**: `/api/themes/quick` (≤10초) / 상세 조회: `/api/themes/snapshot` (~30초)
 
 ## API 엔드포인트
 
@@ -107,6 +122,8 @@ KRX_PW=your_krx_password
 | POST | `/api/ai-report/{code}` | AI 종목 분석 리포트 생성 (Perplexity SSE 스트리밍) |
 | GET | `/api/ai-report/{code}/history` | 저장된 AI 분석 이력 목록 |
 | GET | `/api/ai-report/{code}/{filename}` | 저장된 AI 분석 파일 조회 |
+| GET | `/api/themes/snapshot` | 테마 분석 스냅샷 (5종 DataFrame: themes, strong_themes, stocks, leaders, multi_theme_stocks) |
+| GET | `/api/themes/quick` | 테마 분석 빠른 조회 (테마 목록만, ≤10초) |
 
 ## 필터 유형
 
@@ -119,10 +136,10 @@ KRX_PW=your_krx_password
 
 ## 기술 스택
 
-- **백엔드**: Python 3.13, FastAPI, uvicorn, sse-starlette
+- **백엔드**: Python 3.13, FastAPI, uvicorn, sse-starlette, requests, beautifulsoup4 (테마 크롤링)
 - **프론트엔드**: React 19, TypeScript, Vite, TradingView Lightweight Charts, react-window
-- **데이터베이스**: SQLite (WAL mode)
-- **데이터 소스**: Naver Finance API, pykrx (한국거래소)
+- **데이터베이스**: SQLite (WAL mode, read-only 모드)
+- **데이터 소스**: Naver Finance API, pykrx (한국거래소), 네이버 금융 테마 페이지 (finance.naver.com/sise/theme.naver)
 
 ## 프로젝트 구조
 
