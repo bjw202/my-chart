@@ -1,0 +1,103 @@
+{
+  "isSuccess": true,
+  "detailCode": "ok",
+  "message": "OK",
+  "result": {
+    "totalRisingCount": 1392,
+    "totalUnChangedCount": 180,
+    "totalFallingCount": 4663,
+    "sectors": [
+      {
+        "sectorCode": "178",
+        "sectorName": "전선",
+        "sectorDescription": null,
+        "changeRate": 9.2,
+        "totalMarketCap": 40485714,
+        "risingCount": 8,
+        "unChangedCount": 0,
+        "fallingCount": 0,
+        "items": [
+          {
+            "stockEndType": "stock",
+            "itemCode": "024840",
+            "itemName": "KBI메탈",
+            "changeRate": 29.94,
+            "marketCap": 178036,
+            "itemInfo": null
+          }
+        ]
+      },
+      {
+        "sectorCode": "200",
+        "sectorName": "AI 로봇",
+        "sectorDescription": null,
+        "changeRate": 7.5,
+        "totalMarketCap": 80000000,
+        "risingCount": 12,
+        "unChangedCount": 2,
+        "fallingCount": 1,
+        "items": [
+          {
+            "stockEndType": "stock",
+            "itemCode": "012345",
+            "itemName": "로봇테크",
+            "changeRate": 10.5,
+            "marketCap": 250000,
+            "itemInfo": null
+          }
+        ]
+      },
+      {
+        "sectorCode": "301",
+        "sectorName": "2차전지",
+        "sectorDescription": null,
+        "changeRate": 5.0,
+        "totalMarketCap": 150000000,
+        "risingCount": 20,
+        "unChangedCount": 3,
+        "fallingCount": 5,
+        "items": [
+          {
+            "stockEndType": "stock",
+            "itemCode": "000660",
+            "itemName": "SK하이닉스",
+            "changeRate": 4.8,
+            "marketCap": 500000,
+            "itemInfo": null
+          }
+        ]
+      },
+      {
+        "sectorCode": "402",
+        "sectorName": "보합테마",
+        "sectorDescription": null,
+        "changeRate": 0.0,
+        "totalMarketCap": 30000000,
+        "risingCount": 3,
+        "unChangedCount": 10,
+        "fallingCount": 3,
+        "items": []
+      },
+      {
+        "sectorCode": "503",
+        "sectorName": "하락테마",
+        "sectorDescription": null,
+        "changeRate": -2.5,
+        "totalMarketCap": 20000000,
+        "risingCount": 1,
+        "unChangedCount": 2,
+        "fallingCount": 8,
+        "items": [
+          {
+            "stockEndType": "stock",
+            "itemCode": "999001",
+            "itemName": "하락종목A",
+            "changeRate": -3.1,
+            "marketCap": 50000,
+            "itemInfo": null
+          }
+        ]
+      }
+    ]
+  }
+}
