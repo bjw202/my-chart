@@ -1,6 +1,9 @@
 """naver_theme_v2.service 단위 테스트 — AC-1, AC-2, AC-5, AC-6, AC-11, AC-12, AC-13 service-level.
 
-V1 컬럼 세트 정의는 SPEC acceptance.md §AC-5 기준.
+V1 컬럼 세트 정의는 V1 코드 직접 inspection 결과 기준
+(backend/services/naver_theme/parser.py + backend/services/naver_theme/analyzer.py).
+SPEC acceptance.md v1.0.1 amendment: plan phase 추정 컬럼명(score/rank/rising_count 등)이
+V1 실측(change_pct/up_count 등)과 불일치한 사실이 RUN phase에서 발견됨 → V1 실측으로 정정.
 """
 from __future__ import annotations
 
@@ -23,20 +26,24 @@ from backend.services.naver_theme_v2 import collect_and_analyze_v2, ThemeAnalysi
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures" / "naver_theme_v2"
 
-# V1 컬럼 기준 세트 (AC-5, AC-12)
+# V1 실측 컬럼 세트 (AC-5, AC-12) — V1 build_strong_themes 입력 + V1 parser.py 출력 기준
+# V1 themes_df: theme_id, theme_name, change_pct, change_pct_3d, up_count, flat_count, down_count, top_stocks_preview
+# V1 stocks_df: theme_id, theme_name, stock_code, stock_name, inclusion_reason, price, change, change_pct, volume, trade_value, per, roe (+ market_cap from enrich_market_cap)
 V1_THEMES_COLUMNS = {
-    "theme_id", "theme_name", "change_rate", "score", "rank",
-    "rising_count", "unchanged_count", "falling_count",
+    "theme_id", "theme_name", "change_pct", "change_pct_3d",
+    "up_count", "flat_count", "down_count",
 }
 V1_STOCKS_COLUMNS = {
-    "theme_id", "theme_name", "code", "name",
-    "market_cap", "change_rate", "inclusion_reason",
+    "theme_id", "theme_name", "stock_code", "stock_name",
+    "inclusion_reason", "change_pct", "volume", "trade_value", "market_cap",
 }
 
-FRONTEND_THEMES_REQUIRED = {"theme_id", "theme_name", "change_rate", "score", "rank"}
+# Frontend 의존 컬럼 (research.md §3.3) — V1 실측 컬럼명 기준
+# V2 parser.py는 V1 호환 alias(change_rate, code, name)도 추가 노출하지만 검증의 source-of-truth는 V1 실측
+FRONTEND_THEMES_REQUIRED = {"theme_id", "theme_name", "change_pct"}
 FRONTEND_STOCKS_REQUIRED = {
-    "theme_id", "theme_name", "code", "name",
-    "market_cap", "change_rate", "inclusion_reason",
+    "theme_id", "theme_name", "stock_code", "stock_name",
+    "market_cap", "change_pct", "inclusion_reason",
 }
 
 
