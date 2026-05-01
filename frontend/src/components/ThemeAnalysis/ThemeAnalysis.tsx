@@ -32,6 +32,11 @@ export function ThemeAnalysis(): ReactElement {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
+    // race condition 방지: 이전 fetch가 진행 중일 때 mode가 변경되면
+    // 이전 응답이 새 mode 화면을 덮어쓰지 않도록 cleanup flag로 무시한다.
+    // 시나리오: quick(10s) 진행 중 사용자가 full 클릭 → 새 useEffect run.
+    // 이전 quick의 then이 늦게 도착하면 cancelled=true이므로 setData 건너뜀.
+    let cancelled = false
     setLoading(true)
     setError(null)
     const promise = mode === 'quick'
@@ -40,6 +45,7 @@ export function ThemeAnalysis(): ReactElement {
 
     promise
       .then(result => {
+        if (cancelled) return
         // quick 모드는 stocks/leaders/multi_theme_stocks가 없으므로 빈 배열로 정규화
         if (mode === 'quick') {
           setData({
@@ -56,11 +62,17 @@ export function ThemeAnalysis(): ReactElement {
         }
       })
       .catch((e: unknown) => {
+        if (cancelled) return
         setError(e instanceof Error ? e.message : '데이터 로딩 실패')
       })
       .finally(() => {
+        if (cancelled) return
         setLoading(false)
       })
+
+    return () => {
+      cancelled = true
+    }
   // mode 변경 시만 재실행
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
