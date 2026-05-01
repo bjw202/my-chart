@@ -29,6 +29,7 @@ from backend.routers.market import router as market_router
 from backend.routers.screen import router as screen_router
 from backend.routers.sectors import router as sectors_router
 from backend.routers.stage import router as stage_router
+from backend.routers.themes import router as themes_router
 from backend.services.deep_research_service import (
     _cleanup_stale_staging_dirs,
     _load_synthesis_prompt,
@@ -112,6 +113,7 @@ app.include_router(market_router, prefix="/api")
 app.include_router(screen_router, prefix="/api")
 app.include_router(sectors_router, prefix="/api")
 app.include_router(stage_router, prefix="/api")
+app.include_router(themes_router, prefix="/api")
 
 
 @app.get("/health")
