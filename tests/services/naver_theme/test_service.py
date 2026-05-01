@@ -1,6 +1,19 @@
-import pytest
+"""naver_theme.service 단위 테스트 (tests/services/naver_theme/ 버전)."""
+
+from __future__ import annotations
+
+import sys
+import types
+
 import pandas as pd
-from unittest.mock import patch, MagicMock
+import pytest
+from unittest.mock import patch
+
+# pykrx 스텁
+for _m in ("pykrx", "pykrx.stock"):
+    if _m not in sys.modules:
+        sys.modules[_m] = types.ModuleType(_m)
+
 from backend.services.naver_theme.service import (
     ThemeAnalysisResult,
     collect_and_analyze,
@@ -29,34 +42,12 @@ def test_theme_analysis_result_structure():
 
 
 @pytest.mark.unit
-@patch("backend.services.naver_theme.crawler.fetch_theme_list_page")
-@patch("backend.services.naver_theme.crawler.fetch_theme_detail_page")
-@patch("backend.services.naver_theme.parser.parse_theme_list")
-@patch("backend.services.naver_theme.parser.parse_theme_detail")
-def test_collect_and_analyze_returns_result(
-    mock_detail_parse, mock_list_parse, mock_detail_fetch, mock_list_fetch
-):
+def test_collect_and_analyze_returns_result():
     """collect_and_analyze() returns ThemeAnalysisResult with 5 DataFrames."""
-    mock_list_fetch.return_value = "<html></html>"
-    mock_detail_fetch.return_value = "<html></html>"
-    mock_list_parse.return_value = pd.DataFrame({
-        "theme_id": [1],
-        "theme_name": ["Test"],
-        "change_pct": [1.0],
-        "change_pct_3d": [1.0],
-    })
-    mock_detail_parse.return_value = [
-        {
-            "stock_code": "001",
-            "stock_name": "Test Stock",
-            "change_pct": 1.0,
-            "volume": 1000,
-            "theme_id": 1,
-            "collected_at": "2026-05-01T00:00:00+09:00",
-        }
-    ]
+    with patch("backend.services.naver_theme.service.fetch_theme_list_page") as mock_fetch:
+        mock_fetch.return_value = "<html><body></body></html>"
 
-    result = collect_and_analyze(top_n_themes=5, skip_details=True)
+        result = collect_and_analyze(top_n_themes=5, skip_details=True)
 
     assert isinstance(result.themes_df, pd.DataFrame)
     assert isinstance(result.stocks_df, pd.DataFrame)
@@ -67,12 +58,11 @@ def test_collect_and_analyze_returns_result(
 
 
 @pytest.mark.unit
-@patch("backend.services.naver_theme.crawler.fetch_theme_list_page")
-def test_collect_and_analyze_metadata(mock_list_fetch):
+def test_collect_and_analyze_metadata():
     """Metadata contains required keys."""
-    mock_list_fetch.return_value = "<html></html>"
-
-    result = collect_and_analyze(skip_details=True)
+    with patch("backend.services.naver_theme.service.fetch_theme_list_page") as mock_fetch:
+        mock_fetch.return_value = "<html><body></body></html>"
+        result = collect_and_analyze(skip_details=True)
 
     assert "collected_at" in result.metadata
     assert "theme_count" in result.metadata
@@ -83,48 +73,20 @@ def test_collect_and_analyze_metadata(mock_list_fetch):
 
 
 @pytest.mark.unit
-@patch("backend.services.naver_theme.crawler.fetch_theme_list_page")
-@patch("backend.services.naver_theme.parser.parse_theme_list")
-def test_collect_and_analyze_pagination_stops(mock_parse, mock_fetch):
-    """Pagination stops when parse_theme_list returns empty DataFrame."""
-    mock_fetch.side_effect = ["<html></html>", "<html></html>"]
-    mock_parse.side_effect = [
-        pd.DataFrame({
-            "theme_id": [1],
-            "theme_name": ["T1"],
-            "change_pct": [1.0],
-            "change_pct_3d": [1.0],
-        }),
-        pd.DataFrame(),  # Empty, pagination stops
-    ]
-
-    result = collect_and_analyze(skip_details=True)
-
-    assert len(result.themes_df) == 1  # Only first page
-
-
-@pytest.mark.unit
-@patch("backend.services.naver_theme.crawler.fetch_theme_list_page")
-def test_collect_and_analyze_top_n_limit(mock_fetch):
+def test_collect_and_analyze_top_n_limit():
     """top_n_themes parameter limits results."""
-    mock_fetch.side_effect = Exception("Should not fetch if limit reached")
-
-    try:
+    with patch("backend.services.naver_theme.service.fetch_theme_list_page") as mock_fetch:
+        mock_fetch.side_effect = Exception("Stop")
         result = collect_and_analyze(top_n_themes=5, skip_details=True)
-        # Should handle gracefully
         assert isinstance(result, ThemeAnalysisResult)
-    except Exception:
-        pass  # Expected when no valid data
+        # fetch_theme_list_page 가 호출되었어야 함
+        assert mock_fetch.called
 
 
 @pytest.mark.unit
 def test_collect_and_analyze_default_parameters():
     """collect_and_analyze() uses default parameters."""
-    with patch("backend.services.naver_theme.crawler.fetch_theme_list_page") as mock_fetch:
+    with patch("backend.services.naver_theme.service.fetch_theme_list_page") as mock_fetch:
         mock_fetch.side_effect = Exception("Stop")
-        try:
-            result = collect_and_analyze()
-        except:
-            pass
-        # Should have been called with defaults
+        result = collect_and_analyze()
         assert mock_fetch.called

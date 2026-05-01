@@ -9,6 +9,7 @@ CRAWL_DELAY = 0.7  # 초 (네이버 권고)
 REQUEST_TIMEOUT = 10  # 초
 MAX_RETRIES = 1
 USER_AGENT = "KR-Stock-Screener/1.0 (naver_theme_analysis)"
+RESPONSE_ENCODING = "euc-kr"  # REQ-NT-NF-002: 네이버 금융 EUC-KR 강제
 
 # 모멘텀 계산 가중치
 MOMENTUM_WEIGHT_1D = 0.6  # 1일 등락률 가중치

@@ -1,5 +1,5 @@
 // Tab navigation types for SPEC-TOPDOWN-001B
-export type TabId = 'market-overview' | 'sector-analysis' | 'stock-explorer' | 'chart-grid'
+export type TabId = 'market-overview' | 'sector-analysis' | 'stock-explorer' | 'chart-grid' | 'theme-analysis'
 
 // Cross-tab navigation parameters
 export interface CrossTabParams {

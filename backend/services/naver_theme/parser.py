@@ -1,162 +1,130 @@
+import math
 import re
+
 from bs4 import BeautifulSoup
-import pandas as pd
-from datetime import datetime
-import pytz
 
-from backend.services.naver_theme.config import MOMENTUM_WEIGHT_1D, MOMENTUM_WEIGHT_3D
+# REQ-NT-003: theme_id는 href의 ?no=(\d+) 에서 추출 (A-7)
+_THEME_NO_RE = re.compile(r"no=(\d+)")
+# REQ-NT-006: stock_code는 href의 ?code=(\d{6}) 에서 추출
+_STOCK_CODE_RE = re.compile(r"code=(\d{6})")
+
+# REQ-NT-003, REQ-NT-NF-005: 한글 단위 변환 (조/억/천만/백만/만)
+_KOREAN_UNIT: dict[str, float] = {
+    "조": 1_000_000_000_000,
+    "억": 100_000_000,
+    "천만": 10_000_000,
+    "백만": 1_000_000,
+    "만": 10_000,
+}
+_KOREAN_NUMBER_RE = re.compile(r"([\d,]+(?:\.\d+)?)\s*(조|억|천만|백만|만)?")
 
 
-def to_num(x: str) -> int | float:
-    """콤마 포맷 문자열을 int 또는 float으로 변환.
-
-    @param x: 입력 문자열
-    @return: 변환된 숫자 (변환 불가시 0)
-    """
-    num = str(x).replace(",", "")
+def to_num(x: str) -> float:
+    # 콤마/공백/퍼센트 제거 후 float; 변환 불가 또는 센티널('-','N/A','') → NaN
+    s = (x or "").replace(",", "").strip().replace("%", "")
+    if s in ("", "-", "N/A"):
+        return math.nan
     try:
-        if "." in num:
-            return float(num)
-        return int(num)
+        return float(s)
     except ValueError:
-        return 0
+        return math.nan
 
 
-def normalize_money(s: str) -> int | float:
-    """한글 화폐 단위를 정규화.
-
-    "1000억" → 100,000,000,000
-    "1조" → 1,000,000,000,000
-    "100만" → 100,000,000
-    """
-    s = str(s).strip()
-
-    # 조 단위
-    if "조" in s:
-        base = to_num(s.replace("조", ""))
-        return int(base * 1_000_000_000_000)
-
-    # 억 단위
-    if "억" in s:
-        base = to_num(s.replace("억", ""))
-        return int(base * 100_000_000)
-
-    # 만 단위
-    if "만" in s:
-        base = to_num(s.replace("만", ""))
-        return int(base * 10_000)
-
-    # 일반 숫자
-    return to_num(s)
+def _parse_korean_number(text: str) -> float:
+    # '1,289조 1,044억', '524억', '1.2조' 등을 원 단위 float으로 누적 합산
+    if not text:
+        return math.nan
+    total = 0.0
+    matched = False
+    for raw, unit in _KOREAN_NUMBER_RE.findall(text):
+        if not raw:
+            continue
+        val = float(raw.replace(",", ""))
+        total += val * _KOREAN_UNIT.get(unit, 1)
+        matched = True
+    return total if matched else math.nan
 
 
-def parse_theme_list(html: str) -> pd.DataFrame:
-    """테마 목록 페이지 파싱.
-
-    @param html: HTML 문자열
-    @return: 테마 DataFrame (theme_id, theme_name, change_pct, change_pct_3d, ...)
-    """
-    soup = BeautifulSoup(html, "html.parser")
-
-    themes = []
-    collected_at = datetime.now(pytz.timezone("Asia/Seoul")).isoformat()
-
-    # 테마 테이블 찾기
-    # 일반적으로 <tr> 태그로 시작하는 행 구조
-    rows = soup.find_all("tr")
+def parse_theme_list(html: str) -> dict:
+    # REQ-NT-002, REQ-NT-003: 테마 목록 파싱 및 last_page 탐지
+    # Returns {'themes': [...], 'last_page': int}
+    soup = BeautifulSoup(html, "lxml")
+    rows = soup.select("table.type_1 tr")
+    themes: list[dict] = []
 
     for row in rows:
-        cols = row.find_all("td")
-        if len(cols) < 5:
+        anchor = row.select_one("td.col_type1 a")
+        if not anchor:
             continue
-
-        try:
-            # 첫 번째 td에 테마 링크와 ID 포함
-            link = cols[0].find("a")
-            if not link:
-                continue
-
-            href = link.get("href", "")
-            # ?no=178 에서 178 추출
-            match = re.search(r"no=(\d+)", href)
-            if not match:
-                continue
-
-            theme_id = int(match.group(1))
-            theme_name = link.text.strip()
-
-            # 등락률 컬럼들 (정렬 순서는 페이지마다 다를 수 있음, 일반적으로)
-            change_pct = to_num(cols[1].text.strip())
-            change_pct_3d = to_num(cols[2].text.strip())
-            up_count = to_num(cols[3].text.strip())
-            flat_count = to_num(cols[4].text.strip())
-            down_count = to_num(cols[5].text.strip()) if len(cols) > 5 else 0
-
-            themes.append({
-                "theme_id": theme_id,
-                "theme_name": theme_name,
-                "change_pct": change_pct,
-                "change_pct_3d": change_pct_3d,
-                "up_count": int(up_count),
-                "flat_count": int(flat_count),
-                "down_count": int(down_count),
-                "top_stocks_preview": "",
-                "collected_at": collected_at,
-            })
-        except (IndexError, AttributeError, ValueError):
+        href = anchor.get("href", "")
+        m = _THEME_NO_RE.search(href)
+        if not m:
             continue
-
-    return pd.DataFrame(themes)
-
-
-def parse_theme_detail(html: str, theme_id: int) -> list[dict]:
-    """테마 상세 페이지 파싱 (종목 추출).
-
-    @param html: HTML 문자열
-    @param theme_id: 테마 ID
-    @return: 종목 정보 리스트
-    """
-    soup = BeautifulSoup(html, "html.parser")
-
-    stocks = []
-    collected_at = datetime.now(pytz.timezone("Asia/Seoul")).isoformat()
-
-    # 테마 상세 페이지의 종목 테이블
-    rows = soup.find_all("tr")
-
-    for row in rows:
-        cols = row.find_all("td")
-        if len(cols) < 3:
+        theme_id = int(m.group(1))
+        cells = row.find_all("td")
+        if len(cells) < 7:
             continue
+        themes.append({
+            "theme_id": theme_id,
+            "theme_name": anchor.get_text(strip=True),
+            "change_pct": to_num(cells[1].get_text()),
+            "change_pct_3d": to_num(cells[2].get_text()),
+            "up_count": to_num(cells[3].get_text()),
+            "flat_count": to_num(cells[4].get_text()),
+            "down_count": to_num(cells[5].get_text()),
+            "top_stocks_preview": cells[6].get_text(" ", strip=True) if len(cells) > 6 else "",
+        })
 
-        try:
-            # 종목 코드와 이름
-            link = cols[0].find("a")
-            if not link:
-                continue
+    # REQ-NT-003: 페이지네이션 블록에서 최대 페이지 번호 추출
+    last_page = 1
+    for a in soup.select("table.Nnavi a, td.pgRR a"):
+        txt = a.get_text(strip=True)
+        if txt.isdigit():
+            last_page = max(last_page, int(txt))
 
-            stock_code_text = link.text.strip()
-            # "000001" 또는 "삼성전자(000001)" 형식
-            code_match = re.search(r"(\d{6})", stock_code_text)
-            if not code_match:
-                continue
+    return {"themes": themes, "last_page": last_page}
 
-            stock_code = code_match.group(1)
-            stock_name = cols[0].text.strip()
 
-            # 등락률, 거래량 등
-            change_pct = to_num(cols[1].text.strip()) if len(cols) > 1 else 0
-            volume = to_num(cols[2].text.strip()) if len(cols) > 2 else 0
+def parse_theme_detail(html: str, theme_id: int, theme_name: str) -> list[dict]:
+    # REQ-NT-006, REQ-NT-008: 테마 상세 종목 파싱
+    # 컬럼 매핑 (A-6):
+    #   td[0] 종목명 (a.tltle), code는 href에서 추출
+    #   td[1] 편입사유 (REQ-NT-008)
+    #   td[2] 현재가
+    #   td[3] 전일비
+    #   td[4] 등락률
+    #   td[7] 거래량
+    #   td[8] 거래대금 (_parse_korean_number)
+    # PER/ROE = NaN 고정 (A-5)
+    soup = BeautifulSoup(html, "lxml")
+    stocks: list[dict] = []
 
-            stocks.append({
-                "stock_code": stock_code,
-                "stock_name": stock_name,
-                "change_pct": change_pct,
-                "volume": int(volume),
-                "theme_id": theme_id,
-                "collected_at": collected_at,
-            })
-        except (IndexError, AttributeError, ValueError):
+    for row in soup.select("table.type_5 tr"):
+        anchor = row.select_one("td a.tltle, td a[href*='code=']")
+        if not anchor:
             continue
+        href = anchor.get("href", "")
+        m = _STOCK_CODE_RE.search(href)
+        if not m:
+            continue
+        cells = row.find_all("td")
+        if len(cells) < 9:
+            continue
+        volume_text = cells[7].get_text(strip=True)
+        trade_text = cells[8].get_text(strip=True)
+        stocks.append({
+            "theme_id": theme_id,
+            "theme_name": theme_name,
+            "stock_code": m.group(1),
+            "stock_name": anchor.get_text(strip=True),
+            "inclusion_reason": cells[1].get_text(" ", strip=True),
+            "price": to_num(cells[2].get_text()),
+            "change": to_num(cells[3].get_text()),
+            "change_pct": to_num(cells[4].get_text()),
+            "volume": int(_parse_korean_number(volume_text)) if volume_text else 0,
+            "trade_value": int(_parse_korean_number(trade_text)) if trade_text else 0,
+            "per": math.nan,
+            "roe": math.nan,
+        })
 
     return stocks

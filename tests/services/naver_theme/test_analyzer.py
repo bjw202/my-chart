@@ -16,9 +16,12 @@ def test_build_strong_themes_filters_by_momentum():
         "theme_name": ["A", "B", "C"],
         "change_pct": [5.0, 2.0, -1.0],
         "change_pct_3d": [10.0, 3.0, 0.0],
+        "up_count": [8.0, 5.0, 3.0],
+        "flat_count": [2.0, 3.0, 2.0],
+        "down_count": [2.0, 4.0, 7.0],
     })
 
-    result = build_strong_themes(themes_df)
+    result = build_strong_themes(themes_df, top_n=3)
 
     # momentum_score = change_pct * 0.6 + change_pct_3d * 0.4
     assert "momentum_score" in result.columns
@@ -31,6 +34,7 @@ def test_build_leaders_calculates_z_score():
     stocks_df = pd.DataFrame({
         "stock_code": ["000001", "000002", "000003"],
         "stock_name": ["A", "B", "C"],
+        "theme_name": ["T1", "T1", "T1"],
         "change_pct": [5.0, 2.0, -1.0],
         "volume": [1000000, 500000, 200000],
         "market_cap": [100000000000, 50000000000, 20000000000],
@@ -53,6 +57,7 @@ def test_build_multi_theme_stocks_filters_count():
         "stock_name": ["A", "A", "B", "C", "A"],
         "theme_id": [1, 2, 1, 2, 3],
         "theme_name": ["T1", "T2", "T1", "T2", "T3"],
+        "change_pct": [5.0, 3.0, 4.0, 2.0, 6.0],
     })
 
     result = build_multi_theme_stocks(stocks_df)
