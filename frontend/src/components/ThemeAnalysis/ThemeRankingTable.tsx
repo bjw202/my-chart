@@ -1,5 +1,5 @@
-// @MX:NOTE: [AUTO] ThemeRankingTable은 강세 테마 목록을 정렬 가능한 테이블로 렌더링
-// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-005
+// @MX:NOTE: [AUTO] ThemeRankingTable은 강세 테마 목록을 정렬 가능한 테이블로 렌더링; theme_description hover tooltip 지원
+// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-005, SPEC-NAVER-THEME-003 REQ-NT3-004
 import type { ReactElement } from 'react'
 import type { ThemeItem } from '../../api/themes'
 
@@ -76,7 +76,12 @@ export function ThemeRankingTable({
             className={selectedThemeId === theme.theme_id ? 'selected' : undefined}
             onClick={() => onThemeClick(theme.theme_id)}
           >
-            <td style={{ textAlign: 'left' }}>{theme.theme_name}</td>
+            <td
+              style={{ textAlign: 'left' }}
+              title={theme.theme_description || undefined}
+            >
+              {theme.theme_name}
+            </td>
             <td
               style={{
                 textAlign: 'right',

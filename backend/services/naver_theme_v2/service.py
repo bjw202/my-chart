@@ -1,6 +1,7 @@
 """단일 진입점 + V1 analyzer/db_join 재사용."""
 
 import json
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -22,6 +23,7 @@ from . import config, crawler, parser
 
 # @MX:ANCHOR: V2 단일 진입점 (REQ-NT2-001) — frontend/route 진입점, fan_in≥3 예상
 # @MX:REASON: V1 collect_and_analyze와 동일 시그니처 패턴, V2 mobile API 기반
+# @MX:SPEC: SPEC-NAVER-THEME-002 REQ-NT2-001, SPEC-NAVER-THEME-003 REQ-NT3-005
 
 
 def collect_and_analyze_v2(
@@ -40,6 +42,7 @@ def collect_and_analyze_v2(
         ThemeAnalysisResult (V1 schema 동일, themes_df/stocks_df에 신규 컬럼 추가)
     """
     errors: list[dict] = []
+    _start_time = time.monotonic()  # elapsed_sec 측정 시작 (REQ-NT3-005)
 
     # Phase A: list endpoint 페이지네이션
     all_themes: list[dict] = []
@@ -64,7 +67,7 @@ def collect_and_analyze_v2(
 
     themes_df = pd.DataFrame(all_themes)
     if themes_df.empty:
-        return _empty_result(errors)
+        return _empty_result(errors, elapsed=time.monotonic() - _start_time)
 
     # Phase B: top-N 결정 (V1 analyzer 재사용)
     strong_themes_df = build_strong_themes(themes_df, top_n=top_n_themes)
@@ -122,6 +125,9 @@ def collect_and_analyze_v2(
         leaders_df = pd.DataFrame()
         multi_theme_stocks_df = pd.DataFrame()
 
+    _generated_at = datetime.now(timezone.utc).isoformat()
+    _elapsed = time.monotonic() - _start_time
+
     return ThemeAnalysisResult(
         themes_df=themes_df,
         stocks_df=stocks_df,
@@ -129,10 +135,16 @@ def collect_and_analyze_v2(
         leaders_df=leaders_df,
         multi_theme_stocks_df=multi_theme_stocks_df,
         metadata={
+            # 기존 V2 필드 보존 (REQ-NT3-C-003 additive only)
             "data_source": config.DATA_SOURCE,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": _generated_at,
             "total_themes_seen": len(themes_df),
             "errors": errors,
+            # V1 alias 4 필드 추가 (REQ-NT3-005, SPEC-NAVER-THEME-003)
+            "collected_at": _generated_at,
+            "theme_count": len(themes_df),
+            "stock_count": len(stocks_df),
+            "elapsed_sec": _elapsed,
         },
     )
 
@@ -157,8 +169,11 @@ def _empty_stocks_df() -> pd.DataFrame:
     )
 
 
-def _empty_result(errors: list[dict]) -> ThemeAnalysisResult:
-    """모든 list 호출이 실패한 경우 빈 결과 반환 (예외 X — REQ-NT2-NF-003)."""
+def _empty_result(errors: list[dict], elapsed: float = 0.0) -> ThemeAnalysisResult:
+    """모든 list 호출이 실패한 경우 빈 결과 반환 (예외 X — REQ-NT2-NF-003).
+
+    V1 alias 4 필드 zero values 보장 (REQ-NT3-006, SPEC-NAVER-THEME-003).
+    """
     empty_themes = pd.DataFrame(
         columns=[
             "theme_id",
@@ -173,6 +188,7 @@ def _empty_result(errors: list[dict]) -> ThemeAnalysisResult:
         ]
     )
     empty_stocks = _empty_stocks_df()
+    _generated_at = datetime.now(timezone.utc).isoformat()
     return ThemeAnalysisResult(
         themes_df=empty_themes,
         stocks_df=empty_stocks,
@@ -180,9 +196,15 @@ def _empty_result(errors: list[dict]) -> ThemeAnalysisResult:
         leaders_df=empty_stocks.copy(),
         multi_theme_stocks_df=empty_stocks.copy(),
         metadata={
+            # 기존 V2 필드 보존 (REQ-NT3-C-003 additive only)
             "data_source": config.DATA_SOURCE,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": _generated_at,
             "total_themes_seen": 0,
             "errors": errors,
+            # V1 alias zero values (REQ-NT3-006, SPEC-NAVER-THEME-003)
+            "collected_at": _generated_at,
+            "theme_count": 0,
+            "stock_count": 0,
+            "elapsed_sec": elapsed,
         },
     )

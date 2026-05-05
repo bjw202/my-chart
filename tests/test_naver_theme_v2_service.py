@@ -292,6 +292,127 @@ def test_5xx_retry_then_partial_failure():
 
 
 # ---------------------------------------------------------------------------
+# SPEC-NAVER-THEME-003 AC-6 ~ AC-10: V1 metadata alias 4 필드 검증
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_metadata_v1_alias_fields_present():
+    """AC-6 (SPEC-NT3): V2 metadata에 V1 alias 4 필드 모두 존재 + 기존 4 필드 보존.
+
+    REQ-NT3-005: collected_at, theme_count, stock_count, elapsed_sec 추가.
+    REQ-NT3-C-003: 기존 data_source, generated_at, total_themes_seen, errors 보존.
+    alias 정합성: collected_at == generated_at, theme_count == total_themes_seen.
+    """
+    with _make_service_mock():
+        result = collect_and_analyze_v2(top_n_themes=5, skip_details=False)
+    metadata = result.metadata
+
+    # V1 alias 4 필드 존재
+    assert "collected_at" in metadata
+    assert "theme_count" in metadata
+    assert "stock_count" in metadata
+    assert "elapsed_sec" in metadata
+
+    # 기존 V2 필드 보존 (REQ-NT3-C-003 additive only)
+    assert metadata["data_source"] == "naver_mobile_v2"
+    assert "generated_at" in metadata
+    assert "total_themes_seen" in metadata
+    assert "errors" in metadata
+
+    # alias 정합성
+    assert metadata["collected_at"] == metadata["generated_at"]
+    assert metadata["theme_count"] == metadata["total_themes_seen"]
+
+
+@pytest.mark.unit
+def test_metadata_collected_at_iso8601():
+    """AC-7 (SPEC-NT3): collected_at은 ISO-8601 parsable + timezone-aware.
+
+    REQ-NT3-005: str 타입 + datetime.fromisoformat 파싱 가능 + tzinfo 존재.
+    """
+    from datetime import datetime
+
+    with _make_service_mock():
+        result = collect_and_analyze_v2(top_n_themes=5)
+    collected_at = result.metadata["collected_at"]
+
+    assert isinstance(collected_at, str)
+    # Z 접미사를 +00:00으로 교체하여 fromisoformat 호환
+    parsed = datetime.fromisoformat(collected_at.replace("Z", "+00:00"))
+    assert parsed.tzinfo is not None
+
+
+@pytest.mark.unit
+def test_metadata_stock_count_matches_df():
+    """AC-8 (SPEC-NT3): stock_count == len(result.stocks_df).
+
+    REQ-NT3-005: stock_count는 stocks_df 행 수와 일치해야 함.
+    """
+    with _make_service_mock():
+        result = collect_and_analyze_v2(top_n_themes=5)
+    stock_count = result.metadata["stock_count"]
+    actual_len = len(result.stocks_df)
+
+    assert isinstance(stock_count, int)
+    assert stock_count == actual_len, (
+        f"stock_count={stock_count}, len(stocks_df)={actual_len}"
+    )
+
+
+@pytest.mark.unit
+def test_metadata_elapsed_sec_positive():
+    """AC-9 (SPEC-NT3): elapsed_sec은 float, >= 0.0, < 60.0.
+
+    REQ-NT3-005: time.monotonic() 측정값 — fixture mock이므로 < 60초.
+    """
+    with _make_service_mock():
+        result = collect_and_analyze_v2(top_n_themes=5)
+    elapsed = result.metadata["elapsed_sec"]
+
+    assert isinstance(elapsed, float)
+    assert elapsed >= 0.0
+    assert elapsed < 60.0
+
+
+@pytest.mark.unit
+def test_empty_result_has_v1_alias():
+    """AC-10 (SPEC-NT3): 5xx mock으로 _empty_result 경로 강제 — V1 alias 4 필드 zero values.
+
+    REQ-NT3-006: _empty_result()에도 collected_at, theme_count=0, stock_count=0, elapsed_sec>=0.
+    errors[]에 최소 1건 기록.
+    """
+    import requests
+
+    def fake_5xx(*args, **kwargs):
+        resp = mock.MagicMock()
+        resp.status_code = 503
+        resp.headers = {"Content-Type": "application/json"}
+        raise requests.HTTPError("503 Service Unavailable")
+
+    with mock.patch(
+        "backend.services.naver_theme_v2.crawler.requests.Session.get",
+        side_effect=fake_5xx,
+    ):
+        result = collect_and_analyze_v2(top_n_themes=5, skip_details=False)
+
+    metadata = result.metadata
+
+    # 빈 결과 반환 — 예외 X (REQ-NT2-NF-003 계승)
+    assert len(result.themes_df) == 0
+    assert len(result.stocks_df) == 0
+
+    # V1 alias 4 필드 모두 존재 (zero values)
+    assert metadata["collected_at"]  # truthy ISO string
+    assert metadata["theme_count"] == 0
+    assert metadata["stock_count"] == 0
+    assert metadata["elapsed_sec"] >= 0.0
+
+    # errors 기록됨
+    assert len(metadata["errors"]) >= 1
+
+
+# ---------------------------------------------------------------------------
 # 라이브 통합 테스트 (T5에서 실행, 여기서는 작성만)
 # ---------------------------------------------------------------------------
 

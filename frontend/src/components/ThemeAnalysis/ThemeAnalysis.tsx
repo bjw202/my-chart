@@ -1,6 +1,7 @@
 // @MX:ANCHOR: [AUTO] ThemeAnalysis는 테마 분석 탭의 컨테이너; 좌열=ThemeRankingTable, 우열=ThemeDetailPanel, 하단=멀티테마 위젯
-// @MX:REASON: AppContent에서 theme-analysis 탭에 마운트되는 단일 진입 컴포넌트; SPEC-NAVER-THEME-001 Phase 3
-// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-R-001, REQ-NT-R-002
+// @MX:REASON: AppContent에서 theme-analysis 탭에 마운트되는 단일 진입 컴포넌트; SPEC-NAVER-THEME-003 V2 endpoint 채택 + retry 패턴
+// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-R-001, REQ-NT-R-002, SPEC-NAVER-THEME-003 REQ-NT3-007
+// @MX:NOTE: [AUTO] retry 패턴은 race-safe — useEffect cleanup(cancelled flag, ba3f20c) + retryNonce trigger
 import { useState, useMemo } from 'react'
 import type { ReactElement } from 'react'
 import { ThemeRankingTable } from './ThemeRankingTable'
@@ -27,6 +28,7 @@ export function ThemeAnalysis(): ReactElement {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<LoadMode>('quick')
+  const [retryNonce, setRetryNonce] = useState(0) // retry trigger — useEffect deps에 포함 (REQ-NT3-007)
   const [selectedThemeId, setSelectedThemeId] = useState<number | null>(null)
   const [sortField, setSortField] = useState('change_pct')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -73,9 +75,9 @@ export function ThemeAnalysis(): ReactElement {
     return () => {
       cancelled = true
     }
-  // mode 변경 시만 재실행
+  // mode 변경 또는 retryNonce 증가 시 재실행 (REQ-NT3-007)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode])
+  }, [mode, retryNonce])
 
   const themes = data?.strong_themes ?? data?.themes ?? []
 
@@ -92,6 +94,10 @@ export function ThemeAnalysis(): ReactElement {
     })
     return list
   }, [themes, sortField, sortDirection])
+
+  // retry 핸들러 — retryNonce 증가로 useEffect 재실행 유도 (REQ-NT3-007, D-1)
+  // V1 자동 폴백 없음 (REQ-NT3-C-006): setError 후 사용자가 직접 재시도
+  const handleRetry = (): void => setRetryNonce(n => n + 1)
 
   const handleSort = (field: string): void => {
     if (field === sortField) {
@@ -140,8 +146,16 @@ export function ThemeAnalysis(): ReactElement {
       )}
 
       {error && (
-        <div style={{ padding: 24, fontSize: 13, color: 'var(--negative)' }}>
-          오류: {error}
+        <div className="theme-analysis-error" style={{ padding: 24, fontSize: 13 }}>
+          <p style={{ color: 'var(--negative)', marginBottom: 12 }}>
+            테마 데이터를 가져오지 못했습니다. 다시 시도해 주세요.
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 12 }}>
+            오류: {error}
+          </p>
+          <button type="button" onClick={handleRetry}>
+            다시 시도
+          </button>
         </div>
       )}
 
