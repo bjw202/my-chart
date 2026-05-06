@@ -162,6 +162,31 @@ v1.0.2까지 코드에 본문 박스가 추가됐고 vitest도 PASS했음에도 
 
 **적용**: 다음 frontend SPEC에서 (1) default mode/state를 명시 결정 항목으로, (2) backend lazy-fill 필드 매트릭스를 plan §환경 섹션에 기록, (3) "default 진입 시 사용자가 보는 정보" sanity check를 plan annotation cycle에 포함.
 
+### 9. v1.0.4 amendment — DataFrame 머지 시점 함정 (strong_themes_df description 누락)
+
+v1.0.3에서 default 'full' 적용 후에도 description이 안 보인다는 신고. 라이브 추적:
+
+- backend snapshot 응답에 `themes` 배열의 description은 정상(274자) ✓
+- 그러나 `strong_themes` 배열의 description은 0(empty) ❌
+
+원인: `service.py:73` `strong_themes_df = build_strong_themes(themes_df, ...)`이 detail 호출 **전**에 만들어지고, line 92-95 detail 머지가 `themes_df`에만 적용. `strong_themes_df`는 이미 만들어진 시점에 description=None인 상태로 남고, 이후 themes_df 업데이트가 반영 안 됨.
+
+frontend `ThemeAnalysis.tsx:80`: `data?.strong_themes ?? data?.themes` — strong_themes 우선 사용. 사용자가 클릭한 selectedTheme이 description=null인 strong_themes에서 find되므로 D-4 hidden.
+
+**v1.0.0 RUN 시점부터 잠재된 버그가 v1.0.3 default 'full'로 수면 위로 떠오름**. v1.0.0~v1.0.2까지는 default가 'quick'이라 detail 호출 자체가 안 되어 description 본문 박스가 hidden인 게 정상. v1.0.3에서 default 'full'로 바꾸자 detail은 호출되지만 strong_themes 머지 누락이 드러남.
+
+**핵심 통찰**:
+- 분기/필터/요약 DataFrame은 원본 DataFrame의 시점 sliced 결과 — 원본 update가 자동 반영되지 않음 (pandas는 view가 아닌 copy 반환).
+- 데이터 가공 파이프라인에서 "어느 단계의 데이터가 어느 단계에서 업데이트되는가"를 명시 추적해야 함. 머지 순서가 바뀌면 일부 컬럼이 stale.
+- 비슷한 패턴: backend가 list/detail/strong/leaders/multi_theme_stocks 5개 DataFrame을 만들 때, 원본 themes_df update 후 모든 derived DataFrame을 다시 매핑해야 정합.
+
+**교훈**:
+- DataFrame 가공 순서를 SPEC plan §환경에 다이어그램으로 기록. "themes_df → build_strong_themes → detail 머지 → strong_themes 매핑" 같은 흐름. 머지 순서가 SPEC에 박혀 있으면 비슷한 버그를 plan 단계에서 발견 가능.
+- "원본만 update하면 derived 자동 반영"이라는 가정 금지. derived DataFrame 각각 명시적 update.
+- frontend가 backend 응답의 어느 배열을 우선 사용하는지(strong_themes vs themes) plan에 명시. "frontend 사용 array → backend가 채워야 할 컬럼" 매트릭스를 plan §환경에 두면 머지 누락이 발견 가능.
+
+**적용**: backend SPEC plan에 "DataFrame derived 의존성 그래프"를 명시. 각 derived DataFrame이 어느 시점에 어느 컬럼을 채우는지 표로 정리.
+
 ---
 
 ## 시리즈 전반 적용 가능 패턴

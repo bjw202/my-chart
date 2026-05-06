@@ -1,8 +1,8 @@
 ---
 id: SPEC-NAVER-THEME-003
-title: V2 frontend 채택 (default 'full' mode + theme_description prominent body)
+title: V2 frontend 채택 (default 'full' + strong_themes description merge)
 status: Implemented
-version: 1.0.3
+version: 1.0.4
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -29,6 +29,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.4 amendment: backend `strong_themes_df`에 theme_description 머지 누락 수정 (REQ-NT3-014 신규). v1.0.3 default 'full' 적용 후에도 사용자 화면에 description 미노출. 라이브 검증 결과: backend snapshot 응답의 `themes` 배열에는 description=274자(유리 기판) 채워지나 `strong_themes` 배열에는 description=0자(empty). 원인: `service.py:73`에서 `strong_themes_df = build_strong_themes(themes_df, ...)`를 detail 호출 전에 빌드하고, line 92-95에서 detail 머지가 `themes_df`에만 적용됨 → `strong_themes_df`는 description=None 상태 유지. frontend `ThemeAnalysis.tsx:80`이 `data?.strong_themes ?? data?.themes`로 strong_themes 우선 사용 → 사용자가 클릭한 selectedTheme이 description=null인 strong_themes에서 매핑됨 → ThemeDetailPanel D-4 hidden. 해결: detail loop 종료 후 `strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(themes_df.set_index("theme_id")["theme_description"].to_dict())` 1줄 추가. backend pytest AC-21 신규 — 총 21 AC. frontend 변경 0, V1 backend 무수정, 의존성 변경 0.
 - 2026-05-06 v1.0.3 amendment: default mode를 'quick' → 'full'로 변경 + 빠른 조회 모드 advisory 추가. 사용자 후속 신고 — v1.0.2까지 본문 박스가 코드에는 추가됐으나 화면에 안 보인다는 신고. Root cause: backend의 `service.py:92-95`가 detail 호출 결과로만 `theme_description`을 themes_df에 머지함. parser.py 주석에도 `list 응답 sectorDescription은 항상 null` 명시. 즉 빠른 조회(quick) 모드는 detail skip → backend가 description = null 반환 → frontend D-4 정책으로 hidden. 라이브 list endpoint 응답 직접 확인으로 sectorDescription=None 재검증 완료. 해결: ThemeAnalysis.tsx의 `useState<LoadMode>('quick')` → `('full')` (REQ-NT3-012 신규). 사용자가 "빠른 조회" 토글 시 화면에 회색 advisory 박스 추가 — "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다" 안내 (REQ-NT3-013 신규). AC-19/20 신규 — 총 20 AC. backend, V1 backend, 의존성 변경 0.
 - 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description 본문 prominent 강화. 사용자가 v1.0.1 amendment 후 화면(스크린샷 1)에서 "주도주" 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 다른 점을 신고. ThemeDetailPanel.tsx의 주도주(themeLeaders) 전체 섹션을 제거 (REQ-NT3-011 신규). theme_description 본문 박스 스타일 강화 — 글자 크기 12→13, 색 text-secondary→text-primary, padding 8/12→12/14, border-radius 6→8, border-left 3px→4px (REQ-NT3-009 강화). leaders prop은 호출부 호환을 위해 optional로 유지하되 컴포넌트 내부에서 미사용. 종목 테이블 + inclusion_reason 본문(REQ-NT3-010)은 그대로. AC-18 신규 추가 — 총 18 AC.
 - 2026-05-06 v1.0.1 amendment: D-3 reverse — 사용자 라이브 검증 결과 hover tooltip만으로는 description이 한눈에 안 보여 네이버 모바일 UX와 어긋남. ThemeDetailPanel.tsx에 (1) 테마명 아래 `theme_description`을 본문 박스로 노출 (REQ-NT3-009 신규), (2) 주도주 카드와 종목 테이블 각 행 뒤에 `inclusion_reason`을 본문으로 펼쳐 노출 (REQ-NT3-010 신규). hover tooltip(`title` 속성)은 그대로 보존하여 중복 노출. AC-16/17 신규 추가 — 총 17 AC. ThemeDetailPanel.tsx 무수정 정책(D-3 v1.0.0)은 종료, 본문 표시(D-3 옵션 A 변형) 정책으로 전환. backend/V1 무수정(REQ-NT3-C-002), additive only(REQ-NT3-C-003), 신규 의존성 0(REQ-NT3-C-004)은 그대로 유지.
@@ -201,6 +202,20 @@ Frontend (기존 의존성 그대로):
 **The system shall** initialize `ThemeAnalysis.tsx`의 `mode` state with default value `'full'` (snapshot endpoint), not `'quick'` (list-only endpoint).
 
 **Rationale**: backend list 응답에 `sectorDescription`이 항상 null이라 빠른 조회 모드 사용자는 v1.0.1/v1.0.2의 theme_description 본문 박스를 영원히 볼 수 없음. default 진입 시 사용자가 description을 즉시 볼 수 있도록 default를 'full'로 변경. 사용자는 필요 시 '빠른 조회' 토글로 전환 가능 (UX 옵트아웃). 코드 변경 1줄(`useState<LoadMode>('quick')` → `('full')`).
+
+#### REQ-NT3-014: strong_themes_df theme_description 머지 (v1.0.4 amendment)
+
+**The system shall** populate `theme_description` field in `strong_themes_df` (backend service.py output) by mapping from `themes_df` after detail endpoint loop completes. The mapping uses `theme_id` as the key.
+
+**Implementation**: After the Phase C detail loop in `collect_and_analyze_v2()`, before returning the result, execute:
+```python
+desc_map = themes_df.set_index("theme_id")["theme_description"].to_dict()
+strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(desc_map)
+```
+
+**Skip condition**: When `skip_details=True` (quick mode equivalent in service layer), this merge is unnecessary since both `themes_df` and `strong_themes_df` carry `theme_description=None` from the list endpoint.
+
+**Rationale**: `strong_themes_df` is built at line 73 by `build_strong_themes(themes_df, ...)` BEFORE the detail loop merges description into `themes_df`. Without this post-loop merge, `strong_themes_df["theme_description"]` remains `None` even though `themes_df` is properly populated. Since frontend's `ThemeAnalysis.tsx` uses `data?.strong_themes ?? data?.themes` (strong_themes first), the user's clicked theme is mapped from `strong_themes` → description=null → ThemeDetailPanel D-4 hidden. Bug present since v1.0.0 RUN, surfaced after v1.0.3 default 'full'.
 
 #### REQ-NT3-013: 빠른 조회 모드 advisory (v1.0.3 amendment)
 

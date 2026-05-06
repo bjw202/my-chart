@@ -2,7 +2,7 @@
 id: SPEC-NAVER-THEME-003
 title: V2 frontend 채택 — Acceptance Criteria
 status: Implemented
-version: 1.0.3
+version: 1.0.4
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -25,6 +25,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.4 amendment: backend strong_themes_df에 theme_description 머지 누락 수정. AC-21 신규 (strong_themes_df description 매핑 검증). 총 21 AC.
 - 2026-05-06 v1.0.3 amendment: default mode를 'full'로 변경 + 빠른 조회 모드 advisory. AC-19 신규 (default mode 'full' 검증) + AC-20 신규 (quick advisory 노출). 총 20 AC.
 - 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description prominent 강화. AC-18 신규 추가 (주도주 섹션 미렌더링 검증). AC-17은 stock body 검증만으로 좁힘 (leader body는 더 이상 발생 안함). 총 18 AC.
 - 2026-05-06 v1.0.1 amendment: D-3 reverse로 AC-16, AC-17 신규 추가 (theme_description 본문 노출 + inclusion_reason 본문 노출). 총 17 AC.
@@ -702,6 +703,41 @@ await waitFor(() => {
 
 ---
 
+## AC-21: strong_themes_df theme_description 매핑 (REQ-NT3-014, v1.0.4 amendment)
+
+### Given
+- `_make_service_mock()` (V2 service 단위 테스트 fixture). detail_synthetic.json fixture에 sectorDescription 채워져 있음.
+
+### When
+```python
+from backend.services.naver_theme_v2 import collect_and_analyze_v2
+
+with _make_service_mock():
+    result = collect_and_analyze_v2(top_n_themes=5, skip_details=False)
+```
+
+### Then
+```python
+# strong_themes_df 컬럼에 theme_description 존재
+assert "theme_description" in result.strong_themes_df.columns
+
+# themes_df → strong_themes_df 매핑 정합
+desc_map = result.themes_df.set_index("theme_id")["theme_description"].to_dict()
+for _, row in result.strong_themes_df.iterrows():
+    theme_id = row["theme_id"]
+    expected = desc_map.get(theme_id)
+    actual = row["theme_description"]
+    assert actual == expected, f"mismatch theme_id={theme_id}"
+
+# detail fixture가 description을 채우므로 strong_themes에도 truthy description 1개 이상
+truthy_count = sum(
+    1 for desc in result.strong_themes_df["theme_description"] if desc
+)
+assert truthy_count >= 1
+```
+
+---
+
 ## 부록: 검증 자동화 매트릭스
 
 | AC | 검증 방식 | 의존성 |
@@ -726,6 +762,7 @@ await waitFor(() => {
 | AC-18 | unit (vitest, RTL render + leader-inclusion-reason-body 미렌더링 + "주도주" 텍스트 미렌더링) | @testing-library/react |
 | AC-19 | unit (vitest, default render → /themes/v2/snapshot 호출 검증) | @testing-library/react + vi.mock |
 | AC-20 | unit (vitest, quick 토글 → theme-quick-advisory data-testid 노출) | @testing-library/react |
+| AC-21 | unit (pytest, _make_service_mock + strong_themes_df description 매핑 검증) | unittest.mock, fixtures |
 
 ### 라이브 테스트 정책
 

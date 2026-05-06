@@ -376,6 +376,43 @@ def test_metadata_elapsed_sec_positive():
 
 
 @pytest.mark.unit
+def test_strong_themes_has_theme_description():
+    """AC-21 (SPEC-NT3 v1.0.4): strong_themes_df의 theme_description이 themes_df와 동일하게 매핑.
+
+    REQ-NT3-014: detail 호출 후 themes_df에 머지된 theme_description이 strong_themes_df에도 매핑되어야 함.
+    v1.0.4 amendment 이전: strong_themes_df = build_strong_themes(themes_df, ...)이 detail 머지 전에 빌드되어
+    description이 None으로 남는 버그. frontend가 strong_themes를 우선 사용하므로 사용자 화면에 description 미노출.
+
+    fixture: detail_synthetic.json에 sectorDescription="각종 전선 및 전람(電纜)제조 관련 종목 (synthetic)" 채워짐.
+    """
+    with _make_service_mock():
+        result = collect_and_analyze_v2(top_n_themes=5, skip_details=False)
+
+    # strong_themes_df 컬럼에 theme_description 존재
+    assert "theme_description" in result.strong_themes_df.columns
+
+    # themes_df → strong_themes_df 매핑 정합성
+    desc_map = result.themes_df.set_index("theme_id")["theme_description"].to_dict()
+    for _, row in result.strong_themes_df.iterrows():
+        theme_id = row["theme_id"]
+        expected = desc_map.get(theme_id)
+        actual = row["theme_description"]
+        assert actual == expected, (
+            f"strong_themes theme_id={theme_id} description mismatch: "
+            f"strong={actual!r} vs themes={expected!r}"
+        )
+
+    # fixture가 detail에 description을 포함하므로 strong_themes에도 truthy description 1개 이상
+    truthy_count = sum(
+        1 for desc in result.strong_themes_df["theme_description"] if desc
+    )
+    assert truthy_count >= 1, (
+        "strong_themes_df에 theme_description이 채워진 row가 1개 이상 있어야 함 "
+        "(detail fixture sectorDescription이 머지되어야 함)"
+    )
+
+
+@pytest.mark.unit
 def test_empty_result_has_v1_alias():
     """AC-10 (SPEC-NT3): 5xx mock으로 _empty_result 경로 강제 — V1 alias 4 필드 zero values.
 

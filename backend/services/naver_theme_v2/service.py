@@ -104,6 +104,12 @@ def collect_and_analyze_v2(
                 )
                 continue
 
+    # REQ-NT3-014 (v1.0.4 amendment): strong_themes_df는 line 73에서 detail 머지 전 빌드되므로
+    # theme_description이 None 상태. detail 머지 후 themes_df의 theme_description을 strong_themes_df에 매핑.
+    if not skip_details and "theme_description" in themes_df.columns:
+        desc_map = themes_df.set_index("theme_id")["theme_description"].to_dict()
+        strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(desc_map)
+
     stocks_df = pd.DataFrame(all_stocks) if all_stocks else _empty_stocks_df()
 
     # Phase D: market_cap fallback (REQ-NT2-006) — marketValue 누락 종목 보강

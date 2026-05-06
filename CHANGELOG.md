@@ -77,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - RankBadge 함수 미사용으로 제거
     - AC-18 신규 추가 (총 18 AC)
     - ThemeDetailPanel.test.tsx vitest 7 cases (AC-13 1 + AC-16 2 + AC-17 2 + AC-18 2)
+  - **v1.0.4 amendment** (backend strong_themes_df description 머지 누락 수정):
+    - 사용자 후속 신고: v1.0.3 default 'full' 적용 후에도 화면에 description 미노출
+    - 라이브 진단 결과: backend snapshot 응답의 `themes` 배열에는 description=274자 정상이지만 `strong_themes` 배열에는 description=0(empty). frontend는 `data?.strong_themes ?? data?.themes`로 strong_themes 우선 사용 → 사용자가 클릭한 테마는 description=null인 strong_themes에서 매핑됨 → ThemeDetailPanel D-4 hidden
+    - Root cause: `service.py:73`에서 `strong_themes_df = build_strong_themes(themes_df, ...)`를 detail 호출 전에 빌드, line 92-95 detail 머지가 `themes_df`에만 적용됨. v1.0.0 RUN 시점부터 잠재된 버그가 v1.0.3 default 'full'로 수면 위로
+    - 해결: detail loop 종료 후 `strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(themes_df.set_index("theme_id")["theme_description"].to_dict())` 1줄 추가 (REQ-NT3-014 신규)
+    - backend pytest AC-21 신규 (총 21 AC)
+    - frontend 변경 0, V1 backend 무수정, 의존성 변경 0
   - **v1.0.3 amendment** (default 'full' mode + 빠른 조회 advisory):
     - 사용자 후속 신고: v1.0.2까지 본문 박스가 코드에 추가됐으나 화면에 표시 안 됨
     - Root cause: backend `service.py:92-95`가 detail 호출 시에만 `theme_description`을 themes_df에 머지. 빠른 조회 모드는 detail skip → backend가 description=null 반환 → frontend D-4 hidden 정책으로 본문 박스 미표시. parser.py 주석에도 "list 응답 sectorDescription은 항상 null" 명시되어 있고 라이브 list endpoint 호출로 재검증 완료.
