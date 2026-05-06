@@ -102,11 +102,18 @@ KRX_PW=your_krx_password
 - **재무 분석 (FS 버튼)**: FnGuide 크롤링 기반 S-RIM 8섹션 재무 대시보드 (사업실적·건전성·대차대조표·수익률분해·이익워터폴·활동성·추세신호·5개질문)
 - **AI 기업 분석 (AI 버튼)**: Perplexity API 기반 실시간 AI 스윙 트레이더 리포트. 공간(Spaces) 수준의 깊이 있는 분석 (SSE 스트리밍 + 자동 저장 + 히스토리 관리)
 
-### 5. Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001 V1
-- **테마 목록**: 네이버 금융 테마 실시간 수집, 강세 테마 상위 N개 추출
-- **테마 상세**: 테마별 주도주 (z-score 기반 가중치), 편입사유 호버 툴팁
+### 5. Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001/002/003 V1+V2
+
+**V1 (desktop HTML 크롤링, SPEC-NAVER-THEME-001)** — cohabitation 보존, 즉시 rollback 경로
+**V2 (mobile JSON API, SPEC-NAVER-THEME-002+003)** — 현재 frontend 호출 대상
+
+- **테마 목록**: 네이버 금융 테마 실시간 수집(V1: 데스크탑 HTML, V2: 모바일 m.stock.naver.com JSON), 강세 테마 상위 N개 추출
+- **테마 설명 tooltip**: V2 응답의 `theme_description`이 theme_name 셀 hover 시 native HTML title로 노출 (D-2, SPEC-003 REQ-NT3-004)
+- **테마 상세**: 테마별 주도주 (z-score 기반 가중치), 편입사유/편입설명 호버 툴팁 (V1 inclusion_reason / V2 description 동일 source 자동 호환)
 - **멀티테마 종목**: 2개 이상 테마에 동시 편입된 종목 분석
-- **빠른 조회**: `/api/themes/quick` (≤10초) / 상세 조회: `/api/themes/snapshot` (~30초)
+- **에러 처리 (V2)**: V2 endpoint 503/timeout 시 사용자 친화적 에러 메시지 + 다시 시도 버튼 (V1 자동 폴백 X — D-1, SPEC-003 REQ-NT3-007)
+- **빠른 조회**: V2 `/api/themes/v2/quick` (≤10초) / 상세 조회: V2 `/api/themes/v2/snapshot` (~30초)
+- **rollback 경로**: V1 endpoints `/api/themes/snapshot`, `/api/themes/quick`은 등록 유지 — frontend `themes.ts` URL을 V1으로 되돌리면 즉시 복귀
 
 ## API 엔드포인트
 
@@ -122,8 +129,10 @@ KRX_PW=your_krx_password
 | POST | `/api/ai-report/{code}` | AI 종목 분석 리포트 생성 (Perplexity SSE 스트리밍) |
 | GET | `/api/ai-report/{code}/history` | 저장된 AI 분석 이력 목록 |
 | GET | `/api/ai-report/{code}/{filename}` | 저장된 AI 분석 파일 조회 |
-| GET | `/api/themes/snapshot` | 테마 분석 스냅샷 (5종 DataFrame: themes, strong_themes, stocks, leaders, multi_theme_stocks) |
-| GET | `/api/themes/quick` | 테마 분석 빠른 조회 (테마 목록만, ≤10초) |
+| GET | `/api/themes/snapshot` | V1 테마 분석 (데스크탑 HTML, cohabitation rollback 경로) |
+| GET | `/api/themes/quick` | V1 테마 분석 빠른 조회 (데스크탑 HTML, cohabitation rollback 경로) |
+| GET | `/api/themes/v2/snapshot` | V2 테마 분석 스냅샷 (모바일 JSON API 기반, 5종 DataFrame + V1-호환 metadata, ~30초) |
+| GET | `/api/themes/v2/quick` | V2 테마 분석 빠른 조회 (모바일 JSON API 기반, ≤10초) |
 
 ## 필터 유형
 

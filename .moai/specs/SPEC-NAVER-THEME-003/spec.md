@@ -1,7 +1,7 @@
 ---
 id: SPEC-NAVER-THEME-003
 title: V2 frontend 채택 (theme_description tooltip + V2 endpoint swap)
-status: Draft
+status: Implemented
 version: 1.0.0
 owner: bjw2002
 created: 2026-05-06
@@ -29,6 +29,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.0 ship: commit `6284280` — RUN phase 완료. AC 15/15 PASS, V1 51 회귀 0, V2 24+5=29 PASS, frontend 271 PASS (baseline diff 0). evaluator-active PASS (Func 100/Sec 90/Craft 92/Cons 95). 16 files +3050/-19. ThemeDetailPanel.tsx 무수정 (D-3). frontend/package.json 무수정 (REQ-NT3-C-004). bare except 0건 (REQ-NT3-C-005).
 - 2026-05-06 v1.0.0: 초안 작성 (manager-spec). SPEC-NAVER-THEME-002 V2 backend ship 후속 작업으로 frontend가 V2 endpoint를 채택하도록 한다. 핸드오프 문서(`.moai/specs/SPEC-NAVER-THEME-002/handoff-frontend-v2.md`) Stage B 기반. 사용자 결정 D-1(에러 메시지+retry), D-2(theme_name hover Tooltip), D-3(inclusion_reason 컬럼 자리 재사용 — V2 parser 동일 source 활용), D-4(null hidden) 사전 잠금. V1 routes/모듈 byte-identical 보존(REQ-NT3-C-001/C-002), V2 backend metadata는 additive-only V1 alias 4 필드 추가(REQ-NT3-005), pip 신규 의존성 금지(REQ-NT3-C-004), bare except 금지(REQ-NT3-C-005). V2 endpoint 503/timeout 시 V1 자동 폴백 금지(REQ-NT3-C-006).
 
 ---

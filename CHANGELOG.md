@@ -29,6 +29,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 단위 테스트 51개, 커버리지 99%
   - V2 핸드오프 노트: `.moai/specs/SPEC-NAVER-THEME-001/v2-handoff.md` (모바일 stock.naver.com 기반 SPEC 작성 용도)
 
+### Added (SPEC-NAVER-THEME-002)
+
+- **네이버 모바일 m.stock.naver.com 기반 V2 backend 모듈** (SPEC-NAVER-THEME-002 v1.0.1)
+  - **V1+V2 cohabitation 정책**: V1 desktop HTML 모듈 무수정 + V2 mobile JSON API 신규 모듈
+  - **신규 모듈**: `backend/services/naver_theme_v2/{__init__,service,crawler,parser,config}.py` (5 모듈)
+  - **신규 REST API 엔드포인트**:
+    - `GET /api/themes/v2/snapshot?top_n=20&leaders_per_theme=3` — V2 mobile JSON 기반 5종 records list + metadata (~30s, V1 shape 호환)
+    - `GET /api/themes/v2/quick?top_n=20` — V2 themes only (≤10s)
+  - **ThemeAnalysisResult shape**: V1과 동일 (frontend forward-compat) — `themes_df`, `strong_themes_df`, `stocks_df`, `leaders_df`, `multi_theme_stocks_df`
+  - **신규 의존성 0건** (REQ-NT2-C-004): 기존 requests/pandas/numpy/pydantic/fastapi 활용
+  - **bare except 0건** (REQ-NT2-C-005): RequestException, Timeout, JSONDecodeError, ValidationError 등 specific exception만 catch
+  - **v1.0.1 amendment** (commit b1c24eb): V1 컬럼 호환성 검증 강화 + acceptance.md 14-AC 정정
+  - **race condition fix** (ba3f20c): ThemeAnalysis.tsx useEffect cleanup 패턴 (V2와 무관, 본 SPEC과 함께 ship)
+  - **단위 테스트**: 24개 pytest PASS + 라이브 1개 PASS (`@pytest.mark.live test_collect_and_analyze_v2_live`)
+  - **V1 routes 정책**: V1 endpoints `/api/themes/snapshot`, `/api/themes/quick` 등록 유지 — cohabitation rollback 경로
+
+### Added (SPEC-NAVER-THEME-003)
+
+- **V2 frontend 채택 + theme_description tooltip + V2 metadata V1 alias** (SPEC-NAVER-THEME-003 v1.0.0)
+  - **V2 endpoint URL swap**: `frontend/src/api/themes.ts` 가 V2 endpoint 호출 (REQ-NT3-001)
+  - **TypeScript 타입 확장**: `ThemeItem.theme_description?`, `ThemeStockItem.stock_description?` optional 필드 (REQ-NT3-002, REQ-NT3-003)
+  - **ThemeRankingTable hover tooltip** (D-2): theme_name 셀에 native HTML title 속성 (REQ-NT3-004)
+  - **null/undefined/empty 정책** (D-4): title 속성 자체 미렌더링 — 노이즈 회피 (REQ-NT3-NF-002)
+  - **ThemeAnalysis 에러 메시지 + retry 버튼** (D-1): V2 503/timeout 시 사용자 친화적 메시지 + 수동 retry. retryNonce trigger + race-safe cleanup 보존 (REQ-NT3-007). V1 자동 폴백 금지 (REQ-NT3-C-006).
+  - **ThemeDetailPanel 무수정** (D-3): V2 parser inclusion_reason ← item.description 정책으로 자동 호환 (REQ-NT3-008)
+  - **V2 backend metadata V1 alias**: `collected_at`, `theme_count`, `stock_count`, `elapsed_sec` 4 필드 additive 추가 (REQ-NT3-005, REQ-NT3-C-003). `_empty_result` 에도 동일 적용 (REQ-NT3-006).
+  - **검증**: V1 51 PASS (회귀 0, REQ-NT3-C-002) + V2 24+5=29 PASS + frontend vitest 271 PASS (baseline diff 0, ChartGrid 1 fail pre-existing)
+  - **evaluator-active PASS**: Functionality 100 / Security 90 / Craft 92 / Consistency 95
+  - **신규 의존성 0건** (REQ-NT3-C-004): native HTML title 사용 (Radix Tooltip 미도입)
+  - **신규 단위 테스트**: backend 5 (V2 metadata alias) + frontend vitest 4 파일 15 tests
+
 ### Changed (SPEC-AI-REPORT-003)
 
 - **AI 리포트 Fast/Deep 양쪽 모드를 Perplexity API 에서 Codex CLI 로 전면 전환** (SPEC-AI-REPORT-003 v1.0.1)

@@ -81,7 +81,33 @@ Frontend (expert-frontend, T-003 ~ T-010):
 - V1 endpoint URL grep in api/themes.ts: empty (REQ-NT3-001 V2 swap 완료)
 - V1 자동 폴백 코드: 부재 (REQ-NT3-C-006)
 
-### Phase 2.75 — Pre-Review Gate (skipped)
+### Phase 2.75 — Pre-Review Gate (passed)
 - TypeScript compile: 0 errors (frontend agent 보고)
 - Python ruff: 별도 실행 안함 (본 SPEC가 lint 정책 변경 없음)
 - 신규 fail 0 (ChartGrid baseline only)
+
+### Phase 2.8a — evaluator-active (final-pass, standard harness)
+- Overall verdict: PASS
+- Functionality 100 / Security 90 / Craft 92 / Consistency 95
+- Critical findings: 0
+- Warnings: 1 (ThemeAnalysis.tsx error 메시지 raw e.message 노출 — info disclosure risk, not OWASP critical)
+- Suggestions: 1 (AC-12 success-transition coverage gap — 별도 SPEC 가능)
+- 사용자 결정: 지금 상태로 commit 진행
+
+### Phase 2.9 — MX Tag Update (handled by agents)
+- service.py @MX:ANCHOR + @MX:SPEC SPEC-NAVER-THEME-003 REQ-NT3-005 추가
+- themes.ts @MX:ANCHOR + @MX:SPEC SPEC-NAVER-THEME-003 REQ-NT3-001/002/003 추가
+- ThemeRankingTable.tsx @MX:NOTE + @MX:SPEC SPEC-NAVER-THEME-003 REQ-NT3-004 추가
+- ThemeAnalysis.tsx @MX:ANCHOR + @MX:SPEC SPEC-NAVER-THEME-003 REQ-NT3-007 추가 + retry 패턴 @MX:NOTE
+- ThemeDetailPanel.tsx 무수정 (D-3, SPEC ID 추가는 옵션 — 미적용)
+
+### Phase 3 — Git Operations (completed)
+- Commit: 6284280 — feat(naver-theme-v2-frontend): SPEC-NAVER-THEME-003 — V2 frontend 채택 + theme_description tooltip + V2 metadata V1 alias
+- 변경 통계: 16 files, +3050 / -19 (SPEC artifacts 5,956 LOC 포함)
+- Branch: chore/integrated-main-merge-2026-04-25 (no new branch per plan §11)
+- Stage 정책: 본 SPEC 11 파일 + SPEC-002 핸드오프 1 파일 명시 stage. SPEC-AI-REPORT-003 별도 작업 + .moai/state/session-memo.md + .moai/reports/session-* unstaged 그대로.
+- Push: 사용자 결정 대기 (Phase 4)
+
+### Completion Marker
+- 2026-05-06 SPEC-NAVER-THEME-003 RUN phase complete. AC 15/15 verified, regression matrix 9/9 PASS, evaluator-active PASS.
+- &lt;moai&gt;DONE&lt;/moai&gt;
