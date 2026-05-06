@@ -77,6 +77,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - RankBadge 함수 미사용으로 제거
     - AC-18 신규 추가 (총 18 AC)
     - ThemeDetailPanel.test.tsx vitest 7 cases (AC-13 1 + AC-16 2 + AC-17 2 + AC-18 2)
+  - **v1.0.5 amendment** (탭 전환 재 fetch 해결 — frontend localStorage 캐시 + 명시적 갱신 버튼):
+    - 사용자 신고: "한 번 크롤링 했는데 다른 메뉴 갔다오면 왜 다시 크롤링을 하느라 시간을 쓰지?"
+    - Root cause: backend/frontend 양쪽 캐시 0건. AppContent는 CSS display:none/flex 토글로 mount 보존되지만, 사용자가 빠른/전체 조회 모드 버튼 토글 시 매번 useEffect 재실행 → 30초 재크롤링. 페이지 새로고침 시에도 자동 30초 fetch.
+    - 사용자 사용 패턴 (혼자 사용 + Chart Grid DB 수동 업데이트와 동일 모델) 반영해서 자동 fetch 최소화 + 명시적 갱신 모델로 전환
+    - 해결: ThemeAnalysis.tsx에 (1) `theme-analysis-cache-{quick|full}` localStorage 캐시 — mount/mode 변경 시 cache 우선 읽기 → cache hit이면 fetch skip + 즉시 표시 (REQ-NT3-015 신규), (2) 툴바에 `🔄 갱신` 버튼 추가 (data-testid="theme-refresh-button") — 클릭 시 현재 mode 캐시 무효화 + 강제 fetch + 응답을 캐시에 재쓰기 (REQ-NT3-016 신규)
+    - 캐시 schema: `{cache_version: 'v1', saved_at: ISO-8601, data: ThemesSnapshotResponse}`. cache_version mismatch 시 자동 무효화 → 향후 backend schema 변경 대비
+    - 자동 만료 없음 (수동 갱신 모델). 갱신 버튼만 trigger
+    - AC-22/23/24 신규 (총 24 AC). ThemeAnalysis.test.tsx vitest 3 cases 추가 (mount cache hit / refresh button / mode별 cache key 분리)
+    - **수정 범위**: ThemeAnalysis.tsx 1 파일 + 테스트 1 파일. backend 무수정, V1 무수정, 의존성 변경 0
+    - **검증**: vitest 284/285 PASS (ChartGrid 1 fail pre-existing baseline 동일, REQ-NT3-NF-004), 회귀 0건
   - **v1.0.4 amendment** (backend strong_themes_df description 머지 누락 수정):
     - 사용자 후속 신고: v1.0.3 default 'full' 적용 후에도 화면에 description 미노출
     - 라이브 진단 결과: backend snapshot 응답의 `themes` 배열에는 description=274자 정상이지만 `strong_themes` 배열에는 description=0(empty). frontend는 `data?.strong_themes ?? data?.themes`로 strong_themes 우선 사용 → 사용자가 클릭한 테마는 description=null인 strong_themes에서 매핑됨 → ThemeDetailPanel D-4 hidden

@@ -2,7 +2,7 @@
 id: SPEC-NAVER-THEME-003
 title: V2 frontend 채택 — Acceptance Criteria
 status: Implemented
-version: 1.0.4
+version: 1.0.5
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -19,12 +19,13 @@ depends_on: SPEC-NAVER-THEME-002
 | 버전 | 1.0.0 |
 | 검증 방식 | 자동 (pytest + vitest) — 라이브 테스트 신규 추가 없음 |
 | 사인오프 | Product Owner |
-| 총 AC | 15개 (전부 PASS 시 본 SPEC 완료) |
+| 총 AC | 24개 (전부 PASS 시 본 SPEC 완료) |
 
 ---
 
 ## HISTORY
 
+- 2026-05-06 v1.0.5 amendment: 탭 전환 시 재 fetch 문제 해결 — localStorage 캐시 + 갱신 버튼. AC-22 신규 (mount 시 cache hit이면 fetch skip), AC-23 신규 (refresh button → cache 무효화 + fetch + cache 재쓰기), AC-24 신규 (quick/full mode별 캐시 key 분리). 총 24 AC.
 - 2026-05-06 v1.0.4 amendment: backend strong_themes_df에 theme_description 머지 누락 수정. AC-21 신규 (strong_themes_df description 매핑 검증). 총 21 AC.
 - 2026-05-06 v1.0.3 amendment: default mode를 'full'로 변경 + 빠른 조회 모드 advisory. AC-19 신규 (default mode 'full' 검증) + AC-20 신규 (quick advisory 노출). 총 20 AC.
 - 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description prominent 강화. AC-18 신규 추가 (주도주 섹션 미렌더링 검증). AC-17은 stock body 검증만으로 좁힘 (leader body는 더 이상 발생 안함). 총 18 AC.
@@ -738,6 +739,136 @@ assert truthy_count >= 1
 
 ---
 
+## AC-22: localStorage cache hit on mount → fetch skip (REQ-NT3-015, v1.0.5)
+
+### Given
+- `localStorage`에 사전에 `theme-analysis-cache-full` key로 valid cache entry가 저장되어 있음 (cache_version='v1')
+
+### When
+```typescript
+import { render, waitFor } from '@testing-library/react'
+import { ThemeAnalysis } from '../ThemeAnalysis'
+import client from '../../../api/client'
+
+vi.mock('../../../api/client', () => ({ default: { get: vi.fn() } }))
+
+const cachedResponse = {
+  themes: [{ theme_id: 1, theme_name: 'Cached', change_pct: 5, change_pct_3d: 7 }],
+  strong_themes: [], stocks: [], leaders: [], multi_theme_stocks: [],
+  metadata: { collected_at: '2026-05-06T10:00:00+00:00', theme_count: 1, stock_count: 0, elapsed_sec: 30, errors: [] }
+}
+localStorage.setItem('theme-analysis-cache-full', JSON.stringify({
+  cache_version: 'v1',
+  saved_at: '2026-05-06T10:00:00+00:00',
+  data: cachedResponse,
+}))
+
+render(<ThemeAnalysis />)
+```
+
+### Then
+```typescript
+await waitFor(() => {
+  // Cached 테마가 즉시 화면에 표시됨
+  expect(screen.getByText('Cached')).toBeTruthy()
+})
+// network fetch는 호출되지 않음 (cache hit)
+expect(vi.mocked(client.get)).not.toHaveBeenCalled()
+```
+
+---
+
+## AC-23: refresh button click → cache invalidate + new fetch + cache rewrite (REQ-NT3-016, v1.0.5)
+
+### Given
+- 정상 응답 mock + localStorage에 사전 저장된 cache entry
+
+### When
+```typescript
+// 사전 저장 cache
+localStorage.setItem('theme-analysis-cache-full', JSON.stringify({
+  cache_version: 'v1',
+  saved_at: '2026-05-06T10:00:00+00:00',
+  data: { themes: [], strong_themes: [], stocks: [], leaders: [], multi_theme_stocks: [], metadata: {...} },
+}))
+
+// 새 응답 mock (refresh 후 받게 될 데이터)
+vi.mocked(client.get).mockResolvedValue({
+  data: {
+    themes: [{ theme_id: 99, theme_name: 'Refreshed', change_pct: 10, change_pct_3d: 12 }],
+    strong_themes: [], stocks: [], leaders: [], multi_theme_stocks: [],
+    metadata: { collected_at: '2026-05-06T11:00:00+00:00', theme_count: 1, stock_count: 0, elapsed_sec: 31, errors: [] },
+  }
+})
+
+render(<ThemeAnalysis />)
+
+// 처음에는 cache hit으로 fetch 안 함
+await waitFor(() => expect(vi.mocked(client.get)).not.toHaveBeenCalled())
+
+// 🔄 갱신 버튼 클릭
+fireEvent.click(screen.getByTestId('theme-refresh-button'))
+```
+
+### Then
+```typescript
+await waitFor(() => {
+  // V2 endpoint 호출 발생
+  const calls = vi.mocked(client.get).mock.calls
+  expect(calls.length).toBeGreaterThanOrEqual(1)
+  expect(calls.some(([url]) => url === '/themes/v2/snapshot')).toBe(true)
+})
+
+await waitFor(() => {
+  // 새 데이터가 화면에 표시됨
+  expect(screen.getByText('Refreshed')).toBeTruthy()
+})
+
+// localStorage가 새 응답으로 덮어쓰여짐
+const updated = JSON.parse(localStorage.getItem('theme-analysis-cache-full')!)
+expect(updated.cache_version).toBe('v1')
+expect(updated.data.themes[0].theme_name).toBe('Refreshed')
+```
+
+---
+
+## AC-24: quick/full mode별 캐시 key 분리 (REQ-NT3-015, v1.0.5)
+
+### Given
+- localStorage에 quick mode cache만 저장되어 있고 full mode cache는 없음
+
+### When
+```typescript
+const quickCache = {
+  themes: [{ theme_id: 7, theme_name: 'QuickOnly', change_pct: 1, change_pct_3d: 1 }],
+  strong_themes: [], stocks: [], leaders: [], multi_theme_stocks: [],
+  metadata: { collected_at: '2026-05-06T10:00:00+00:00', theme_count: 1, stock_count: 0, elapsed_sec: 5, errors: [] }
+}
+localStorage.setItem('theme-analysis-cache-quick', JSON.stringify({
+  cache_version: 'v1',
+  saved_at: '2026-05-06T10:00:00+00:00',
+  data: quickCache,
+}))
+// theme-analysis-cache-full은 부재
+
+vi.mocked(client.get).mockResolvedValue({ data: { themes: [], strong_themes: [], stocks: [], leaders: [], multi_theme_stocks: [], metadata: { collected_at: '...', theme_count: 0, stock_count: 0, elapsed_sec: 30, errors: [] } } })
+
+render(<ThemeAnalysis />)
+```
+
+### Then
+```typescript
+// default가 'full'이므로 cache miss → snapshot endpoint 호출
+await waitFor(() => {
+  const calls = vi.mocked(client.get).mock.calls
+  expect(calls.some(([url]) => url === '/themes/v2/snapshot')).toBe(true)
+  // quick endpoint는 호출되지 않음 (default full에서는 quick 캐시 무시)
+  expect(calls.some(([url]) => url === '/themes/v2/quick')).toBe(false)
+})
+```
+
+---
+
 ## 부록: 검증 자동화 매트릭스
 
 | AC | 검증 방식 | 의존성 |
@@ -763,6 +894,9 @@ assert truthy_count >= 1
 | AC-19 | unit (vitest, default render → /themes/v2/snapshot 호출 검증) | @testing-library/react + vi.mock |
 | AC-20 | unit (vitest, quick 토글 → theme-quick-advisory data-testid 노출) | @testing-library/react |
 | AC-21 | unit (pytest, _make_service_mock + strong_themes_df description 매핑 검증) | unittest.mock, fixtures |
+| AC-22 | unit (vitest, localStorage 사전 setItem + render → no fetch 검증) | jsdom localStorage |
+| AC-23 | unit (vitest, fireEvent click theme-refresh-button → fetch 발생 + localStorage 덮어쓰기 검증) | jsdom localStorage + axios mock |
+| AC-24 | unit (vitest, mode별 cache key 분리 — quick cache가 full 진입 시 사용 안 됨) | jsdom localStorage + axios mock |
 
 ### 라이브 테스트 정책
 

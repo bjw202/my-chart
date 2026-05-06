@@ -117,6 +117,7 @@ KRX_PW=your_krx_password
 - **에러 처리 (V2)**: V2 endpoint 503/timeout 시 사용자 친화적 에러 메시지 + 다시 시도 버튼 (V1 자동 폴백 X — D-1, SPEC-003 REQ-NT3-007)
 - **빠른 조회**: V2 `/api/themes/v2/quick` (≤10초) / 상세 조회: V2 `/api/themes/v2/snapshot` (~30초)
 - **rollback 경로**: V1 endpoints `/api/themes/snapshot`, `/api/themes/quick`은 등록 유지 — frontend `themes.ts` URL을 V1으로 되돌리면 즉시 복귀
+- **localStorage 캐시 + 🔄 갱신 버튼 (v1.0.5 amendment)**: 한 번 받은 데이터를 `localStorage`에 저장 (key: `theme-analysis-cache-{quick|full}`, schema versioned). 탭 전환/페이지 새로고침/모드 토글에서 즉시 표시 (~ 1ms). 새 데이터를 원할 때만 툴바의 `🔄 갱신` 버튼 클릭 → 캐시 무효화 + 새 fetch + 응답 캐시 재쓰기. 자동 만료 없음 — Chart Grid DB 수동 업데이트 모델과 일관성 (REQ-NT3-015, REQ-NT3-016)
 - **비개발자용 가이드**: 작업 배경, V1→V2 변천사, 4가지 결정(D-1~D-4) 친절 설명 → [docs/theme-analysis-guide.md](docs/theme-analysis-guide.md), 시리즈 회고/교훈 → [.moai/learnings/SPEC-NAVER-THEME-001-003-lessons.md](.moai/learnings/SPEC-NAVER-THEME-001-003-lessons.md)
 
 ## API 엔드포인트

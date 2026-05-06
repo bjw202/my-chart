@@ -111,3 +111,15 @@ Frontend (expert-frontend, T-003 ~ T-010):
 ### Completion Marker
 - 2026-05-06 SPEC-NAVER-THEME-003 RUN phase complete. AC 15/15 verified, regression matrix 9/9 PASS, evaluator-active PASS.
 - &lt;moai&gt;DONE&lt;/moai&gt;
+
+### v1.0.5 Amendment — localStorage cache + 🔄 갱신 버튼 (2026-05-06)
+- Trigger: 사용자 신고 "한 번 크롤링 했는데 다른 메뉴 갔다오면 왜 다시 크롤링을 하느라 시간을 쓰지?"
+- Root cause 진단: AppContent CSS toggle은 mount 보존이지만 빠른/전체 모드 토글 시 useEffect 재실행 → 30s 재크롤링. 페이지 새로고침 시 자동 30s fetch. backend/frontend 양쪽 캐시 0건.
+- 사용자 결정: A. Frontend localStorage + 🔄 갱신 버튼 (혼자 사용 + Chart Grid DB 수동 업데이트 모델 일관성)
+- RED: ThemeAnalysis.test.tsx 신규 3 케이스 (AC-22 mount cache hit / AC-23 refresh button / AC-24 mode별 cache key 분리). 첫 실행 3 fail 확인.
+- GREEN: ThemeAnalysis.tsx에 readCache/writeCache/clearCache 헬퍼 + useEffect 시작 시 localStorage 우선 + 툴바에 🔄 갱신 버튼 (data-testid="theme-refresh-button") 추가. cache_version 'v1' 검증으로 향후 schema 변경 자동 무효화. handleRefresh = clearCache + setRetryNonce.
+- Test fix: getByText → getAllByText (테마명이 ThemeRankingTable + ThemeDetailPanel 양쪽에 등장하는 정상 동작). 9/9 PASS.
+- Verify: vitest 전체 284/285 PASS (ChartGrid 1 fail pre-existing baseline 동일). 회귀 0건. 신규 fail 0건.
+- 수정 범위: 7 files — spec.md / acceptance.md / progress.md / CHANGELOG.md / README.md / ThemeAnalysis.tsx / ThemeAnalysis.test.tsx
+- backend 무수정. V1 무수정. 의존성 변경 0.
+- AC: 24개 (v1.0.4 21 → +3 신규 v1.0.5 24).

@@ -1,8 +1,8 @@
 ---
 id: SPEC-NAVER-THEME-003
-title: V2 frontend 채택 (default 'full' + strong_themes description merge)
+title: V2 frontend 채택 (default 'full' + strong_themes description merge + localStorage cache + 갱신 버튼)
 status: Implemented
-version: 1.0.4
+version: 1.0.5
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -29,6 +29,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.5 amendment: 탭 전환 시 재 fetch 및 페이지 새로고침 시 30초 재크롤링 문제 해결 — frontend localStorage 캐시 + 명시적 "🔄 갱신" 버튼 도입. 사용자 신고: "한 번 크롤링 했는데 다른 메뉴 갔다오면 왜 다시 크롤링을 하느라 시간을 쓰지?". Root cause: backend/frontend 양쪽 캐시 0 — `ThemeAnalysis`는 mount 보존되지만 사용자가 모드 토글 시 매번 새 fetch + 새로고침 시 자동 30초 fetch. 사용자 사용 패턴(혼자 사용 + Chart Grid DB 수동 업데이트와 동일 모델) 반영해서 자동 fetch 최소화 + 명시적 갱신 모델로 전환. 해결: (1) `ThemeAnalysis.tsx`에서 quick/full 각 mode별 응답을 `localStorage`에 `theme-analysis-cache-{mode}` key로 저장 (REQ-NT3-015 신규), (2) mount/mode 변경 시 캐시 우선 읽기 → cache hit이면 fetch skip + 즉시 표시, miss이면 fetch (3) 툴바에 "🔄 갱신" 버튼 추가 — 클릭 시 현재 mode의 캐시 무효화 + 강제 fetch (REQ-NT3-016 신규). 자동 만료 없음 (수동 갱신 모델, Chart Grid 패턴 일관성). cache_version 'v1' 필드로 향후 schema 변경 시 자동 무효화 가능. AC-22/23/24 신규 — 총 24 AC. ThemeAnalysis.tsx만 수정 + frontend 단위 테스트 1 파일에 케이스 3개 추가. backend 무수정, V1 무수정, 의존성 변경 0. data-testid="theme-refresh-button" 추가.
 - 2026-05-06 v1.0.4 amendment: backend `strong_themes_df`에 theme_description 머지 누락 수정 (REQ-NT3-014 신규). v1.0.3 default 'full' 적용 후에도 사용자 화면에 description 미노출. 라이브 검증 결과: backend snapshot 응답의 `themes` 배열에는 description=274자(유리 기판) 채워지나 `strong_themes` 배열에는 description=0자(empty). 원인: `service.py:73`에서 `strong_themes_df = build_strong_themes(themes_df, ...)`를 detail 호출 전에 빌드하고, line 92-95에서 detail 머지가 `themes_df`에만 적용됨 → `strong_themes_df`는 description=None 상태 유지. frontend `ThemeAnalysis.tsx:80`이 `data?.strong_themes ?? data?.themes`로 strong_themes 우선 사용 → 사용자가 클릭한 selectedTheme이 description=null인 strong_themes에서 매핑됨 → ThemeDetailPanel D-4 hidden. 해결: detail loop 종료 후 `strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(themes_df.set_index("theme_id")["theme_description"].to_dict())` 1줄 추가. backend pytest AC-21 신규 — 총 21 AC. frontend 변경 0, V1 backend 무수정, 의존성 변경 0.
 - 2026-05-06 v1.0.3 amendment: default mode를 'quick' → 'full'로 변경 + 빠른 조회 모드 advisory 추가. 사용자 후속 신고 — v1.0.2까지 본문 박스가 코드에는 추가됐으나 화면에 안 보인다는 신고. Root cause: backend의 `service.py:92-95`가 detail 호출 결과로만 `theme_description`을 themes_df에 머지함. parser.py 주석에도 `list 응답 sectorDescription은 항상 null` 명시. 즉 빠른 조회(quick) 모드는 detail skip → backend가 description = null 반환 → frontend D-4 정책으로 hidden. 라이브 list endpoint 응답 직접 확인으로 sectorDescription=None 재검증 완료. 해결: ThemeAnalysis.tsx의 `useState<LoadMode>('quick')` → `('full')` (REQ-NT3-012 신규). 사용자가 "빠른 조회" 토글 시 화면에 회색 advisory 박스 추가 — "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다" 안내 (REQ-NT3-013 신규). AC-19/20 신규 — 총 20 AC. backend, V1 backend, 의존성 변경 0.
 - 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description 본문 prominent 강화. 사용자가 v1.0.1 amendment 후 화면(스크린샷 1)에서 "주도주" 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 다른 점을 신고. ThemeDetailPanel.tsx의 주도주(themeLeaders) 전체 섹션을 제거 (REQ-NT3-011 신규). theme_description 본문 박스 스타일 강화 — 글자 크기 12→13, 색 text-secondary→text-primary, padding 8/12→12/14, border-radius 6→8, border-left 3px→4px (REQ-NT3-009 강화). leaders prop은 호출부 호환을 위해 optional로 유지하되 컴포넌트 내부에서 미사용. 종목 테이블 + inclusion_reason 본문(REQ-NT3-010)은 그대로. AC-18 신규 추가 — 총 18 AC.
@@ -216,6 +217,42 @@ strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(desc_ma
 **Skip condition**: When `skip_details=True` (quick mode equivalent in service layer), this merge is unnecessary since both `themes_df` and `strong_themes_df` carry `theme_description=None` from the list endpoint.
 
 **Rationale**: `strong_themes_df` is built at line 73 by `build_strong_themes(themes_df, ...)` BEFORE the detail loop merges description into `themes_df`. Without this post-loop merge, `strong_themes_df["theme_description"]` remains `None` even though `themes_df` is properly populated. Since frontend's `ThemeAnalysis.tsx` uses `data?.strong_themes ?? data?.themes` (strong_themes first), the user's clicked theme is mapped from `strong_themes` → description=null → ThemeDetailPanel D-4 hidden. Bug present since v1.0.0 RUN, surfaced after v1.0.3 default 'full'.
+
+#### REQ-NT3-015: localStorage 응답 캐시 (v1.0.5 amendment)
+
+**The system shall** persist successful V2 endpoint responses to `localStorage` under keys `theme-analysis-cache-quick` and `theme-analysis-cache-full`, scoped per `mode`.
+
+**WHEN** `ThemeAnalysis` mounts or `mode` changes, **the system shall** read the corresponding `localStorage` entry first. If a valid cached entry exists (matching `cache_version: 'v1'`), **the system shall** display it immediately by calling `setData(cached.data)` and skip the network fetch.
+
+**WHEN** no cached entry exists for the current `mode` or `cache_version` mismatches, **the system shall** initiate the normal fetch flow (existing 30s/10s flow).
+
+**WHEN** a fetch succeeds, **the system shall** write the response to `localStorage` for the current `mode` with the schema:
+```json
+{
+  "cache_version": "v1",
+  "saved_at": "<ISO-8601>",
+  "data": <ThemesSnapshotResponse>
+}
+```
+
+**The system shall not** apply automatic expiration (no TTL). Cache invalidation is exclusively user-driven via the refresh button (REQ-NT3-016).
+
+**Rationale**: 사용자 단독 사용 시나리오 + Chart Grid DB 수동 업데이트 패턴과 일관된 "수동 갱신" 모델. 탭 전환/페이지 새로고침/모드 토글 모두에서 동일 데이터 즉시 표시 (~ 1ms). `cache_version` 필드로 향후 backend 응답 schema 변경 시 자동 무효화 가능. data-testid="theme-analysis-cache-storage"는 사용하지 않고 직접 localStorage spy로 검증.
+
+#### REQ-NT3-016: 명시적 "🔄 갱신" 버튼 (v1.0.5 amendment)
+
+**The system shall** render a refresh button in the ThemeAnalysis toolbar (within `.sector-analysis-toolbar`), positioned next to the period-toggle (`빠른 조회 / 전체 조회`). The button shall be labeled `🔄 갱신` and carry `data-testid="theme-refresh-button"`.
+
+**WHEN** the user clicks the refresh button, **the system shall**:
+1. Remove the `localStorage` entry for the current `mode` (`localStorage.removeItem('theme-analysis-cache-' + mode)`)
+2. Set `loading=true` and clear `error`
+3. Trigger a new network fetch via `setRetryNonce(n => n + 1)` (reusing the existing retry mechanism)
+
+**WHEN** the new fetch succeeds, **the system shall** write the response to `localStorage` per REQ-NT3-015 (overwriting any prior cache for the current mode).
+
+**WHEN** the new fetch fails, **the system shall** display the existing error message + retry button (REQ-NT3-007). The localStorage entry remains cleared (no stale data fallback).
+
+**Rationale**: 사용자가 명시적으로 "데이터 새로 받고 싶다"고 결정하는 시점에만 새 fetch. Chart Grid DB 수동 업데이트 모델과 일관성. button label은 한국어 사용자 친화적 ("Refresh"가 아닌 "갱신") + 이모지 🔄로 명확한 시각 신호. localStorage.removeItem은 silent — 캐시 부재 상태에서도 안전.
 
 #### REQ-NT3-013: 빠른 조회 모드 advisory (v1.0.3 amendment)
 
