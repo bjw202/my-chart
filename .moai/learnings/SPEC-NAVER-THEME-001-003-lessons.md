@@ -13,6 +13,7 @@
 | SPEC-NAVER-THEME-001 | 2026-04 | 데스크탑 HTML 기반 테마 분석 V1 신규 | 14 AC PASS, 51 tests, 커버리지 99% |
 | SPEC-NAVER-THEME-002 | 2026-04 | 모바일 JSON API 기반 V2 backend 신규 (V1 무수정) | V2 24 + 라이브 1 PASS, V1 51 회귀 0 |
 | SPEC-NAVER-THEME-003 | 2026-05-06 | 화면이 V2 통로 사용 + V2 metadata V1 alias | AC 15/15 PASS, V2 29 PASS, frontend 271 PASS, evaluator-active 4/4 PASS |
+| SPEC-NAVER-THEME-003 v1.0.5 amendment | 2026-05-07 | frontend localStorage 캐시 + 🔄 갱신 버튼 (탭 전환 재크롤링 해결) | AC 24/24, vitest 284/285 PASS, 회귀 0 |
 
 ship branch: `chore/integrated-main-merge-2026-04-25`. PR #4 (통합 머지)에 누적.
 
@@ -187,6 +188,49 @@ frontend `ThemeAnalysis.tsx:80`: `data?.strong_themes ?? data?.themes` — stron
 
 **적용**: backend SPEC plan에 "DataFrame derived 의존성 그래프"를 명시. 각 derived DataFrame이 어느 시점에 어느 컬럼을 채우는지 표로 정리.
 
+### 10. v1.0.5 amendment — 캐시 정책은 사용자 사용 패턴에 종속된다 (localStorage + 명시적 갱신 도입)
+
+SPEC-003 ship 직후 사용자 신고: "한 번 크롤링 했는데 다른 메뉴 갔다오면 왜 다시 크롤링을 하느라 시간을 쓰지?"
+
+진단:
+
+- AppContent는 CSS `display: none/flex` 토글로 모든 탭 mount 보존 → ThemeAnalysis state 유지됨 (다른 메뉴 갔다 와도 기존 데이터 그대로). 여기까지는 정상.
+- 그러나 사용자가 "빠른/전체 조회" mode 토글하거나 페이지 새로고침(F5)하면 useEffect 재실행 → 매번 30초 재크롤링.
+- backend/frontend 양쪽 모두 캐시 0건. SPEC-003 plan 시점에는 "사용자가 클릭할 때마다 최신 시세를 받자"는 가정이 디폴트.
+
+가정이 틀렸던 지점: 사용자께서는 단독 사용 + Chart Grid DB 수동 업데이트 모델로 운영하고 계셨음. 즉 "데이터 신선도는 내가 직접 관리한다, 시스템이 알아서 새로 받지 마라"는 패턴. 자동 fetch는 그 패턴과 정반대 방향.
+
+해결 (v1.0.5):
+
+- ThemeAnalysis.tsx에 `theme-analysis-cache-{quick|full}` localStorage 캐시 도입 (REQ-NT3-015). cache_version 'v1' schema 매칭 시에만 사용 → 향후 backend 응답 schema 변경 시 자동 무효화.
+- mount/mode 변경 시 cache 우선 → cache hit이면 fetch skip + 즉시 표시 (~ 1ms).
+- 툴바에 명시적 🔄 갱신 버튼 (REQ-NT3-016). 클릭 시 캐시 무효화 + 강제 fetch + 응답 재캐시.
+- 자동 만료(TTL) 없음 — 사용자가 데이터 신선도를 직접 관리.
+- AC-22/23/24 신규, vitest 9/9 PASS, 회귀 0.
+
+**핵심 통찰**:
+
+- **캐시 정책은 코드 결정이 아니라 사용자 사용 패턴 결정이다**. 다중 사용자 + 실시간성 요구 vs 단독 사용자 + 수동 업데이트 패턴은 정반대 캐시 전략을 요구. plan 시점에 "이 시스템은 누가 어떻게 쓰는가"를 먼저 묻지 않으면 캐시 0건 또는 잘못된 TTL로 끝남.
+- **같은 프로젝트 내 일관된 모델은 학습 비용을 0에 가깝게 만든다**. Chart Grid의 "내가 누를 때만 업데이트"와 테마 분석의 "🔄 갱신 누를 때만 새로 받음"은 동일 mental model. 사용자가 한 번 익히면 모든 곳에 적용.
+- **AppContent CSS toggle vs useEffect re-run의 미스매치**가 문제의 본질이었다. mount는 보존되지만 useEffect deps([mode, retryNonce])가 사용자 클릭으로 변하면 재실행. "mount 보존 = fetch 안 일어남"이라는 가정이 부분만 참.
+- **cache_version 같은 schema 버전 필드**는 캐시 도입 시 일관 적용해야 하는 작은 투자. 향후 backend 응답 schema 변경 시 frontend 캐시 자동 무효화 가능. 비용 거의 0, 이득 큼.
+- **Frontend 단독 캐시 (localStorage)는 디바이스 한정**. 단독 사용 시나리오에서는 충분, 다중 디바이스/팀 사용 시나리오에서는 backend 캐시(별도 SPEC) 필요. 본 SPEC에서는 작업량 최소 + 사용자 패턴 적합 → frontend 한정.
+
+**교훈**:
+
+- **plan 단계에서 "누가 어떻게 쓰는가" 인터뷰 항목을 명시 결정 항목으로**: 단독/팀, 자동/수동, 실시간/지연 — 세 축으로 사용 패턴 분류 후 캐시 정책 도출.
+- **같은 프로젝트 내 다른 기능과 일관된 모델을 우선**. 새 패턴 도입은 사용자 학습 비용 발생 — 일관성이 새로움보다 거의 항상 우월.
+- **자동 만료 vs 명시적 갱신 모델 선택은 "사용자가 신선도를 직접 관리하길 원하는가" 질문 하나로 결정**. Yes면 명시적 갱신(단순), No면 TTL.
+- **"AC PASS = 사용자 만족"이 아닌 또 한 가지 사례**. AC는 코드/회귀 검증, 사용자 사용 패턴 검증은 라이브 신고 후. plan 단계 사용 패턴 인터뷰가 amendment 발동 임계치를 낮춤.
+- **Mount 보존 ≠ fetch 안 일어남**. CSS toggle은 unmount만 막고, useEffect deps 변경은 별개 트리거. 캐시가 없으면 deps 변경마다 fetch 재발생.
+
+**적용**:
+
+- Frontend SPEC plan 단계에 "사용자 사용 패턴 인터뷰" 섹션 추가 (단독/팀, 자동/수동, 실시간/지연 3축). 각 축 결정에 따라 캐시 정책 자동 도출.
+- 캐시 도입 시 항상 `cache_version` 필드 포함 (frontend localStorage / backend lru_cache 무관).
+- 같은 프로젝트 내 기존 기능의 사용자 모델(예: Chart Grid 수동 업데이트)을 plan §환경 섹션에 reference로 기록 → 새 기능이 같은 모델 따르도록 plan 시점에 잠금.
+- 다음 frontend SPEC에서 mount/state lifecycle을 명시 다이어그램으로 plan에 포함 (mount/unmount 트리거, useEffect deps 트리거, fetch 트리거 분리).
+
 ---
 
 ## 시리즈 전반 적용 가능 패턴
@@ -225,13 +269,31 @@ plan 시점에:
 - cleanup은 별도 SPEC (충분히 안정 후)
 ```
 
+### 패턴 4 — 사용자 사용 패턴 기반 캐시 정책 (v1.0.5 도출)
+
+```
+plan 단계 사용자 사용 패턴 인터뷰:
+  Q1. 단독 사용 vs 팀 사용?
+  Q2. 데이터 신선도 자동 vs 수동?
+  Q3. 실시간성 요구 vs 지연 허용?
+
+→ 패턴별 캐시 정책 도출:
+  단독+수동+지연 → frontend localStorage + 명시적 갱신 버튼 (TTL 없음)
+  단독+자동+실시간 → 캐시 없음 또는 backend 짧은 TTL (1분)
+  팀+수동+지연 → backend 긴 TTL (1h~24h) + 명시적 갱신
+  팀+자동+실시간 → backend 짧은 TTL + auto-refresh
+
+→ 같은 프로젝트 내 다른 기능과 동일 모델 우선
+→ cache_version 필드 항상 포함 (schema 변경 자동 무효화)
+```
+
 ---
 
 ## 미해결 / 후속 작업 (별도 SPEC 후보)
 
 | 후보 | 동기 | 선행 조건 |
 |---|---|---|
-| SPEC-NAVER-THEME-CACHE | 30s API 호출 캐시 정책 (TTL, lru_cache) | SPEC-003 ship 후 권장 |
+| SPEC-NAVER-THEME-CACHE-BACKEND | backend in-memory long-TTL 캐시 (1h~24h) — 다중 디바이스/팀 사용 시. v1.0.5 frontend 캐시는 디바이스 한정 | 다중 사용자 또는 팀 사용으로 전환 시 |
 | SPEC-NAVER-THEME-V1-CLEANUP | V1 endpoint/모듈 dead code 제거 | V2 충분히 안정 후 |
 | SPEC-NAVER-THEME-MOBILE-UX | mobile touch에서도 theme_description 표시 | Radix/custom Tooltip 도입 검토 |
 | SPEC-NAVER-THEME-STOCK-DESC | stock_description 별도 컬럼 표시 (D-3 옵션 A) | desktop 가로 폭 여유 검토 |
@@ -251,6 +313,7 @@ plan 시점에:
 
 ---
 
-Version: 1.0.0
+Version: 1.0.1
 Created: 2026-05-06
+Updated: 2026-05-07 (SPEC-NAVER-THEME-003 v1.0.5 amendment 회고 추가 — §10 + 패턴 4)
 Source: SPEC-NAVER-THEME-003 sync phase 직후 시리즈 회고
