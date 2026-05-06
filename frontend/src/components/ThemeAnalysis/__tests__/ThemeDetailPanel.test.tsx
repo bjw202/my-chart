@@ -1,9 +1,10 @@
 // SPEC-NAVER-THEME-003 ThemeDetailPanel vitest
 // AC-13: V2 description via inclusion_reason title (D-3 cohabitation, hover tooltip 보존)
-// AC-16: theme_description 본문 노출 (REQ-NT3-009, v1.0.1 amendment)
-// AC-17: inclusion_reason 본문 노출 — 주도주 카드 + 종목 테이블 행 (REQ-NT3-010, v1.0.1 amendment)
+// AC-16: theme_description 본문 노출 (REQ-NT3-009, v1.0.1 amendment + v1.0.2 강화)
+// AC-17: stock inclusion_reason 본문 노출 (REQ-NT3-010, v1.0.1 amendment)
+// AC-18: 주도주 섹션 미렌더링 (REQ-NT3-011, v1.0.2 amendment — leader card 제거)
 import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { ThemeDetailPanel } from '../ThemeDetailPanel'
 
 const baseStock = {
@@ -43,8 +44,8 @@ describe('ThemeDetailPanel — V2 description via inclusion_reason title (AC-13,
   })
 })
 
-describe('ThemeDetailPanel — theme_description 본문 노출 (AC-16, REQ-NT3-009 v1.0.1)', () => {
-  it('renders theme_description as body text when present', () => {
+describe('ThemeDetailPanel — theme_description 본문 노출 (AC-16, REQ-NT3-009 v1.0.1+v1.0.2)', () => {
+  it('renders theme_description as prominent body text when present', () => {
     const theme = {
       theme_id: 178,
       theme_name: '전선',
@@ -78,7 +79,7 @@ describe('ThemeDetailPanel — theme_description 본문 노출 (AC-16, REQ-NT3-0
   })
 })
 
-describe('ThemeDetailPanel — inclusion_reason 본문 노출 (AC-17, REQ-NT3-010 v1.0.1)', () => {
+describe('ThemeDetailPanel — stock inclusion_reason 본문 노출 (AC-17, REQ-NT3-010 v1.0.1)', () => {
   it('renders inclusion_reason as body text in stock table row', () => {
     const theme = {
       theme_id: 178,
@@ -104,33 +105,7 @@ describe('ThemeDetailPanel — inclusion_reason 본문 노출 (AC-17, REQ-NT3-01
     expect(reasonBody?.textContent).toContain('와이어하네스')
   })
 
-  it('renders inclusion_reason as body text in leader card', () => {
-    const theme = {
-      theme_id: 557,
-      theme_name: '유리 기판',
-      change_pct: 13.58,
-      change_pct_3d: 13.58,
-    }
-    const leader = {
-      ...baseStock,
-      theme_id: 557,
-      theme_name: '유리 기판',
-      stock_code: '011790',
-      stock_name: 'SKC',
-      inclusion_reason: "美 반도체 소재 자회사 SK앱솔릭스, 글라스 기판을 게임 체인저로 보고 상용화 추진",
-      rank: 1,
-    }
-
-    const { container } = render(
-      <ThemeDetailPanel theme={theme} stocks={[]} leaders={[leader]} />
-    )
-
-    const leaderReasonBody = container.querySelector('[data-testid="leader-inclusion-reason-body"]')
-    expect(leaderReasonBody).not.toBeNull()
-    expect(leaderReasonBody?.textContent).toContain('게임 체인저')
-  })
-
-  it('omits inclusion_reason body when stock has no inclusion_reason', () => {
+  it('omits inclusion_reason body when stock has empty inclusion_reason', () => {
     const theme = {
       theme_id: 178,
       theme_name: '전선',
@@ -152,5 +127,60 @@ describe('ThemeDetailPanel — inclusion_reason 본문 노출 (AC-17, REQ-NT3-01
 
     const reasonBody = container.querySelector('[data-testid="stock-inclusion-reason-body"]')
     expect(reasonBody).toBeNull()
+  })
+})
+
+describe('ThemeDetailPanel — 주도주 섹션 미렌더링 (AC-18, REQ-NT3-011 v1.0.2 amendment)', () => {
+  it('does NOT render leader card section even when leaders prop is provided', () => {
+    const theme = {
+      theme_id: 557,
+      theme_name: '유리 기판',
+      change_pct: 13.58,
+      change_pct_3d: 13.58,
+    }
+    const leaders = [
+      {
+        ...baseStock,
+        theme_id: 557,
+        theme_name: '유리 기판',
+        stock_code: '011790',
+        stock_name: 'SKC',
+        inclusion_reason: "美 반도체 소재 자회사 SK앱솔릭스, 글라스 기판을 게임 체인저로",
+        rank: 1,
+      },
+    ]
+
+    const { container } = render(
+      <ThemeDetailPanel theme={theme} stocks={[]} leaders={leaders} />
+    )
+
+    // leader card body는 v1.0.2에서 미렌더링
+    const leaderReasonBody = container.querySelector('[data-testid="leader-inclusion-reason-body"]')
+    expect(leaderReasonBody).toBeNull()
+
+    // "주도주" 헤더 텍스트도 미렌더링
+    expect(screen.queryByText('주도주')).toBeNull()
+  })
+
+  it('renders correctly when leaders prop is omitted entirely', () => {
+    const theme = {
+      theme_id: 557,
+      theme_name: '유리 기판',
+      change_pct: 13.58,
+      change_pct_3d: 13.58,
+      theme_description: '유리 기판은 차세대 반도체 기판입니다.',
+    }
+
+    // leaders prop omitted (optional after v1.0.2)
+    const { container } = render(
+      <ThemeDetailPanel theme={theme} stocks={[]} />
+    )
+
+    // 테마 설명 본문은 정상 렌더링
+    const descBody = container.querySelector('[data-testid="theme-description-body"]')
+    expect(descBody).not.toBeNull()
+
+    // 주도주 섹션은 미렌더링
+    expect(screen.queryByText('주도주')).toBeNull()
   })
 })

@@ -2,7 +2,7 @@
 id: SPEC-NAVER-THEME-003
 title: V2 frontend 채택 — Acceptance Criteria
 status: Implemented
-version: 1.0.1
+version: 1.0.2
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -25,6 +25,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description prominent 강화. AC-18 신규 추가 (주도주 섹션 미렌더링 검증). AC-17은 stock body 검증만으로 좁힘 (leader body는 더 이상 발생 안함). 총 18 AC.
 - 2026-05-06 v1.0.1 amendment: D-3 reverse로 AC-16, AC-17 신규 추가 (theme_description 본문 노출 + inclusion_reason 본문 노출). 총 17 AC.
 - 2026-05-06 v1.0.0: 초안 작성 (manager-spec). 15 AC. SPEC-002 14-AC 스타일 mirror + D-1 retry 시나리오 1 추가. V1 routes/모듈 byte-identical 회귀 검증, V2 metadata V1 alias 4 필드 검증, frontend api/themes.ts URL swap 검증, theme_name hover Tooltip rendering(RTL), null hidden 검증, V2 503 mock 에러 메시지 + retry 시나리오 검증 포함. 라이브 테스트는 SPEC-002 라이브 1 PASS로 충분 — 신규 라이브 마커 미추가.
 
@@ -587,6 +588,55 @@ expect(reasonBody).toBeNull()
 
 ---
 
+## AC-18: 주도주 섹션 미렌더링 (REQ-NT3-011, v1.0.2 amendment)
+
+### Given
+- ThemeDetailPanel에 leaders 배열이 채워진 props 전달
+
+### When
+```typescript
+const theme = {
+  theme_id: 557,
+  theme_name: '유리 기판',
+  change_pct: 13.58,
+  change_pct_3d: 13.58,
+}
+const leaders = [{
+  theme_id: 557, theme_name: '유리 기판',
+  stock_code: '011790', stock_name: 'SKC',
+  inclusion_reason: '美 반도체 소재 자회사 SK앱솔릭스, 글라스 기판을 게임 체인저로',
+  price: 161200, change: 37200, change_pct: 30.0,
+  volume: 2100000, trade_value: 320_300_000_000, market_cap: 6_104_400_000_000,
+  rank: 1,
+}]
+
+const { container } = render(
+  <ThemeDetailPanel theme={theme} stocks={[]} leaders={leaders} />
+)
+```
+
+### Then
+```typescript
+// leader card body는 v1.0.2에서 미렌더링
+const leaderReasonBody = container.querySelector('[data-testid="leader-inclusion-reason-body"]')
+expect(leaderReasonBody).toBeNull()
+
+// "주도주" 헤더 텍스트도 미렌더링
+expect(screen.queryByText('주도주')).toBeNull()
+```
+
+또한 leaders prop을 omit한 경우(optional)에도 정상 렌더링:
+```typescript
+const { container } = render(
+  <ThemeDetailPanel theme={theme} stocks={[]} />  // leaders omitted
+)
+const descBody = container.querySelector('[data-testid="theme-description-body"]')
+expect(descBody).not.toBeNull()  // 테마 설명은 정상
+expect(screen.queryByText('주도주')).toBeNull()  // 주도주 미렌더링
+```
+
+---
+
 ## 부록: 검증 자동화 매트릭스
 
 | AC | 검증 방식 | 의존성 |
@@ -608,6 +658,7 @@ expect(reasonBody).toBeNull()
 | AC-15 | integration (pytest + vitest 전체 실행 + baseline 비교) | pytest, vitest |
 | AC-16 | unit (vitest, RTL render + data-testid 본문 노출 검증) | @testing-library/react |
 | AC-17 | unit (vitest, RTL render + data-testid 본문 노출 + title hover 보존 검증) | @testing-library/react |
+| AC-18 | unit (vitest, RTL render + leader-inclusion-reason-body 미렌더링 + "주도주" 텍스트 미렌더링) | @testing-library/react |
 
 ### 라이브 테스트 정책
 

@@ -1,8 +1,8 @@
 ---
 id: SPEC-NAVER-THEME-003
-title: V2 frontend 채택 (theme_description tooltip + V2 endpoint swap + body description)
+title: V2 frontend 채택 (theme_description prominent body + 주도주 섹션 제거)
 status: Implemented
-version: 1.0.1
+version: 1.0.2
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -29,6 +29,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description 본문 prominent 강화. 사용자가 v1.0.1 amendment 후 화면(스크린샷 1)에서 "주도주" 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 다른 점을 신고. ThemeDetailPanel.tsx의 주도주(themeLeaders) 전체 섹션을 제거 (REQ-NT3-011 신규). theme_description 본문 박스 스타일 강화 — 글자 크기 12→13, 색 text-secondary→text-primary, padding 8/12→12/14, border-radius 6→8, border-left 3px→4px (REQ-NT3-009 강화). leaders prop은 호출부 호환을 위해 optional로 유지하되 컴포넌트 내부에서 미사용. 종목 테이블 + inclusion_reason 본문(REQ-NT3-010)은 그대로. AC-18 신규 추가 — 총 18 AC.
 - 2026-05-06 v1.0.1 amendment: D-3 reverse — 사용자 라이브 검증 결과 hover tooltip만으로는 description이 한눈에 안 보여 네이버 모바일 UX와 어긋남. ThemeDetailPanel.tsx에 (1) 테마명 아래 `theme_description`을 본문 박스로 노출 (REQ-NT3-009 신규), (2) 주도주 카드와 종목 테이블 각 행 뒤에 `inclusion_reason`을 본문으로 펼쳐 노출 (REQ-NT3-010 신규). hover tooltip(`title` 속성)은 그대로 보존하여 중복 노출. AC-16/17 신규 추가 — 총 17 AC. ThemeDetailPanel.tsx 무수정 정책(D-3 v1.0.0)은 종료, 본문 표시(D-3 옵션 A 변형) 정책으로 전환. backend/V1 무수정(REQ-NT3-C-002), additive only(REQ-NT3-C-003), 신규 의존성 0(REQ-NT3-C-004)은 그대로 유지.
 - 2026-05-06 v1.0.0 ship: commit `6284280` — RUN phase 완료. AC 15/15 PASS, V1 51 회귀 0, V2 24+5=29 PASS, frontend 271 PASS (baseline diff 0). evaluator-active PASS (Func 100/Sec 90/Craft 92/Cons 95). 16 files +3050/-19. ThemeDetailPanel.tsx 무수정 (D-3). frontend/package.json 무수정 (REQ-NT3-C-004). bare except 0건 (REQ-NT3-C-005).
 - 2026-05-06 v1.0.0: 초안 작성 (manager-spec). SPEC-NAVER-THEME-002 V2 backend ship 후속 작업으로 frontend가 V2 endpoint를 채택하도록 한다. 핸드오프 문서(`.moai/specs/SPEC-NAVER-THEME-002/handoff-frontend-v2.md`) Stage B 기반. 사용자 결정 D-1(에러 메시지+retry), D-2(theme_name hover Tooltip), D-3(inclusion_reason 컬럼 자리 재사용 — V2 parser 동일 source 활용), D-4(null hidden) 사전 잠금. V1 routes/모듈 byte-identical 보존(REQ-NT3-C-001/C-002), V2 backend metadata는 additive-only V1 alias 4 필드 추가(REQ-NT3-005), pip 신규 의존성 금지(REQ-NT3-C-004), bare except 금지(REQ-NT3-C-005). V2 endpoint 503/timeout 시 V1 자동 폴백 금지(REQ-NT3-C-006).
@@ -170,23 +171,37 @@ Frontend (기존 의존성 그대로):
 
 **Rationale (v1.0.0)**: D-3 결정. V2 mobile parser의 동일 source 정책(§2.3 research) 활용 → frontend 컴포넌트 변경 0. inclusion_reason cell의 hover tooltip이 V1 desktop의 편입사유 → V2 mobile의 편입설명으로 자연스럽게 전환.
 
-#### REQ-NT3-009: 테마 설명 본문 노출 (v1.0.1 amendment, D-3 reverse)
+#### REQ-NT3-009: 테마 설명 본문 prominent 노출 (v1.0.1 amendment, D-3 reverse + v1.0.2 강화)
 
-**WHEN** ThemeDetailPanel이 렌더링되고 `theme.theme_description`이 non-null/non-empty string이면, **the system shall** render the description as visible body text in a styled container directly below the theme title (hover tooltip 외에 본문으로도 노출).
+**WHEN** ThemeDetailPanel이 렌더링되고 `theme.theme_description`이 non-null/non-empty string이면, **the system shall** render the description as visible body text in a styled container directly below the theme title with prominent typography:
+- font-size: 13px (v1.0.2 강화, 이전 12px)
+- color: var(--text-primary) (v1.0.2 강화, 이전 var(--text-secondary))
+- line-height: 1.65
+- padding: 12px 14px
+- border-radius: 8px
+- border-left: 4px solid var(--positive)
 
 **WHEN** `theme.theme_description`이 null/undefined/empty이면, **the system shall not** render the body container (D-4 hidden 정책 보존).
 
-**Rationale**: 사용자 라이브 검증 결과 hover tooltip만으로는 description이 발견되기 어려움. 네이버 모바일 사이트 UX와 일치시키기 위해 본문 노출 추가. data-testid="theme-description-body"로 vitest 검증.
+**Rationale**: v1.0.1에서 hover-only 발견성 문제 해결, v1.0.2에서 사용자 신고 — "테마 설명을 가장 prominent하게 봐야 한다"는 네이버 모바일 UX 일치 강화. data-testid="theme-description-body"로 vitest 검증.
 
 #### REQ-NT3-010: 종목 편입설명 본문 노출 (v1.0.1 amendment, D-3 reverse)
 
-**WHEN** ThemeDetailPanel이 종목 행(주도주 카드 또는 종목 테이블)을 렌더링하고 해당 stock의 `inclusion_reason`이 non-null/non-empty string이면, **the system shall** render the inclusion_reason as visible body text in a styled container associated with the stock row (hover tooltip 외에 본문으로도 노출).
+**WHEN** ThemeDetailPanel이 종목 테이블 행을 렌더링하고 해당 stock의 `inclusion_reason`이 non-null/non-empty string이면, **the system shall** render the inclusion_reason as visible body text in a styled container directly below the stock row (hover tooltip 외에 본문으로도 노출).
 
 **WHEN** `inclusion_reason`이 null/undefined/empty이면, **the system shall not** render the body container.
 
 **The system shall** preserve the existing `title` attribute on stock rows (hover tooltip 호환성, 중복 노출 허용).
 
-**Rationale**: REQ-NT3-009와 동일 — hover-only UX는 발견성 부족. 네이버 모바일 UX 일치. data-testid="leader-inclusion-reason-body" / "stock-inclusion-reason-body"로 vitest 검증.
+**Rationale**: REQ-NT3-009와 동일 — hover-only UX는 발견성 부족. 네이버 모바일 UX 일치. data-testid="stock-inclusion-reason-body"로 vitest 검증. v1.0.2에서 주도주 카드는 제거됐으므로 leader-inclusion-reason-body는 더 이상 발생하지 않음 (REQ-NT3-011).
+
+#### REQ-NT3-011: 주도주 섹션 제거 (v1.0.2 amendment)
+
+**The system shall not** render the "주도주" (leader) section in `ThemeDetailPanel.tsx`, including the section header and any leader cards, regardless of whether `leaders` prop contains items.
+
+**The system shall** preserve the `leaders` prop as optional in `ThemeDetailPanel`'s interface for backward compatibility with existing call sites (`ThemeAnalysis.tsx` 호출부 무수정).
+
+**Rationale**: 사용자 신고 — 주도주 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 어긋남. 주도주 정보는 종목 테이블에 모든 종목 표시되므로 별도 섹션 불필요 (rank 정보는 v1.0.2에서 자연스럽게 사라짐 — 추후 종목 테이블에 통합 가능). data-testid="leader-inclusion-reason-body" 미렌더링 + "주도주" 텍스트 미렌더링으로 vitest 검증.
 
 ### 3.2 Non-Functional Requirements
 

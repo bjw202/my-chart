@@ -109,8 +109,9 @@ KRX_PW=your_krx_password
 
 - **테마 목록**: 네이버 금융 테마 실시간 수집(V1: 데스크탑 HTML, V2: 모바일 m.stock.naver.com JSON), 강세 테마 상위 N개 추출
 - **테마 설명 tooltip**: V2 응답의 `theme_description`이 theme_name 셀 hover 시 native HTML title로 노출 (D-2, SPEC-003 REQ-NT3-004)
-- **테마 상세**: 테마별 주도주 (z-score 기반 가중치), 종목별 편입설명을 **본문 텍스트로 항상 노출** + hover tooltip 동시 (v1.0.1 amendment, REQ-NT3-009/010 — 네이버 모바일 UX 일치)
-- **테마 설명 본문**: 선택된 테마의 `theme_description`을 우측 상세 패널 상단에 본문으로 표시 (v1.0.1 amendment)
+- **테마 설명 본문 (prominent)**: 선택된 테마의 `theme_description`을 우측 상세 패널 상단에 큰 글씨 + 좌측 색 띠로 prominent하게 표시 (v1.0.2 amendment, REQ-NT3-009 강화)
+- **종목 테이블 + 편입설명**: 종목별 편입설명을 종목 행 다음에 본문 텍스트로 노출 + hover tooltip 동시 (v1.0.1 amendment, REQ-NT3-010)
+- **주도주 섹션 제거**: v1.0.2 amendment에서 별도 "주도주" 섹션 제거. 주도주 정보는 종목 테이블의 모든 종목으로 통합 (REQ-NT3-011)
 - **멀티테마 종목**: 2개 이상 테마에 동시 편입된 종목 분석
 - **에러 처리 (V2)**: V2 endpoint 503/timeout 시 사용자 친화적 에러 메시지 + 다시 시도 버튼 (V1 자동 폴백 X — D-1, SPEC-003 REQ-NT3-007)
 - **빠른 조회**: V2 `/api/themes/v2/quick` (≤10초) / 상세 조회: V2 `/api/themes/v2/snapshot` (~30초)

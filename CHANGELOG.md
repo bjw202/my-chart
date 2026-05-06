@@ -69,6 +69,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - hover tooltip(`title` 속성)은 보존 (중복 노출, AC-13 호환)
     - AC-16/17 신규 추가 (총 17 AC)
     - ThemeDetailPanel.test.tsx vitest 6 cases 추가
+  - **v1.0.2 amendment** (주도주 섹션 제거 + theme_description prominent 강화):
+    - 사용자 후속 신고: 테마명 직후 "주도주" 섹션이 가장 위에 위치해서 네이버 모바일의 "테마 설명 우선" UX와 어긋남
+    - ThemeDetailPanel 주도주(themeLeaders) 섹션 완전 제거 (REQ-NT3-011 신규)
+    - theme_description 본문 박스 스타일 강화: font-size 12→13px, color text-secondary→text-primary, padding 8/12→12/14, border-radius 6→8, border-left 3px→4px (REQ-NT3-009 강화)
+    - leaders prop은 호출부 호환을 위해 optional로 유지하되 컴포넌트 내부에서 미사용
+    - RankBadge 함수 미사용으로 제거
+    - AC-18 신규 추가 (총 18 AC)
+    - ThemeDetailPanel.test.tsx vitest 7 cases (AC-13 1 + AC-16 2 + AC-17 2 + AC-18 2)
 
 ### Changed (SPEC-AI-REPORT-003)
 

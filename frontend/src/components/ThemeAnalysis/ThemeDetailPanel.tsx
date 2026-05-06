@@ -1,5 +1,5 @@
-// @MX:NOTE: [AUTO] ThemeDetailPanel은 선택된 테마의 주도주 + 전체 종목을 렌더링; theme_description과 inclusion_reason을 본문 + hover tooltip으로 동시 노출 (네이버 모바일 UX 일치)
-// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-008, SPEC-NAVER-THEME-003 REQ-NT3-009, REQ-NT3-010 (v1.0.1 amendment — D-3 reverse)
+// @MX:NOTE: [AUTO] ThemeDetailPanel은 선택된 테마의 설명 + 전체 종목을 렌더링; theme_description은 본문 prominent + hover tooltip 동시 노출 (네이버 모바일 UX 일치)
+// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-008, SPEC-NAVER-THEME-003 REQ-NT3-009 (강화), REQ-NT3-010, REQ-NT3-011 (v1.0.2 amendment — 주도주 섹션 제거)
 import { Fragment } from 'react'
 import type { ReactElement } from 'react'
 import type { ThemeItem, ThemeStockItem } from '../../api/themes'
@@ -7,33 +7,7 @@ import type { ThemeItem, ThemeStockItem } from '../../api/themes'
 interface ThemeDetailPanelProps {
   theme: ThemeItem
   stocks: ThemeStockItem[]
-  leaders: ThemeStockItem[]
-}
-
-function RankBadge({ rank }: { rank: number }): ReactElement {
-  const colors: Record<number, string> = {
-    1: 'var(--positive)',
-    2: 'var(--text-secondary)',
-    3: '#cd7f32',
-  }
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 18,
-      height: 18,
-      borderRadius: '50%',
-      background: colors[rank] ?? 'var(--bg-surface)',
-      color: 'var(--bg-primary)',
-      fontSize: 10,
-      fontWeight: 700,
-      marginRight: 4,
-      flexShrink: 0,
-    }}>
-      {rank}
-    </span>
-  )
+  leaders?: ThemeStockItem[]  // v1.0.2 amendment 이후 미사용 (호출부 호환을 위해 optional 유지)
 }
 
 function formatChangePct(value: number): ReactElement {
@@ -43,28 +17,27 @@ function formatChangePct(value: number): ReactElement {
   return <span style={{ color }}>{sign}{value.toFixed(2)}%</span>
 }
 
-export function ThemeDetailPanel({ theme, stocks, leaders }: ThemeDetailPanelProps): ReactElement {
+export function ThemeDetailPanel({ theme, stocks }: ThemeDetailPanelProps): ReactElement {
   const themeStocks = stocks.filter(s => s.theme_id === theme.theme_id)
-  const themeLeaders = leaders.filter(s => s.theme_id === theme.theme_id)
 
   return (
     <div className="sector-detail-panel">
       <div className="sector-detail-panel-title">{theme.theme_name}</div>
 
-      {/* 테마 설명 본문 (REQ-NT3-009, v1.0.1 amendment) */}
+      {/* 테마 설명 본문 — prominent style (REQ-NT3-009 v1.0.2 강화) */}
       {theme.theme_description && (
         <div
           data-testid="theme-description-body"
           style={{
-            fontSize: 12,
-            color: 'var(--text-secondary)',
-            lineHeight: 1.55,
-            padding: '8px 12px',
-            marginTop: 8,
-            marginBottom: 12,
+            fontSize: 13,
+            color: 'var(--text-primary)',
+            lineHeight: 1.65,
+            padding: '12px 14px',
+            marginTop: 12,
+            marginBottom: 16,
             background: 'var(--bg-surface)',
-            borderRadius: 6,
-            borderLeft: '3px solid var(--positive)',
+            borderRadius: 8,
+            borderLeft: '4px solid var(--positive)',
             whiteSpace: 'pre-wrap',
           }}
         >
@@ -72,45 +45,7 @@ export function ThemeDetailPanel({ theme, stocks, leaders }: ThemeDetailPanelPro
         </div>
       )}
 
-      {/* 주도주 Top 3 — 각 카드에 편입설명 본문 노출 (REQ-NT3-010) */}
-      {themeLeaders.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
-            주도주
-          </div>
-          {themeLeaders.map(stock => (
-            <div
-              key={stock.stock_code}
-              title={stock.inclusion_reason || undefined}
-              style={{ padding: '6px 0', fontSize: 12, cursor: 'default' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {stock.rank != null && <RankBadge rank={stock.rank} />}
-                <span style={{ fontWeight: 500, color: 'var(--text-primary)', flex: 1 }}>{stock.stock_name}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 8 }}>{stock.stock_code}</span>
-                {formatChangePct(stock.change_pct)}
-              </div>
-              {stock.inclusion_reason && (
-                <div
-                  data-testid="leader-inclusion-reason-body"
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--text-muted)',
-                    lineHeight: 1.45,
-                    marginTop: 4,
-                    marginLeft: 26,
-                    paddingLeft: 8,
-                    borderLeft: '2px solid var(--border)',
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {stock.inclusion_reason}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* 주도주 섹션 제거 (v1.0.2 amendment, REQ-NT3-011). leaders prop은 호환을 위해 받지만 미사용. */}
 
       {/* 전체 종목 테이블 — 각 종목 행 뒤에 편입설명 본문 행 추가 (REQ-NT3-010) */}
       {themeStocks.length > 0 && (

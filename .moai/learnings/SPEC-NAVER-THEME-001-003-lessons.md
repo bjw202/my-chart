@@ -126,6 +126,22 @@ SPEC-003 plan에서 D-2(테마 설명 hover tooltip) + D-3(편입설명 hover to
 
 **적용**: 다음 frontend SPEC에서 hover-only 결정을 할 때, "본문 표시 추가 가능성"을 옵션으로 plan에 함께 기록 → amendment 발동 임계치 낮춤.
 
+### 7. v1.0.2 amendment — 정보 우선순위(IA)는 라이브 화면에서 다시 잡기 (주도주 섹션 제거)
+
+v1.0.1에서 본문 표시를 추가했음에도 사용자는 후속 신고를 함: "주도주" 섹션이 테마명 바로 아래에 자리 잡고 있어서 사용자 시선이 테마 설명보다 먼저 도달함. 네이버 모바일 사이트는 테마 설명을 가장 위에 prominent하게 두고 종목/주도주는 그다음에 배치. v1.0.2 amendment에서 주도주(themeLeaders) 섹션을 완전 제거하고 theme_description 본문 박스를 prominent style(font-size 13, padding 강화, border-left 4px)로 강화.
+
+**핵심 통찰**:
+- "코드는 데이터를 노출했다" ≠ "사용자가 데이터를 발견했다". 화면의 자리(IA — Information Architecture)와 비주얼 prominence가 발견성의 절반 이상을 좌우.
+- v1.0.1처럼 "데이터를 화면에 추가" 작업이 끝나도, 라이브 화면에서 우선순위(어느 영역이 가장 먼저 시선을 받는가)를 다시 검증해야 함.
+- "기존 섹션을 그대로 두고 추가" 패턴은 IA를 변경하지 않는 안전한 변경 같지만, 정작 "새로 추가한 정보가 가장 prominent하지 않은" 결과를 낳을 수 있음.
+
+**교훈**:
+- frontend SPEC에서 새 정보를 추가할 때 "가장 위에 둘 것인가, 기존 섹션 다음에 둘 것인가"는 plan 단계 결정 항목으로 명시. 단순 "표시할지 여부"만이 아니라 "어느 위치에 어느 비중으로"까지 기록.
+- reference 사이트 비교 시 "어떤 데이터를 노출하느냐"뿐 아니라 "어떤 순서로 어떤 비중으로"도 기록 — 정보 우선순위가 reference 그대로 따라가도록.
+- Amendment를 두려워하지 말기. v1.0.1 → v1.0.2처럼 작은 단계로 라이브 검증 후 잡으면 큰 위험 없음. 한 번에 완벽한 plan보다 빠른 iteration이 낫다 (사용자 라이브 신고 기반).
+
+**적용**: SPEC-003 amendment chain (v1.0.0 → v1.0.1 → v1.0.2)을 다른 SPEC에서도 패턴화. 각 amendment는 spec.md HISTORY entry + acceptance.md AC 신규 + 작은 commit으로 정리.
+
 ---
 
 ## 시리즈 전반 적용 가능 패턴
