@@ -1,8 +1,8 @@
 ---
 id: SPEC-NAVER-THEME-003
-title: V2 frontend 채택 (theme_description tooltip + V2 endpoint swap)
+title: V2 frontend 채택 (theme_description tooltip + V2 endpoint swap + body description)
 status: Implemented
-version: 1.0.0
+version: 1.0.1
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -29,6 +29,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.1 amendment: D-3 reverse — 사용자 라이브 검증 결과 hover tooltip만으로는 description이 한눈에 안 보여 네이버 모바일 UX와 어긋남. ThemeDetailPanel.tsx에 (1) 테마명 아래 `theme_description`을 본문 박스로 노출 (REQ-NT3-009 신규), (2) 주도주 카드와 종목 테이블 각 행 뒤에 `inclusion_reason`을 본문으로 펼쳐 노출 (REQ-NT3-010 신규). hover tooltip(`title` 속성)은 그대로 보존하여 중복 노출. AC-16/17 신규 추가 — 총 17 AC. ThemeDetailPanel.tsx 무수정 정책(D-3 v1.0.0)은 종료, 본문 표시(D-3 옵션 A 변형) 정책으로 전환. backend/V1 무수정(REQ-NT3-C-002), additive only(REQ-NT3-C-003), 신규 의존성 0(REQ-NT3-C-004)은 그대로 유지.
 - 2026-05-06 v1.0.0 ship: commit `6284280` — RUN phase 완료. AC 15/15 PASS, V1 51 회귀 0, V2 24+5=29 PASS, frontend 271 PASS (baseline diff 0). evaluator-active PASS (Func 100/Sec 90/Craft 92/Cons 95). 16 files +3050/-19. ThemeDetailPanel.tsx 무수정 (D-3). frontend/package.json 무수정 (REQ-NT3-C-004). bare except 0건 (REQ-NT3-C-005).
 - 2026-05-06 v1.0.0: 초안 작성 (manager-spec). SPEC-NAVER-THEME-002 V2 backend ship 후속 작업으로 frontend가 V2 endpoint를 채택하도록 한다. 핸드오프 문서(`.moai/specs/SPEC-NAVER-THEME-002/handoff-frontend-v2.md`) Stage B 기반. 사용자 결정 D-1(에러 메시지+retry), D-2(theme_name hover Tooltip), D-3(inclusion_reason 컬럼 자리 재사용 — V2 parser 동일 source 활용), D-4(null hidden) 사전 잠금. V1 routes/모듈 byte-identical 보존(REQ-NT3-C-001/C-002), V2 backend metadata는 additive-only V1 alias 4 필드 추가(REQ-NT3-005), pip 신규 의존성 금지(REQ-NT3-C-004), bare except 금지(REQ-NT3-C-005). V2 endpoint 503/timeout 시 V1 자동 폴백 금지(REQ-NT3-C-006).
 
@@ -159,13 +160,33 @@ Frontend (기존 의존성 그대로):
 
 **Rationale**: D-1 결정. UI 분기 최소화 + Sentry release 활발한 risk(R-1) 시 사용자 즉시 인지 + 수동 retry. 자동 폴백은 V1↔V2 schema 차이로 복잡도 증가 → 회피.
 
-#### REQ-NT3-008: ThemeDetailPanel inclusion_reason 자리에서 V2 description 자동 노출 (D-3)
+#### REQ-NT3-008: ThemeDetailPanel inclusion_reason 자리에서 V2 description 자동 노출 (D-3, v1.0.0)
 
-**The system shall** preserve the existing `title={stock.inclusion_reason}` rendering in `ThemeDetailPanel.tsx` (line 62, 92) without modification.
+> v1.0.1 amendment에서 REQ-NT3-009 / REQ-NT3-010으로 보강됨. hover tooltip은 보존하되 본문 노출이 추가됨.
+
+**The system shall** preserve the existing `title={stock.inclusion_reason}` rendering in `ThemeDetailPanel.tsx` (hover tooltip 보존).
 
 **WHEN** V2 endpoint가 호출되고 V2 parser가 `inclusion_reason`과 `stock_description`을 동일 source(`item.description`)로 채운 응답을 반환하면, **the system shall** display V2의 종목별 편입설명을 기존 inclusion_reason 자리에 자동으로 노출한다.
 
-**Rationale**: D-3 결정. V2 mobile parser의 동일 source 정책(§2.3 research) 활용 → frontend 컴포넌트 변경 0. inclusion_reason cell의 hover tooltip이 V1 desktop의 편입사유 → V2 mobile의 편입설명으로 자연스럽게 전환.
+**Rationale (v1.0.0)**: D-3 결정. V2 mobile parser의 동일 source 정책(§2.3 research) 활용 → frontend 컴포넌트 변경 0. inclusion_reason cell의 hover tooltip이 V1 desktop의 편입사유 → V2 mobile의 편입설명으로 자연스럽게 전환.
+
+#### REQ-NT3-009: 테마 설명 본문 노출 (v1.0.1 amendment, D-3 reverse)
+
+**WHEN** ThemeDetailPanel이 렌더링되고 `theme.theme_description`이 non-null/non-empty string이면, **the system shall** render the description as visible body text in a styled container directly below the theme title (hover tooltip 외에 본문으로도 노출).
+
+**WHEN** `theme.theme_description`이 null/undefined/empty이면, **the system shall not** render the body container (D-4 hidden 정책 보존).
+
+**Rationale**: 사용자 라이브 검증 결과 hover tooltip만으로는 description이 발견되기 어려움. 네이버 모바일 사이트 UX와 일치시키기 위해 본문 노출 추가. data-testid="theme-description-body"로 vitest 검증.
+
+#### REQ-NT3-010: 종목 편입설명 본문 노출 (v1.0.1 amendment, D-3 reverse)
+
+**WHEN** ThemeDetailPanel이 종목 행(주도주 카드 또는 종목 테이블)을 렌더링하고 해당 stock의 `inclusion_reason`이 non-null/non-empty string이면, **the system shall** render the inclusion_reason as visible body text in a styled container associated with the stock row (hover tooltip 외에 본문으로도 노출).
+
+**WHEN** `inclusion_reason`이 null/undefined/empty이면, **the system shall not** render the body container.
+
+**The system shall** preserve the existing `title` attribute on stock rows (hover tooltip 호환성, 중복 노출 허용).
+
+**Rationale**: REQ-NT3-009와 동일 — hover-only UX는 발견성 부족. 네이버 모바일 UX 일치. data-testid="leader-inclusion-reason-body" / "stock-inclusion-reason-body"로 vitest 검증.
 
 ### 3.2 Non-Functional Requirements
 

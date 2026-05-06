@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **신규 의존성 0건** (REQ-NT3-C-004): native HTML title 사용 (Radix Tooltip 미도입)
   - **신규 단위 테스트**: backend 5 (V2 metadata alias) + frontend vitest 4 파일 15 tests
   - **비개발자용 종합 가이드**: [docs/theme-analysis-guide.md](docs/theme-analysis-guide.md), 시리즈 회고: [.moai/learnings/SPEC-NAVER-THEME-001-003-lessons.md](.moai/learnings/SPEC-NAVER-THEME-001-003-lessons.md)
+  - **v1.0.1 amendment** (D-3 reverse — UX 사용성 개선):
+    - hover tooltip만으로는 description이 한눈에 안 보여 네이버 모바일 UX와 어긋난다는 사용자 라이브 검증 결과 반영
+    - ThemeDetailPanel 테마명 아래 `theme_description` 본문 박스로 노출 (REQ-NT3-009 신규)
+    - 주도주 카드 + 종목 테이블 각 행 뒤에 `inclusion_reason` 본문으로 펼쳐 노출 (REQ-NT3-010 신규)
+    - hover tooltip(`title` 속성)은 보존 (중복 노출, AC-13 호환)
+    - AC-16/17 신규 추가 (총 17 AC)
+    - ThemeDetailPanel.test.tsx vitest 6 cases 추가
 
 ### Changed (SPEC-AI-REPORT-003)
 

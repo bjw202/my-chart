@@ -1,33 +1,36 @@
-// RED: ThemeDetailPanel — D-3 V2 description cohabitation 검증 (SPEC-NAVER-THEME-003 AC-13)
-// ThemeDetailPanel.tsx 무수정 전제. 기존 title={stock.inclusion_reason} 패턴이 V2 mock에서도 동작하는지 검증.
+// SPEC-NAVER-THEME-003 ThemeDetailPanel vitest
+// AC-13: V2 description via inclusion_reason title (D-3 cohabitation, hover tooltip 보존)
+// AC-16: theme_description 본문 노출 (REQ-NT3-009, v1.0.1 amendment)
+// AC-17: inclusion_reason 본문 노출 — 주도주 카드 + 종목 테이블 행 (REQ-NT3-010, v1.0.1 amendment)
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { ThemeDetailPanel } from '../ThemeDetailPanel'
 
+const baseStock = {
+  theme_id: 178,
+  theme_name: '전선',
+  price: 12000,
+  change: 100,
+  change_pct: 0.84,
+  volume: 100000,
+  trade_value: 1_200_000_000,
+  market_cap: 100_000_000_000,
+}
+
 describe('ThemeDetailPanel — V2 description via inclusion_reason title (AC-13, D-3)', () => {
-  it('exposes V2 description via inclusion_reason title (D-3 cohabitation)', () => {
-    // V2 parser 정책: inclusion_reason ← item.description (parser.py:271)
-    // V2 응답에서 inclusion_reason이 V2 mobile description 텍스트로 채워진 mock
+  it('exposes V2 description via inclusion_reason title (D-3 cohabitation, hover tooltip 보존)', () => {
     const theme = {
       theme_id: 178,
       theme_name: '전선',
       change_pct: 9.2,
       change_pct_3d: 12.0,
     }
-
     const stocks = [
       {
-        theme_id: 178,
-        theme_name: '전선',
+        ...baseStock,
         stock_code: '009470',
         stock_name: '삼화전기',
-        inclusion_reason: '전선 제조사로 자동차 와이어하네스 등 다각화', // V2 parser가 item.description으로 채움
-        price: 12000,
-        change: 100,
-        change_pct: 0.84,
-        volume: 100000,
-        trade_value: 1_200_000_000,
-        market_cap: 100_000_000_000,
+        inclusion_reason: '전선 제조사로 자동차 와이어하네스 등 다각화',
       },
     ]
 
@@ -35,9 +38,119 @@ describe('ThemeDetailPanel — V2 description via inclusion_reason title (AC-13,
       <ThemeDetailPanel theme={theme} stocks={stocks} leaders={[]} />
     )
 
-    // 종목 행에 title 속성으로 V2 description이 노출 (기존 inclusion_reason 자리 — D-3)
-    // ThemeDetailPanel.tsx line 92: title={stock.inclusion_reason || undefined}
     const stockRow = container.querySelector('tr[title*="전선 제조사로"]')
     expect(stockRow).not.toBeNull()
+  })
+})
+
+describe('ThemeDetailPanel — theme_description 본문 노출 (AC-16, REQ-NT3-009 v1.0.1)', () => {
+  it('renders theme_description as body text when present', () => {
+    const theme = {
+      theme_id: 178,
+      theme_name: '전선',
+      change_pct: 9.2,
+      change_pct_3d: 12.0,
+      theme_description: '각종 전선 및 전람(電纜)제조 판매업체. AI 인프라 수요 급증.',
+    }
+
+    const { container } = render(
+      <ThemeDetailPanel theme={theme} stocks={[]} leaders={[]} />
+    )
+
+    const descBody = container.querySelector('[data-testid="theme-description-body"]')
+    expect(descBody).not.toBeNull()
+    expect(descBody?.textContent).toContain('각종 전선')
+  })
+
+  it('omits theme_description body when null/undefined/empty (D-4 보존)', () => {
+    const cases = [
+      { theme_id: 1, theme_name: 'NullDesc', change_pct: 0, change_pct_3d: 0, theme_description: null },
+      { theme_id: 2, theme_name: 'NoDesc', change_pct: 0, change_pct_3d: 0 },
+      { theme_id: 3, theme_name: 'EmptyDesc', change_pct: 0, change_pct_3d: 0, theme_description: '' },
+    ]
+    cases.forEach(theme => {
+      const { container } = render(
+        <ThemeDetailPanel theme={theme} stocks={[]} leaders={[]} />
+      )
+      const descBody = container.querySelector('[data-testid="theme-description-body"]')
+      expect(descBody).toBeNull()
+    })
+  })
+})
+
+describe('ThemeDetailPanel — inclusion_reason 본문 노출 (AC-17, REQ-NT3-010 v1.0.1)', () => {
+  it('renders inclusion_reason as body text in stock table row', () => {
+    const theme = {
+      theme_id: 178,
+      theme_name: '전선',
+      change_pct: 9.2,
+      change_pct_3d: 12.0,
+    }
+    const stocks = [
+      {
+        ...baseStock,
+        stock_code: '009470',
+        stock_name: '삼화전기',
+        inclusion_reason: '전선 제조사로 자동차 와이어하네스 등 다각화',
+      },
+    ]
+
+    const { container } = render(
+      <ThemeDetailPanel theme={theme} stocks={stocks} leaders={[]} />
+    )
+
+    const reasonBody = container.querySelector('[data-testid="stock-inclusion-reason-body"]')
+    expect(reasonBody).not.toBeNull()
+    expect(reasonBody?.textContent).toContain('와이어하네스')
+  })
+
+  it('renders inclusion_reason as body text in leader card', () => {
+    const theme = {
+      theme_id: 557,
+      theme_name: '유리 기판',
+      change_pct: 13.58,
+      change_pct_3d: 13.58,
+    }
+    const leader = {
+      ...baseStock,
+      theme_id: 557,
+      theme_name: '유리 기판',
+      stock_code: '011790',
+      stock_name: 'SKC',
+      inclusion_reason: "美 반도체 소재 자회사 SK앱솔릭스, 글라스 기판을 게임 체인저로 보고 상용화 추진",
+      rank: 1,
+    }
+
+    const { container } = render(
+      <ThemeDetailPanel theme={theme} stocks={[]} leaders={[leader]} />
+    )
+
+    const leaderReasonBody = container.querySelector('[data-testid="leader-inclusion-reason-body"]')
+    expect(leaderReasonBody).not.toBeNull()
+    expect(leaderReasonBody?.textContent).toContain('게임 체인저')
+  })
+
+  it('omits inclusion_reason body when stock has no inclusion_reason', () => {
+    const theme = {
+      theme_id: 178,
+      theme_name: '전선',
+      change_pct: 0,
+      change_pct_3d: 0,
+    }
+    const stocks = [
+      {
+        ...baseStock,
+        stock_code: '000000',
+        stock_name: 'NoReason',
+        inclusion_reason: '',
+      },
+    ]
+
+    const { container } = render(
+      <ThemeDetailPanel theme={theme} stocks={stocks} leaders={[]} />
+    )
+
+    const reasonBody = container.querySelector('[data-testid="stock-inclusion-reason-body"]')
+    expect(reasonBody).toBeNull()
   })
 })

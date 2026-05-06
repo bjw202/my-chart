@@ -1,8 +1,8 @@
 ---
 id: SPEC-NAVER-THEME-003
 title: V2 frontend 채택 — Acceptance Criteria
-status: Draft
-version: 1.0.0
+status: Implemented
+version: 1.0.1
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -25,6 +25,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.1 amendment: D-3 reverse로 AC-16, AC-17 신규 추가 (theme_description 본문 노출 + inclusion_reason 본문 노출). 총 17 AC.
 - 2026-05-06 v1.0.0: 초안 작성 (manager-spec). 15 AC. SPEC-002 14-AC 스타일 mirror + D-1 retry 시나리오 1 추가. V1 routes/모듈 byte-identical 회귀 검증, V2 metadata V1 alias 4 필드 검증, frontend api/themes.ts URL swap 검증, theme_name hover Tooltip rendering(RTL), null hidden 검증, V2 503 mock 에러 메시지 + retry 시나리오 검증 포함. 라이브 테스트는 SPEC-002 라이브 1 PASS로 충분 — 신규 라이브 마커 미추가.
 
 ---
@@ -501,6 +502,91 @@ baseline diff:
 
 ---
 
+## AC-16: ThemeDetailPanel에 theme_description 본문 노출 (REQ-NT3-009, v1.0.1 amendment)
+
+### Given
+- ThemeDetailPanel에 `theme_description`이 채워진 ThemeItem 1개 props 전달
+
+### When
+```typescript
+import { render } from '@testing-library/react'
+import { ThemeDetailPanel } from '../ThemeDetailPanel'
+
+const theme = {
+  theme_id: 178,
+  theme_name: '전선',
+  change_pct: 9.2,
+  change_pct_3d: 12.0,
+  theme_description: '각종 전선 및 전람(電纜)제조 판매업체. AI 인프라 수요 급증.',
+}
+
+const { container } = render(
+  <ThemeDetailPanel theme={theme} stocks={[]} leaders={[]} />
+)
+```
+
+### Then
+```typescript
+const descBody = container.querySelector('[data-testid="theme-description-body"]')
+expect(descBody).not.toBeNull()
+expect(descBody?.textContent).toContain('각종 전선')
+```
+
+또한 `theme_description`이 null/undefined/empty일 때:
+```typescript
+const descBody = container.querySelector('[data-testid="theme-description-body"]')
+expect(descBody).toBeNull()  // D-4 hidden 정책 보존
+```
+
+---
+
+## AC-17: ThemeDetailPanel에 inclusion_reason 본문 노출 (REQ-NT3-010, v1.0.1 amendment)
+
+### Given
+- ThemeDetailPanel에 `inclusion_reason`이 채워진 stock + leader props 전달
+
+### When
+```typescript
+const theme = { theme_id: 557, theme_name: '유리 기판', change_pct: 13.58, change_pct_3d: 13.58 }
+const stocks = [{
+  theme_id: 557, theme_name: '유리 기판',
+  stock_code: '011790', stock_name: 'SKC',
+  inclusion_reason: "美 반도체 소재 자회사 SK앱솔릭스, 글라스 기판을 게임 체인저로 보고 상용화 추진",
+  price: 161200, change: 37200, change_pct: 30.0,
+  volume: 2100000, trade_value: 320_300_000_000, market_cap: 6_104_400_000_000,
+}]
+const leader = { ...stocks[0], rank: 1 }
+
+const { container } = render(
+  <ThemeDetailPanel theme={theme} stocks={stocks} leaders={[leader]} />
+)
+```
+
+### Then
+```typescript
+// 종목 테이블 행 뒤 본문 노출 검증
+const stockReasonBody = container.querySelector('[data-testid="stock-inclusion-reason-body"]')
+expect(stockReasonBody).not.toBeNull()
+expect(stockReasonBody?.textContent).toContain('게임 체인저')
+
+// 주도주 카드 본문 노출 검증
+const leaderReasonBody = container.querySelector('[data-testid="leader-inclusion-reason-body"]')
+expect(leaderReasonBody).not.toBeNull()
+expect(leaderReasonBody?.textContent).toContain('게임 체인저')
+
+// hover tooltip(title 속성) 보존 검증 (AC-13 호환)
+const stockRow = container.querySelector('tr[title*="게임 체인저"]')
+expect(stockRow).not.toBeNull()
+```
+
+또한 `inclusion_reason`이 null/undefined/empty일 때:
+```typescript
+const reasonBody = container.querySelector('[data-testid="stock-inclusion-reason-body"]')
+expect(reasonBody).toBeNull()
+```
+
+---
+
 ## 부록: 검증 자동화 매트릭스
 
 | AC | 검증 방식 | 의존성 |
@@ -520,6 +606,8 @@ baseline diff:
 | AC-13 | unit (vitest, RTL render + title attr 검증, ThemeDetailPanel 무수정 호환) | @testing-library/react |
 | AC-14 | integration (FastAPI TestClient route 검사) | TestClient |
 | AC-15 | integration (pytest + vitest 전체 실행 + baseline 비교) | pytest, vitest |
+| AC-16 | unit (vitest, RTL render + data-testid 본문 노출 검증) | @testing-library/react |
+| AC-17 | unit (vitest, RTL render + data-testid 본문 노출 + title hover 보존 검증) | @testing-library/react |
 
 ### 라이브 테스트 정책
 

@@ -112,6 +112,20 @@ SPEC-002 V2 backend ship(commits `888e2eb`~`b1c24eb`) 시점에 CHANGELOG에 SPE
 
 **교훈**: ship phase 직전 sync에서 CHANGELOG entry 추가가 누락되기 쉽다. sync workflow의 명시 checklist에 "CHANGELOG entry 신규 SPEC 추가됐는지" 항목을 두자.
 
+### 6. D-2/D-3 hover tooltip-only 결정의 발견성 함정 (v1.0.1 amendment 사유)
+
+SPEC-003 plan에서 D-2(테마 설명 hover tooltip) + D-3(편입설명 hover tooltip 자리 재사용)을 결정한 이유는 "최소 변경 + 레이아웃 0 영향"이었음. 그러나 사용자 라이브 검증에서 "한눈에 description이 안 보여 데이터가 없어 보인다"는 신고. 네이버 모바일 사이트는 동일 데이터를 본문 텍스트로 항상 표시하고 있어 사용자 기대와 어긋남.
+
+**즉시 대응** (v1.0.1 amendment): ThemeDetailPanel.tsx에 본문 노출 추가, hover tooltip은 보존하여 중복 노출. data-testid 기반 vitest 추가 (AC-16/17). SPEC-003 spec.md HISTORY에 D-3 reverse 명시.
+
+**교훈**:
+- "최소 변경" 결정이 항상 좋은 UX는 아님. 데이터의 발견성(discoverability)을 사용자 기준으로 평가해야 함.
+- 비교 reference(네이버 모바일 사이트 등)가 있으면 plan 단계에서 reference UX 분석을 명시 — "참조 사이트가 X 위치에 표시한다면 우리도 X 위치에 표시" 정책을 plan에서 잠그면 reverse를 피할 수 있음.
+- hover-only UX는 mobile touch 미동작뿐 아니라 desktop에서도 hover 행동이 필요해 발견성이 낮음. **본문 표시 + hover 중복**이 가장 안전.
+- amendment(v1.0.x)는 SPEC version만 올리면 되므로 큰 부담은 아님. plan에서 너무 보수적으로 잡는 것보다 라이브 검증 후 amend가 효율적인 경우도 있음.
+
+**적용**: 다음 frontend SPEC에서 hover-only 결정을 할 때, "본문 표시 추가 가능성"을 옵션으로 plan에 함께 기록 → amendment 발동 임계치 낮춤.
+
 ---
 
 ## 시리즈 전반 적용 가능 패턴
