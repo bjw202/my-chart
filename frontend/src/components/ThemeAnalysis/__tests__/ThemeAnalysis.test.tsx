@@ -1,4 +1,8 @@
-// RED: ThemeAnalysis — V2 503 에러 메시지 + retry 버튼 검증 (SPEC-NAVER-THEME-003 AC-11, AC-12)
+// ThemeAnalysis vitest
+// AC-11: V2 503 에러 메시지 + retry 버튼 (REQ-NT3-007)
+// AC-12: retry 버튼 V2 재호출 (REQ-NT3-007)
+// AC-19: default mode 'full' (REQ-NT3-012, v1.0.3 amendment)
+// AC-20: quick 모드 advisory 노출 (REQ-NT3-013, v1.0.3 amendment)
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { ThemeAnalysis } from '../ThemeAnalysis'
@@ -53,6 +57,85 @@ describe('ThemeAnalysis — V2 503 에러 처리 (AC-11)', () => {
     const calls = vi.mocked(client.get).mock.calls
     const v1Calls = calls.filter(([url]) => url === '/themes/snapshot' || url === '/themes/quick')
     expect(v1Calls.length).toBe(0)
+  })
+})
+
+describe('ThemeAnalysis — default mode full (AC-19, REQ-NT3-012 v1.0.3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('default mode is full — calls /themes/v2/snapshot on initial render (not /themes/v2/quick)', async () => {
+    vi.mocked(client.get).mockResolvedValue({
+      data: {
+        themes: [],
+        strong_themes: [],
+        stocks: [],
+        leaders: [],
+        multi_theme_stocks: [],
+        metadata: {
+          collected_at: '2026-05-06T00:00:00+00:00',
+          theme_count: 0,
+          stock_count: 0,
+          elapsed_sec: 0.5,
+          errors: [],
+        },
+      },
+    })
+
+    render(<ThemeAnalysis />)
+
+    await waitFor(() => {
+      const calls = vi.mocked(client.get).mock.calls
+      const snapshotCalls = calls.filter(([url]) => url === '/themes/v2/snapshot')
+      expect(snapshotCalls.length).toBeGreaterThanOrEqual(1)
+
+      // quick endpoint는 default 진입 시 호출되지 않아야 함
+      const quickCalls = calls.filter(([url]) => url === '/themes/v2/quick')
+      expect(quickCalls.length).toBe(0)
+    })
+  })
+})
+
+describe('ThemeAnalysis — quick 모드 advisory (AC-20, REQ-NT3-013 v1.0.3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows advisory when mode is toggled to quick (default full has no advisory)', async () => {
+    vi.mocked(client.get).mockResolvedValue({
+      data: {
+        themes: [],
+        strong_themes: [],
+        stocks: [],
+        leaders: [],
+        multi_theme_stocks: [],
+        metadata: {
+          collected_at: '2026-05-06T00:00:00+00:00',
+          theme_count: 0,
+          stock_count: 0,
+          elapsed_sec: 0.5,
+          errors: [],
+        },
+      },
+    })
+
+    render(<ThemeAnalysis />)
+
+    // default full → advisory 미노출
+    await waitFor(() => {
+      expect(screen.queryByTestId('theme-quick-advisory')).toBeNull()
+    })
+
+    // "빠른 조회" 토글 클릭
+    fireEvent.click(screen.getByRole('button', { name: /빠른 조회/i }))
+
+    // advisory 노출 검증
+    await waitFor(() => {
+      const advisory = screen.queryByTestId('theme-quick-advisory')
+      expect(advisory).not.toBeNull()
+      expect(advisory?.textContent).toContain('빠른 조회 모드')
+    })
   })
 })
 

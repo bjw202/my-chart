@@ -142,6 +142,26 @@ v1.0.1에서 본문 표시를 추가했음에도 사용자는 후속 신고를 �
 
 **적용**: SPEC-003 amendment chain (v1.0.0 → v1.0.1 → v1.0.2)을 다른 SPEC에서도 패턴화. 각 amendment는 spec.md HISTORY entry + acceptance.md AC 신규 + 작은 commit으로 정리.
 
+### 8. v1.0.3 amendment — data availability ≠ data display (default mode 함정)
+
+v1.0.2까지 코드에 본문 박스가 추가됐고 vitest도 PASS했음에도 사용자 화면에 description이 안 보임. 원인 추적:
+- backend `service.py:92-95`가 detail endpoint 호출 결과로만 `theme_description`을 머지. parser.py 주석에 "list 응답 sectorDescription은 항상 null" 명시.
+- frontend ThemeAnalysis.tsx의 default mode가 `'quick'` (list-only) → backend가 description=null 반환 → D-4 hidden 정책으로 본문 박스 미표시.
+- 사용자가 "빠른 조회"가 default라 항상 quick 응답만 봤기 때문에 description을 영원히 못 봄.
+
+**핵심 통찰**:
+- "코드가 description을 표시할 수 있다" ≠ "사용자 default 화면에 description이 노출된다". data availability와 data display는 default 진입 path에서 만나야 함.
+- 빠른 조회/전체 조회 같은 mode 분기가 있을 때 default가 어떤 mode인지가 사용자 첫 인상을 결정.
+- backend가 lazy-fill하는 데이터 (detail endpoint에서만 채워지는 필드)는 frontend default mode가 lazy-fill을 트리거하지 않으면 사용자에겐 영원히 안 보임.
+
+**교훈**:
+- Frontend SPEC에서 default mode/state는 plan 단계 결정 항목으로 명시. "어느 데이터가 어느 mode에서만 채워지는지" 매트릭스를 plan에 박아두면 default mode 함정을 피할 수 있음.
+- Backend의 lazy-fill 정책 (예: detail 호출 시에만 필드 채움)을 frontend SPEC에서도 추적. 둘이 맞물려야 사용자에게 보임.
+- "AC PASS = 사용자에게 보임"이 아님. AC는 코드의 정합성 검증이고, 사용자 default path 검증은 별도. plan 단계에서 "default 진입 시 사용자가 보는 정보 매트릭스"를 만들어두면 좋음.
+- amendment chain은 두려워하지 말기 (v1.0.0 → v1.0.1 → v1.0.2 → v1.0.3). 사용자 라이브 신고가 amendment 발동 임계치 — 첫 amendment는 코드 추가, 두 번째는 IA 조정, 세 번째는 default path 조정 — 각 단계가 학습 cycle.
+
+**적용**: 다음 frontend SPEC에서 (1) default mode/state를 명시 결정 항목으로, (2) backend lazy-fill 필드 매트릭스를 plan §환경 섹션에 기록, (3) "default 진입 시 사용자가 보는 정보" sanity check를 plan annotation cycle에 포함.
+
 ---
 
 ## 시리즈 전반 적용 가능 패턴

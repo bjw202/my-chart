@@ -1,8 +1,8 @@
 ---
 id: SPEC-NAVER-THEME-003
-title: V2 frontend 채택 (theme_description prominent body + 주도주 섹션 제거)
+title: V2 frontend 채택 (default 'full' mode + theme_description prominent body)
 status: Implemented
-version: 1.0.2
+version: 1.0.3
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -29,6 +29,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.3 amendment: default mode를 'quick' → 'full'로 변경 + 빠른 조회 모드 advisory 추가. 사용자 후속 신고 — v1.0.2까지 본문 박스가 코드에는 추가됐으나 화면에 안 보인다는 신고. Root cause: backend의 `service.py:92-95`가 detail 호출 결과로만 `theme_description`을 themes_df에 머지함. parser.py 주석에도 `list 응답 sectorDescription은 항상 null` 명시. 즉 빠른 조회(quick) 모드는 detail skip → backend가 description = null 반환 → frontend D-4 정책으로 hidden. 라이브 list endpoint 응답 직접 확인으로 sectorDescription=None 재검증 완료. 해결: ThemeAnalysis.tsx의 `useState<LoadMode>('quick')` → `('full')` (REQ-NT3-012 신규). 사용자가 "빠른 조회" 토글 시 화면에 회색 advisory 박스 추가 — "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다" 안내 (REQ-NT3-013 신규). AC-19/20 신규 — 총 20 AC. backend, V1 backend, 의존성 변경 0.
 - 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description 본문 prominent 강화. 사용자가 v1.0.1 amendment 후 화면(스크린샷 1)에서 "주도주" 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 다른 점을 신고. ThemeDetailPanel.tsx의 주도주(themeLeaders) 전체 섹션을 제거 (REQ-NT3-011 신규). theme_description 본문 박스 스타일 강화 — 글자 크기 12→13, 색 text-secondary→text-primary, padding 8/12→12/14, border-radius 6→8, border-left 3px→4px (REQ-NT3-009 강화). leaders prop은 호출부 호환을 위해 optional로 유지하되 컴포넌트 내부에서 미사용. 종목 테이블 + inclusion_reason 본문(REQ-NT3-010)은 그대로. AC-18 신규 추가 — 총 18 AC.
 - 2026-05-06 v1.0.1 amendment: D-3 reverse — 사용자 라이브 검증 결과 hover tooltip만으로는 description이 한눈에 안 보여 네이버 모바일 UX와 어긋남. ThemeDetailPanel.tsx에 (1) 테마명 아래 `theme_description`을 본문 박스로 노출 (REQ-NT3-009 신규), (2) 주도주 카드와 종목 테이블 각 행 뒤에 `inclusion_reason`을 본문으로 펼쳐 노출 (REQ-NT3-010 신규). hover tooltip(`title` 속성)은 그대로 보존하여 중복 노출. AC-16/17 신규 추가 — 총 17 AC. ThemeDetailPanel.tsx 무수정 정책(D-3 v1.0.0)은 종료, 본문 표시(D-3 옵션 A 변형) 정책으로 전환. backend/V1 무수정(REQ-NT3-C-002), additive only(REQ-NT3-C-003), 신규 의존성 0(REQ-NT3-C-004)은 그대로 유지.
 - 2026-05-06 v1.0.0 ship: commit `6284280` — RUN phase 완료. AC 15/15 PASS, V1 51 회귀 0, V2 24+5=29 PASS, frontend 271 PASS (baseline diff 0). evaluator-active PASS (Func 100/Sec 90/Craft 92/Cons 95). 16 files +3050/-19. ThemeDetailPanel.tsx 무수정 (D-3). frontend/package.json 무수정 (REQ-NT3-C-004). bare except 0건 (REQ-NT3-C-005).
@@ -194,6 +195,20 @@ Frontend (기존 의존성 그대로):
 **The system shall** preserve the existing `title` attribute on stock rows (hover tooltip 호환성, 중복 노출 허용).
 
 **Rationale**: REQ-NT3-009와 동일 — hover-only UX는 발견성 부족. 네이버 모바일 UX 일치. data-testid="stock-inclusion-reason-body"로 vitest 검증. v1.0.2에서 주도주 카드는 제거됐으므로 leader-inclusion-reason-body는 더 이상 발생하지 않음 (REQ-NT3-011).
+
+#### REQ-NT3-012: 기본 조회 모드 'full' (v1.0.3 amendment)
+
+**The system shall** initialize `ThemeAnalysis.tsx`의 `mode` state with default value `'full'` (snapshot endpoint), not `'quick'` (list-only endpoint).
+
+**Rationale**: backend list 응답에 `sectorDescription`이 항상 null이라 빠른 조회 모드 사용자는 v1.0.1/v1.0.2의 theme_description 본문 박스를 영원히 볼 수 없음. default 진입 시 사용자가 description을 즉시 볼 수 있도록 default를 'full'로 변경. 사용자는 필요 시 '빠른 조회' 토글로 전환 가능 (UX 옵트아웃). 코드 변경 1줄(`useState<LoadMode>('quick')` → `('full')`).
+
+#### REQ-NT3-013: 빠른 조회 모드 advisory (v1.0.3 amendment)
+
+**WHEN** ThemeAnalysis 컴포넌트가 정상 데이터를 표시 중이고 (`!loading && !error && data`) `mode === 'quick'`이면, **the system shall** render a visible advisory container above the ThemeDetailPanel area with text: "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다. 자세한 정보는 위의 [전체 조회]를 클릭해 주세요 (약 30초 소요)."
+
+**WHEN** `mode === 'full'` (default)이면, **the system shall not** render the advisory.
+
+**Rationale**: quick 모드 사용자가 "테마 설명이 안 보이는 이유"를 즉시 인지하고 전체 조회로 전환할 수 있도록 명확한 안내 제공. data-testid="theme-quick-advisory"로 vitest 검증.
 
 #### REQ-NT3-011: 주도주 섹션 제거 (v1.0.2 amendment)
 

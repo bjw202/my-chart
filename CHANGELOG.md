@@ -77,6 +77,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - RankBadge 함수 미사용으로 제거
     - AC-18 신규 추가 (총 18 AC)
     - ThemeDetailPanel.test.tsx vitest 7 cases (AC-13 1 + AC-16 2 + AC-17 2 + AC-18 2)
+  - **v1.0.3 amendment** (default 'full' mode + 빠른 조회 advisory):
+    - 사용자 후속 신고: v1.0.2까지 본문 박스가 코드에 추가됐으나 화면에 표시 안 됨
+    - Root cause: backend `service.py:92-95`가 detail 호출 시에만 `theme_description`을 themes_df에 머지. 빠른 조회 모드는 detail skip → backend가 description=null 반환 → frontend D-4 hidden 정책으로 본문 박스 미표시. parser.py 주석에도 "list 응답 sectorDescription은 항상 null" 명시되어 있고 라이브 list endpoint 호출로 재검증 완료.
+    - ThemeAnalysis.tsx의 default mode를 `'quick'` → `'full'`로 변경 (REQ-NT3-012 신규). 첫 진입 시 자동 snapshot 호출 → description 정상 표시 (~30초).
+    - 사용자가 "빠른 조회"를 토글한 경우 ThemeRankingTable 아래에 회색 advisory 박스 노출 — "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다" + "전체 조회" CTA 안내 (REQ-NT3-013 신규).
+    - AC-19/20 신규 추가 (총 20 AC).
+    - ThemeAnalysis.test.tsx vitest 4 cases (AC-11 1 + AC-12 1 + AC-19 1 + AC-20 1).
+    - backend, V1 backend, 의존성 변경 0.
 
 ### Changed (SPEC-AI-REPORT-003)
 

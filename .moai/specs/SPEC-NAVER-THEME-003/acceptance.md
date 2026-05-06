@@ -2,7 +2,7 @@
 id: SPEC-NAVER-THEME-003
 title: V2 frontend 채택 — Acceptance Criteria
 status: Implemented
-version: 1.0.2
+version: 1.0.3
 owner: bjw2002
 created: 2026-05-06
 updated: 2026-05-06
@@ -25,6 +25,7 @@ depends_on: SPEC-NAVER-THEME-002
 
 ## HISTORY
 
+- 2026-05-06 v1.0.3 amendment: default mode를 'full'로 변경 + 빠른 조회 모드 advisory. AC-19 신규 (default mode 'full' 검증) + AC-20 신규 (quick advisory 노출). 총 20 AC.
 - 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description prominent 강화. AC-18 신규 추가 (주도주 섹션 미렌더링 검증). AC-17은 stock body 검증만으로 좁힘 (leader body는 더 이상 발생 안함). 총 18 AC.
 - 2026-05-06 v1.0.1 amendment: D-3 reverse로 AC-16, AC-17 신규 추가 (theme_description 본문 노출 + inclusion_reason 본문 노출). 총 17 AC.
 - 2026-05-06 v1.0.0: 초안 작성 (manager-spec). 15 AC. SPEC-002 14-AC 스타일 mirror + D-1 retry 시나리오 1 추가. V1 routes/모듈 byte-identical 회귀 검증, V2 metadata V1 alias 4 필드 검증, frontend api/themes.ts URL swap 검증, theme_name hover Tooltip rendering(RTL), null hidden 검증, V2 503 mock 에러 메시지 + retry 시나리오 검증 포함. 라이브 테스트는 SPEC-002 라이브 1 PASS로 충분 — 신규 라이브 마커 미추가.
@@ -637,6 +638,70 @@ expect(screen.queryByText('주도주')).toBeNull()  // 주도주 미렌더링
 
 ---
 
+## AC-19: 기본 조회 모드 'full' (REQ-NT3-012, v1.0.3 amendment)
+
+### Given
+- ThemeAnalysis 컴포넌트 첫 마운트 직후
+
+### When
+```typescript
+import { render, waitFor } from '@testing-library/react'
+import { ThemeAnalysis } from '../ThemeAnalysis'
+import client from '../../../api/client'
+
+vi.mock('../../../api/client', () => ({ default: { get: vi.fn() } }))
+vi.mocked(client.get).mockResolvedValue({ data: { themes: [], strong_themes: [], stocks: [], leaders: [], multi_theme_stocks: [], metadata: { ... } } })
+
+render(<ThemeAnalysis />)
+```
+
+### Then
+```typescript
+await waitFor(() => {
+  const calls = vi.mocked(client.get).mock.calls
+  // default가 full이므로 snapshot endpoint 호출
+  const snapshotCalls = calls.filter(([url]) => url === '/themes/v2/snapshot')
+  expect(snapshotCalls.length).toBeGreaterThanOrEqual(1)
+  // quick endpoint는 default 진입 시 호출되지 않음
+  const quickCalls = calls.filter(([url]) => url === '/themes/v2/quick')
+  expect(quickCalls.length).toBe(0)
+})
+```
+
+---
+
+## AC-20: 빠른 조회 모드 advisory 노출 (REQ-NT3-013, v1.0.3 amendment)
+
+### Given
+- ThemeAnalysis 정상 마운트 후 사용자가 "빠른 조회" 버튼 클릭
+
+### When
+```typescript
+import { fireEvent, screen, render, waitFor } from '@testing-library/react'
+
+render(<ThemeAnalysis />)
+
+// default full → advisory 미노출
+await waitFor(() => {
+  expect(screen.queryByTestId('theme-quick-advisory')).toBeNull()
+})
+
+// 빠른 조회 토글
+fireEvent.click(screen.getByRole('button', { name: /빠른 조회/i }))
+```
+
+### Then
+```typescript
+await waitFor(() => {
+  const advisory = screen.queryByTestId('theme-quick-advisory')
+  expect(advisory).not.toBeNull()
+  expect(advisory?.textContent).toContain('빠른 조회 모드')
+  expect(advisory?.textContent).toContain('전체 조회')  // CTA 안내
+})
+```
+
+---
+
 ## 부록: 검증 자동화 매트릭스
 
 | AC | 검증 방식 | 의존성 |
@@ -659,6 +724,8 @@ expect(screen.queryByText('주도주')).toBeNull()  // 주도주 미렌더링
 | AC-16 | unit (vitest, RTL render + data-testid 본문 노출 검증) | @testing-library/react |
 | AC-17 | unit (vitest, RTL render + data-testid 본문 노출 + title hover 보존 검증) | @testing-library/react |
 | AC-18 | unit (vitest, RTL render + leader-inclusion-reason-body 미렌더링 + "주도주" 텍스트 미렌더링) | @testing-library/react |
+| AC-19 | unit (vitest, default render → /themes/v2/snapshot 호출 검증) | @testing-library/react + vi.mock |
+| AC-20 | unit (vitest, quick 토글 → theme-quick-advisory data-testid 노출) | @testing-library/react |
 
 ### 라이브 테스트 정책
 

@@ -27,7 +27,7 @@ export function ThemeAnalysis(): ReactElement {
   const [data, setData] = useState<ThemesSnapshotResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<LoadMode>('quick')
+  const [mode, setMode] = useState<LoadMode>('full')  // v1.0.3 amendment: default 'full' (REQ-NT3-012) — quick 모드는 backend가 detail skip → theme_description/inclusion_reason null이라 사용자가 description 못 봄
   const [retryNonce, setRetryNonce] = useState(0) // retry trigger — useEffect deps에 포함 (REQ-NT3-007)
   const [selectedThemeId, setSelectedThemeId] = useState<number | null>(null)
   const [sortField, setSortField] = useState('change_pct')
@@ -169,6 +169,25 @@ export function ThemeAnalysis(): ReactElement {
             onThemeClick={setSelectedThemeId}
             selectedThemeId={selectedThemeId}
           />
+
+          {/* 빠른 조회 모드 안내 (REQ-NT3-013, v1.0.3 amendment) */}
+          {mode === 'quick' && (
+            <div
+              data-testid="theme-quick-advisory"
+              style={{
+                padding: '10px 14px',
+                margin: '8px 0',
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                background: 'var(--bg-surface)',
+                borderRadius: 6,
+                borderLeft: '3px solid var(--text-muted)',
+                lineHeight: 1.55,
+              }}
+            >
+              빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다. 자세한 정보는 위의 <strong>[전체 조회]</strong>를 클릭해 주세요 (약 30초 소요).
+            </div>
+          )}
 
           {selectedTheme && (
             <ThemeDetailPanel
