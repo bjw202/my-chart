@@ -1,11 +1,11 @@
 ---
 id: SPEC-CHART-NAV-001
 title: 차트 그리드 종목 네비게이션 통합 (테마→그리드 + 종목 검색 + 필터 우회)
-status: Draft
+status: Rolled-back
 version: 1.0.0
 owner: bjw2002
 created: 2026-05-07
-updated: 2026-05-07
+updated: 2026-05-09
 depends_on: SPEC-NAVER-THEME-CONSOLIDATED
 ---
 
@@ -18,7 +18,7 @@ depends_on: SPEC-NAVER-THEME-CONSOLIDATED
 | SPEC ID | SPEC-CHART-NAV-001 |
 | 제목 | 차트 그리드 종목 네비게이션 통합 — 테마 진입 + 종목 검색 + 필터 우회 |
 | 생성일 | 2026-05-07 |
-| 상태 | Draft |
+| 상태 | Rolled-back (2026-05-09) |
 | 우선순위 | High |
 | 담당 | expert-backend, expert-frontend, expert-testing |
 | 의존 SPEC | SPEC-NAVER-THEME-CONSOLIDATED v1.0.0 |
@@ -30,6 +30,9 @@ depends_on: SPEC-NAVER-THEME-CONSOLIDATED
 ## HISTORY
 
 - 2026-05-07 v1.0.0: 초안 작성 (manager-spec). 사용자 승인된 plan 파일(`/Users/byunjungwon/.claude/plans/swirling-napping-canyon.md`) 기반. SPEC-NAVER-THEME-CONSOLIDATED 회고에서 도출된 LESSON-NTC-001~005 적용. 사용자 사전 잠금 결정 사항(D-1~D-8): A 액션 위치(상세 패널 메인 버튼 + 행별 chip 둘 다), 필터 reset 정책(full reset), 누락 안내 문구(비개발자 친화), 검색 매칭(종목명 부분 + 코드 prefix + 초성), stock master 데이터 소스(신규 GET /api/stocks/master), 검색 결과 0건 표시, 503 처리, URL deep linking 별도 SPEC 분리.
+- 2026-05-07 implementation: feat/SPEC-CHART-NAV-001 브랜치에 Agent Teams `--team` 모드(3 implementer)로 9 commits 통합 — T1 backend(9be9767, 119 LOC), T3+T4 frontend 인프라(1e20dd8, 150 LOC), T5 UX 컴포넌트(2a0c4b7, 296 LOC), T2+T6 테스트(ec6b8d4, 648 LOC), frontmatter Implemented(c6ac934), e2e Playwright 12/12 PASS(a4f8307). 자동화 검증 모두 통과: backend pytest 4/4, frontend vitest 47 신규 + 회귀 317/317.
+- 2026-05-08 fix amendments: filter-bar chip layout overlap 해소(91fd63b — chip을 form 첫 자식 inline 이동) + chart-cell race condition guard(df3ca36 — StrictMode/cleanup safe cancelled flag).
+- 2026-05-09 v1.0.0 ROLLBACK: 사용자 라이브 사용 후 가치 재평가 결과 폐기 결정. 사용자 표현: "써보니 이 기능이 필요가 없는데, 이전 버전으로 돌아갈 수 있나?" + "성능이 떨어졌다". chore/integrated-main-merge-2026-04-25 브랜치로 checkout 수행. feat/SPEC-CHART-NAV-001 브랜치는 9 commits archive로 보존(미래 재시도 시 `git checkout feat/SPEC-CHART-NAV-001`로 복원 가능). stash@{0}: rollback 직전 hooks edits, stash@{1}: SPEC-AI-REPORT-003 step 1 작업. 명명 혼동 사실: 사용자 첫 직관 "테마 메뉴" = "테마 분석" 탭으로 인식했으나 실제로 그 탭은 SPEC-NAVER-THEME 시리즈(별도 17 commits) 결과물. NAVER-THEME 시리즈는 그대로 보존 결정. 자세한 내용은 retrospective.md 참조. project lesson #7로 학습 사항 lock-in.
 
 ---
 
