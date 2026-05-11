@@ -29,7 +29,8 @@ export interface StockSearchModalProps {
   stock: StockMasterItem
   initialTimeframe?: 'daily' | 'weekly'
   onClose: () => void
-  triggerRef: React.RefObject<HTMLElement | null>
+  /** modal close 시 focus를 복귀할 target — HTMLElement 또는 focus() 메서드를 가진 handle */
+  triggerRef: React.RefObject<{ focus(): void } | null>
 }
 
 /**
@@ -45,6 +46,8 @@ export function StockSearchModal({
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>(
     initialTimeframe ?? 'daily',
   )
+  const [chartLoading, setChartLoading] = useState(true)
+  const [chartError, setChartError] = useState(false)
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -111,6 +114,8 @@ export function StockSearchModal({
   // @MX:REASON: archive df3ca36 ChartCell race guard 패턴 적용. modal close → cleanup → cancelled=true → setData 0회
   useEffect(() => {
     let cancelled = false
+    setChartLoading(true)
+    setChartError(false)
 
     fetchChartData(stock.code, timeframe)
       .then((data) => {
@@ -125,9 +130,12 @@ export function StockSearchModal({
           })),
         )
         chartRef.current?.timeScale().fitContent()
+        setChartLoading(false)
       })
       .catch(() => {
-        // 차트 로드 실패는 silent — modal은 유지
+        if (cancelled) return
+        setChartLoading(false)
+        setChartError(true)
       })
 
     return () => {
@@ -238,10 +246,32 @@ export function StockSearchModal({
             </div>
           </div>
 
+          {/* Loading state (F-3 spec §4 row 11) */}
+          {chartLoading && (
+            <div
+              data-testid="stock-search-modal-loading"
+              aria-busy="true"
+              style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}
+            >
+              차트 로딩 중...
+            </div>
+          )}
+
+          {/* Error state (F-3 spec §4 row 12) */}
+          {chartError && (
+            <div
+              data-testid="stock-search-modal-error"
+              role="alert"
+              style={{ textAlign: 'center', padding: '16px', color: '#e74c3c', fontSize: 13 }}
+            >
+              차트 불러오기 실패
+            </div>
+          )}
+
           {/* Chart container */}
           <div
             ref={chartContainerRef}
-            style={{ width: '100%', height: 300 }}
+            style={{ width: '100%', height: 300, display: chartLoading || chartError ? 'none' : 'block' }}
             aria-label={`${stock.name} 차트`}
           />
         </div>

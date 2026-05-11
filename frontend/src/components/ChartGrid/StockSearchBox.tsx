@@ -27,6 +27,8 @@ const DEBOUNCE_MS = 150
 
 export interface StockSearchBoxHandle {
   clearInput: () => void
+  /** focus 복귀 — modal close 시 검색 입력창으로 focus를 돌려보낸다 (REQ-MODAL-002 step 3) */
+  focus: () => void
 }
 
 export interface StockSearchBoxProps {
@@ -50,13 +52,16 @@ export const StockSearchBox = forwardRef<StockSearchBoxHandle, StockSearchBoxPro
 
     const is503 = error?.message === 'stock_meta_not_ready'
 
-    // clearInput imperative handle (REQ-MODAL-002 step 4)
+    // clearInput + focus imperative handle (REQ-MODAL-002 step 3+4)
     useImperativeHandle(ref, () => ({
       clearInput() {
         setQuery('')
         setCandidates([])
         setOpen(false)
         setHighlightIndex(-1)
+      },
+      focus() {
+        inputRef.current?.focus()
       },
     }))
 

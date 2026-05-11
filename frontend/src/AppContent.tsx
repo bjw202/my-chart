@@ -28,8 +28,9 @@ export function AppContent(): ReactElement {
   // 종목 검색 modal state (MP-1: ChartGrid가 이 상태에 반응하지 않아야 함)
   const [selectedStock, setSelectedStock] = useState<StockMasterItem | null>(null)
   const [selectedTimeframe, setSelectedTimeframe] = useState<'daily' | 'weekly'>('daily')
+  // searchBoxRef — ChartGrid에 전달되어 StockSearchBox forwardRef에 연결됨.
+  // clearInput() + focus() 두 가지 용도로 사용: modal close 시 clearInput + focus 복귀 (F-1, REQ-MODAL-002)
   const searchBoxRef = useRef<StockSearchBoxHandle | null>(null)
-  const triggerRef = useRef<HTMLInputElement>(null)
 
   // R1: When navigating to chart-grid with stockCodes, apply codes filter
   useEffect(() => {
@@ -39,18 +40,17 @@ export function AppContent(): ReactElement {
     }
   }, [activeTab, crossTabParams, clearCrossTabParams, applyFilters])
 
-  // AC-MODAL-009: timeframe snapshot 계승 — ChartGrid 현재 timeframe을 modal에 전달
-  // ChartGrid의 timeframe은 StockSearchBox onSelect 콜백 시점에 캡처되어야 하나,
-  // 현재는 AppContent level에서 daily로 초기화 (간소화)
-  const handleSelectStock = useCallback((stock: StockMasterItem): void => {
+  // AC-MODAL-009 + F-2: ChartGrid가 onSelectStock(stock, timeframe) 형태로 호출 —
+  // timeframe을 두 번째 인자로 받아 selectedTimeframe에 저장
+  const handleSelectStock = useCallback((stock: StockMasterItem, timeframe: 'daily' | 'weekly' = 'daily'): void => {
     setSelectedStock(stock)
-    setSelectedTimeframe('daily')
+    setSelectedTimeframe(timeframe)
   }, [])
 
   const handleModalClose = useCallback((): void => {
     setSelectedStock(null)
     searchBoxRef.current?.clearInput()
-    // focus 복귀는 triggerRef를 통해 StockSearchModal 내부에서 처리
+    // focus 복귀는 StockSearchModal 내부에서 triggerRef.current?.focus() 로 처리 (F-1, REQ-MODAL-002)
   }, [])
 
   return (
@@ -88,12 +88,13 @@ export function AppContent(): ReactElement {
 
       {/* StockSearchModal — portal mount on document.body (MP-4, AC-ARCH-001)
           ChartGrid subtree 외부에 mount되어 MP-1/MP-3 invariant를 보존한다 */}
+      {/* StockSearchModal triggerRef = searchBoxRef — StockSearchBox handle (focus() + clearInput()) */}
       {selectedStock && (
         <StockSearchModal
           stock={selectedStock}
           initialTimeframe={selectedTimeframe}
           onClose={handleModalClose}
-          triggerRef={triggerRef}
+          triggerRef={searchBoxRef}
         />
       )}
     </div>

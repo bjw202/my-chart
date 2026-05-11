@@ -251,3 +251,43 @@ describe('StockSearchBox — AC-ARCH-003', () => {
     expect(hasUseTab).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// F-1 — focus() imperative handle (focus restoration)
+// ---------------------------------------------------------------------------
+
+import React from 'react'
+import type { StockSearchBoxHandle } from '../StockSearchBox'
+
+describe('StockSearchBox — focus() imperative handle (F-1)', () => {
+  it('ref.focus() 호출 시 input에 focus 이동', () => {
+    const ref = React.createRef<StockSearchBoxHandle>()
+    render(<StockSearchBox ref={ref} onSelect={vi.fn()} />)
+    const input = screen.getByTestId('chart-search-input')
+
+    // focus 다른 곳에 두기
+    input.blur()
+
+    ref.current?.focus()
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('clearInput 후에도 focus() 가능', async () => {
+    vi.useFakeTimers()
+    const ref = React.createRef<StockSearchBoxHandle>()
+    render(<StockSearchBox ref={ref} onSelect={vi.fn()} />)
+    const input = screen.getByTestId('chart-search-input') as HTMLInputElement
+
+    await act(async () => {
+      fireEvent.change(input, { target: { value: '삼' } })
+      vi.advanceTimersByTime(200)
+    })
+
+    await act(async () => {
+      ref.current?.clearInput()
+    })
+    ref.current?.focus()
+    expect(document.activeElement).toBe(input)
+    vi.useRealTimers()
+  })
+})
