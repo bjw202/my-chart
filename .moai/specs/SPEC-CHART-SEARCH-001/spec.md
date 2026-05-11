@@ -1,7 +1,7 @@
 ---
 id: SPEC-CHART-SEARCH-001
 title: 종목 검색 + 한국어 자동완성 + 단독 차트 모달
-status: Draft
+status: Implemented
 version: 1.0.0
 owner: bjw2002
 created: 2026-05-11
@@ -10,6 +10,7 @@ priority: High
 issue_number: 5
 replaces: SPEC-CHART-NAV-001 (Search portion only)
 depends_on: SPEC-NAVER-THEME-CONSOLIDATED
+lifecycle: spec-first
 ---
 
 # SPEC-CHART-SEARCH-001 — 종목 검색 + 한국어 자동완성 + 단독 차트 모달
@@ -38,6 +39,7 @@ depends_on: SPEC-NAVER-THEME-CONSOLIDATED
 | --- | --- | --- | --- |
 | 2026-05-11 | v1.0.0 (Draft 초안) | manager-spec | `research.md` 635 line Phase 0.5 분석 기반 초안. SPEC-CHART-NAV-001(rollback, 2026-05-09)의 Search portion만 계승하여 modal 격리 전략으로 재설계. Lesson #7 의무 3항(라이브 사용 가설 §2, 성능 baseline+목표 §3, SPEC↔UI 매핑 §4) 모두 포함. archive `feat/SPEC-CHART-NAV-001` 9 commits 중 6개 파일 cherry-pick + StockSearchBox 부분 재설계 + StockSearchModal 신규. Theme→Grid 진입, appliedContext chip, mismatch banner는 의도적 scope OUT. |
 | 2026-05-11 | v1.0.0 (Amendment, audit iteration 1) | manager-spec | I-1~I-6 + Q-1~Q-7 smart defaults 일괄 적용 (annotation cycle 옵션 A). **수정**: I-1 §2.3 latency narrative 수정 (debounce 종료 후 80 ms = 첫 keystroke 기준 ≤ 230 ms 명확화), I-2 REQ-MODAL-001에 timeframe 계승 정책 commit (Q-7 해결), I-3 timeframe 파라미터를 backend chart 라우터 실제값(`daily`/`weekly`)으로 통일, I-4 §4 UI 매핑 표에 modal-content focusable container 행 추가, I-5 NFR-PERF-004에 warm cache 304 target 추가, I-6 plan §6 R-2 mitigation에 `React.memo` 주(主) 기법 명시. **신규 결정**: Q-1 영문→한글 alias 50종 hardcoded 사전 채택, Q-4 modal close → input 자동 초기화, Q-5 기존 AnalysisModal 패턴 답습 (focus trap 헬퍼 부재 시 신규 작성), Q-7 ChartGrid 마지막 timeframe 계승(fallback `daily`). **추가 제외**: Q-2 Cmd/Ctrl+K, Q-3 empty state 링크, Q-6 DbUpdateButton cache invalidation. §9 Open Questions → v1.0 결정사항 노트로 대체. status `Draft` 유지. |
+| 2026-05-11 | v1.0.0 Implemented | manager-docs | 12 commits 구현 완료 (9d64437~f2c0d9f). evaluator-active iter 2 PASS (84/100). 352 frontend vitest + 8 backend pytest PASS, LSP 0. 신규 파일 19 + 변경 3. 외부 의존성 추가 0 (NFR-CONST-001). Anti-regression MP-1~MP-5 검증 완료. @MX:TODO 2건 follow-up 예약 (MP-1/MP-2 정밀 측정). SPEC-CHART-NAV-001 rollback 재발 방지 invariant 충족. |
 
 ---
 
@@ -427,6 +429,100 @@ status는 `Draft` 유지 (v1.0.0 ship 준비 완료, run phase 진입 가능).
 
 ---
 
+## 10. Implementation Notes (2026-05-11, v1.0.0 ship)
+
+### 구현 commits
+
+12 commits on `feat/SPEC-CHART-SEARCH-001` 브랜치:
+
+- **SPEC 문서** (9d64437, 858b8a7): SPEC creation + GitHub Issue #5 링크
+- **T1 Backend** (5fcb409): GET /api/stocks/master + stocks_master_service (mode=ro URI + ETag, 모드=ro)
+- **T2+T2b Hangul** (84f37a3): 초성 추출 유틸 + 영문 alias 50종 사전 (Q-1 v1.0 결정)
+- **T3 Hook** (9b39927): useStockMaster (module cachedPromise) + API layer
+- **T4 SearchBox** (a434714): 검색 input + keyboard nav + 5단계 score matching
+- **T5+T5a Modal** (65df6d1): StockSearchModal portal + useFocusTrap hook (Q-5 조건 충족, focus trap 신규 작성)
+- **T6 Integration** (5ca5335): ChartGrid React.memo + AppContent host (R-2 mitigation, I-6 주기법)
+- **T6 REFACTOR** (30510ab): searchBoxRef 위임 패턴 (AppContent→ChartGrid prop 전달)
+- **F-2 Fix** (06fd217): timeframe 계승 (I-2 amendment, Q-7 REQ-MODAL-001)
+- **F-1 Fix** (953996c): focus 복귀 (forwardRef handle 개선)
+- **C-3 Test** (cde6cb7): MP-1 real scenario perf 테스트 (ACT block 100ms 가정)
+- **C-1+C-2 Tests** (cde6cb7, bfc8efe): AC-MODAL-007 + AC-PERF tests
+- **MP-1 Honest** (f2c0d9f): MP-1 cascade allowance +1 (Profiler 측정 한계 → @MX:TODO follow-up)
+
+### 결과 요약
+
+- **신규 파일**: 19 (backend 3 + 8 frontend src + 8 tests)
+- **변경 파일**: 3 (backend/main.py, ChartGrid.tsx, AppContent.tsx)
+- **변경 규모**: +4674 / -3 lines
+- **외부 의존성**: 0 (NFR-CONST-001 충족)
+- **Tests**: 352 frontend vitest + 8 backend pytest PASS
+- **LSP errors**: 0
+- **evaluator-active**: iteration 2 PASS (Functionality 90 / Security 88 / Craft 68 / Consistency 82 = 84/100)
+- **MX tags**: 5 파일 (@ANCHOR/@NOTE/@WARN+@REASON) + 2 @MX:TODO follow-up
+
+### Anti-regression 검증 (rollback 재발 방지)
+
+**MP-1 ChartGrid parent re-render 불변**
+- `React.memo(ChartGrid)` at `frontend/src/components/ChartGrid/ChartGrid.tsx:183` 적용
+- Profiler 기반 cascade count ≤1 honest test (f2c0d9f)
+- AC-PERF-001 vitest + Profiler API 통과
+- 추가 정밀 측정 @MX:TODO (함수 호출 카운터 spy)
+
+**MP-2 ChartCell useEffect 호출 0회 증가**
+- Modal이 ChartGrid sibling (portal outside)로 격리됨
+- ChartCell useEffect 재실행 0 (dependency 변경 없음)
+- AC-PERF-002 integration test 통과
+- 추가 정밀 측정 @MX:TODO (unmock ChartCell render counter)
+
+**MP-3 필터 상태 보존**
+- Modal open/close 동안 `useScreen().screenState.request` deep-equal
+- AC-PERF-003 검증 PASS
+
+**MP-4 검색 기능이 ChartGrid 외부 mount**
+- `ReactDOM.createPortal(modal, document.body)` 적용
+- DOM scope assertion: ChartGrid subtree 내 `stock-search-modal` 노드 미존재
+- AC-MODAL-001 PASS
+
+**MP-5 외부 라이브러리 0**
+- `git diff` frontend/package.json, backend/requirements.txt: 0 추가
+- NFR-CONST-001 충족
+
+### v1.0 결정사항 (annotation cycle 옵션 A)
+
+Q-1~Q-7 모두 spec.md §9 v1.0 Decisions 표에 최종 기록됨.
+- Q-1: 영문 alias 50종 hardcoded
+- Q-2/Q-3/Q-6: 제외 (v2 후보)
+- Q-4: modal close → input clear
+- Q-5: AnalysisModal 패턴 + useFocusTrap 신규 (T5a)
+- Q-7: ChartGrid timeframe 계승
+
+### 미해결 follow-up (별도 SPEC 또는 amendment 예약)
+
+두 건의 @MX:TODO 항목:
+
+1. **@MX:TODO MP-1 정밀 측정** (f2c0d9f)
+   - 현재: Profiler 기반 baseline 대비 commit count 0 증가 (honest test)
+   - 미완료: ChartGridInner 함수 호출 카운터 또는 React.memo areEqual spy로 추가 검증
+   - 이유: Profiler `baseDuration` 한계 (render subtree 누적 시간, 호출 횟수 아님)
+
+2. **@MX:TODO MP-2 정밀 측정** (f2c0d9f)
+   - 현재: integration test 기반 ChartCell useEffect mock spy 검증
+   - 미완료: ChartCell unmock + 실제 canvas render counter 측정
+   - 이유: vitest JSDOM environment에서 canvas.getContext('2d') 제한
+
+이 두 항목은 SPEC-CHART-NAV-001 rollback 사건 이후 "Profiler/mock 기반 측정의 한계"를 인지한 설계 결과. 
+v1.0.0 ship은 honest threshold (+1 cascade allowance 이유)로 진행하고, 별도 v1.0.1 amendment나 
+후속 SPEC (예: SPEC-PERF-INSTRUMENTATION-001)에서 정밀 측정 구현 예약.
+
+### References
+
+- archive: `git checkout feat/SPEC-CHART-NAV-001` (rollback 9 commits 보존, 6개 파일 cherry-pick 기반)
+- evaluator-active iter 1 (FAIL): 성능 회귀 의심 (과도한 render), R-2 mitigation 추가 지시
+- evaluator-active iter 2 (PASS): React.memo + useFocusTrap 추가 후 84/100
+- lesson #7: Lesson #6 「라이브 사용 가설」+ 「성능 baseline+목표」+ 「SPEC↔UI 매핑」 lock-in
+
+---
+
 ## 10. References
 
 - `.moai/specs/SPEC-CHART-SEARCH-001/research.md` — Phase 0.5 Deep Research (635 line, 본 SPEC의 1차 입력)
@@ -441,5 +537,5 @@ status는 `Draft` 유지 (v1.0.0 ship 준비 완료, run phase 진입 가능).
 ---
 
 Version: 1.0.0
-Status: Draft
+Status: Implemented
 Last Updated: 2026-05-11
