@@ -7,7 +7,7 @@ owner: bjw2002
 created: 2026-05-11
 updated: 2026-05-11
 priority: High
-issue_number: 0
+issue_number: 5
 replaces: SPEC-CHART-NAV-001 (Search portion only)
 depends_on: SPEC-NAVER-THEME-CONSOLIDATED
 ---
