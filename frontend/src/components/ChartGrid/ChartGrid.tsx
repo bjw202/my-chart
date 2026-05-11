@@ -25,7 +25,8 @@ import type { StockSearchBoxHandle } from './StockSearchBox'
 import type { StockMasterItem } from '../../api/stocks'
 
 export interface ChartGridProps {
-  onSelectStock?: (stock: StockMasterItem) => void
+  /** F-2 / AC-MODAL-009: 두 번째 인자 timeframe = ChartGrid 현재 timeframe snapshot (Q-7 결정사항) */
+  onSelectStock?: (stock: StockMasterItem, timeframe: 'daily' | 'weekly') => void
   searchBoxRef?: React.RefObject<StockSearchBoxHandle | null>
 }
 
@@ -86,6 +87,14 @@ function ChartGridInner({ onSelectStock, searchBoxRef: externalSearchBoxRef }: C
     setTimeframe((prev) => (prev === 'daily' ? 'weekly' : 'daily'))
   }
 
+  // F-2 / AC-MODAL-009: timeframe snapshot 계승 — 현재 ChartGrid timeframe을 함께 전달
+  const handleSelectWithTimeframe = useCallback(
+    (item: StockMasterItem): void => {
+      onSelectStock?.(item, timeframe)
+    },
+    [onSelectStock, timeframe],
+  )
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement).tagName
@@ -120,7 +129,7 @@ function ChartGridInner({ onSelectStock, searchBoxRef: externalSearchBoxRef }: C
         {onSelectStock && (
           <StockSearchBox
             ref={searchBoxRef}
-            onSelect={onSelectStock}
+            onSelect={handleSelectWithTimeframe}
           />
         )}
         <button
