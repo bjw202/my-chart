@@ -75,7 +75,7 @@ export function AppContent(): ReactElement {
       <div className="tab-content" style={{ display: activeTab === 'chart-grid' ? 'flex' : 'none' }}>
         <FilterBar />
         <main className="app-main">
-          <ChartGrid onSelectStock={handleSelectStock} />
+          <ChartGrid onSelectStock={handleSelectStock} searchBoxRef={searchBoxRef} />
           <StockList />
         </main>
       </div>

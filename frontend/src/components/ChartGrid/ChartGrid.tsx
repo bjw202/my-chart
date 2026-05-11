@@ -26,20 +26,22 @@ import type { StockMasterItem } from '../../api/stocks'
 
 export interface ChartGridProps {
   onSelectStock?: (stock: StockMasterItem) => void
+  searchBoxRef?: React.RefObject<StockSearchBoxHandle | null>
 }
 
 /**
  * ChartGrid는 React.memo로 래핑되어 AppContent의 selectedStock state 변경에
  * 반응하지 않는다 (MP-1, AC-PERF-001).
  */
-function ChartGridInner({ onSelectStock }: ChartGridProps): React.ReactElement {
+function ChartGridInner({ onSelectStock, searchBoxRef: externalSearchBoxRef }: ChartGridProps): React.ReactElement {
   const { results, applyFilters } = useScreen()
   const { crossTabParams, clearCrossTabParams } = useTab()
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
   const [stageMap, setStageMap] = useState<Map<string, number>>(new Map())
-  const searchBoxRef = useRef<StockSearchBoxHandle | null>(null)
+  const internalSearchBoxRef = useRef<StockSearchBoxHandle | null>(null)
+  const searchBoxRef = externalSearchBoxRef ?? internalSearchBoxRef
 
   // Fetch stage overview once and build code->stage lookup map
   useEffect(() => {
