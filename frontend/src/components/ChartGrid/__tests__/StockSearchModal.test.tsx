@@ -299,3 +299,138 @@ describe('StockSearchModal — initial timeframe (AC-MODAL-009)', () => {
     expect(mockFetchChartData).toHaveBeenCalledWith('005930', 'daily')
   })
 })
+
+// ---------------------------------------------------------------------------
+// AC-MODAL-007 (must-pass) — chart useEffect 1회만 실행
+// ---------------------------------------------------------------------------
+
+describe('StockSearchModal — chart useEffect 1회 실행 (AC-MODAL-007)', () => {
+  it('mount 시 fetchChartData 정확히 1회 호출', async () => {
+    const triggerRef = createRef<HTMLElement>()
+    render(
+      <StockSearchModal
+        stock={mockStock}
+        initialTimeframe="daily"
+        onClose={vi.fn()}
+        triggerRef={triggerRef}
+      />,
+    )
+    await act(async () => {})
+    // useEffect([stock.code, timeframe]) → mount 1회만 호출
+    expect(mockFetchChartData).toHaveBeenCalledTimes(1)
+    expect(mockFetchChartData).toHaveBeenCalledWith('005930', 'daily')
+  })
+
+  it('props 변화 없으면 fetchChartData 추가 호출 없음', async () => {
+    const triggerRef = createRef<HTMLElement>()
+    const { rerender } = render(
+      <StockSearchModal
+        stock={mockStock}
+        initialTimeframe="daily"
+        onClose={vi.fn()}
+        triggerRef={triggerRef}
+      />,
+    )
+    await act(async () => {})
+    const callsAfterMount = mockFetchChartData.mock.calls.length
+
+    // 동일 props로 rerender → deps 변화 없음 → useEffect 재실행 없음
+    await act(async () => {
+      rerender(
+        <StockSearchModal
+          stock={mockStock}
+          initialTimeframe="daily"
+          onClose={vi.fn()}
+          triggerRef={triggerRef}
+        />,
+      )
+    })
+    expect(mockFetchChartData.mock.calls.length).toBe(callsAfterMount)
+  })
+
+  it('AC-MODAL-008 race guard: close 중 resolve된 fetch 결과 무시', async () => {
+    let resolveChart!: () => void
+    mockFetchChartData.mockImplementation(
+      () =>
+        new Promise<{ candles: [] }>((resolve) => {
+          resolveChart = () => resolve({ candles: [] })
+        }),
+    )
+    const onClose = vi.fn()
+    const triggerRef = createRef<HTMLElement>()
+    const { unmount } = render(
+      <StockSearchModal
+        stock={mockStock}
+        initialTimeframe="daily"
+        onClose={onClose}
+        triggerRef={triggerRef}
+      />,
+    )
+
+    // modal unmount (cancelled = true)
+    await act(async () => {
+      unmount()
+    })
+
+    // 이후 resolve → cancelled 이므로 setData 호출 없어야 함 (no throw)
+    await act(async () => {
+      resolveChart()
+    })
+    // 에러 없이 완료 — createChart.setData 미호출 검증은 별도 chart mock에서
+    expect(mockFetchChartData).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// F-3 — loading/error data-testid (spec §4 row 11-12)
+// ---------------------------------------------------------------------------
+
+describe('StockSearchModal — loading / error 상태 표시 (F-3)', () => {
+  it('fetch 진행 중 stock-search-modal-loading 노출', async () => {
+    // fetchChartData가 resolve되지 않는 pending promise
+    mockFetchChartData.mockImplementation(() => new Promise(() => {}))
+    const triggerRef = createRef<HTMLElement>()
+    render(
+      <StockSearchModal
+        stock={mockStock}
+        initialTimeframe="daily"
+        onClose={vi.fn()}
+        triggerRef={triggerRef}
+      />,
+    )
+    // 로딩 중 상태 — stock-search-modal-loading visible
+    expect(screen.getByTestId('stock-search-modal-loading')).toBeTruthy()
+  })
+
+  it('fetch 실패 시 stock-search-modal-error 노출', async () => {
+    mockFetchChartData.mockRejectedValue(new Error('network error'))
+    const triggerRef = createRef<HTMLElement>()
+    render(
+      <StockSearchModal
+        stock={mockStock}
+        initialTimeframe="daily"
+        onClose={vi.fn()}
+        triggerRef={triggerRef}
+      />,
+    )
+    await act(async () => {})
+    expect(screen.getByTestId('stock-search-modal-error')).toBeTruthy()
+    expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  it('fetch 성공 시 loading/error 없음', async () => {
+    mockFetchChartData.mockResolvedValue({ candles: [] })
+    const triggerRef = createRef<HTMLElement>()
+    render(
+      <StockSearchModal
+        stock={mockStock}
+        initialTimeframe="daily"
+        onClose={vi.fn()}
+        triggerRef={triggerRef}
+      />,
+    )
+    await act(async () => {})
+    expect(screen.queryByTestId('stock-search-modal-loading')).toBeNull()
+    expect(screen.queryByTestId('stock-search-modal-error')).toBeNull()
+  })
+})
