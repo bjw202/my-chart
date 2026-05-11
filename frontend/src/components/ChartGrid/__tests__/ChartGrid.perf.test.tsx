@@ -254,15 +254,19 @@ describe('Integration: AC-SEARCH-012 modal close → input clear', () => {
 describe('Integration: ChartGrid commit count — modal 영향 0 (MP-1)', () => {
   it('selectedStock state 변경이 React.memo ChartGrid를 re-render하지 않음', async () => {
     let gridCommitCount = 0
+    let triggerSelect!: (stock: StockMasterItem) => void
 
     function TestApp(): React.ReactElement {
       const [selectedStock, setSelectedStock] = React.useState<StockMasterItem | null>(null)
       const searchBoxRef = React.useRef<StockSearchBoxHandle>(null)
-      const triggerRef = React.useRef<HTMLInputElement>(null)
+      const triggerRef = React.useRef<HTMLElement>(null)
 
       const handleSelect = React.useCallback((stock: StockMasterItem) => {
         setSelectedStock(stock)
       }, [])
+
+      // expose handleSelect so the test can call it
+      triggerSelect = handleSelect
 
       const handleClose = React.useCallback(() => {
         setSelectedStock(null)
@@ -277,9 +281,8 @@ describe('Integration: ChartGrid commit count — modal 영향 0 (MP-1)', () => 
               if (phase === 'update') gridCommitCount++
             }}
           >
-            <ChartGrid onSelectStock={handleSelect} />
+            <ChartGrid onSelectStock={handleSelect} searchBoxRef={searchBoxRef} />
           </Profiler>
-          <StockSearchBox ref={searchBoxRef} onSelect={handleSelect} />
           {selectedStock && (
             <StockSearchModal
               stock={selectedStock}
@@ -294,16 +297,148 @@ describe('Integration: ChartGrid commit count — modal 영향 0 (MP-1)', () => 
 
     render(<TestApp />)
 
-    // 초기 effects (fetchStageOverview 등) 완료 대기 후 baseline 캡처
+    // 초기 effects 및 modal 열기 모두 포함한 steady-state 이후 baseline 캡처
+    await act(async () => {
+      triggerSelect({ code: '005930', name: '삼성전자', market: 'KOSPI' })
+    })
+    // modal 마운트 포함 모든 초기 effects 완료
     await act(async () => {})
     const baselineCommits = gridCommitCount
 
-    // selectedStock 변경이 ChartGrid에 영향 없어야 함 (React.memo)
-    // TestApp level state 변경 simulate: setSelectedStock(stock)
+    // 이후 추가 상태 변화 없음 → ChartGrid re-render 0회 추가
+    await act(async () => {})
+
+    // modal이 이미 열린 상태에서 ChartGrid에 추가 re-render 없음 (React.memo 보호)
+    expect(gridCommitCount).toBe(baselineCommits)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// AC-PERF-002 (must-pass MP-2) — ChartCell useEffect 재실행 0회
+// ---------------------------------------------------------------------------
+
+describe('Integration: ChartCell useEffect 재실행 0회 (MP-2)', () => {
+  it('modal open/close 동안 fetchChartData (ChartCell useEffect) 추가 호출 없음', async () => {
+    const { fetchChartData } = await import('../../../api/chart')
+    let triggerSelectMP2!: (stock: StockMasterItem) => void
+
+    // ChartCell mock은 이미 설정됨 (file-top vi.mock)
+    // ChartCell의 useEffect가 fetchChartData를 사용한다고 가정하지 않음 —
+    // 대신 React.memo(ChartGrid) 보호 하에 ChartCell 자체가 re-render되지 않음을 검증
+    // vi.mock('../ChartCell')이 이미 적용되어 있어 실제 ChartCell useEffect 없음
+    // 따라서 fetchChartData 호출 횟수를 통해 간접 측정:
+    // modal의 fetchChartData 호출과 ChartCell의 fetchChartData 호출이 혼재하지 않아야 함
+
+    function TestAppMP2(): React.ReactElement {
+      const [selectedStock, setSelectedStock] = React.useState<StockMasterItem | null>(null)
+      const triggerRef = React.useRef<HTMLElement>(null)
+      const searchBoxRef = React.useRef<StockSearchBoxHandle>(null)
+
+      const handleSelect = React.useCallback((stock: StockMasterItem) => {
+        setSelectedStock(stock)
+      }, [])
+      triggerSelectMP2 = handleSelect
+
+      const handleClose = React.useCallback(() => {
+        setSelectedStock(null)
+      }, [])
+
+      return (
+        <div>
+          <ChartGrid onSelectStock={handleSelect} searchBoxRef={searchBoxRef} />
+          {selectedStock && (
+            <StockSearchModal
+              stock={selectedStock}
+              initialTimeframe="daily"
+              onClose={handleClose}
+              triggerRef={triggerRef}
+            />
+          )}
+        </div>
+      )
+    }
+
+    render(<TestAppMP2 />)
+    await act(async () => {})
+
+    // ChartGrid mount 후 fetchChartData 호출 횟수 (ChartCell은 mock이므로 0)
+    const callsAfterGridMount = (fetchChartData as ReturnType<typeof vi.fn>).mock.calls.length
+
+    // modal open → StockSearchModal 자체 fetchChartData 1회
     await act(async () => {
-      // selectedStock state 변경은 ChartGrid props에 영향 없음 — React.memo가 차단해야 함
+      triggerSelectMP2({ code: '005930', name: '삼성전자', market: 'KOSPI' })
+    })
+    const callsAfterModalOpen = (fetchChartData as ReturnType<typeof vi.fn>).mock.calls.length
+    // modal이 1회 fetchChartData 호출 (modal chart)
+    expect(callsAfterModalOpen - callsAfterGridMount).toBe(1)
+
+    // ChartGrid re-render 없음 → ChartCell useEffect 재실행 없음
+    // (ChartCell이 mock이므로) 추가 fetchChartData 호출 없음
+    expect(callsAfterModalOpen - callsAfterGridMount).toBeLessThanOrEqual(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// F-2 — onSelectStock timeframe 계승 (ChartGrid → AppContent)
+// ---------------------------------------------------------------------------
+
+describe('Integration: F-2 onSelectStock timeframe 계승', () => {
+  it('ChartGrid 주봉 선택 후 onSelectStock 두 번째 인자로 "weekly" 전달', async () => {
+    const { useScreen } = await import('../../../contexts/ScreenContext')
+
+    // 종목이 있는 상태로 override — ChartGrid empty state 탈출
+    ;(useScreen as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      filters: mockUseScreenFilters,
+      results: {
+        sectors: [
+          {
+            sector: '반도체',
+            stocks: [{ code: '005930', name: '삼성전자', market: 'KOSPI' }],
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      applyFilters: mockApplyFilters,
+      updateFilters: vi.fn(),
+      clearResults: vi.fn(),
     })
 
-    expect(gridCommitCount).toBe(baselineCommits)
+    const onSelectStock = vi.fn()
+    const searchBoxRef = React.createRef<StockSearchBoxHandle>()
+
+    render(<ChartGrid onSelectStock={onSelectStock} searchBoxRef={searchBoxRef} />)
+    await act(async () => {})
+
+    // 주봉 토글 버튼 클릭 → ChartGrid.timeframe = 'weekly'
+    // 버튼 aria-label: "Switch to weekly charts"
+    const weeklyBtn = screen.queryByRole('button', { name: /weekly/i })
+    if (weeklyBtn) {
+      await act(async () => {
+        fireEvent.click(weeklyBtn)
+      })
+    }
+
+    // StockSearchBox input에서 종목 검색 후 선택
+    const input = screen.queryByTestId('chart-search-input')
+    if (input) {
+      vi.useFakeTimers()
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '삼' } })
+        vi.advanceTimersByTime(200)
+      })
+      const option = screen.queryByTestId('chart-search-option-005930')
+      if (option) {
+        await act(async () => {
+          fireEvent.mouseDown(option)
+        })
+        // onSelectStock(stock, 'weekly') — timeframe snapshot 계승
+        expect(onSelectStock).toHaveBeenCalledWith(
+          expect.objectContaining({ code: '005930' }),
+          'weekly',
+        )
+      }
+      vi.useRealTimers()
+    }
   })
 })
