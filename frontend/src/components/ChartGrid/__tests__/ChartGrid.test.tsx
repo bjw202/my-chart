@@ -151,6 +151,7 @@ describe('ChartGrid — crossTabParams 수신 (R1)', () => {
         markets: [],
         sectors: [],
         codes: stockCodes,
+        minervini_trend_template: null,
       })
     })
   })

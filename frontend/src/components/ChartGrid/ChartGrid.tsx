@@ -1,3 +1,13 @@
+/**
+ * ChartGrid — 차트 그리드 컴포넌트
+ *
+ * MP-1: React.memo로 래핑 — AppContent selectedStock 상태 변경이
+ *        ChartGrid re-render를 유발하지 않도록 격리 (SPEC-CHART-SEARCH-001 AC-PERF-001)
+ *
+ * @MX:ANCHOR: [AUTO] ChartGrid — AppContent > tab-content > ChartGrid mount (fan_in >= 3)
+ * @MX:REASON: 최상위 차트 그리드 진입점; React.memo 격리로 modal 상태로부터 보호
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { VariableSizeList } from 'react-window'
 import { useScreen } from '../../contexts/ScreenContext'
@@ -10,14 +20,26 @@ import { fetchStageOverview } from '../../api/stage'
 import { DEFAULT_SCREEN_REQUEST } from '../../types/filter'
 import { ChartCell } from './ChartCell'
 import { ChartPagination } from './ChartPagination'
+import { StockSearchBox } from './StockSearchBox'
+import type { StockSearchBoxHandle } from './StockSearchBox'
+import type { StockMasterItem } from '../../api/stocks'
 
-export function ChartGrid(): React.ReactElement {
+export interface ChartGridProps {
+  onSelectStock?: (stock: StockMasterItem) => void
+}
+
+/**
+ * ChartGrid는 React.memo로 래핑되어 AppContent의 selectedStock state 변경에
+ * 반응하지 않는다 (MP-1, AC-PERF-001).
+ */
+function ChartGridInner({ onSelectStock }: ChartGridProps): React.ReactElement {
   const { results, applyFilters } = useScreen()
   const { crossTabParams, clearCrossTabParams } = useTab()
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
   const [stageMap, setStageMap] = useState<Map<string, number>>(new Map())
+  const searchBoxRef = useRef<StockSearchBoxHandle | null>(null)
 
   // Fetch stage overview once and build code->stage lookup map
   useEffect(() => {
@@ -92,6 +114,13 @@ export function ChartGrid(): React.ReactElement {
   return (
     <div className="chart-grid">
       <div className="chart-grid-toolbar">
+        {/* 종목 검색 박스 (AC-SEARCH-001, chart-grid-toolbar 좌측) */}
+        {onSelectStock && (
+          <StockSearchBox
+            ref={searchBoxRef}
+            onSelect={onSelectStock}
+          />
+        )}
         <button
           type="button"
           className="grid-toggle-btn"
@@ -138,3 +167,6 @@ export function ChartGrid(): React.ReactElement {
     </div>
   )
 }
+
+// React.memo — AppContent selectedStock 상태 변경이 ChartGrid를 re-render하지 않도록 보호 (MP-1)
+export const ChartGrid = React.memo(ChartGridInner)
