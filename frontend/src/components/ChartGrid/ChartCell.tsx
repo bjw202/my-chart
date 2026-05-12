@@ -90,12 +90,12 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
     aiReport.reset()
   }, [aiReport])
 
-  const handleStartAiReport = useCallback((mode: 'perplexity' | 'deep') => {
+  const handleStartAiReport = useCallback((mode: 'fast' | 'deep') => {
     aiReport.startStream(stock.code, mode)
   }, [stock.code, aiReport])
 
-  const handleRetryAiReport = useCallback((mode?: 'perplexity' | 'deep') => {
-    aiReport.startStream(stock.code, mode ?? 'perplexity')
+  const handleRetryAiReport = useCallback((mode?: 'fast' | 'deep') => {
+    aiReport.startStream(stock.code, mode ?? 'fast')
   }, [stock.code, aiReport])
 
   const handleLoadAiHistory = useCallback(() => {

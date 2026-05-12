@@ -173,10 +173,9 @@ def _make_router_app(
     service_mod와 deep_service_mod는 위 fixture로부터 주입된 격리 모듈.
     라우터 모듈을 직접 로드해 sys.modules에 없는 의존성을 스텁으로 대체.
     """
-    import os
-
-    os.environ["PERPLEXITY_API_KEY"] = api_key
-
+    # SPEC-AI-REPORT-003: api_key 파라미터는 더 이상 사용되지 않음 (Perplexity 자산 제거됨).
+    # api_key 인자는 하위 시그니처 호환을 위해 유지하되 환경변수에 쓰지 않는다.
+    _ = api_key  # noqa: F841
     _install_stubs()
 
     # 라우터가 import할 서비스 스텁 등록
@@ -218,20 +217,25 @@ def _make_router_app(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class TestPerplexityPathPreservation:
-    """mode 없거나 'perplexity'이면 기존 Perplexity 경로만 사용됨을 검증."""
+class TestFastModePathPreservation:
+    """SPEC-AI-REPORT-003: mode 없거나 'fast'/'perplexity' 이면 Codex Fast 경로로 라우팅."""
 
-    def test_no_mode_param_routes_to_perplexity(self):
-        """mode 파라미터 없으면 stream_perplexity 호출, stream_deep_analysis 미호출."""
+    def _setup_fast_mode_app(self, mode_suffix: str, query_suffix: str = ""):
+        """Fast Mode 테스트용 앱 생성 — stream_codex_fast 를 fake 로 교체."""
+        import shutil
         _install_stubs()
-        svc = _load_service_module("_test_svc_np", _SERVICE_PATH)
+        svc = _load_service_module(f"_test_svc_{mode_suffix}", _SERVICE_PATH)
         svc._active_analyses.clear()
+        svc._daily_call_count = 0
+        svc._daily_reset_date = ""
+        svc._recent_call_timestamps.clear()
 
-        call_tracker = {"perp": 0, "deep": 0}
+        call_tracker = {"fast": 0, "deep": 0}
 
-        async def fake_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
-            call_tracker["perp"] += 1
-            yield "chunk"
+        async def fake_fast(stock_name: str, code: str) -> AsyncGenerator[dict, None]:
+            call_tracker["fast"] += 1
+            yield {"data": "chunk"}
+            yield {"event": "done", "data": ""}
 
         async def fake_deep(code: str, stock_name: str) -> AsyncGenerator[dict, None]:
             call_tracker["deep"] += 1
@@ -247,64 +251,46 @@ class TestPerplexityPathPreservation:
         sys.modules["backend.services.ai_report_service"] = svc
         sys.modules["backend.services.deep_research_service"] = ds_stub
 
-        router_mod = _load_service_module("_test_router_np", _ROUTER_PATH)
-        # stream_perplexity를 fake로 교체
-        router_mod.stream_perplexity = fake_perplexity
+        router_mod = _load_service_module(f"_test_router_{mode_suffix}", _ROUTER_PATH)
+        router_mod.stream_codex_fast = fake_fast
+        # shutil.which("codex") 가 True 를 반환하도록 하여 바이너리 체크 통과
+        router_mod.shutil = types.SimpleNamespace(which=lambda cmd: "/usr/local/bin/codex")
 
         app = FastAPI()
         app.include_router(router_mod.router, prefix="/api")
+        return app, call_tracker
 
-        import os
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
-
+    def test_no_mode_param_routes_to_fast(self):
+        """mode 파라미터 없으면 stream_codex_fast 호출, stream_deep_analysis 미호출."""
+        app, call_tracker = self._setup_fast_mode_app("np_fast")
         with TestClient(app, raise_server_exceptions=False) as client:
             response = client.post("/api/ai-report/005930")
 
         assert response.status_code == 200
         assert "text/event-stream" in response.headers.get("content-type", "")
-        assert call_tracker["perp"] == 1, "stream_perplexity가 정확히 1번 호출되어야 함"
-        assert call_tracker["deep"] == 0, "stream_deep_analysis는 호출되지 않아야 함"
+        assert call_tracker["fast"] == 1, "stream_codex_fast 가 정확히 1번 호출되어야 함"
+        assert call_tracker["deep"] == 0, "stream_deep_analysis 는 호출되지 않아야 함"
 
-    def test_mode_perplexity_routes_to_perplexity(self):
-        """?mode=perplexity이면 stream_perplexity 호출, stream_deep_analysis 미호출."""
-        _install_stubs()
-        svc = _load_service_module("_test_svc_mp", _SERVICE_PATH)
-        svc._active_analyses.clear()
+    def test_mode_fast_routes_to_fast(self):
+        """?mode=fast 이면 stream_codex_fast 호출."""
+        app, call_tracker = self._setup_fast_mode_app("mf_fast")
+        with TestClient(app, raise_server_exceptions=False) as client:
+            response = client.post("/api/ai-report/005930?mode=fast")
 
-        call_tracker = {"perp": 0, "deep": 0}
+        assert response.status_code == 200
+        assert call_tracker["fast"] == 1
+        assert call_tracker["deep"] == 0
 
-        async def fake_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
-            call_tracker["perp"] += 1
-            yield "chunk"
-
-        async def fake_deep(code: str, stock_name: str) -> AsyncGenerator[dict, None]:
-            call_tracker["deep"] += 1
-            yield {"data": "bad"}
-
-        ds_stub = types.SimpleNamespace(
-            stream_deep_analysis=fake_deep,
-            check_deep_rate_limit=MagicMock(),
-            _active_deep_analyses=set(),
-            DeepRateLimitError=type("DeepRateLimitError", (Exception,), {}),
-            AlreadyRunningError=type("AlreadyRunningError", (Exception,), {}),
-        )
-        sys.modules["backend.services.ai_report_service"] = svc
-        sys.modules["backend.services.deep_research_service"] = ds_stub
-
-        router_mod = _load_service_module("_test_router_mp", _ROUTER_PATH)
-        router_mod.stream_perplexity = fake_perplexity
-
-        app = FastAPI()
-        app.include_router(router_mod.router, prefix="/api")
-
-        import os
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
-
+    def test_mode_perplexity_is_deprecated_alias_to_fast(self):
+        """?mode=perplexity 는 backward-compat 알리아스 → stream_codex_fast 로 라우팅."""
+        app, call_tracker = self._setup_fast_mode_app("mp_fast")
         with TestClient(app, raise_server_exceptions=False) as client:
             response = client.post("/api/ai-report/005930?mode=perplexity")
 
         assert response.status_code == 200
-        assert call_tracker["perp"] == 1
+        assert call_tracker["fast"] == 1, (
+            "perplexity alias 도 Codex Fast 로 라우팅되어야 함"
+        )
         assert call_tracker["deep"] == 0
 
 
@@ -327,7 +313,7 @@ class TestDeepModeRouting:
         """Deep mode 테스트용 앱 생성 헬퍼."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
 
         svc = _load_service_module("_test_svc_deep", _SERVICE_PATH)
@@ -392,7 +378,7 @@ class TestDeepModeRouting:
         """?mode=invalid → FastAPI Query 패턴 검증 실패로 422 반환."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_inv", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -436,7 +422,7 @@ class TestDeepModeRouting:
 
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_rl", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -477,25 +463,22 @@ class TestDeepModeRouting:
         detail_str = str(body["detail"])
         assert "이미 진행" in detail_str or "already" in detail_str.lower()
 
-    def test_perplexity_rate_limit_unaffected_by_deep_quota(self):
-        """Deep 쿼터 소진 후에도 Perplexity 경로는 정상 동작 (200 SSE)."""
-        import os
-        from datetime import datetime
-
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+    def test_fast_rate_limit_unaffected_by_deep_quota(self):
+        """SPEC-AI-REPORT-003: Deep 쿼터 소진 후에도 Fast (Codex) 경로는 정상 동작 (200 SSE)."""
         _install_stubs()
         svc = _load_service_module("_test_svc_prul", _SERVICE_PATH)
         svc._active_analyses.clear()
-        # Perplexity rate limit 상태 초기화
+        # Fast rate limit 상태 초기화
         svc._daily_call_count = 0
         svc._daily_reset_date = ""
         svc._recent_call_timestamps.clear()
 
-        call_tracker = {"perp": 0}
+        call_tracker = {"fast": 0}
 
-        async def fake_perplexity(stock_name: str) -> AsyncGenerator[str, None]:
-            call_tracker["perp"] += 1
-            yield "chunk"
+        async def fake_fast(stock_name: str, code: str) -> AsyncGenerator[dict, None]:
+            call_tracker["fast"] += 1
+            yield {"data": "chunk"}
+            yield {"event": "done", "data": ""}
 
         ds_stub = types.SimpleNamespace(
             stream_deep_analysis=MagicMock(),
@@ -504,12 +487,11 @@ class TestDeepModeRouting:
             DeepRateLimitError=type("DeepRateLimitError", (Exception,), {}),
             AlreadyRunningError=type("AlreadyRunningError", (Exception,), {}),
         )
-        # Deep 쿼터 소진 시뮬레이션 (실제 deep_service의 상태가 아닌 스텁이므로
-        # 여기서는 Perplexity 경로 독립성을 확인)
         sys.modules["backend.services.ai_report_service"] = svc
         sys.modules["backend.services.deep_research_service"] = ds_stub
         router_mod = _load_service_module("_test_router_prul", _ROUTER_PATH)
-        router_mod.stream_perplexity = fake_perplexity
+        router_mod.stream_codex_fast = fake_fast
+        router_mod.shutil = types.SimpleNamespace(which=lambda cmd: "/usr/local/bin/codex")
 
         app = FastAPI()
         app.include_router(router_mod.router, prefix="/api")
@@ -518,13 +500,13 @@ class TestDeepModeRouting:
             response = client.post("/api/ai-report/005930")
 
         assert response.status_code == 200
-        assert call_tracker["perp"] == 1
+        assert call_tracker["fast"] == 1
 
     def test_existing_guard_chain_preserved_for_deep_invalid_format(self):
         """잘못된 형식 종목 코드(5자리)는 deep mode에서도 422 반환."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_gcp", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -555,7 +537,7 @@ class TestDeepModeRouting:
         """존재하지 않는 종목 코드는 deep mode에서도 404 반환."""
         import os
 
-        os.environ["PERPLEXITY_API_KEY"] = "test-key"
+        # SPEC-AI-REPORT-003: PERPLEXITY_API_KEY no-op (자산 제거됨). 호환성 위해 유지.
         _install_stubs()
         svc = _load_service_module("_test_svc_404", _SERVICE_PATH)
         svc._active_analyses.clear()
@@ -622,12 +604,18 @@ def _load_main_isolated(
         _s = types.SimpleNamespace(router=empty_router)
         sys.modules[_rmod] = _s
 
-    # ai_report_service 스텁 (lifespan에서 _load_prompt_template 호출)
+    # SPEC-AI-REPORT-003: lifespan 이 codex_cli_runner.load_codex_prompt 를 호출하도록 변경됨.
+    # ai_report_service 스텁은 유지 (_active_analyses 만 필요)
     svc_stub = types.SimpleNamespace(
-        _load_prompt_template=lambda: "tmpl {{종목명}}",
         _active_analyses=set(),
     )
     sys.modules["backend.services.ai_report_service"] = svc_stub
+
+    # codex_cli_runner 스텁 (lifespan 이 load_codex_prompt 로 fail-fast 검증)
+    codex_stub = types.SimpleNamespace(
+        load_codex_prompt=lambda *, code, stock_name: f"tmpl {stock_name} ({code})",
+    )
+    sys.modules["backend.services.codex_cli_runner"] = codex_stub
 
     # deep_research_service 스텁 (lifespan에서 import)
     if load_synthesis_fn is None:

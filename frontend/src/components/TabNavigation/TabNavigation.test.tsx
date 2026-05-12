@@ -14,12 +14,13 @@ function renderWithTabProvider() {
 }
 
 describe('TabNavigation', () => {
-  it('should render all 4 tabs', () => {
+  it('should render all 5 tabs', () => {
     renderWithTabProvider()
     expect(screen.getByText('Market Overview')).toBeInTheDocument()
     expect(screen.getByText('Sector Analysis')).toBeInTheDocument()
     expect(screen.getByText('Stock Explorer')).toBeInTheDocument()
     expect(screen.getByText('Chart Grid')).toBeInTheDocument()
+    expect(screen.getByText('테마 분석')).toBeInTheDocument()
   })
 
   it('should have Chart Grid as active by default', () => {
@@ -49,6 +50,6 @@ describe('TabNavigation', () => {
   it('should render all tabs as tab elements', () => {
     renderWithTabProvider()
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(4)
+    expect(tabs).toHaveLength(5)
   })
 })

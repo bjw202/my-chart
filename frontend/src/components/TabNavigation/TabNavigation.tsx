@@ -12,6 +12,7 @@ const TABS: TabConfig[] = [
   { id: 'sector-analysis', label: 'Sector Analysis' },
   { id: 'stock-explorer', label: 'Stock Explorer' },
   { id: 'chart-grid', label: 'Chart Grid' },
+  { id: 'theme-analysis', label: '테마 분석' },
 ]
 
 // @MX:ANCHOR: [AUTO] TabNavigation renders the 4-tab header bar for the app

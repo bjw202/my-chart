@@ -34,7 +34,7 @@ REFERENCE_STOCK = "삼성전자"
 # Paths
 INPUT_DIR = Path(__file__).parent.parent / "Input"
 OUTPUT_DIR = Path(__file__).parent.parent / "Output"
-SECTORMAP_PATH = INPUT_DIR / "sectormap.xlsx"
+SECTORMAP_PATH = INPUT_DIR / "sectormap-original.xlsx"
 
 # Ensure Output directory exists
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

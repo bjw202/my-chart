@@ -126,7 +126,7 @@ kr-stock-screener/
 │   ├── weekly_rs.db
 │   └── daily_price.db
 │
-├── sectormap_original.xlsx      # Sector classification reference
+├── sectormap-original.xlsx      # 단일 source — 53 컬럼 원본, registry.py가 header=8로 로드, 6 컬럼 사용 (Code/Name/Market/산업명(대)/산업명(중)/주요제품). 이전 sectormap.xlsx 는 2026-05-12 폐기
 ├── pyproject.toml               # Python project config
 ├── requirements.txt             # Python dependencies
 └── README.md

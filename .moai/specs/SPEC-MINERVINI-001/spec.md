@@ -1,17 +1,11 @@
 ---
-id: SPEC-MINERVINI-001
-title: Mark Minervini Trend Template Screener (Data Layer & Evaluation Engine)
-version: 1.0.3
-status: completed
-created: 2026-04-21
-updated: 2026-04-21
-author: jw
-priority: P1
-tags: [screener, minervini, trend-template, sqlite, fastapi, pydantic, tdd]
-related:
-  - SPEC-RS-LINE-001
-  - SPEC-DASHBOARD-002
-  - SPEC-PRESET-001 (downstream, UI presets)
+
+id: SPEC-MINERVINI-001 title: Mark Minervini Trend Template Screener (Data Layer & Evaluation Engine) version: 1.0.3 status: completed created: 2026-04-21 updated: 2026-04-21 author: jw priority: P1 tags: \[screener, minervini, trend-template, sqlite, fastapi, pydantic, tdd\] related:
+
+- SPEC-RS-LINE-001
+- SPEC-DASHBOARD-002
+- SPEC-PRESET-001 (downstream, UI presets)
+
 ---
 
 # SPEC-MINERVINI-001: Mark Minervini Trend Template 스크리너 (데이터 계층 + 평가 엔진)
@@ -19,7 +13,7 @@ related:
 ## HISTORY
 
 | 버전 | 날짜 | 작성자 | 변경 내용 |
-|------|------|--------|----------|
+| --- | --- | --- | --- |
 | 1.0.0 | 2026-04-21 | jw | 초기 SPEC 작성 (research.md 2026-03-08 기반) |
 | 1.0.1 | 2026-04-21 | jw | SMA200 shift 값 20일 확정 (컬럼명 `SMA200_20D_AGO`), score 엄격 모드 확정 (strict gate, 통과 행은 항상 `trend_template_score=8`) |
 | 1.0.2 | 2026-04-21 | jw | 전체 DB 재생성 전략 확정 (ALTER 마이그레이션 → 파일 교체). 기존 daily/weekly DB 파일 삭제 후 db-update 파이프라인 전체 재실행을 정상 경로로 채택. ALTER 경로는 방어적 백업으로 유지. |
@@ -47,7 +41,7 @@ related:
 ### 1.3 기존 코드 현황 (2026-04-21 기준)
 
 | 경로 | 역할 | 본 SPEC 에서의 역할 |
-|------|------|-------------------|
+| --- | --- | --- |
 | `my_chart/db/daily/price_daily_db.py` | 일봉 DB 생성 (OHLCV + EMA10/20 + SMA50/100/200 + RS_Line) | 신규 컬럼 계산 추가 |
 | `backend/services/db_service.py` | 4단계 DB 업데이트 오케스트레이션 | 변경 없음 |
 | `backend/services/meta_service.py` | `stock_meta` 스냅샷 재빌드 | 스냅샷 컬럼 확장 + 멱등 ALTER |
@@ -72,7 +66,7 @@ SMA50, SMA100, SMA200, Close, rs_12m, HIGH_52W 는 이미 존재한다.
 
 - A1: Trend Template 8조건은 research.md §2.1 의 정의를 그대로 따른다. 특히 T6 의 배율은 **1.25** (25% 이상) 를 사용한다. (1.30 을 쓰는 자료도 있으나 본 프로젝트는 research.md 기준을 채택.)
 - A2: 52주 최고/최저는 **250 영업일 rolling window** 로 정의한다. 주말·공휴일을 제외한 순수 거래일 기준.
-- A3: "20영업일 전 SMA200" 은 **정확히 20 trading-day shift** 로 계산한다. 즉 `SMA200_20D_AGO[t] = SMA200[t - 20]`. 컬럼명과 shift 값은 **v1.0.1 (2026-04-21) 결정**으로 확정되었으며, research.md §2.1 의 "20 trading days ago" 표현과 일치한다. (이전 초안에서 혼용되던 "~1 calendar month ≈ 22 days" 해석은 폐기.)
+- A3: "20영업일 전 SMA200" 은 **정확히 20 trading-day shift** 로 계산한다. 즉 `SMA200_20D_AGO[t] = SMA200[t - 20]`. 컬럼명과 shift 값은 **v1.0.1 (2026-04-21) 결정**으로 확정되었으며, research.md §2.1 의 "20 trading days ago" 표현과 일치한다. (이전 초안에서 혼용되던 "\~1 calendar month ≈ 22 days" 해석은 폐기.)
 - A4: 상장 후 거래일이 250일 미만인 종목은 T6, T7 에서 NULL 을 반환하므로 WHERE 조건에서 자연스럽게 탈락한다.
 - A5: 모든 컬럼 추가는 **멱등**이어야 한다. 파이프라인을 두 번 실행해도 오류가 발생하거나 컬럼이 중복되지 않는다.
 - A6: 신규 컬럼이 아직 마이그레이션되지 않은 환경에서도 `/api/screen` 는 **HTTP 200** 을 반환해야 한다 (empty list + warning log). 기존 필터는 영향을 받지 않는다.
@@ -107,7 +101,7 @@ SMA50, SMA100, SMA200, Close, rs_12m, HIGH_52W 는 이미 존재한다.
 시스템은 **항상** 각 종목의 일봉 데이터 처리 시 20 거래일 전의 SMA200 값을 `stock_prices.SMA200_20D_AGO` (REAL) 컬럼에 저장해야 한다.
 
 - 산식: `SMA200_20D_AGO[t] = SMA200[t - 20]`
-- SMA200 이 NULL 이거나 t < 20 인 행은 NULL 로 저장한다.
+- SMA200 이 NULL 이거나 t &lt; 20 인 행은 NULL 로 저장한다.
 - 런타임 스크리닝 쿼리에서 재계산을 피하기 위해 **precompute** 한다 (Assumption A3, 의사결정 #1).
 
 ### Module 2: stock_meta Snapshot Rebuild
@@ -155,12 +149,12 @@ AND (rs_12m >= 70)                                            -- T8
 
 **REQ-MIN-006 — Trend Template 점수 노출 (엄격 모드)**
 
-**WHEN** `minervini_trend_template=true` 이고 **WHERE 절을 통과한 행**이 있으면 **THEN** 시스템은 각 `StockItem` 에 `trend_template_score: int` 필드로 **고정값 `8`** 을 포함해야 한다.
+**WHEN** `minervini_trend_template=true` 이고 **WHERE 절을 통과한 행**이 있으면 **THEN** 시스템은 각 `StockItem` 에 `trend_template_score: int` 필드로 **고정값** `8` 을 포함해야 한다.
 
-- **v1.0.1 (2026-04-21) 결정 — 엄격 모드 (strict gate) 확정**: WHERE 절이 8조건 전체를 AND 결합하는 strict gate 이므로 결과 집합에 반환되는 모든 행은 정의상 8조건을 모두 통과한다. 따라서 `trend_template_score` 는 반환되는 모든 행에서 **항상 정확히 `8`** 이다.
+- **v1.0.1 (2026-04-21) 결정 — 엄격 모드 (strict gate) 확정**: WHERE 절이 8조건 전체를 AND 결합하는 strict gate 이므로 결과 집합에 반환되는 모든 행은 정의상 8조건을 모두 통과한다. 따라서 `trend_template_score` 는 반환되는 모든 행에서 **항상 정확히** `8` 이다.
 - 필드는 **API 스키마 안정성**을 위해 유지된다. 향후 부분 매칭 모드가 별도 SPEC 으로 도입되더라도 본 필드의 타입과 위치는 변경되지 않는다.
 - SQL 은 `SUM(CASE WHEN T_i THEN 1 ELSE 0 END)` 형태로 계산하지만 strict gate 특성상 결과는 항상 8 이다. 구현 단순화를 위해 `CASE WHEN :minervini_on = 1 THEN 8 END AS trend_template_score` 로 축약해도 무방하다 (구현 재량).
-- [HARD] **부분 매칭 (예: 6/8 통과 행) 은 본 SPEC 에서 반환하지 않는다.** WHERE 을 HAVING + CASE SUM 으로 리팩터하여 부분 매칭을 노출하는 접근은 **명시적으로 out of scope** 이다 (§10 참조).
+- \[HARD\] **부분 매칭 (예: 6/8 통과 행) 은 본 SPEC 에서 반환하지 않는다.** WHERE 을 HAVING + CASE SUM 으로 리팩터하여 부분 매칭을 노출하는 접근은 **명시적으로 out of scope** 이다 (§10 참조).
 - **WHEN** `minervini_trend_template` 이 꺼져 있거나 요청에 해당 필드가 없으면 **THEN** `trend_template_score` 는 `None` 으로 반환한다.
 - `StockItem` 스키마 필드: `trend_template_score: int | None = None`.
 
@@ -176,7 +170,7 @@ AND (rs_12m >= 70)                                            -- T8
 2. HTTP **200 OK** 를 반환한다 (500 또는 503 금지).
 3. `ScreenResponse(total=0, sectors=[])` 를 반환한다.
 4. WARN 레벨 로그 1회 기록: `"[minervini] required columns missing; delete DB files and re-run db-update pipeline"`
-5. 기존 필터 (market_cap, chg_*, patterns, rs_min, sectors, markets, codes) 는 **Minervini 플래그와 무관하게** 정상 작동해야 한다.
+5. 기존 필터 (market_cap, chg\_\*, patterns, rs_min, sectors, markets, codes) 는 **Minervini 플래그와 무관하게** 정상 작동해야 한다.
 
 컬럼 존재 검사는 `_build_minervini_where()` 호출 직전에 `PRAGMA table_info(stock_meta)` 1회 조회로 수행하여 불필요한 예외 왕복을 회피할 수도 있다 (구현 재량).
 
@@ -279,7 +273,7 @@ AND (rs_12m >= 70)                                            -- T8
 #### stock_prices (daily)
 
 | 컬럼 | 타입 | 설명 | 생성 시점 |
-|------|------|------|----------|
+| --- | --- | --- | --- |
 | `SMA150` | REAL | 150일 단순이평 | price_daily_db.py |
 | `HIGH_52W` | REAL | 250 거래일 rolling max(High) | price_daily_db.py |
 | `LOW_52W` | REAL | 250 거래일 rolling min(Low) | price_daily_db.py |
@@ -288,7 +282,7 @@ AND (rs_12m >= 70)                                            -- T8
 #### stock_meta (스냅샷)
 
 | 컬럼 | 타입 | 설명 | 생성 시점 |
-|------|------|------|----------|
+| --- | --- | --- | --- |
 | `sma150` | REAL | 신규. 해당 종목 최신 SMA150 | rebuild_stock_meta |
 | `low52w` | REAL | 신규. 해당 종목 최신 LOW_52W | rebuild_stock_meta |
 | `sma200_20d_ago` | REAL | 신규. 해당 종목 최신 SMA200_20D_AGO | rebuild_stock_meta |
@@ -342,7 +336,7 @@ export interface StockItem {
 ### 4.5 수정 파일 목록
 
 | 파일 | 변경 사항 | SPEC 레퍼런스 |
-|------|----------|---------------|
+| --- | --- | --- |
 | `my_chart/db/daily/price_daily_db.py` | SMA150, HIGH_52W, LOW_52W, SMA200_20D_AGO 계산 추가 | REQ-MIN-001/002/003 |
 | `backend/services/meta_service.py` | 멱등 ALTER + 스냅샷 4개 컬럼 복사 | REQ-MIN-004, REQ-MIN-008 |
 | `backend/schemas/screen.py` | `minervini_trend_template`, `trend_template_score` 추가, `patterns.max_length=5` | REQ-MIN-005, REQ-MIN-006 |
@@ -357,7 +351,7 @@ export interface StockItem {
 ### 4.7 Traceability
 
 | 요구사항 | 구현 파일 | 테스트 |
-|---------|----------|--------|
+| --- | --- | --- |
 | REQ-MIN-001 | my_chart/db/daily/price_daily_db.py | test_sma150_rolling_correctness, test_sma150_insufficient_history_null |
 | REQ-MIN-002 | my_chart/db/daily/price_daily_db.py | test_52w_rolling_max_min, test_52w_ipo_under_250days_null |
 | REQ-MIN-003 | my_chart/db/daily/price_daily_db.py | test_sma200_20d_ago_shift, test_sma200_20d_ago_null_for_short_history |
@@ -397,14 +391,14 @@ export interface StockItem {
 ### AC-4: 통합 — 8조건 경계 케이스 픽스처 (strict gate)
 
 - **Given** 아래 10개 종목으로 구성된 fixture DB:
-  - S1 ~ S8: 각각 T1 ~ T8 조건 하나만 실패 (다른 7개는 통과)
+  - S1 \~ S8: 각각 T1 \~ T8 조건 하나만 실패 (다른 7개는 통과)
   - S9: 8조건 모두 통과 (예상 통과)
   - S10: 8조건 모두 실패
 - **When** `POST /api/screen { minervini_trend_template: true }` 를 호출한다
 - **Then**
-  - 결과 집합은 **정확히 `{S9}` 단 하나**만 포함한다 (strict gate 로 S1~S8 은 각각 단 하나의 조건 실패로도 탈락)
+  - 결과 집합은 **정확히** `{S9}` **단 하나**만 포함한다 (strict gate 로 S1\~S8 은 각각 단 하나의 조건 실패로도 탈락)
   - `S9.trend_template_score == 8` (정확한 동등 비교)
-  - S1~S8 의 부분 매칭 점수 (예: 7) 는 **노출되지 않는다**
+  - S1\~S8 의 부분 매칭 점수 (예: 7) 는 **노출되지 않는다**
 
 ### AC-5: 통합 — trend_template_score 엄격 모드 노출
 
@@ -418,7 +412,7 @@ export interface StockItem {
 
 ### AC-6: 회귀 — 기존 필터 영향 없음
 
-- **Given** fixture DB 와 `minervini_trend_template` 이 false/None 인 기존 요청들 (market_cap_min, chg_1w_min, chg_1m_min, chg_3m_min, rs_min, patterns[2개], markets, sectors, codes)
+- **Given** fixture DB 와 `minervini_trend_template` 이 false/None 인 기존 요청들 (market_cap_min, chg_1w_min, chg_1m_min, chg_3m_min, rs_min, patterns\[2개\], markets, sectors, codes)
 - **When** 각 요청을 전송한다
 - **Then** SPEC-MINERVINI-001 적용 전과 동일한 결과 집합과 정렬이 반환된다
 - **And** Pydantic 의 `patterns.max_length=5` 확장이 기존 3개 이하 요청을 거부하지 않는다
@@ -443,7 +437,7 @@ export interface StockItem {
 - **And When** 동일 DB 에서 `minervini_trend_template=false` 로 다른 필터를 호출하면
 - **Then** 정상 결과가 반환된다 (fallback 이 기존 필터에 영향 주지 않음)
 
-### AC-9: IPO 종목 (거래일 < 250일) 자연 탈락
+### AC-9: IPO 종목 (거래일 &lt; 250일) 자연 탈락
 
 - **Given** 상장 후 거래일 150일인 종목 (HIGH_52W, LOW_52W 가 NULL)
 - **When** `minervini_trend_template=true` 로 스크리닝한다
@@ -451,12 +445,18 @@ export interface StockItem {
 
 ### Definition of Done
 
-- [ ] 모든 REQ-MIN-001 ~ 008 의 코드 변경 완료
+- [ ] 모든 REQ-MIN-001 \~ 008 의 코드 변경 완료
+
 - [ ] pytest 커버리지 ≥ 85% (`backend/services/screen_service.py`, `backend/services/meta_service.py`)
-- [ ] AC-1 ~ AC-9 전부 통과
+
+- [ ] AC-1 \~ AC-9 전부 통과
+
 - [ ] ruff lint 경고 0
+
 - [ ] 실제 KRX DB (KOSPI 100 종목 샘플) 에서 수동 검증: `minervini_trend_template=true` 결과가 research.md §2.1 의 8조건과 일치
+
 - [ ] @MX:NOTE 태그 추가 (`_build_minervini_where()`), @MX:ANCHOR 태그 (`screen_stocks()` — fan_in ≥ 3)
+
 - [ ] Frontend 타입 변경은 타입체크만 통과 (UI 변경 없음)
 
 ---
@@ -551,7 +551,7 @@ WHERE ...
 
 `minervini_trend_template` 이 false/None 이면 `trend_template_score` 는 NULL 로 반환되어 `StockItem.trend_template_score = None` 으로 직렬화된다.
 
-[HARD] WHERE 을 느슨하게 풀고 HAVING + CASE SUM 으로 부분 매칭을 노출하는 리팩터는 **본 SPEC 에서 금지**한다. 부분 매칭은 §10 에 out of scope 로 명시된다.
+\[HARD\] WHERE 을 느슨하게 풀고 HAVING + CASE SUM 으로 부분 매칭을 노출하는 리팩터는 **본 SPEC 에서 금지**한다. 부분 매칭은 §10 에 out of scope 로 명시된다.
 
 ### 6.5 컬럼 누락 가드 전략
 
@@ -564,7 +564,7 @@ WHERE ...
 ### 6.6 MX 태그 계획
 
 | 태그 | 위치 | 이유 |
-|------|------|------|
+| --- | --- | --- |
 | `# @MX:NOTE` | `_build_minervini_where()` 위 | 8조건 식이 research.md §2.1 에 대응된다는 맥락 전달 |
 | `# @MX:ANCHOR` | `screen_stocks()` | fan_in ≥ 3 (router + 테스트 + 추후 preset service). `@MX:REASON: 사용자-facing 스크리닝 엔트리 포인트` |
 | `# @MX:TODO` | `_build_minervini_where()` 초안 | RED 단계에서 추가, GREEN 에서 제거 |
@@ -595,11 +595,11 @@ WHERE ...
 ## 8. Risk Register (리스크와 완화)
 
 | ID | 리스크 | 영향 | 발생 가능성 | 완화책 |
-|----|--------|------|-------------|--------|
+| --- | --- | --- | --- | --- |
 | R1 | 배포 시 DB 재생성 실패 (Phase 3 또는 Phase 4 중단) 로 부분적으로 채워진 DB 가 남음 | 중 | 낮음 | **v1.0.2 전략 변경으로 blast radius 축소**: DB 파일 교체 방식이므로 부분 실패 시 `mv daily.db.bak daily.db` 로 즉시 복구 가능. **완화책**: 배포 스크립트에 `mv daily.db daily.db.bak && mv weekly.db weekly.db.bak` 단계 필수 포함. 파이프라인 실패 시 (1) 로그 확인 → (2) 백업 파일 복구 → (3) 재실행. 기존 `stock_meta` ALTER 동시 잠금 리스크는 새 DB 생성 플로우에서는 해당 없음 (defense path 에서만 유효하며 WAL 모드가 짧게 잠근다). |
 | R2 | 일봉 파이프라인 실행 시간 증가 (rolling 250 윈도우) | 저 | 중 | pandas rolling 은 벡터화되어 종목당 수 ms 증가에 그친다. KOSPI+KOSDAQ 2,500 종목 기준 수 초 이내. 실측은 R&D 단계에서 확인. |
 | R3 | 신규 컬럼 NULL 이 기존 필터 (PatternCondition) 와 상호작용하여 결과가 달라짐 | 중 | 낮음 | 기존 PatternCondition 의 indicator 매핑은 SMA50/100/200 에 한정되므로 SMA150 등 신규 컬럼과 교차하지 않는다. 회귀 테스트 (AC-6) 로 방어. |
-| R4 | 250 거래일 rolling 이 메모리를 증가시킴 | 저 | 매우 낮음 | 종목별 DataFrame 은 2~3천 행 수준이므로 영향 없음. |
+| R4 | 250 거래일 rolling 이 메모리를 증가시킴 | 저 | 매우 낮음 | 종목별 DataFrame 은 2\~3천 행 수준이므로 영향 없음. |
 | R5 | 레거시 DB 사용자 (마이그레이션 누락) 가 `/api/screen` 500 에러를 받음 | 고 | 중 | REQ-MIN-007 로 200 OK + empty + WARN log 를 보장. AC-8 로 회귀 방어. |
 | R6 | `patterns.max_length` 3→5 확장이 Pydantic 검증에서 기존 클라이언트를 거부 | 고 | 매우 낮음 | 기존 클라이언트는 항상 3개 이하를 보내므로 확장은 완화 방향 (relaxation). 회귀 테스트로 확인. |
 | R7 | Trend Template 8조건 해석 차이 (T6 배율 1.25 vs 1.30) | 중 | 낮음 | research.md §2.1 이 1.25 를 채택. Assumption A1 에 명시. 필요 시 설정화는 후속 SPEC. |
@@ -617,7 +617,7 @@ WHERE ...
 
 신규 파일 `backend/tests/test_minervini_template.py` 에 다음 순서로 테스트를 먼저 작성하고 **모두 실패함을 확인**한다.
 
-**Group A — 단위: rolling 계산 + Greenfield 파이프라인 (모듈 `my_chart/db/daily/`)**
+**Group A — 단위: rolling 계산 + Greenfield 파이프라인 (모듈** `my_chart/db/daily/`**)**
 
 - `test_sma150_rolling_correctness` — 150일 선형 Close 입력 → `SMA150[149] == 174.5`
 - `test_sma150_insufficient_history_null` — 100일 데이터 → 모든 SMA150 값이 NULL
@@ -625,7 +625,7 @@ WHERE ...
 - `test_52w_ipo_under_250days_null` — 150일 데이터 → HIGH_52W, LOW_52W 전부 NULL
 - `test_sma200_20d_ago_shift` — SMA200 배열을 shift(20) 과 동일하게 생성
 - `test_sma200_20d_ago_null_for_short_history` — 215일 데이터 → `SMA200_20D_AGO` 전부 NULL (SMA200 이 200일 이후 유효 + 20일 shift → 220일 이후부터 유효)
-- **`test_greenfield_db_all_columns_present_after_pipeline`** — Primary path 검증 (v1.0.2). 빈 디렉토리에서 시작하여 `stock_prices` 와 `stock_meta` 가 존재하지 않는 상태로 `db_service.update_all()` 을 **1회** 실행한 후:
+- `test_greenfield_db_all_columns_present_after_pipeline` — Primary path 검증 (v1.0.2). 빈 디렉토리에서 시작하여 `stock_prices` 와 `stock_meta` 가 존재하지 않는 상태로 `db_service.update_all()` 을 **1회** 실행한 후:
   - `PRAGMA table_info(stock_prices)` 결과에 `SMA150, HIGH_52W, LOW_52W, SMA200_20D_AGO` 가 포함된다
   - `PRAGMA table_info(stock_meta)` 결과에 `sma150, high52w, low52w, sma200_20d_ago` 가 포함된다
   - 250 거래일 이상의 히스토리를 가진 fixture 종목들에 대해 위 4개 컬럼의 **NULL 비율 ≤ 5%** (거의 모든 행이 채워짐)
@@ -640,15 +640,15 @@ WHERE ...
 **Group C — 통합: screen_service WHERE + 점수 (strict gate)**
 
 - `test_minervini_where_all_conditions_met` — fixture S9 (모든 조건 통과) → 결과 포함 + score=8
-- `test_minervini_where_each_boundary_case` — S1~S8 각각 조건 하나씩 실패 → 결과에서 제외 (parametrize). 부분 점수 (7) 는 노출되지 않음을 확인
-- `test_trend_template_score_is_8_for_all_returned_rows` — strict gate 검증. 응답의 모든 `StockItem` 에 대해 `trend_template_score == 8` (전수 assert). 0~7 값은 결과에 존재하지 않음
+- `test_minervini_where_each_boundary_case` — S1\~S8 각각 조건 하나씩 실패 → 결과에서 제외 (parametrize). 부분 점수 (7) 는 노출되지 않음을 확인
+- `test_trend_template_score_is_8_for_all_returned_rows` — strict gate 검증. 응답의 모든 `StockItem` 에 대해 `trend_template_score == 8` (전수 assert). 0\~7 값은 결과에 존재하지 않음
 - `test_trend_template_score_none_when_flag_off` — `minervini_trend_template=false` 또는 None → score=None
 - `test_minervini_with_existing_filters_combined` — market_cap_min + minervini 플래그 AND 결합 동작
 
 **Group D — 회귀: 기존 필터 불변성**
 
 - `test_existing_chg_filters_unchanged` — chg_1w/1m/3m 기존 응답과 byte-level 동일
-- `test_existing_patterns_unchanged` — patterns[0..3개] 기존 응답과 동일
+- `test_existing_patterns_unchanged` — patterns\[0..3개\] 기존 응답과 동일
 - `test_patterns_max_length_5_accepts_4_or_5` — Pydantic 이 4개, 5개 pattern 을 허용 (기존 3개는 물론 허용)
 - `test_patterns_max_length_5_rejects_6` — Pydantic 이 6개는 거부
 
@@ -656,7 +656,7 @@ WHERE ...
 
 > 본 그룹은 Primary path (전체 DB 재생성) 가 아닌 **운영 실수 시나리오** 를 검증한다. 기존 DB 파일을 삭제하지 않은 채 신규 코드만 배포된 경우를 모사한다.
 
-- `test_defense_missing_columns_returns_200_empty` — 레거시 stock_meta (신규 컬럼 없음) + `minervini=true` → 200 OK, total=0, sectors=[]
+- `test_defense_missing_columns_returns_200_empty` — 레거시 stock_meta (신규 컬럼 없음) + `minervini=true` → 200 OK, total=0, sectors=\[\]
 - `test_defense_warn_log_emitted_once` — 동일 요청에서 caplog 로 WARN 1회 확인 (로그 문구: `"[minervini] required columns missing; delete DB files and re-run db-update pipeline"`)
 - `test_defense_other_filters_still_work` — 같은 레거시 DB + `minervini=false` + market_cap_min → 정상 결과 (defense path 가 기존 필터에 영향 없음)
 
@@ -680,7 +680,7 @@ WHERE ...
 
 - 실제 KRX 일봉 DB (최근 250 거래일 이상) 로 `/api/refresh` 실행
 - `POST /api/screen { minervini_trend_template: true }` 를 KOSPI 우량주 표본 100 종목에 적용
-- 결과 종목들이 차트에서 Stage 2 상승 추세로 확인되는지 샘플링 검토 (3~5 종목)
+- 결과 종목들이 차트에서 Stage 2 상승 추세로 확인되는지 샘플링 검토 (3\~5 종목)
 
 ---
 
@@ -688,24 +688,21 @@ WHERE ...
 
 본 SPEC 은 다음을 **다루지 않는다**. 각 항목은 별도 SPEC 으로 분리된다.
 
-1. **프리셋 칩 UI / 프리셋 버튼 / 프리셋 상태 관리** → SPEC-PRESET-001
-2. **VCP (Volatility Contraction Pattern) 자동 감지 알고리즘** → 향후 SPEC (research.md §5.2 P3)
-3. **거래량 돌파 감지 (150%+)** → 향후 SPEC
-4. **시장 환경 필터 (KOSPI/KOSDAQ 추세 기반)** → 향후 SPEC
-5. **주봉 SMA30 추가** → research.md §5.2 P1 에 언급되나 본 SPEC 은 일봉만 다룸. 주봉 확장은 필요 시 별도 SPEC
-6. **프런트엔드 UI 변경** (칩, 토글 위젯, 점수 시각화) → SPEC-PRESET-001 및 후속 UI SPEC
-7. **`patterns.max_length` 확장의 **실제 활용**** (5개 pattern 조합 UI) → SPEC-PRESET-001 에서 소비. 본 SPEC 은 Pydantic 제약 완화만 수행
-8. **손절/익절/포지션 사이징 로직** — 이는 screener 의 범위가 아니며, 별도 트레이딩 모듈의 책임
-9. **설정화된 임계값 (Configurable RS threshold 포함)** — T6 의 1.25, T8 의 `rs_12m >= 70` 등을 `.env` / config 로 외부화하여 사용자가 조정할 수 있게 하는 기능은 **본 SPEC 에서 다루지 않는다**. 현재는 research.md §2.1 의 하드코딩 기준값을 유지한다. 필요성 확인 후 별도 SPEC 으로 분리한다.
+ 1. **프리셋 칩 UI / 프리셋 버튼 / 프리셋 상태 관리** → SPEC-PRESET-001
+ 2. **VCP (Volatility Contraction Pattern) 자동 감지 알고리즘** → 향후 SPEC (research.md §5.2 P3)
+ 3. **거래량 돌파 감지 (150%+)** → 향후 SPEC
+ 4. **시장 환경 필터 (KOSPI/KOSDAQ 추세 기반)** → 향후 SPEC
+ 5. **주봉 SMA30 추가** → research.md §5.2 P1 에 언급되나 본 SPEC 은 일봉만 다룸. 주봉 확장은 필요 시 별도 SPEC
+ 6. **프런트엔드 UI 변경** (칩, 토글 위젯, 점수 시각화) → SPEC-PRESET-001 및 후속 UI SPEC
+ 7. `patterns.max_length` **확장의 실제 활용** (5개 pattern 조합 UI) → SPEC-PRESET-001 에서 소비. 본 SPEC 은 Pydantic 제약 완화만 수행
+ 8. **손절/익절/포지션 사이징 로직** — 이는 screener 의 범위가 아니며, 별도 트레이딩 모듈의 책임
+ 9. **설정화된 임계값 (Configurable RS threshold 포함)** — T6 의 1.25, T8 의 `rs_12m >= 70` 등을 `.env` / config 로 외부화하여 사용자가 조정할 수 있게 하는 기능은 **본 SPEC 에서 다루지 않는다**. 현재는 research.md §2.1 의 하드코딩 기준값을 유지한다. 필요성 확인 후 별도 SPEC 으로 분리한다.
 10. **부분 매칭 점수 (Partial-Match Score Exposure)** — 6/8, 7/8 등 일부 조건만 통과한 종목을 점수와 함께 노출하는 기능은 **명시적으로 out of scope** 이다 (v1.0.1 2026-04-21 결정). 본 SPEC 은 **strict gate** 로만 동작하며, 반환되는 모든 행은 8조건을 모두 통과한다 (score 는 항상 정확히 8). WHERE 를 HAVING + CASE SUM 으로 바꿔 부분 매칭을 허용하는 리팩터 또한 **금지**된다. 향후 사용자 UX 연구 후 별도 SPEC 으로 평가한다.
 11. **점진적 ALTER 마이그레이션 (파일 교체가 정상 경로)** — 기존 DB 를 유지한 채 새 컬럼만 백필하는 점진적 마이그레이션 전략은 **본 SPEC 의 정상 경로가 아니다** (v1.0.2 2026-04-21 결정, Assumption A9 참조). 배포 시 기존 `daily.db` / `weekly.db` 파일을 삭제하고 `db-update` 파이프라인을 전체 재실행하여 새 DB 를 생성하는 **파일 교체 전략**이 Primary path 이다. REQ-MIN-008 의 idempotent PRAGMA + ALTER 로직과 REQ-MIN-007 의 누락 컬럼 fallback 은 **defense-in-depth 백업**으로만 유지되며, 성능 튜닝 / 프로덕션 규모 백필 / 다운타임 최소화 마이그레이션 플레이북은 본 SPEC 범위 밖이다. 필요 시 운영 런북에서 별도로 다룬다.
 
 ---
 
-문서 버전: 1.0.3
-작성일: 2026-04-21 (v1.0.0 초안), 2026-04-21 (v1.0.1 shift 값/strict 결정 반영), 2026-04-21 (v1.0.2 DB 파일 교체 전략 반영), 2026-04-21 (v1.0.3 구현 완료 및 Implementation Notes)
-작성자: MoAI (manager-spec)
-기반 리서치: `.moai/specs/SPEC-MINERVINI-001/research.md` v1.1.0 (2026-03-08)
+문서 버전: 1.0.3 작성일: 2026-04-21 (v1.0.0 초안), 2026-04-21 (v1.0.1 shift 값/strict 결정 반영), 2026-04-21 (v1.0.2 DB 파일 교체 전략 반영), 2026-04-21 (v1.0.3 구현 완료 및 Implementation Notes) 작성자: MoAI (manager-spec) 기반 리서치: `.moai/specs/SPEC-MINERVINI-001/research.md` v1.1.0 (2026-03-08)
 
 ---
 
@@ -716,14 +713,14 @@ WHERE ...
 ### 11.1 Divergence from Original SPEC
 
 | 항목 | SPEC 기재 | 실제 구현 | 사유 |
-|------|----------|----------|------|
+| --- | --- | --- | --- |
 | 파이프라인 파일 경로 | `my_chart/db/daily/price_daily_db.py` | `my_chart/db/daily.py` (함수 `price_daily_db()` 포함) | 기존 모듈 구조가 SPEC 표기와 달랐음. 실제 구조를 따름. |
 | `HIGH_52W` 컬럼 생성 | "신규 컬럼 추가" (§4.2 스키마 표) | 기존 `stock_prices.High52W` 컬럼 **재사용**, rolling window만 252 → **250** 으로 변경 | SQLite는 컬럼명 대소문자 무시. 기존 컬럼의 정의만 250 거래일(SPEC A2)에 맞춰 조정. 신규 컬럼은 `SMA150`, `LOW_52W`, `SMA200_20D_AGO` 3개만 추가. 사용자 승인 (2026-04-21). |
 | SPEC 원본의 `High52W` 값 | window=252 결과 | window=250 결과 | SPEC A2 요구사항과 일치. 영향 범위: 기존 `High52W` 를 읽는 모든 코드 (스크리너 7번 조건, 차트 상단 표식 등). Minervini T7은 이 값을 사용한다. |
 
 ### 11.2 구현 산출물
 
-**Git 이력 (2 commits on `main`):**
+**Git 이력 (2 commits on** `main`**):**
 
 - `79de6a8` — `feat(minervini): SPEC-MINERVINI-001 — Mark Minervini Trend Template 스크리너 구현`
   - `my_chart/db/daily.py` (+77/-0 이후 cd72fcb 로 조정) — `_compute_minervini_indicators()` 추가
@@ -742,7 +739,7 @@ WHERE ...
 **@MX 태그:**
 
 | 위치 | 태그 | 내용 |
-|------|------|------|
+| --- | --- | --- |
 | `screen_service.py:_build_minervini_where` | `@MX:NOTE` | 순수 상수 SQL — SQL injection 표면 없음 |
 | `screen_service.py:screen_stocks` | `@MX:ANCHOR` + `@MX:REASON` | strict-gate invariant — `minervini_trend_template=True` 로 반환되는 모든 행은 8조건 통과 + `trend_template_score=8` 보증 |
 
@@ -750,7 +747,7 @@ WHERE ...
 
 - **테스트**: `pytest backend/tests/test_minervini_template.py -v` → **28 passed**, 1 warning (pykrx pkg_resources deprecation, 무관)
 - **회귀**: 기존 `backend/tests/` 스위트 141 passed (pre-existing `test_sector_advanced.py` 5 실패는 SPEC-MINERVINI-001 과 무관)
-- **커버리지 추정**: `screen_service.py` (신규 코드) ~94% / `meta_service.py` (신규 코드) ~96% / `my_chart/db/daily.py:_compute_minervini_indicators` ~100%
+- **커버리지 추정**: `screen_service.py` (신규 코드) \~94% / `meta_service.py` (신규 코드) \~96% / `my_chart/db/daily.py:_compute_minervini_indicators` \~100%
 - **ruff lint**: 신규 코드 경고 0. 기존 `meta_service.py:7, :222` 의 I001 (import ordering) 2건은 pre-existing 이며 SPEC 범위 밖 (Scope discipline).
 
 ### 11.4 배포 단계 체크리스트 (운영자 용)

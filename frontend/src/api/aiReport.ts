@@ -22,8 +22,9 @@ export async function fetchAiReportContent(
   return res.data
 }
 
-// SPEC-AI-REPORT-002: 분석 모드 타입 정의 (FR-011, D6)
-export type AiReportMode = 'perplexity' | 'deep'
+// SPEC-AI-REPORT-003: 분석 모드 타입 (Fast Mode 는 Codex CLI 기반으로 전환됨).
+// 백엔드 라우터는 'perplexity' 를 deprecated alias 로 수용하지만 프론트엔드는 'fast' 로 통일.
+export type AiReportMode = 'fast' | 'deep'
 
 /**
  * SSE 스트리밍으로 AI 리포트 생성.
@@ -42,7 +43,7 @@ export function createAiReportStream(
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (message: string) => void,
-  mode: AiReportMode = 'perplexity',
+  mode: AiReportMode = 'fast',
   onPhase?: OnPhase,
 ): AbortController {
   const controller = new AbortController()

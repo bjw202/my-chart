@@ -139,8 +139,8 @@ def _make_source(name: str, success: bool) -> SourceResult:
 
 
 def _make_collection_result(n_success: int, code: str = "005930", stock_name: str = "삼성전자") -> CollectionResult:
-    """n_success개 소스가 성공한 CollectionResult 생성."""
-    src_names = ["perplexity", "brave", "tavily", "naver", "youtube"]
+    """n_success개 소스가 성공한 CollectionResult 생성 (SPEC-AI-REPORT-003: codex 슬롯)."""
+    src_names = ["codex", "brave", "tavily", "naver", "youtube"]
     sources = {}
     for i, name in enumerate(src_names):
         sources[name] = _make_source(name, i < n_success)
@@ -197,10 +197,14 @@ async def test_orchestrate_full_success_5_of_5(tmp_path, monkeypatch, synthesis_
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         yield TextDelta("# 리포트\n")
@@ -210,7 +214,8 @@ async def test_orchestrate_full_success_5_of_5(tmp_path, monkeypatch, synthesis_
     mock_save = MagicMock(return_value="2026-04-16.md")
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -241,10 +246,14 @@ async def test_orchestrate_partial_sources_3_of_5(tmp_path, monkeypatch, synthes
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         yield TextDelta("# 부분 리포트\n")
@@ -253,7 +262,8 @@ async def test_orchestrate_partial_sources_3_of_5(tmp_path, monkeypatch, synthes
     mock_save = MagicMock(return_value="2026-04-16.md")
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -332,8 +342,13 @@ async def test_orchestrate_cli_timeout(tmp_path, monkeypatch, synthesis_prompt_f
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
+        (staging_dir / "sources").mkdir(parents=True, exist_ok=True)
         return staging_dir
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         raise asyncio.TimeoutError()
@@ -342,7 +357,8 @@ async def test_orchestrate_cli_timeout(tmp_path, monkeypatch, synthesis_prompt_f
     mock_save = MagicMock()
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -371,15 +387,21 @@ async def test_orchestrate_client_disconnect_cancelled(tmp_path, monkeypatch, sy
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
+        (staging_dir / "sources").mkdir(parents=True, exist_ok=True)
         return staging_dir
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         raise asyncio.CancelledError()
         yield  # 제너레이터로 만들기
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
 
     with pytest.raises(asyncio.CancelledError):
@@ -403,10 +425,14 @@ async def test_report_saved_on_done(tmp_path, monkeypatch, synthesis_prompt_file
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         yield TextDelta("# 리포트\n")
@@ -420,7 +446,8 @@ async def test_report_saved_on_done(tmp_path, monkeypatch, synthesis_prompt_file
         return "2026-04-16.md"
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -547,10 +574,14 @@ async def test_active_analysis_released_on_success(tmp_path, monkeypatch, synthe
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         yield DoneSignal()
@@ -558,7 +589,8 @@ async def test_active_analysis_released_on_success(tmp_path, monkeypatch, synthe
     mock_save = MagicMock(return_value="2026-04-16.md")
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -580,15 +612,21 @@ async def test_active_analysis_released_on_exception(tmp_path, monkeypatch, synt
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
+        (staging_dir / "sources").mkdir(parents=True, exist_ok=True)
         return staging_dir
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         raise RuntimeError("테스트 예외")
         yield
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
 
     try:
@@ -638,10 +676,14 @@ async def test_opus_model_flag_passed_when_env_set(tmp_path, monkeypatch, synthe
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     captured_model = []
 
@@ -652,7 +694,8 @@ async def test_opus_model_flag_passed_when_env_set(tmp_path, monkeypatch, synthe
     mock_save = MagicMock(return_value="2026-04-16.md")
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -673,10 +716,14 @@ async def test_default_model_when_env_not_set(tmp_path, monkeypatch, synthesis_p
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     captured_model = []
 
@@ -687,7 +734,8 @@ async def test_default_model_when_env_not_set(tmp_path, monkeypatch, synthesis_p
     mock_save = MagicMock(return_value="2026-04-16.md")
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
     monkeypatch.setattr(_svc_mod, "save_report", mock_save)
 
@@ -721,16 +769,21 @@ async def test_streamer_error_signal_propagated(tmp_path, monkeypatch, synthesis
     async def mock_collect(code, stock_name, **kwargs):
         return collection_result
 
-    def mock_staging(code, result, **kwargs):
+    def mock_prepare(code, **kwargs):
         d = tmp_path / f"staging_{code}"
-        d.mkdir(parents=True, exist_ok=True)
+        (d / "sources").mkdir(parents=True, exist_ok=True)
         return d
+
+    def mock_finalize(*args, **kwargs):
+        # SPEC-AI-REPORT-003: 테스트에서는 summary.md/JSON 쓰기 생략 (no-op).
+        pass
 
     async def mock_streamer(cwd, prompt, system_prompt, model=None, **kwargs):
         yield ErrorSignal("Claude CLI 내부 오류")
 
     monkeypatch.setattr(_svc_mod, "collect_all_sources", mock_collect)
-    monkeypatch.setattr(_svc_mod, "create_staging_directory", mock_staging)
+    monkeypatch.setattr(_svc_mod, "prepare_staging_directory", mock_prepare)
+    monkeypatch.setattr(_svc_mod, "finalize_staging_directory", mock_finalize)
     monkeypatch.setattr(_svc_mod, "stream_claude_synthesis", mock_streamer)
 
     events = []

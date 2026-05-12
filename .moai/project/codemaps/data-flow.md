@@ -139,7 +139,7 @@ backend/routers/sectors.py
 backend/services/sector_service.py
     ↓ (cached after first call)
 my_chart.registry.get_stock_registry()
-    → Load from pykrx + sectormap_original.xlsx
+    → Load from pykrx + sectormap-original.xlsx
     → Group by 산업명(대) + 산업명(중)
     ↓
 Response: [{name: "반도체", count: 45}, {name: "배터리", count: 23}, ...]

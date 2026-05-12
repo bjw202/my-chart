@@ -50,8 +50,14 @@
 - Streams progress via SSE callback
 
 **sector_service.py**
-- Loads sector data from `get_stock_registry()` and `sectormap_original.xlsx`
+- Loads sector data from `get_stock_registry()` and `sectormap-original.xlsx` (단일 source)
 - Caches sector list for fast repeated access
+
+**naver_theme/** (SPEC-NAVER-THEME-001 V1 신규)
+- Stateless read-only module for Naver Finance theme crawling
+- Entry point: `collect_and_analyze()` → `ThemeAnalysisResult`
+- Sub-modules: config (constants), crawler (HTTP + retry), parser (EUC-KR HTML), analyzer (z-score), db_join (read-only SELECT), service (orchestration), schemas (Pydantic models)
+- Used by: `backend/routers/themes.py` for `/api/themes/snapshot`, `/api/themes/quick`
 
 ### backend/schemas/ - Pydantic Models
 
