@@ -213,7 +213,12 @@ function ChartGridInner({
         target?.classList.remove('cell-search-highlight')
       }
     }
-  }, [injectedStock, displayedStocks, gridSize, goToPage])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectedStock?.code])
+  // M-2: dep을 injectedStock?.code로 축소.
+  //   displayedStocks / gridSize / goToPage를 dep에 포함하면 stageMap async fetch(~500ms) 완료 시
+  //   enrichedFilterResults → displayedStocks 변경으로 highlight가 재실행됨(timing race).
+  //   injectedStock?.code만 감시하면 검색 변경 시만 정확히 1회 fire됨.
 
   const cols = gridSize === 4 ? 2 : 3
   const rows = gridSize === 4 ? 2 : 3
