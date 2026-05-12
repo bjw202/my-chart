@@ -48,7 +48,7 @@
 - Used in: db/ module for all data persistence
 
 **openpyxl** (>= 3.6.0)
-- Purpose: Excel file reading (sectormap_original.xlsx)
+- Purpose: Excel file reading (sectormap-original.xlsx, header=8, 53→6 컬럼 select)
 - Used in: registry.py for sector classification data
 
 **matplotlib** (>= 3.4.0), **mplfinance** (>= 0.12.9)

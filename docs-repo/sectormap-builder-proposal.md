@@ -10,8 +10,10 @@ my_chart 프로젝트는 종목 기본 정보를 두 개의 외부 엑셀 파일
 
 | 파일 | 출처 | 용도 |
 | --- | --- | --- |
-| `sectormap.xlsx` | 세종데이터 (수동 다운로드) | 종목코드, 종목명, 시장, 섹터 분류 |
+| `sectormap-original.xlsx` | 세종데이터 (수동 다운로드) | 종목코드, 종목명, 시장, 섹터 분류 (53 컬럼 원본, registry.py가 header=8로 로드 후 6 컬럼만 사용) |
 | `basic_data.xlsx` | KRX 정보데이터시스템 (수동 다운로드) | 상장주식수 (시가총액 계산) |
+
+> **참고 (2026-05-12)**: 과거에는 `sectormap.xlsx`(6 컬럼 추출본)와 `sectormap-original.xlsx`(53 컬럼 원본) 두 파일이 공존했으나, 단일 source 통합으로 `sectormap-original.xlsx`만 사용하도록 변경되었다. 본 builder 산출물도 동일 파일명 + 동일 컬럼 구조(header row=8, 6 핵심 컬럼)를 따라야 drop-in 교체가 가능하다.
 
 ### 문제
 
@@ -21,7 +23,7 @@ my_chart 프로젝트는 종목 기본 정보를 두 개의 외부 엑셀 파일
 
 ### 목표
 
-FnGuide 크롤링 + AI 분류를 통해 `sectormap.xlsx`를 자체 생성하는 별도 프로젝트를 구축한다. my_chart와 동일한 엑셀 형식으로 출력하여 기존 시스템에 드롭인 교체 가능하게 한다.
+FnGuide 크롤링 + AI 분류를 통해 `sectormap-original.xlsx`를 자체 생성하는 별도 프로젝트를 구축한다. my_chart와 동일한 엑셀 형식(header row=8, 6 핵심 컬럼 + 47 보조 컬럼)으로 출력하여 기존 시스템에 드롭인 교체 가능하게 한다.
 
 ---
 
@@ -151,7 +153,7 @@ kr-sectormap/
 │   └── basic_data.xlsx          # KRX에서 다운로드 (종목코드, 상장주식수)
 │
 ├── Output/
-│   └── sectormap.xlsx           # 최종 산출물 (my_chart 호환 형식)
+│   └── sectormap-original.xlsx  # 최종 산출물 (my_chart 호환: header row=8, 6 핵심 컬럼)
 │
 ├── data/
 │   ├── raw_summaries.json       # Phase 1 크롤링 결과 (2,500종목 Summary + FICS)
@@ -161,7 +163,7 @@ kr-sectormap/
 │   ├── crawl.py                 # FnGuide 스냅샷 크롤링 (Summary, FICS, 시장)
 │   ├── taxonomy.py              # 분류 체계 설계 보조 도구
 │   ├── classify.py              # 확정된 체계에 종목 자동 분류 (AI)
-│   └── build.py                 # sectormap.xlsx 생성
+│   └── build.py                 # sectormap-original.xlsx 생성
 │
 └── mapping/
     ├── taxonomy_rules.md        # 분류 기준 문서 (경계 케이스 포함)
@@ -195,7 +197,7 @@ Step 4: 자동 분류 (classify.py)
   출력: 종목별 분류 결과 JSON
 
 Step 5: 사람 검수 + 엑셀 생성 (build.py)
-  분류 결과 검토 → 수정 → sectormap.xlsx 생성
+  분류 결과 검토 → 수정 → sectormap-original.xlsx 생성
   my_chart/Input/에 복사하여 즉시 사용 가능
 ```
 
@@ -204,16 +206,17 @@ Step 5: 사람 검수 + 엑셀 생성 (build.py)
 ## 산출물 형식 (my_chart 호환)
 
 ```
-sectormap.xlsx 컬럼:
-  Code          종목코드 (6자리, zero-padded)
-  Name          종목명
-  Market        KOSPI / KOSDAQ
+sectormap-original.xlsx 컬럼 (header row=8 기준):
+  종목\n코드     종목코드 (6자리, zero-padded) → registry.py에서 "Code"로 rename
+  종목명         → "Name"으로 rename
+  시장           KOSPI / KOSDAQ → "Market"으로 rename
   산업명(대)     대분류 섹터 (25-35개)
   산업명(중)     중분류 섹터 (100-130개)
   주요제품       주요 사업/제품 (FnGuide Summary에서 추출)
+  (이후 47개 보조 컬럼: 주가변화율, 재무지표 등 — 현재 my_chart는 미사용)
 ```
 
-my_chart의 `registry.py`가 이 형식을 `pd.read_excel()`로 직접 로드하므로, 파일명과 컬럼명만 동일하면 코드 변경 없이 교체 가능.
+my_chart의 `registry.py`가 `pd.read_excel(path, header=8)`로 로드한 뒤 한글→영문 rename + 6 컬럼 select 한다. 파일명과 핵심 컬럼명만 동일하면 코드 변경 없이 교체 가능.
 
 ---
 
@@ -285,7 +288,7 @@ sectors:
 
 ## 참고: my_chart에서의 sectormap 사용처
 
-sectormap.xlsx를 교체할 때 영향받는 코드:
+sectormap-original.xlsx를 교체할 때 영향받는 코드:
 
 | 파일 | 함수 | 역할 |
 | --- | --- | --- |
@@ -294,7 +297,7 @@ sectormap.xlsx를 교체할 때 영향받는 코드:
 | `my_chart/registry.py` | `get_sector_registry()` | 전체 컬럼 (섹터 포함) |
 | `backend/services/meta_service.py` | `rebuild_stock_meta()` | DB에 섹터 정보 적재 |
 
-**교체 조건**: 컬럼명이 동일하면 (`Code`, `Name`, `Market`, `산업명(대)`, `산업명(중)`, `주요제품`) 코드 변경 없이 파일만 교체 가능.
+**교체 조건**: header row=8 + 핵심 6 컬럼명(`종목\n코드`/`종목명`/`시장`/`산업명(대)`/`산업명(중)`/`주요제품`)이 동일하면 코드 변경 없이 파일만 교체 가능. registry.py가 자체적으로 한글→영문(`Code`/`Name`/`Market`) rename 처리.
 
 ---
 

@@ -176,7 +176,7 @@ ChartGrid page change → StockList scrolls to corresponding position
 ### Internal Systems
 
 **SQLite Databases** - All runtime data access goes through DB
-**sectormap_original.xlsx** - Sector classification loaded into registry cache
+**sectormap-original.xlsx** - 단일 source (53 컬럼 원본). registry.py가 header=8로 로드하여 6 컬럼만 cache
 **Frontend Static Assets** - Served by Vite dev server (dev) or FastAPI static files (prod)
 
 ## Module Dependency Graph
@@ -194,7 +194,7 @@ Backend (FastAPI)
 
 my_chart/ (existing)
   ├── price.py → requests, Naver Finance
-  ├── registry.py → pykrx, sectormap.xlsx
+  ├── registry.py → pykrx, sectormap-original.xlsx
   ├── indicators.py → pandas, numpy
   ├── screening/ → price, registry, indicators
   ├── db/ → sqlite3, price

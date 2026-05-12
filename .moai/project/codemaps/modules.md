@@ -50,7 +50,7 @@
 - Streams progress via SSE callback
 
 **sector_service.py**
-- Loads sector data from `get_stock_registry()` and `sectormap_original.xlsx`
+- Loads sector data from `get_stock_registry()` and `sectormap-original.xlsx` (단일 source)
 - Caches sector list for fast repeated access
 
 **naver_theme/** (SPEC-NAVER-THEME-001 V1 신규)
