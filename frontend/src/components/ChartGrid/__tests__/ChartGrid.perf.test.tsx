@@ -229,12 +229,14 @@ describe('MP-2: ChartCell key 동일성으로 instance reuse (AC-INTEGRATE-006)'
     cleanup()
   })
 
-  it('MP-2: injectedStock prepend 후 기존 cell key 변경 없음 → React instance reuse', () => {
+  it('MP-2: injectedStock prepend 후 기존 cell DOM element identity 보존 (React reconciler key 동일성)', () => {
+    // DOM element reference 동일성으로 React instance reuse 검증
+    // unmount/remount 발생 시 새 DOM element가 생성되어 reference가 달라짐
     const stockA = makeStock('REUSE-A')
     const stockB = makeStock('REUSE-B')
     const stockX = makeStock('REUSE-X')
 
-    const { rerender } = render(
+    const { rerender, container } = render(
       <ChartGrid
         filterResults={[stockA, stockB]}
         injectedStock={null}
@@ -242,13 +244,13 @@ describe('MP-2: ChartCell key 동일성으로 instance reuse (AC-INTEGRATE-006)'
       />,
     )
 
-    // 초기 렌더 후 stockA, stockB render count
-    const countAAfterFirst = cellRenderCounts.get(stockA.code) ?? 0
-    const countBAfterFirst = cellRenderCounts.get(stockB.code) ?? 0
-    expect(countAAfterFirst).toBeGreaterThan(0)
-    expect(countBAfterFirst).toBeGreaterThan(0)
+    // 초기 렌더 후 DOM element reference 캡처
+    const elemAOriginal = container.querySelector(`[data-code="${stockA.code}"]`)
+    const elemBOriginal = container.querySelector(`[data-code="${stockB.code}"]`)
+    expect(elemAOriginal).not.toBeNull()
+    expect(elemBOriginal).not.toBeNull()
 
-    // injectedStock 주입 (stockX - 새 종목)
+    // injectedStock prepend (stockX — filterResults에 없음)
     rerender(
       <ChartGrid
         filterResults={[stockA, stockB]}
@@ -257,17 +259,13 @@ describe('MP-2: ChartCell key 동일성으로 instance reuse (AC-INTEGRATE-006)'
       />,
     )
 
-    // stockX가 prepend됨 (page 0에서 visible은 4개: stockX + stockA + stockB)
-    // stockA와 stockB의 render count가 증가하지 않으면 instance reuse됨
-    // NOTE: React.memo(ChartGrid) 재렌더 시 ChartCell은 key가 같으면 재렌더 skip될 수 있음
-    // 실제 재렌더 여부는 React 최적화에 따라 다름 — key 동일성 확인에 집중
-    const countAAfterRerender = cellRenderCounts.get(stockA.code) ?? 0
-    const countBAfterRerender = cellRenderCounts.get(stockB.code) ?? 0
+    // prepend 후 기존 cell DOM element reference가 동일해야 함 (React key 보존 = no remount)
+    const elemAAfterPrepend = container.querySelector(`[data-code="${stockA.code}"]`)
+    const elemBAfterPrepend = container.querySelector(`[data-code="${stockB.code}"]`)
 
-    // 기존 cell들이 unmount/remount 되지 않아야 함
-    // (재렌더는 가능 — React.memo가 없는 ChartCell mock이므로 — 하지만 key는 동일)
-    expect(countAAfterRerender).toBeGreaterThanOrEqual(countAAfterFirst)
-    expect(countBAfterRerender).toBeGreaterThanOrEqual(countBAfterFirst)
+    // DOM identity: toBe 확인 — 동일 object reference면 React가 remount하지 않은 것
+    expect(elemAAfterPrepend).toBe(elemAOriginal)
+    expect(elemBAfterPrepend).toBe(elemBOriginal)
   })
 
   it('MP-2: cell key는 stock.code (index 기반 key 금지)', () => {
