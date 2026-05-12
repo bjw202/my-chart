@@ -284,8 +284,15 @@ function ChartGridInner({
           return (
             // data-highlight-target: highlight useEffect가 DOM 요소를 찾기 위한 marker
             // data-testid: 테스트용 — injected prepend cell 식별
+            // @MX:WARN [AUTO] CSS Grid layout chain 보존 — wrapper div가 ChartCell의 grid item 자리를
+            //   대신 차지하면서 기본 height:auto가 ChartCell→chart-cell-canvas의 height를 0으로 만든다.
+            // @MX:REASON 부모 ChartGrid는 display:grid + grid-template-rows로 cell height 분배.
+            //   wrapper에 height:100% + minHeight:0 명시해야 자식이 grid track height를 inherit 받는다.
+            //   minHeight:0은 CSS Grid item의 implicit min-height:auto가 overflow를 막아 height stretch
+            //   를 차단하는 케이스 방어 (lightweight-charts canvas 0 height 버그 root cause).
             <div
               key={stock.code}
+              style={{ height: '100%', minHeight: 0 }}
               data-highlight-target={
                 injectedStock?.code === stock.code ? stock.code : undefined
               }

@@ -720,3 +720,57 @@ describe('T13/T14: Full integration — AC-INTEGRATE-006 (cell key 동일성으�
     expect(mockApplyFilters).not.toHaveBeenCalled()
   })
 })
+
+// ────────────────────────────────────────────────────────────
+// Regression: cell wrapper div CSS Grid layout chain 보존 (2026-05-12 live fix)
+//
+// 원인 분석:
+// - 부모 ChartGrid는 display:grid + grid-template-rows로 cell height 분배
+// - v2.0.0에서 ChartCell 위에 wrapper <div>를 추가 (data-highlight-target / data-testid 부착)
+// - wrapper에 height 명시 없으면 default `height: auto` → 자식 ChartCell의
+//   chart-cell-canvas div가 부모(wrapper) auto height를 inherit 받음 → height 0
+// - lightweight-charts는 container.clientHeight를 chart 인스턴스 height로 사용
+//   → height 0 chart → 캔들 미표시 (라이브 결함 사용자 보고 2026-05-12)
+//
+// Fix: wrapper div에 style={{ height: '100%', minHeight: 0 }} 적용으로
+//   grid track height inherit + min-height:auto overflow 차단 방어
+// ────────────────────────────────────────────────────────────
+
+describe('Regression (2026-05-12): cell wrapper height CSS Grid chain', () => {
+  let mockApplyFilters: ReturnType<typeof vi.fn>
+  beforeEach(() => {
+    mockApplyFilters = vi.fn()
+    vi.doMock('../../../contexts/ScreenContext', () => ({
+      useScreen: () => ({ results: { sectors: [] }, applyFilters: mockApplyFilters }),
+    }))
+  })
+  afterEach(() => {
+    cleanup()
+    vi.resetAllMocks()
+  })
+
+  it('cell wrapper div에 style.height === "100%" 및 minHeight === 0 적용 — chart-cell-canvas height 0 회귀 방지', async () => {
+    const { ChartGrid } = await import('../ChartGrid')
+    const onSelectStock = vi.fn()
+    const stockA = makeStock('LIVEFIX-A', '회귀종목A')
+
+    const { container } = render(
+      <ChartGrid
+        filterResults={[stockA]}
+        injectedStock={null}
+        onSelectStock={onSelectStock}
+      />,
+    )
+
+    // cell wrapper div를 찾아서 inline style 검증
+    // (ChartCell mock 안에서 data-code attribute를 가진 element가 ChartCell — wrapper는 그 부모)
+    const cellInner = container.querySelector('[data-code="LIVEFIX-A"]')
+    expect(cellInner).not.toBeNull()
+    const wrapper = cellInner!.parentElement as HTMLElement
+    expect(wrapper).not.toBeNull()
+
+    // CSS Grid layout chain 보존을 위한 핵심 invariant
+    expect(wrapper.style.height).toBe('100%')
+    expect(wrapper.style.minHeight).toBe('0px')
+  })
+})
