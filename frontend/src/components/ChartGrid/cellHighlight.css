@@ -1,0 +1,28 @@
+/**
+ * cellHighlight.css — 검색 종목 셀 highlight 애니메이션
+ *
+ * REQ-INTEGRATE-002/003: cell-search-highlight class 적용 + 2.5s 후 자동 제거
+ *
+ * @MX:NOTE: [AUTO] border-flash keyframes — blue glow 2.5s ease-in-out.
+ *   NFR-CONST-001: 외부 라이브러리 없이 자체 keyframes 구현.
+ *   duration은 setTimeout 2500ms와 동기화 필수.
+ */
+
+@keyframes border-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  25%,
+  75% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.8);
+  }
+}
+
+.cell-search-highlight {
+  animation: border-flash 2.5s ease-in-out;
+  animation-fill-mode: forwards;
+}

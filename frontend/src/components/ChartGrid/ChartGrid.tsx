@@ -1,25 +1,93 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+/**
+ * ChartGrid — 종목 차트 그리드 컴포넌트
+ *
+ * REQ-PERF-001: filterResults prop 기반 → React.memo cascade 차단 가능
+ * REQ-INTEGRATE-001~003: injectedStock prop으로 검색 종목 주입
+ *
+ * @MX:ANCHOR: [AUTO] ChartGrid — AppContent + StockList 등 다수 참조. fan_in >= 3
+ * @MX:REASON: filterResults + injectedStock + onSelectStock props로 외부 컨트롤.
+ *   AppContent가 useScreen() 결과를 prop으로 전달 → React.memo shallow equal로 cascade 차단.
+ *   injectedStock 변경 시 +1 cascade 허용 (highlight/scroll 위해 필요).
+ */
+
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VariableSizeList } from 'react-window'
-import { useScreen } from '../../contexts/ScreenContext'
 import { useTab } from '../../contexts/TabContext'
 import { useNavigation } from '../../contexts/NavigationContext'
 import { useChartGrid } from '../../hooks/useChartGrid'
 import { useScrollSync } from '../../hooks/useScrollSync'
 import type { StockItem } from '../../types/stock'
+import type { StockMasterItem } from '../../api/stocks'
 import { fetchStageOverview } from '../../api/stage'
-import { DEFAULT_SCREEN_REQUEST } from '../../types/filter'
 import { ChartCell } from './ChartCell'
 import { ChartPagination } from './ChartPagination'
+import { StockSearchBox } from './StockSearchBox'
+import './cellHighlight.css'
 
-export function ChartGrid(): React.ReactElement {
-  const { results, applyFilters } = useScreen()
+// ────────────────────────────────────────────────────────────
+// Props 인터페이스
+// ────────────────────────────────────────────────────────────
+
+export interface ChartGridProps {
+  /** AppContent에서 useScreen() 결과를 flat StockItem[]으로 전달 (REQ-PERF-001 핵심) */
+  filterResults: StockItem[]
+  /** 검색으로 주입된 종목 — filterResults에 없으면 prepend, 있으면 scroll+highlight (REQ-INTEGRATE-001) */
+  injectedStock?: StockMasterItem | null
+  /** StockSearchBox onSelect 콜백 — AppContent searchedStock state 업데이트 */
+  onSelectStock: (stock: StockMasterItem) => void
+}
+
+// ────────────────────────────────────────────────────────────
+// StockMasterItem → StockItem 변환 (필수 필드만 채우고 나머지 null)
+// ────────────────────────────────────────────────────────────
+
+function masterToStockItem(master: StockMasterItem): StockItem {
+  return {
+    code: master.code,
+    name: master.name,
+    market: master.market,
+    market_cap: null,
+    sector_major: null,
+    sector_minor: null,
+    product: null,
+    close: null,
+    change_1d: null,
+    rs_12m: null,
+    ema10: null,
+    ema20: null,
+    sma50: null,
+    sma100: null,
+    sma200: null,
+    stage: null,
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// ChartGrid 내부 구현 (React.memo로 감싸서 export)
+// ────────────────────────────────────────────────────────────
+
+function ChartGridInner({
+  filterResults,
+  injectedStock = null,
+  onSelectStock,
+}: ChartGridProps): React.ReactElement {
   const { crossTabParams, clearCrossTabParams } = useTab()
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
   const [stageMap, setStageMap] = useState<Map<string, number>>(new Map())
 
-  // Fetch stage overview once and build code->stage lookup map
+  // highlight 관련 ref
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // crossTabParams는 ChartGrid에서 직접 처리하지 않음 — AppContent에서 처리
+  // (REQ-PERF-001: useScreen() 직접 호출 제거)
+  // NOTE: crossTabParams는 AppContent의 useEffect에서 이미 처리됨
+  // crossTabParams/clearCrossTabParams 참조만 유지 (기존 compat)
+  void crossTabParams
+  void clearCrossTabParams
+
+  // Stage 데이터 1회 페치 (useScreen과 독립적 — REQ-PERF-001 위반 없음)
   useEffect(() => {
     fetchStageOverview()
       .then((data) => {
@@ -34,34 +102,48 @@ export function ChartGrid(): React.ReactElement {
       })
   }, [])
 
-  // crossTabParams.stockCodes 수신 시 해당 종목만 필터링하여 조회
-  useEffect(() => {
-    if (crossTabParams?.stockCodes && crossTabParams.stockCodes.length > 0) {
-      applyFilters({ ...DEFAULT_SCREEN_REQUEST, codes: crossTabParams.stockCodes })
-      clearCrossTabParams()
-    }
-  }, [crossTabParams, applyFilters, clearCrossTabParams])
+  // filterResults에 stage 데이터 enrich
+  const enrichedFilterResults = useMemo<StockItem[]>(
+    () =>
+      filterResults.map((stock) => ({
+        ...stock,
+        stage: stageMap.get(stock.code) ?? stock.stage ?? null,
+      })),
+    [filterResults, stageMap],
+  )
 
-  // Flatten all stocks from sector groups and merge stage data
-  const flatStocks: StockItem[] = (results?.sectors.flatMap((s) => s.stocks) ?? []).map((stock) => ({
-    ...stock,
-    stage: stageMap.get(stock.code) ?? null,
-  }))
+  // ────────────────────────────────────────────────────────
+  // displayedStocks union 계산 (REQ-INTEGRATE-001~003)
+  //
+  // @MX:NOTE: [AUTO] injectedStock이 filterResults에 없으면 prepend,
+  //   있으면 기존 배열 그대로 (scroll + highlight는 useEffect에서 처리).
+  //   useMemo → injectedStock.code 기반 비교 (전체 object compare 불필요).
+  // ────────────────────────────────────────────────────────
+  const displayedStocks = useMemo<StockItem[]>(() => {
+    if (!injectedStock) return enrichedFilterResults
+    const alreadyPresent = enrichedFilterResults.some((s) => s.code === injectedStock.code)
+    if (alreadyPresent) return enrichedFilterResults
+    return [masterToStockItem(injectedStock), ...enrichedFilterResults]
+  }, [injectedStock, enrichedFilterResults])
 
   const { currentPage, gridSize, totalPages, visibleStocks, goToPage, toggleGridSize } =
-    useChartGrid(flatStocks)
+    useChartGrid(displayedStocks)
 
   const { onPageChange } = useScrollSync(listRef)
 
-  const handlePageChange = useCallback((page: number): void => {
-    goToPage(page)
-    onPageChange(page)
-  }, [goToPage, onPageChange])
+  const handlePageChange = useCallback(
+    (page: number): void => {
+      goToPage(page)
+      onPageChange(page)
+    },
+    [goToPage, onPageChange],
+  )
 
   const toggleTimeframe = (): void => {
     setTimeframe((prev) => (prev === 'daily' ? 'weekly' : 'daily'))
   }
 
+  // 키보드 페이지 이동
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement).tagName
@@ -78,10 +160,65 @@ export function ChartGrid(): React.ReactElement {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [currentPage, totalPages, handlePageChange])
 
+  // ────────────────────────────────────────────────────────
+  // injectedStock 변경 시 자동 scroll + highlight (REQ-INTEGRATE-002/003)
+  //
+  // @MX:NOTE: [AUTO] injectedStock 변경 → (1) 해당 페이지로 이동 (2) highlight class 추가
+  //   (3) 2500ms 후 class 제거. cleanup: clearTimeout + classList.remove.
+  //   prepend 케이스 (없는 종목): displayedStocks[0] → page 0 이동.
+  //   scroll 케이스 (있는 종목): Math.floor(idx / gridSize) 페이지로 이동.
+  // ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!injectedStock) return
+
+    // cleanup 이전 highlight
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current)
+      highlightTimeoutRef.current = null
+    }
+
+    const targetIndex = displayedStocks.findIndex((s) => s.code === injectedStock.code)
+    if (targetIndex < 0) return
+
+    const targetPage = Math.floor(targetIndex / Math.max(1, gridSize))
+
+    // AC-INTEGRATE-001: currentPage > 0 && prepend (index 0) → page 0
+    // AC-INTEGRATE-002: 기존 종목 → 해당 page로 이동
+    goToPage(targetPage)
+
+    // highlight: data-highlight-target 속성으로 DOM 요소 찾기
+    // DOM 업데이트 후 highlight 적용
+    // setTimeout(0) 사용: jsdom에서 requestAnimationFrame이 실행되지 않을 수 있음
+    const applyId = setTimeout(() => {
+      const target = document.querySelector(`[data-highlight-target="${injectedStock.code}"]`)
+      if (target) {
+        target.classList.remove('cell-search-highlight')
+        // reflow 강제 (animation restart)
+        void (target as HTMLElement).offsetWidth
+        target.classList.add('cell-search-highlight')
+
+        highlightTimeoutRef.current = setTimeout(() => {
+          target.classList.remove('cell-search-highlight')
+          highlightTimeoutRef.current = null
+        }, 2500)
+      }
+    }, 0)
+
+    return () => {
+      clearTimeout(applyId)
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = null
+        const target = document.querySelector(`[data-highlight-target="${injectedStock.code}"]`)
+        target?.classList.remove('cell-search-highlight')
+      }
+    }
+  }, [injectedStock, displayedStocks, gridSize, goToPage])
+
   const cols = gridSize === 4 ? 2 : 3
   const rows = gridSize === 4 ? 2 : 3
 
-  if (flatStocks.length === 0) {
+  if (displayedStocks.length === 0) {
     return (
       <div className="chart-grid chart-grid--empty">
         <p className="empty-message">필터를 적용하여 종목을 검색하세요.</p>
@@ -92,6 +229,8 @@ export function ChartGrid(): React.ReactElement {
   return (
     <div className="chart-grid">
       <div className="chart-grid-toolbar">
+        {/* REQ-SEARCH-001: 검색 박스 chart-grid-toolbar 좌측 배치 */}
+        <StockSearchBox onSelect={onSelectStock} />
         <button
           type="button"
           className="grid-toggle-btn"
@@ -124,17 +263,43 @@ export function ChartGrid(): React.ReactElement {
       >
         {visibleStocks.map((stock, slotIndex) => {
           const stockIndex = currentPage * gridSize + slotIndex
+          // prepend된 종목 여부 확인
+          const isInjectedPrepend =
+            injectedStock?.code === stock.code &&
+            displayedStocks[0]?.code === stock.code &&
+            !enrichedFilterResults.some((s) => s.code === stock.code)
+
+          const testId = isInjectedPrepend
+            ? `chart-cell-injected-${stock.code}`
+            : undefined
+
           return (
-            <ChartCell
-              key={`${stock.code}-${currentPage}`}
-              stock={stock}
-              isSelected={selectedIndex === stockIndex}
-              onClick={() => {/* StockList click navigates; chart click just highlights */}}
-              timeframe={timeframe}
-            />
+            // data-highlight-target: highlight useEffect가 DOM 요소를 찾기 위한 marker
+            <div
+              key={stock.code}
+              data-highlight-target={
+                injectedStock?.code === stock.code ? stock.code : undefined
+              }
+            >
+              <ChartCell
+                key={stock.code}
+                stock={stock}
+                isSelected={selectedIndex === stockIndex}
+                onClick={() => {
+                  /* StockList click navigates; chart click just highlights */
+                }}
+                timeframe={timeframe}
+                // data-testid를 ChartCell에 전달 (ChartCell이 지원하면)
+                {...(testId ? { 'data-testid': testId } : {})}
+              />
+            </div>
           )
         })}
       </div>
     </div>
   )
 }
+
+// React.memo로 감싸서 shallow equal 기반 cascade 차단
+// filterResults reference 변경 시 cascade (의도), injectedStock 변경 시 cascade 1회 (의도)
+export const ChartGrid = memo(ChartGridInner)
