@@ -35,7 +35,8 @@ from backend.services.deep_research_collector import (
     CollectionResult,
     SourceResult,
     collect_all_sources,
-    create_staging_directory,
+    finalize_staging_directory,
+    prepare_staging_directory,
 )
 
 logger = logging.getLogger(__name__)
@@ -150,7 +151,7 @@ def check_deep_rate_limit(now: datetime | None = None) -> None:
 def _source_count(result: SourceResult) -> int:
     """source_done phase event의 count 필드 값 계산.
 
-    - perplexity: content 문자 수 (cache hit 시에도 동일)
+    - codex: char_count (파일 문자 수)
     - brave/naver/youtube: 정규화된 리스트 길이
     - tavily: results 리스트 길이
 
@@ -165,10 +166,12 @@ def _source_count(result: SourceResult) -> int:
         # tavily
         if "results" in data and isinstance(data["results"], list):
             return len(data["results"])
-        # perplexity
-        if "content" in data:
-            content = data.get("content") or ""
-            return len(content)
+        # codex (SPEC-AI-REPORT-003): markdown_path + char_count 스키마
+        if "char_count" in data:
+            try:
+                return int(data.get("char_count") or 0)
+            except (TypeError, ValueError):
+                return 0
     return 0
 
 
@@ -253,7 +256,15 @@ async def stream_deep_analysis(
     )
 
     try:
-        # Phase 2: 소스 수집 (SPEC-AI-REPORT-002 v1.0.4 per-source progress)
+        # Phase 2a (SPEC-AI-REPORT-003 FR-006): 스테이징 디렉토리 선행 생성.
+        # Codex CLI 의 --output-last-message 가 호출 시점에 경로 존재를 요구하므로
+        # collect 이전에 staging 을 prepare 해야 한다.
+        yield {"event": "phase", "data": json.dumps({"phase": "staging"})}
+        staging_dir = prepare_staging_directory(code)
+        staging_sources_dir = staging_dir / "sources"
+        yield {"event": "phase", "data": json.dumps({"phase": "staging_prepared"})}
+
+        # Phase 2b: 소스 수집 (per-source progress).
         # collect_all_sources를 task로 실행하면서 progress_callback이 asyncio.Queue에 phase
         # 이벤트를 put → 메인 async generator는 queue를 소비해서 yield. SENTINEL이 오면 종료.
         # 기존 "collecting" 이벤트는 backward compat 용으로 유지.
@@ -292,7 +303,10 @@ async def stream_deep_analysis(
         async def _runner() -> CollectionResult:
             try:
                 return await collect_all_sources(
-                    code, stock_name, progress_callback=_progress_cb
+                    code,
+                    stock_name,
+                    progress_callback=_progress_cb,
+                    staging_sources_dir=staging_sources_dir,
                 )
             finally:
                 await event_queue.put(_SENTINEL)
@@ -325,9 +339,8 @@ async def stream_deep_analysis(
             }
             return
 
-        # Phase 3: 스테이징 디렉토리 생성
-        yield {"event": "phase", "data": json.dumps({"phase": "staging"})}
-        staging_dir = create_staging_directory(code, result)
+        # Phase 2c (SPEC-AI-REPORT-003 FR-006): 스테이징 finalize — summary.md + JSON 소스 파일.
+        finalize_staging_directory(staging_dir, code, stock_name, result)
         yield {"event": "phase", "data": json.dumps({"phase": "staging_done"})}
 
         # Phase 4: 합성 프롬프트 로드
@@ -345,7 +358,7 @@ async def stream_deep_analysis(
             "지시:\n"
             "1) 먼저 Read tool로 ./summary.md를 읽고 어떤 소스가 성공했는지 확인하라.\n"
             "2) 다음 5개 파일을 Read tool로 모두 열어라 (존재하는 파일만):\n"
-            "   - sources/perplexity.md\n"
+            "   - sources/codex.md\n"
             "   - sources/brave.json\n"
             "   - sources/tavily.json\n"
             "   - sources/naver.json\n"

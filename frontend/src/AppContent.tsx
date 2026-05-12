@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useTab } from './contexts/TabContext'
 import { useScreen } from './contexts/ScreenContext'
 import { DEFAULT_SCREEN_REQUEST } from './types/filter'
+import type { StockItem } from './types/stock'
+import type { StockMasterItem } from './api/stocks'
 import { TabNavigation } from './components/TabNavigation/TabNavigation'
 import { ContextBar } from './components/ContextBar/ContextBar'
 import { FilterBar } from './components/FilterBar/FilterBar'
@@ -12,21 +14,39 @@ import { StatusBar } from './components/StatusBar/StatusBar'
 import { MarketOverview } from './components/MarketOverview/MarketOverview'
 import { SectorAnalysis } from './components/SectorAnalysis/SectorAnalysis'
 import { StockExplorer } from './components/StockExplorer/StockExplorer'
+import { ThemeAnalysis } from './components/ThemeAnalysis/ThemeAnalysis'
 
-// @MX:NOTE: [AUTO] AppContent is extracted from App so it can consume TabContext
-// Inside the provider tree, uses useTab to render tab panels via CSS display:none/block
+// @MX:NOTE: [AUTO] AppContent는 TabContext 소비를 위해 App에서 분리됨.
+//   searchedStock state lift: StockSearchBox → AppContent → ChartGrid prop drilling.
+//   REQ-PERF-001: useScreen().results를 filterResults로 flatten하여 prop 전달.
+//   → React.memo(ChartGrid) shallow equal로 ScreenContext cascade 차단 가능.
 
 export function AppContent(): ReactElement {
   const { activeTab, crossTabParams, clearCrossTabParams } = useTab()
-  const { applyFilters } = useScreen()
+  const { applyFilters, results } = useScreen()
 
-  // R1: When navigating to chart-grid with stockCodes, apply codes filter
+  // searchedStock: StockSearchBox onSelect 결과 — ChartGrid injectedStock으로 전달
+  const [searchedStock, setSearchedStock] = useState<StockMasterItem | null>(null)
+
+  // R1: Chart-grid 탭 활성화 시 crossTabParams.stockCodes로 필터 적용
   useEffect(() => {
     if (activeTab === 'chart-grid' && crossTabParams?.stockCodes?.length) {
       void applyFilters({ ...DEFAULT_SCREEN_REQUEST, codes: crossTabParams.stockCodes })
       clearCrossTabParams()
     }
   }, [activeTab, crossTabParams, clearCrossTabParams, applyFilters])
+
+  // REQ-PERF-001: useScreen().results를 flat StockItem[]으로 변환
+  // useMemo: results reference가 바뀔 때만 재계산
+  const filterResults: StockItem[] = useMemo(
+    () => results?.sectors.flatMap((s) => s.stocks) ?? [],
+    [results],
+  )
+
+  // onSelectStock: ChartGrid → AppContent searchedStock state 업데이트
+  const handleSelectStock = useCallback((stock: StockMasterItem) => {
+    setSearchedStock(stock)
+  }, [])
 
   return (
     <div className="app">
@@ -50,9 +70,17 @@ export function AppContent(): ReactElement {
       <div className="tab-content" style={{ display: activeTab === 'chart-grid' ? 'flex' : 'none' }}>
         <FilterBar />
         <main className="app-main">
-          <ChartGrid />
+          <ChartGrid
+            filterResults={filterResults}
+            injectedStock={searchedStock}
+            onSelectStock={handleSelectStock}
+          />
           <StockList />
         </main>
+      </div>
+
+      <div className="tab-content" style={{ display: activeTab === 'theme-analysis' ? 'flex' : 'none' }}>
+        <ThemeAnalysis />
       </div>
 
       <StatusBar />

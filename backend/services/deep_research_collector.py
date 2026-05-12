@@ -85,7 +85,6 @@ class CollectionResult:
 # API URL 상수
 # ─────────────────────────────────────────────────────────────────────────────
 
-_PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
 _BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
 _TAVILY_URL = "https://api.tavily.com/search"
 _NAVER_WEB_URL = "https://openapi.naver.com/v1/search/webkr.json"
@@ -136,18 +135,6 @@ def _normalize_tavily(data: dict | None) -> dict:
             }
         )
     return {"results": results, "answer": data.get("answer")}
-
-
-def _normalize_perplexity(data: dict | None) -> dict:
-    # Adapted from docs/deep-research/scripts/merge_results.py::parse_perplexity
-    # <think> 블록 제거 로직 추가
-    if not data or "choices" not in data:
-        return {"content": None, "citations": []}
-    choice = data.get("choices", [{}])[0]
-    message = choice.get("message", {})
-    raw_content = message.get("content", "")
-    cleaned = _strip_think_blocks(raw_content)
-    return {"content": cleaned, "citations": data.get("citations", [])}
 
 
 def _normalize_naver(data: dict | None) -> list[dict]:
@@ -209,93 +196,116 @@ def _deduplicate_by_url(results: list[dict]) -> list[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def _collect_perplexity(
+# @MX:ANCHOR _collect_codex — SPEC-AI-REPORT-003 FR-002/FR-003.
+# @MX:REASON Codex CLI 호출 슬롯. 1회 재시도 (timeout/exit_error/empty_output) + 결정론적 실패 (binary_missing/auth) 재시도 금지.
+#            staging_sources_dir 에 직접 codex.md 를 기록하므로 finalize_staging_directory 는 이 파일을 덮어쓰지 않는다.
+async def _collect_codex(
     code: str,
     stock_name: str,
     *,
-    client: httpx.AsyncClient | None = None,
+    client: httpx.AsyncClient | None = None,  # 미사용, _collect_one_source 시그니처 호환용
+    staging_sources_dir: Path | None = None,
 ) -> SourceResult:
-    # curl 명령 구조 참조: docs/deep-research/skill.md §2
-    # SPEC-AI-REPORT-002 v1.0.3: 시나리오 C(빠른→심층) 비용 절감 — 빠른 분석에서 캐시한
-    # full markdown이 신선(TTL 10분)하면 HTTP 호출 스킵하고 그것을 perplexity 결과로 사용.
-    # Lazy import: 테스트 격리 환경에서 stub 누락 시 silent skip → 일반 호출 흐름 유지.
-    cached: str | None = None
-    try:
-        from backend.services.perplexity_cache import get as _cache_get
-        cached = _cache_get(code)
-    except ImportError:
-        cached = None
-    if cached:
-        return SourceResult(
-            name="perplexity",
-            success=True,
-            data={"content": cached, "citations": []},  # citations은 캐시에 별도 저장 X (재호출 시만 확보)
-            duration_ms=0,
-            cached=True,
-        )
+    """Codex CLI 를 호출해 `staging_sources_dir/codex.md` 에 심층 리서치 마크다운을 생성.
 
-    api_key = os.getenv("PERPLEXITY_API_KEY")
-    if not api_key:
+    FR-003 — 1회 재시도: 첫 호출이 timeout / exit_error / empty_output 로 실패하면 동일
+    프롬프트로 한 번 더 호출. `binary_missing` / `auth` 는 결정론적 실패로 재시도 금지.
+
+    Args:
+        code: 종목 코드.
+        stock_name: 종목명.
+        client: 미사용 (Codex 는 httpx 미사용). 시그니처는 `_collect_one_source` 호환용.
+        staging_sources_dir: `<staging>/sources/` 디렉토리. prepare_staging_directory 가
+            선행 생성한 경로. 이 함수는 `<staging_sources_dir>/codex.md` 를 생성한다.
+
+    Returns:
+        SourceResult(name="codex", success=..., data={"markdown_path": ..., "char_count": ...} | None)
+    """
+    if staging_sources_dir is None:
+        # 호출자 로직 오류 — collect_all_sources 가 staging_sources_dir 을 전달하지 않은 경우
         return SourceResult(
-            name="perplexity",
+            name="codex",
             success=False,
             data=None,
-            error_type="missing_key",
-            error_message="PERPLEXITY_API_KEY 환경변수 미설정",
+            error_type="missing_staging_dir",
+            error_message="codex 수집은 staging_sources_dir 인자가 필수입니다",
         )
 
-    query = f"{stock_name}({code}) 한국 주식 스윙 트레이딩 분석"
-    payload = {
-        "model": "sonar-reasoning-pro",
-        "messages": [{"role": "user", "content": query}],
-        "return_citations": True,
-        "stream": False,
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    output_path = staging_sources_dir / "codex.md"
+
+    # Lazy import — 테스트 격리 환경에서 codex_cli_runner 미로드 대비
+    try:
+        from backend.services.codex_cli_runner import (
+            load_codex_prompt,
+            run_codex_research,
+        )
+    except ImportError as exc:
+        return SourceResult(
+            name="codex",
+            success=False,
+            data=None,
+            error_type="import_error",
+            error_message=f"codex_cli_runner import 실패: {exc}",
+        )
+
+    # 프롬프트 로드 실패 (템플릿 미존재 / malformed) 는 결정론적 실패 — 재시도 없음
+    try:
+        prompt = load_codex_prompt(code=code, stock_name=stock_name)
+    except (FileNotFoundError, ValueError) as exc:
+        return SourceResult(
+            name="codex",
+            success=False,
+            data=None,
+            error_type="prompt_error",
+            error_message=str(exc),
+        )
 
     start = time.monotonic()
-    try:
-        _client = client or httpx.AsyncClient()
-        async with (contextlib.nullcontext(_client) if client else _client) as c:
-            response = await c.post(_PERPLEXITY_URL, json=payload, headers=headers)
-        if response.status_code >= 400:
+    last_error_type: str | None = None
+    last_error_message: str | None = None
+
+    # FR-003: 최대 2회 시도 (최초 + 1회 재시도)
+    for _attempt in range(2):
+        # 이전 실패의 불완전 파일이 남아있으면 제거 → empty_output 오탐 방지
+        if output_path.exists():
+            try:
+                output_path.unlink()
+            except OSError:
+                pass
+
+        codex_result = await run_codex_research(
+            code=code,
+            stock_name=stock_name,
+            output_path=output_path,
+            prompt=prompt,
+        )
+
+        if codex_result.success:
             return SourceResult(
-                name="perplexity",
-                success=False,
-                data=None,
-                error_type="http_error",
-                error_message=f"HTTP {response.status_code}",
+                name="codex",
+                success=True,
+                data={
+                    "markdown_path": str(output_path),
+                    "char_count": codex_result.char_count,
+                },
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
-        raw = response.json()
-        normalized = _normalize_perplexity(raw)
-        return SourceResult(
-            name="perplexity",
-            success=True,
-            data=normalized,
-            duration_ms=int((time.monotonic() - start) * 1000),
-        )
-    except httpx.TimeoutException as exc:
-        return SourceResult(
-            name="perplexity",
-            success=False,
-            data=None,
-            error_type="timeout",
-            error_message=str(exc),
-            duration_ms=int((time.monotonic() - start) * 1000),
-        )
-    except Exception as exc:  # noqa: BLE001
-        return SourceResult(
-            name="perplexity",
-            success=False,
-            data=None,
-            error_type="http_error",
-            error_message=str(exc),
-            duration_ms=int((time.monotonic() - start) * 1000),
-        )
+
+        last_error_type = codex_result.error_type
+        last_error_message = codex_result.error_message
+
+        # ER-001 / ER-002: 결정론적 실패는 재시도 금지 (FR-003 두 번째 문장)
+        if codex_result.error_type in ("binary_missing", "auth"):
+            break
+
+    return SourceResult(
+        name="codex",
+        success=False,
+        data=None,
+        error_type=last_error_type or "unknown",
+        error_message=last_error_message,
+        duration_ms=int((time.monotonic() - start) * 1000),
+    )
 
 
 async def _collect_brave(
@@ -575,12 +585,15 @@ async def _collect_youtube(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-# 소스별 권장 타임아웃 (초). docs/search.sh 레퍼런스 기준:
-#   - perplexity sonar-reasoning-pro: 30~90s 응답이 정상 (search.sh: --max-time 120)
+# 소스별 권장 타임아웃 (초):
+#   - codex: NFR-001 — 단일 호출 600s + 1회 재시도 600s = 최대 1200s.
+#            _collect_one_source 의 asyncio.wait_for 가 외부 timeout 을 강제하므로,
+#            여기 1200s 로 두어야 _collect_codex 내부의 1회 재시도 시간을 보장한다.
 #   - tavily advanced: 60~120s (search.sh: --max-time 60~120)
 #   - brave/naver/youtube: 단순 검색 API, ~3-5s 응답
+# SPEC-AI-REPORT-003: perplexity 키 제거, codex 추가.
 _DEFAULT_TIMEOUTS: dict[str, float] = {
-    "perplexity": 120.0,
+    "codex": 1200.0,
     "tavily": 90.0,
     "brave": 15.0,
     "naver": 15.0,
@@ -591,14 +604,15 @@ _DEFAULT_TIMEOUTS: dict[str, float] = {
 # 충분히 길게 설정 (asyncio.wait_for가 외부에서 자른다).
 _DEFAULT_HTTPX_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=10.0, pool=10.0)
 
-# SPEC-AI-REPORT-002 v1.0.4: 소스명 순서 (진행 상태 패널 표시 순 고정).
-# collect_all_sources 내부와 _collect_one_source helper가 공유.
-SOURCE_NAMES: tuple[str, ...] = ("perplexity", "brave", "tavily", "naver", "youtube")
+# SPEC-AI-REPORT-003 FR-002/FR-008: 소스명 순서 (진행 상태 패널 표시 순 고정).
+# 이전 SPEC-AI-REPORT-002 의 "perplexity" 슬롯이 "codex" 로 교체됨.
+SOURCE_NAMES: tuple[str, ...] = ("codex", "brave", "tavily", "naver", "youtube")
 
 
 # @MX:ANCHOR _collect_one_source — fan_in >= 2 (collect_all_sources, stream_deep_analysis).
-# @MX:REASON SPEC-AI-REPORT-002 v1.0.4: 진행 상태 패널을 위해 소스별 개별 수집 + timeout wrapper 통합.
-#            collector 함수는 모듈 attribute lookup으로 런타임 resolve — monkeypatch 호환성 보장.
+# @MX:REASON SPEC-AI-REPORT-003: 진행 상태 패널을 위해 소스별 개별 수집 + timeout wrapper 통합.
+#            collector 함수는 모듈 attribute lookup 으로 런타임 resolve — monkeypatch 호환성 유지.
+#            codex 는 staging_sources_dir kwarg 도 전달받는다 (다른 소스는 httpx client 만 사용).
 async def _collect_one_source(
     name: str,
     code: str,
@@ -606,8 +620,9 @@ async def _collect_one_source(
     *,
     client: httpx.AsyncClient | None = None,
     timeout: float | None = None,
+    staging_sources_dir: Path | None = None,
 ) -> SourceResult:
-    """단일 소스를 수집한다. timeout 초과 또는 예외 발생 시 실패 SourceResult를 반환한다.
+    """단일 소스를 수집한다. timeout 초과 또는 예외 발생 시 실패 SourceResult 를 반환.
 
     Args:
         name: 소스 이름 (SOURCE_NAMES 중 하나).
@@ -615,25 +630,29 @@ async def _collect_one_source(
         stock_name: 종목명.
         client: 테스트 주입용 httpx.AsyncClient.
         timeout: 단일 호출 timeout (초). None이면 _DEFAULT_TIMEOUTS[name].
+        staging_sources_dir: codex 소스 전용 — <staging>/sources/ 디렉토리 경로.
 
     Returns:
-        SourceResult — 성공/실패 정보 + duration_ms + cached(perplexity cache hit 시 True).
+        SourceResult — 성공/실패 정보 + duration_ms.
     """
     if name not in SOURCE_NAMES:
         raise ValueError(f"알 수 없는 소스: {name}")
 
-    # 런타임에 모듈 globals로 resolve — pytest monkeypatch.setattr(_MOD, "_collect_xxx", ...)
-    # 호환성 유지. globals()는 "이 함수가 정의된 모듈 인스턴스"의 __dict__를 반환하므로,
-    # test helper가 sys.modules를 다른 인스턴스로 덮어써도 원본 인스턴스의 mock이 호출된다.
     collector_fn = globals()[f"_collect_{name}"]
 
     effective_timeout = timeout if timeout is not None else _DEFAULT_TIMEOUTS[name]
     start = time.monotonic()
-    try:
-        return await asyncio.wait_for(
-            collector_fn(code, stock_name, client=client),
-            timeout=effective_timeout,
+
+    # codex 소스는 staging_sources_dir 를 추가로 전달. 다른 소스는 httpx client 만 사용.
+    if name == "codex":
+        coro = collector_fn(
+            code, stock_name, client=client, staging_sources_dir=staging_sources_dir
         )
+    else:
+        coro = collector_fn(code, stock_name, client=client)
+
+    try:
+        return await asyncio.wait_for(coro, timeout=effective_timeout)
     except asyncio.TimeoutError:
         return SourceResult(
             name=name,
@@ -667,20 +686,26 @@ async def collect_all_sources(
     timeouts: dict[str, float] | None = None,
     client: httpx.AsyncClient | None = None,
     progress_callback: ProgressCallback | None = None,
+    staging_sources_dir: Path | None = None,
 ) -> CollectionResult:
     """5개 검색 API를 병렬 수집한다.
+
+    SPEC-AI-REPORT-003 이후 codex 슬롯은 `staging_sources_dir` 이 제공되어야 하며,
+    codex 는 `<staging_sources_dir>/codex.md` 에 직접 마크다운을 기록한다.
 
     Args:
         code: 종목 코드 (예: "005930")
         stock_name: 종목명 (예: "삼성전자")
         timeout_per_source: 모든 소스에 동일하게 적용할 단일 timeout. None이면 source별 기본값
             사용. 테스트 호환을 위해 유지 (기존 시그니처).
-        timeouts: source별 timeout override. {"perplexity": 60.0, ...} 형식. timeout_per_source
+        timeouts: source별 timeout override. {"codex": 600.0, ...} 형식. timeout_per_source
             보다 우선 적용된다.
-        client: 테스트 주입용 httpx.AsyncClient
-        progress_callback: SPEC-AI-REPORT-002 v1.0.4 — 실시간 진행 이벤트 콜백. 소스 시작 시
+        client: 테스트 주입용 httpx.AsyncClient.
+        progress_callback: 실시간 진행 이벤트 콜백. 소스 시작 시
             `{"phase": "source_start", "source": name}`, 소스 완료 시
-            `{"phase": "source_done", "result": SourceResult}`를 await 호출. None이면 기존 동작.
+            `{"phase": "source_done", "result": SourceResult}` 를 await 호출.
+        staging_sources_dir: codex 수집에 필요. prepare_staging_directory 가 생성한
+            `<staging>/sources/` 경로. 누락 시 codex 슬롯은 `missing_staging_dir` 로 실패.
 
     Returns:
         CollectionResult — gate_passed == (성공 소스 수 >= 2)
@@ -708,6 +733,7 @@ async def collect_all_sources(
                     stock_name,
                     client=c,
                     timeout=effective_timeouts[name],
+                    staging_sources_dir=staging_sources_dir,
                 )
             ): name
             for name in SOURCE_NAMES
@@ -788,7 +814,7 @@ def _build_summary_md(code: str, stock_name: str, result: CollectionResult) -> s
     ]
 
     source_display = {
-        "perplexity": "Perplexity",
+        "codex": "Codex 심층 리서치",
         "brave": "Brave Search",
         "tavily": "Tavily",
         "naver": "Naver",
@@ -815,56 +841,71 @@ def _build_summary_md(code: str, stock_name: str, result: CollectionResult) -> s
         f"",
         f"아래 sources/ 디렉토리의 파일을 교차 검증하여 한국 스윙 트레이딩 리포트를 생성하라:",
         f"",
-        f"- `sources/perplexity.md` (Perplexity AI 분석, think 블록 제거됨)",
+        f"- `sources/codex.md` (Codex 심층 리서치 결과, 원출처 URL 포함)",
         f"- `sources/brave.json` (Brave 웹 검색 결과)",
         f"- `sources/tavily.json` (Tavily 심층 검색 + AI 요약)",
         f"- `sources/naver.json` (Naver 한국어 뉴스/웹 검색)",
         f"- `sources/youtube.json` (YouTube 관련 영상)",
         f"",
         f"없는 파일은 해당 소스가 수집 실패한 것이며, 가용 소스만으로 분석을 수행하라.",
-        f"출처 인용 시 `[brave]`, `[tavily]`, `[naver]`, `[youtube]` 레이블을 사용하라.",
+        f"출처 인용 시 `[codex]`, `[brave]`, `[tavily]`, `[naver]`, `[youtube]` 레이블을 사용하라.",
     ]
     return "\n".join(lines)
 
 
 # @MX:ANCHOR create_staging_directory — fan_in >= 2 (orchestrator + tests). Invariant: UUID8 suffix, /tmp path safety check, 실패 소스는 JSON 파일 생성 안 함.
 # @MX:REASON SPEC-AI-REPORT-002 FR-003: 스테이징 디렉토리 경로 탈출 방지 + 소스별 파일 선택적 생성.
-def create_staging_directory(
-    code: str,
-    result: CollectionResult,
-    *,
-    base_dir: Path = Path("/tmp"),
-) -> Path:
-    """스테이징 디렉토리를 생성하고 수집 결과를 파일로 저장한다.
+# /tmp 경로 안전성 검사용 차단 목록 (NFR-005).
+# 허용: /tmp, /tmp 하위, macOS /private/tmp, 시스템 임시 디렉토리.
+# 거부: /usr, /etc, /bin, /sbin, /lib, /root, /home, /var (tmp 제외).
+_BLOCKED_ROOTS: frozenset[str] = frozenset(
+    {"/usr", "/etc", "/bin", "/sbin", "/lib", "/root", "/home"}
+)
 
-    디렉토리 이름 형식: analysis_<code>_<ISO8601-UTC>_<uuid8>/
 
-    Args:
-        code: 종목 코드
-        result: CollectionResult (소스별 수집 결과)
-        base_dir: 기본 디렉토리 (기본 /tmp; 테스트 시 tmp_path 전달)
-
-    Returns:
-        생성된 스테이징 디렉토리 Path
+def _assert_safe_base_dir(base_dir: Path) -> Path:
+    """base_dir 가 시스템 경로로 탈출하지 않는지 검증하고 resolved Path 반환.
 
     Raises:
-        ValueError: base_dir가 /tmp 외부를 가리키는 경우
+        ValueError: base_dir 가 _BLOCKED_ROOTS 에 포함되거나 그 하위인 경우.
     """
-    # /tmp 경로 안전성 검사 (NFR-005)
-    # 위험한 시스템 경로를 차단한다 (경로 탈출 방지).
-    # 허용: /tmp, /tmp 하위, macOS /private/tmp, 시스템 임시 디렉토리.
-    # 거부: /usr, /etc, /bin, /sbin, /lib, /root, /home, /var (tmp 제외).
-    _BLOCKED_ROOTS = {"/usr", "/etc", "/bin", "/sbin", "/lib", "/root", "/home"}
     resolved = base_dir.resolve()
     resolved_str = str(resolved)
-    # 차단 목록의 경로이거나 그 하위인 경우 거부
     for blocked in _BLOCKED_ROOTS:
         if resolved_str == blocked or resolved_str.startswith(blocked + "/"):
             raise ValueError(
                 f"base_dir '{base_dir}' resolved to '{resolved}' which is outside /tmp"
             )
+    return resolved
 
-    # UUID8 생성 및 디렉토리 이름 조합
+
+# @MX:ANCHOR prepare_staging_directory — fan_in >= 2 (service.py collect 전 + create_staging_directory wrapper).
+# @MX:REASON SPEC-AI-REPORT-003 FR-006: Codex --output-last-message 가 호출 시점에 경로 존재를 요구하므로
+#            staging 생성은 collect 이전 (prepare) 과 이후 (finalize) 로 분리되어야 한다.
+def prepare_staging_directory(
+    code: str,
+    *,
+    base_dir: Path = Path("/tmp"),
+) -> Path:
+    """스테이징 디렉토리와 `sources/` 하위 디렉토리를 **선행** 생성한다.
+
+    Codex CLI 의 `--output-last-message` 인자는 호출 시점에 경로가 존재해야 하므로,
+    SPEC-AI-REPORT-003 이후 staging 생성은 collect 이전 (prepare) 과 이후 (finalize) 로
+    분리된다. 이 함수는 경로 안전 검사 + 디렉토리 생성만 수행하고, summary.md 나
+    소스 파일 작성은 `finalize_staging_directory` 에서 수행한다.
+
+    Args:
+        code: 종목 코드.
+        base_dir: 기본 디렉토리 (기본 /tmp; 테스트 시 tmp_path 전달).
+
+    Returns:
+        생성된 staging 디렉토리 Path. `<staging>/sources/` 는 이미 존재함.
+
+    Raises:
+        ValueError: base_dir 가 /tmp 외부를 가리키는 경우.
+    """
+    resolved = _assert_safe_base_dir(base_dir)
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     uuid8 = uuid.uuid4().hex[:8]
     dir_name = f"analysis_{code}_{ts}_{uuid8}"
@@ -872,43 +913,86 @@ def create_staging_directory(
     sources_dir = staging_dir / "sources"
     sources_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.info("스테이징 디렉토리 선행 생성: %s", staging_dir)
+    return staging_dir
+
+
+# @MX:ANCHOR finalize_staging_directory — fan_in >= 2 (service.py collect 후 + create_staging_directory wrapper).
+# @MX:REASON SPEC-AI-REPORT-003 FR-006: summary.md 와 JSON 소스 파일은 collect 완료 후에만 기록.
+#            Codex 는 이미 staging/sources/codex.md 를 직접 썼으므로 여기서는 덮어쓰지 않는다.
+def finalize_staging_directory(
+    staging_dir: Path,
+    code: str,
+    stock_name: str,
+    result: CollectionResult,
+) -> None:
+    """prepare 로 생성된 staging 디렉토리에 summary.md + 성공 소스 파일을 기록한다.
+
+    Codex 가 이미 `staging/sources/codex.md` 를 직접 기록한 경우, 그 파일은 덮어쓰지
+    않는다 (codex 의 SourceResult.data 는 markdown_path 정보만 담고 있으며, 이 함수는
+    codex 소스에 대해 파일 쓰기를 스킵한다).
+
+    Args:
+        staging_dir: prepare_staging_directory 반환값.
+        code: 종목 코드.
+        stock_name: 종목명.
+        result: CollectionResult.
+    """
+    sources_dir = staging_dir / "sources"
+
     # summary.md 작성
-    summary_content = _build_summary_md(code, result.stock_name, result)
+    summary_content = _build_summary_md(code, stock_name, result)
     (staging_dir / "summary.md").write_text(summary_content, encoding="utf-8")
 
-    # 소스별 파일 작성 (성공 소스만)
+    # 소스별 파일 작성 (성공 소스만). codex 는 subprocess 가 이미 직접 기록했으므로 스킵.
     for src_key, src_result in result.sources.items():
         if not src_result.success or src_result.data is None:
             continue
 
-        if src_key == "perplexity":
-            # perplexity.md로 저장, think 블록 제거
-            if isinstance(src_result.data, dict):
-                content = src_result.data.get("content", "")
-                citations = src_result.data.get("citations", [])
-            else:
-                content = str(src_result.data)
-                citations = []
-            # think 블록 재차 제거 (이중 안전)
-            cleaned = _strip_think_blocks(content)
-            md_lines = [f"# Perplexity 분석\n\n{cleaned}"]
-            if citations:
-                md_lines.append("\n\n## 출처\n")
-                md_lines.extend(f"- {c}" for c in citations)
-            (sources_dir / "perplexity.md").write_text(
-                "\n".join(md_lines), encoding="utf-8"
-            )
-        else:
-            # JSON 파일로 저장
-            json_path = sources_dir / f"{src_key}.json"
-            json_path.write_text(
-                json.dumps(src_result.data, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+        if src_key == "codex":
+            # codex 는 subprocess 가 이미 sources/codex.md 를 직접 기록함. 덮어쓰지 않음.
+            continue
+
+        # 나머지 소스 (brave/tavily/naver/youtube) 는 JSON 파일로 저장
+        json_path = sources_dir / f"{src_key}.json"
+        json_path.write_text(
+            json.dumps(src_result.data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     logger.info(
-        "스테이징 디렉토리 생성: %s (성공소스=%d/5)",
+        "스테이징 디렉토리 finalize 완료: %s (성공소스=%d/%d)",
         staging_dir,
         sum(1 for s in result.sources.values() if s.success),
+        len(result.sources),
     )
+
+
+# @MX:ANCHOR create_staging_directory — fan_in >= 2 (orchestrator + tests).
+# @MX:REASON SPEC-AI-REPORT-003 이후 prepare + finalize 를 순차 호출하는 얇은 wrapper 로 유지.
+#            기존 호출자 (테스트 포함) 시그니처 호환성 보장.
+def create_staging_directory(
+    code: str,
+    result: CollectionResult,
+    *,
+    base_dir: Path = Path("/tmp"),
+) -> Path:
+    """스테이징 디렉토리를 생성하고 수집 결과를 파일로 저장한다 (wrapper).
+
+    SPEC-AI-REPORT-003 이후 `prepare_staging_directory` + `finalize_staging_directory`
+    두 함수를 순차 호출하는 얇은 래퍼. 기존 호출자 시그니처 유지.
+
+    Args:
+        code: 종목 코드.
+        result: CollectionResult.
+        base_dir: 기본 디렉토리.
+
+    Returns:
+        생성된 staging 디렉토리 Path.
+
+    Raises:
+        ValueError: base_dir 가 /tmp 외부를 가리키는 경우.
+    """
+    staging_dir = prepare_staging_directory(code, base_dir=base_dir)
+    finalize_staging_directory(staging_dir, code, result.stock_name, result)
     return staging_dir

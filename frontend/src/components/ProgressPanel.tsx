@@ -1,7 +1,7 @@
 /**
- * SPEC-AI-REPORT-002 v1.0.4: 심층 분석 진행 상태 패널.
+ * SPEC-AI-REPORT-003: 심층 분석 진행 상태 패널.
  *
- * 5개 소스(Perplexity/Brave/Tavily/Naver/YouTube) 수집 진행 상황과
+ * 5개 소스(Codex/Brave/Tavily/Naver/YouTube) 수집 진행 상황과
  * Claude CLI 합성 단계 상태를 시각화한다. 본문 위에 렌더링되어
  * 사용자가 "언제쯤 끝나는지 / 어디서 걸려 있는지"를 파악할 수 있다.
  */
@@ -12,7 +12,7 @@ import type { DeepProgress, SourceName, SourceProgress } from '../types/aiReport
 // ── 표시용 상수 ─────────────────────────────────────────────────────────────
 
 const SOURCE_LABELS: Record<SourceName, string> = {
-  perplexity: 'Perplexity',
+  codex: 'Codex 심층 리서치',
   brave: 'Brave',
   tavily: 'Tavily',
   naver: 'Naver',
@@ -36,8 +36,8 @@ function formatDuration(ms?: number): string {
 
 function formatCount(source: SourceName, count?: number): string {
   if (count === undefined || count === 0) return ''
-  if (source === 'perplexity') {
-    // content 문자 수 기준 — KB로 표시하면 직관적
+  if (source === 'codex') {
+    // SPEC-AI-REPORT-003: Codex 는 char_count 를 바로 제공. KB로 표시하면 직관적.
     if (count >= 1000) return `${(count / 1000).toFixed(1)}KB`
     return `${count}자`
   }
@@ -52,7 +52,7 @@ interface ProgressPanelProps {
 }
 
 export function ProgressPanel({ progress }: ProgressPanelProps): React.ReactElement {
-  const orderedSources: SourceName[] = ['perplexity', 'brave', 'tavily', 'naver', 'youtube']
+  const orderedSources: SourceName[] = ['codex', 'brave', 'tavily', 'naver', 'youtube']
 
   return (
     <div className="ai-report-progress-panel" aria-live="polite">

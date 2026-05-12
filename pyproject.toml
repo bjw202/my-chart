@@ -55,6 +55,7 @@ ignore = ["E501"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
+    "unit: 네트워크 없이 실행 가능한 순수 단위 테스트",
     "live: 라이브 HTTP 요청이 필요한 테스트",
     "slow: 실행 시간이 긴 테스트 (크롤링 포함)",
 ]

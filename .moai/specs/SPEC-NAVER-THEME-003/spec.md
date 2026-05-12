@@ -1,0 +1,465 @@
+---
+id: SPEC-NAVER-THEME-003
+title: V2 frontend 채택 (default 'full' + strong_themes description merge + localStorage cache + 갱신 버튼)
+status: Implemented
+version: 1.0.5
+owner: bjw2002
+created: 2026-05-06
+updated: 2026-05-06
+depends_on: SPEC-NAVER-THEME-002
+---
+
+# SPEC-NAVER-THEME-003: V2 frontend 채택
+
+## 메타데이터
+
+| 항목 | 값 |
+| --- | --- |
+| SPEC ID | SPEC-NAVER-THEME-003 |
+| 제목 | Naver Mobile Theme Analysis Frontend Adoption (V2 endpoint swap + tooltip) |
+| 생성일 | 2026-05-06 |
+| 상태 | Draft |
+| 우선순위 | High |
+| 담당 | expert-backend, expert-frontend, expert-testing |
+| 의존 SPEC | SPEC-NAVER-THEME-002 (V2 backend ship 완료, v1.0.1) |
+| Lifecycle | spec-anchored |
+| 버전 | 1.0.0 |
+
+---
+
+## HISTORY
+
+- 2026-05-06 v1.0.5 amendment: 탭 전환 시 재 fetch 및 페이지 새로고침 시 30초 재크롤링 문제 해결 — frontend localStorage 캐시 + 명시적 "🔄 갱신" 버튼 도입. 사용자 신고: "한 번 크롤링 했는데 다른 메뉴 갔다오면 왜 다시 크롤링을 하느라 시간을 쓰지?". Root cause: backend/frontend 양쪽 캐시 0 — `ThemeAnalysis`는 mount 보존되지만 사용자가 모드 토글 시 매번 새 fetch + 새로고침 시 자동 30초 fetch. 사용자 사용 패턴(혼자 사용 + Chart Grid DB 수동 업데이트와 동일 모델) 반영해서 자동 fetch 최소화 + 명시적 갱신 모델로 전환. 해결: (1) `ThemeAnalysis.tsx`에서 quick/full 각 mode별 응답을 `localStorage`에 `theme-analysis-cache-{mode}` key로 저장 (REQ-NT3-015 신규), (2) mount/mode 변경 시 캐시 우선 읽기 → cache hit이면 fetch skip + 즉시 표시, miss이면 fetch (3) 툴바에 "🔄 갱신" 버튼 추가 — 클릭 시 현재 mode의 캐시 무효화 + 강제 fetch (REQ-NT3-016 신규). 자동 만료 없음 (수동 갱신 모델, Chart Grid 패턴 일관성). cache_version 'v1' 필드로 향후 schema 변경 시 자동 무효화 가능. AC-22/23/24 신규 — 총 24 AC. ThemeAnalysis.tsx만 수정 + frontend 단위 테스트 1 파일에 케이스 3개 추가. backend 무수정, V1 무수정, 의존성 변경 0. data-testid="theme-refresh-button" 추가.
+- 2026-05-06 v1.0.4 amendment: backend `strong_themes_df`에 theme_description 머지 누락 수정 (REQ-NT3-014 신규). v1.0.3 default 'full' 적용 후에도 사용자 화면에 description 미노출. 라이브 검증 결과: backend snapshot 응답의 `themes` 배열에는 description=274자(유리 기판) 채워지나 `strong_themes` 배열에는 description=0자(empty). 원인: `service.py:73`에서 `strong_themes_df = build_strong_themes(themes_df, ...)`를 detail 호출 전에 빌드하고, line 92-95에서 detail 머지가 `themes_df`에만 적용됨 → `strong_themes_df`는 description=None 상태 유지. frontend `ThemeAnalysis.tsx:80`이 `data?.strong_themes ?? data?.themes`로 strong_themes 우선 사용 → 사용자가 클릭한 selectedTheme이 description=null인 strong_themes에서 매핑됨 → ThemeDetailPanel D-4 hidden. 해결: detail loop 종료 후 `strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(themes_df.set_index("theme_id")["theme_description"].to_dict())` 1줄 추가. backend pytest AC-21 신규 — 총 21 AC. frontend 변경 0, V1 backend 무수정, 의존성 변경 0.
+- 2026-05-06 v1.0.3 amendment: default mode를 'quick' → 'full'로 변경 + 빠른 조회 모드 advisory 추가. 사용자 후속 신고 — v1.0.2까지 본문 박스가 코드에는 추가됐으나 화면에 안 보인다는 신고. Root cause: backend의 `service.py:92-95`가 detail 호출 결과로만 `theme_description`을 themes_df에 머지함. parser.py 주석에도 `list 응답 sectorDescription은 항상 null` 명시. 즉 빠른 조회(quick) 모드는 detail skip → backend가 description = null 반환 → frontend D-4 정책으로 hidden. 라이브 list endpoint 응답 직접 확인으로 sectorDescription=None 재검증 완료. 해결: ThemeAnalysis.tsx의 `useState<LoadMode>('quick')` → `('full')` (REQ-NT3-012 신규). 사용자가 "빠른 조회" 토글 시 화면에 회색 advisory 박스 추가 — "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다" 안내 (REQ-NT3-013 신규). AC-19/20 신규 — 총 20 AC. backend, V1 backend, 의존성 변경 0.
+- 2026-05-06 v1.0.2 amendment: 주도주 섹션 제거 + theme_description 본문 prominent 강화. 사용자가 v1.0.1 amendment 후 화면(스크린샷 1)에서 "주도주" 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 다른 점을 신고. ThemeDetailPanel.tsx의 주도주(themeLeaders) 전체 섹션을 제거 (REQ-NT3-011 신규). theme_description 본문 박스 스타일 강화 — 글자 크기 12→13, 색 text-secondary→text-primary, padding 8/12→12/14, border-radius 6→8, border-left 3px→4px (REQ-NT3-009 강화). leaders prop은 호출부 호환을 위해 optional로 유지하되 컴포넌트 내부에서 미사용. 종목 테이블 + inclusion_reason 본문(REQ-NT3-010)은 그대로. AC-18 신규 추가 — 총 18 AC.
+- 2026-05-06 v1.0.1 amendment: D-3 reverse — 사용자 라이브 검증 결과 hover tooltip만으로는 description이 한눈에 안 보여 네이버 모바일 UX와 어긋남. ThemeDetailPanel.tsx에 (1) 테마명 아래 `theme_description`을 본문 박스로 노출 (REQ-NT3-009 신규), (2) 주도주 카드와 종목 테이블 각 행 뒤에 `inclusion_reason`을 본문으로 펼쳐 노출 (REQ-NT3-010 신규). hover tooltip(`title` 속성)은 그대로 보존하여 중복 노출. AC-16/17 신규 추가 — 총 17 AC. ThemeDetailPanel.tsx 무수정 정책(D-3 v1.0.0)은 종료, 본문 표시(D-3 옵션 A 변형) 정책으로 전환. backend/V1 무수정(REQ-NT3-C-002), additive only(REQ-NT3-C-003), 신규 의존성 0(REQ-NT3-C-004)은 그대로 유지.
+- 2026-05-06 v1.0.0 ship: commit `6284280` — RUN phase 완료. AC 15/15 PASS, V1 51 회귀 0, V2 24+5=29 PASS, frontend 271 PASS (baseline diff 0). evaluator-active PASS (Func 100/Sec 90/Craft 92/Cons 95). 16 files +3050/-19. ThemeDetailPanel.tsx 무수정 (D-3). frontend/package.json 무수정 (REQ-NT3-C-004). bare except 0건 (REQ-NT3-C-005).
+- 2026-05-06 v1.0.0: 초안 작성 (manager-spec). SPEC-NAVER-THEME-002 V2 backend ship 후속 작업으로 frontend가 V2 endpoint를 채택하도록 한다. 핸드오프 문서(`.moai/specs/SPEC-NAVER-THEME-002/handoff-frontend-v2.md`) Stage B 기반. 사용자 결정 D-1(에러 메시지+retry), D-2(theme_name hover Tooltip), D-3(inclusion_reason 컬럼 자리 재사용 — V2 parser 동일 source 활용), D-4(null hidden) 사전 잠금. V1 routes/모듈 byte-identical 보존(REQ-NT3-C-001/C-002), V2 backend metadata는 additive-only V1 alias 4 필드 추가(REQ-NT3-005), pip 신규 의존성 금지(REQ-NT3-C-004), bare except 금지(REQ-NT3-C-005). V2 endpoint 503/timeout 시 V1 자동 폴백 금지(REQ-NT3-C-006).
+
+---
+
+## 1. Environment (환경)
+
+### 1.1 시스템 개요
+
+본 SPEC은 SPEC-NAVER-THEME-002에서 ship된 V2 백엔드 endpoint(`/api/themes/v2/snapshot`, `/api/themes/v2/quick`)를 frontend ThemeAnalysis 컴포넌트가 호출하도록 swap하고, V2가 제공하는 추가 컬럼 `theme_description`(테마 설명)을 사용자 화면에 노출한다.
+
+V2 mobile parser의 핵심 관찰(`backend/services/naver_theme_v2/parser.py:271-272`): `inclusion_reason`과 `stock_description`은 mobile API의 동일 source(`item.description`)에서 채워진다. ThemeDetailPanel이 이미 `inclusion_reason`을 hover tooltip(`title` 속성)으로 노출 중이므로 V2 endpoint로 swap만 하면 종목별 편입설명이 자동으로 표시된다 (D-3, frontend 변경 거의 0).
+
+V1 desktop endpoint와 V1 backend 모듈은 무수정으로 유지되며 (cohabitation 보존), V1 endpoint는 즉시 rollback 경로로 남긴다.
+
+| 항목 | 값 |
+| --- | --- |
+| frontend API client | `frontend/src/api/themes.ts` (EDIT — V1 → V2 URL swap + 타입 확장) |
+| ThemeAnalysis 컴포넌트 | `frontend/src/components/ThemeAnalysis/{ThemeAnalysis,ThemeRankingTable,ThemeDetailPanel}.tsx` |
+| backend V2 service | `backend/services/naver_theme_v2/service.py` (EDIT — metadata V1 alias 추가) |
+| backend V1 모듈 | `backend/services/naver_theme/*` (무수정, REQ-NT3-C-002) |
+| backend routes | `backend/routers/themes.py` (무수정, V1+V2 모두 등록 유지) |
+| 실행 모델 | stateless (V1+V2 동일) — 호출 1회당 1 사이클 |
+
+### 1.2 모듈 변경 매트릭스
+
+| 파일 | 변경 유형 | 변경 LOC (예상) | 변경 내용 |
+|------|------|------|------|
+| `backend/services/naver_theme_v2/service.py` | EDIT | +20 | metadata에 V1 alias 4 필드 추가 (`collected_at`, `theme_count`, `stock_count`, `elapsed_sec`). `_empty_result` 동일 적용 |
+| `frontend/src/api/themes.ts` | EDIT | +10 | endpoint URL swap (`/themes/snapshot` → `/themes/v2/snapshot`, 동일 quick). ThemeItem에 `theme_description?: string \| null`, ThemeStockItem에 `stock_description?: string \| null` 추가 (forward-compat). axios 503/timeout 처리 보강 |
+| `frontend/src/components/ThemeAnalysis/ThemeRankingTable.tsx` | EDIT | +1 | theme_name 셀에 `title={theme.theme_description ?? undefined}` 추가 (D-2 + D-4) |
+| `frontend/src/components/ThemeAnalysis/ThemeDetailPanel.tsx` | 무수정 | 0 | D-3 — V2 parser가 inclusion_reason과 stock_description을 동일 source로 채움. 기존 `title={stock.inclusion_reason}` 호환 유지 |
+| `frontend/src/components/ThemeAnalysis/ThemeAnalysis.tsx` | EDIT | +15 | V2 endpoint 503/timeout 시 에러 메시지 + retry 버튼 (D-1). `ba3f20c` race condition cleanup 패턴 보존 |
+| `tests/test_naver_theme_v2_service.py` | EDIT | +15 | metadata V1 alias 4 필드 AC 추가 |
+| `frontend/src/components/ThemeAnalysis/__tests__/` | EDIT or NEW | +60 | V2 endpoint mock URL 검증 + tooltip rendering + null hidden + 에러 retry 시나리오 |
+
+**합계 예상**: ~120 LOC, 7 files.
+
+### 1.3 외부 의존성 (기설치, 신규 추가 없음 — REQ-NT3-C-004)
+
+Backend (V2 SPEC-002 의존성 그대로):
+- `requests`, `pandas`, `numpy`, `pydantic`, `fastapi`
+
+Frontend (기존 의존성 그대로):
+- `react ^19`, `axios`, `vitest`, `@testing-library/react`
+
+신규 라이브러리(예: Radix Tooltip) 도입 없이 native HTML `title` 속성으로 D-2 tooltip 구현.
+
+---
+
+## 2. Assumptions (가정)
+
+### 2.1 외부 시스템 가정
+
+- SPEC-NAVER-THEME-002 V2 backend ship 결과 (24/24 GREEN, 라이브 1 PASS)가 그대로 유효
+- V2 endpoint(`/api/themes/v2/snapshot`, `/api/themes/v2/quick`)가 등록된 상태 — `backend/routers/themes.py`에서 확인 가능
+- V2 mobile API 응답 schema (sectorDescription, item.description 컬럼 보존)가 SPEC-002 ship 시점과 동일
+
+### 2.2 호환성 가정
+
+- frontend `ThemeItem`/`ThemeStockItem` 타입 확장은 optional field(`theme_description?`, `stock_description?`)로만 추가 → V1 응답에서 해당 필드가 부재해도 TypeScript compile error 없음
+- ThemeDetailPanel의 `title={stock.inclusion_reason}` 패턴이 V2 응답에서 V2 mobile parser 정책(`inclusion_reason ← item.description`)에 의해 자동 호환
+- frontend vitest baseline 1 fail (ChartGrid pre-existing, V2 무관)은 본 SPEC 회귀 판정 시 baseline diff 적용
+
+### 2.3 Risk-bound 가정
+
+- V2 endpoint URL이 SPEC 작업 진행 중 변경되지 않음 (sentry release `stock-web@` 활발, 변경 시 backend `config.py` 수정 — REQ-NT2-NF-005 그대로)
+- 사용자 화면이 desktop 우선 — mobile hover 부재로 인한 D-2 tooltip 미동작은 본 SPEC 범위 외 (별도 SPEC에서 추후 처리)
+
+---
+
+## 3. Requirements (요구사항, EARS format)
+
+### 3.1 Functional Requirements
+
+#### REQ-NT3-001: V2 endpoint URL swap
+
+**The system shall** update `frontend/src/api/themes.ts` so that `fetchThemesSnapshot()` calls `/themes/v2/snapshot` and `fetchThemesQuick()` calls `/themes/v2/quick`, replacing V1 endpoint URLs.
+
+**Rationale**: V2 backend ship 완료 후 사용자가 V2 데이터를 화면에서 확인 가능하도록 하는 본 SPEC의 핵심 변경.
+
+#### REQ-NT3-002: TypeScript 타입 확장 — theme_description
+
+**The system shall** extend `ThemeItem` interface in `frontend/src/api/themes.ts` to include optional field `theme_description?: string | null`.
+
+**Rationale**: V2 응답이 V1 응답의 superset이므로 optional 필드 추가는 backward-compatible. V1으로 즉시 rollback 시 해당 필드 부재해도 TypeScript compile 정상.
+
+#### REQ-NT3-003: TypeScript 타입 확장 — stock_description (forward-compat)
+
+**The system shall** extend `ThemeStockItem` interface in `frontend/src/api/themes.ts` to include optional field `stock_description?: string | null`.
+
+**Rationale**: V2 parser가 동일 source로 채우는 forward-compat 필드. 본 SPEC에서 직접 사용하지 않으나(D-3 — inclusion_reason 자리 재사용) 향후 별도 SPEC에서 활용 가능.
+
+#### REQ-NT3-004: theme_description Tooltip 표시 (D-2)
+
+**WHEN** ThemeRankingTable이 렌더링되고 `theme.theme_description`이 non-null/non-empty string이면, **the system shall** expose `theme_description`을 native HTML `title` 속성을 통해 theme_name 셀의 hover tooltip으로 노출한다.
+
+**WHEN** `theme.theme_description`이 null, undefined, 또는 빈 문자열이면, **the system shall not** render the `title` 속성 (hidden — D-4).
+
+**Rationale**: D-2 결정 — Tooltip은 레이아웃 변경 0, desktop hover UX 일관성. D-4 — null placeholder 노이즈 회피.
+
+#### REQ-NT3-005: V2 backend metadata에 V1 alias 4 필드 추가
+
+**The system shall** populate `result.metadata` in `collect_and_analyze_v2()` with the following V1-compatible alias fields, in addition to existing fields (`data_source`, `generated_at`, `total_themes_seen`, `errors`):
+
+- `collected_at`: str (alias of `generated_at`, ISO-8601 UTC)
+- `theme_count`: int (alias of `total_themes_seen`)
+- `stock_count`: int (`len(stocks_df)` 계산값)
+- `elapsed_sec`: float (`time.monotonic()` 측정값, snapshot 호출 전체 시간)
+
+**The system shall** preserve all existing V2 metadata fields (additive only — REQ-NT3-C-003).
+
+**Rationale**: frontend `ThemesSnapshotResponse.metadata` (V1 호환)가 4 필드를 기대 — V2 응답이 frontend 타입과 1:1 매칭되도록 alias 추가. V1 alias 4 필드 부재 시 frontend metadata 표시 영역(예: 응답 시간 표시)이 누락됨.
+
+#### REQ-NT3-006: `_empty_result` 헬퍼에도 V1 alias 적용
+
+**The system shall** populate the same V1 alias fields (`collected_at`, `theme_count=0`, `stock_count=0`, `elapsed_sec=0.0`) in the `_empty_result()` helper of `backend/services/naver_theme_v2/service.py`.
+
+**Rationale**: 모든 list endpoint 호출 실패 시(REQ-NT2-NF-003) 부분 결과 반환 — frontend가 metadata 4 필드 기대 시 빈 결과에서도 schema consistency 보장.
+
+#### REQ-NT3-007: V2 endpoint 503/timeout 처리 (D-1)
+
+**WHEN** V2 endpoint가 HTTP 5xx, network error, 또는 timeout으로 실패하면, **the system shall** display an error message in the ThemeAnalysis 화면 with the following structure:
+- Error 메시지: 사용자 친화적 텍스트 (예: "테마 데이터를 가져오지 못했습니다. 다시 시도해 주세요.")
+- Retry 버튼: 클릭 시 현재 mode(`quick` or `full`)로 fetch 재시작
+
+**The system shall not** automatically fall back to V1 endpoint (REQ-NT3-C-006).
+
+**Rationale**: D-1 결정. UI 분기 최소화 + Sentry release 활발한 risk(R-1) 시 사용자 즉시 인지 + 수동 retry. 자동 폴백은 V1↔V2 schema 차이로 복잡도 증가 → 회피.
+
+#### REQ-NT3-008: ThemeDetailPanel inclusion_reason 자리에서 V2 description 자동 노출 (D-3, v1.0.0)
+
+> v1.0.1 amendment에서 REQ-NT3-009 / REQ-NT3-010으로 보강됨. hover tooltip은 보존하되 본문 노출이 추가됨.
+
+**The system shall** preserve the existing `title={stock.inclusion_reason}` rendering in `ThemeDetailPanel.tsx` (hover tooltip 보존).
+
+**WHEN** V2 endpoint가 호출되고 V2 parser가 `inclusion_reason`과 `stock_description`을 동일 source(`item.description`)로 채운 응답을 반환하면, **the system shall** display V2의 종목별 편입설명을 기존 inclusion_reason 자리에 자동으로 노출한다.
+
+**Rationale (v1.0.0)**: D-3 결정. V2 mobile parser의 동일 source 정책(§2.3 research) 활용 → frontend 컴포넌트 변경 0. inclusion_reason cell의 hover tooltip이 V1 desktop의 편입사유 → V2 mobile의 편입설명으로 자연스럽게 전환.
+
+#### REQ-NT3-009: 테마 설명 본문 prominent 노출 (v1.0.1 amendment, D-3 reverse + v1.0.2 강화)
+
+**WHEN** ThemeDetailPanel이 렌더링되고 `theme.theme_description`이 non-null/non-empty string이면, **the system shall** render the description as visible body text in a styled container directly below the theme title with prominent typography:
+- font-size: 13px (v1.0.2 강화, 이전 12px)
+- color: var(--text-primary) (v1.0.2 강화, 이전 var(--text-secondary))
+- line-height: 1.65
+- padding: 12px 14px
+- border-radius: 8px
+- border-left: 4px solid var(--positive)
+
+**WHEN** `theme.theme_description`이 null/undefined/empty이면, **the system shall not** render the body container (D-4 hidden 정책 보존).
+
+**Rationale**: v1.0.1에서 hover-only 발견성 문제 해결, v1.0.2에서 사용자 신고 — "테마 설명을 가장 prominent하게 봐야 한다"는 네이버 모바일 UX 일치 강화. data-testid="theme-description-body"로 vitest 검증.
+
+#### REQ-NT3-010: 종목 편입설명 본문 노출 (v1.0.1 amendment, D-3 reverse)
+
+**WHEN** ThemeDetailPanel이 종목 테이블 행을 렌더링하고 해당 stock의 `inclusion_reason`이 non-null/non-empty string이면, **the system shall** render the inclusion_reason as visible body text in a styled container directly below the stock row (hover tooltip 외에 본문으로도 노출).
+
+**WHEN** `inclusion_reason`이 null/undefined/empty이면, **the system shall not** render the body container.
+
+**The system shall** preserve the existing `title` attribute on stock rows (hover tooltip 호환성, 중복 노출 허용).
+
+**Rationale**: REQ-NT3-009와 동일 — hover-only UX는 발견성 부족. 네이버 모바일 UX 일치. data-testid="stock-inclusion-reason-body"로 vitest 검증. v1.0.2에서 주도주 카드는 제거됐으므로 leader-inclusion-reason-body는 더 이상 발생하지 않음 (REQ-NT3-011).
+
+#### REQ-NT3-012: 기본 조회 모드 'full' (v1.0.3 amendment)
+
+**The system shall** initialize `ThemeAnalysis.tsx`의 `mode` state with default value `'full'` (snapshot endpoint), not `'quick'` (list-only endpoint).
+
+**Rationale**: backend list 응답에 `sectorDescription`이 항상 null이라 빠른 조회 모드 사용자는 v1.0.1/v1.0.2의 theme_description 본문 박스를 영원히 볼 수 없음. default 진입 시 사용자가 description을 즉시 볼 수 있도록 default를 'full'로 변경. 사용자는 필요 시 '빠른 조회' 토글로 전환 가능 (UX 옵트아웃). 코드 변경 1줄(`useState<LoadMode>('quick')` → `('full')`).
+
+#### REQ-NT3-014: strong_themes_df theme_description 머지 (v1.0.4 amendment)
+
+**The system shall** populate `theme_description` field in `strong_themes_df` (backend service.py output) by mapping from `themes_df` after detail endpoint loop completes. The mapping uses `theme_id` as the key.
+
+**Implementation**: After the Phase C detail loop in `collect_and_analyze_v2()`, before returning the result, execute:
+```python
+desc_map = themes_df.set_index("theme_id")["theme_description"].to_dict()
+strong_themes_df["theme_description"] = strong_themes_df["theme_id"].map(desc_map)
+```
+
+**Skip condition**: When `skip_details=True` (quick mode equivalent in service layer), this merge is unnecessary since both `themes_df` and `strong_themes_df` carry `theme_description=None` from the list endpoint.
+
+**Rationale**: `strong_themes_df` is built at line 73 by `build_strong_themes(themes_df, ...)` BEFORE the detail loop merges description into `themes_df`. Without this post-loop merge, `strong_themes_df["theme_description"]` remains `None` even though `themes_df` is properly populated. Since frontend's `ThemeAnalysis.tsx` uses `data?.strong_themes ?? data?.themes` (strong_themes first), the user's clicked theme is mapped from `strong_themes` → description=null → ThemeDetailPanel D-4 hidden. Bug present since v1.0.0 RUN, surfaced after v1.0.3 default 'full'.
+
+#### REQ-NT3-015: localStorage 응답 캐시 (v1.0.5 amendment)
+
+**The system shall** persist successful V2 endpoint responses to `localStorage` under keys `theme-analysis-cache-quick` and `theme-analysis-cache-full`, scoped per `mode`.
+
+**WHEN** `ThemeAnalysis` mounts or `mode` changes, **the system shall** read the corresponding `localStorage` entry first. If a valid cached entry exists (matching `cache_version: 'v1'`), **the system shall** display it immediately by calling `setData(cached.data)` and skip the network fetch.
+
+**WHEN** no cached entry exists for the current `mode` or `cache_version` mismatches, **the system shall** initiate the normal fetch flow (existing 30s/10s flow).
+
+**WHEN** a fetch succeeds, **the system shall** write the response to `localStorage` for the current `mode` with the schema:
+```json
+{
+  "cache_version": "v1",
+  "saved_at": "<ISO-8601>",
+  "data": <ThemesSnapshotResponse>
+}
+```
+
+**The system shall not** apply automatic expiration (no TTL). Cache invalidation is exclusively user-driven via the refresh button (REQ-NT3-016).
+
+**Rationale**: 사용자 단독 사용 시나리오 + Chart Grid DB 수동 업데이트 패턴과 일관된 "수동 갱신" 모델. 탭 전환/페이지 새로고침/모드 토글 모두에서 동일 데이터 즉시 표시 (~ 1ms). `cache_version` 필드로 향후 backend 응답 schema 변경 시 자동 무효화 가능. data-testid="theme-analysis-cache-storage"는 사용하지 않고 직접 localStorage spy로 검증.
+
+#### REQ-NT3-016: 명시적 "🔄 갱신" 버튼 (v1.0.5 amendment)
+
+**The system shall** render a refresh button in the ThemeAnalysis toolbar (within `.sector-analysis-toolbar`), positioned next to the period-toggle (`빠른 조회 / 전체 조회`). The button shall be labeled `🔄 갱신` and carry `data-testid="theme-refresh-button"`.
+
+**WHEN** the user clicks the refresh button, **the system shall**:
+1. Remove the `localStorage` entry for the current `mode` (`localStorage.removeItem('theme-analysis-cache-' + mode)`)
+2. Set `loading=true` and clear `error`
+3. Trigger a new network fetch via `setRetryNonce(n => n + 1)` (reusing the existing retry mechanism)
+
+**WHEN** the new fetch succeeds, **the system shall** write the response to `localStorage` per REQ-NT3-015 (overwriting any prior cache for the current mode).
+
+**WHEN** the new fetch fails, **the system shall** display the existing error message + retry button (REQ-NT3-007). The localStorage entry remains cleared (no stale data fallback).
+
+**Rationale**: 사용자가 명시적으로 "데이터 새로 받고 싶다"고 결정하는 시점에만 새 fetch. Chart Grid DB 수동 업데이트 모델과 일관성. button label은 한국어 사용자 친화적 ("Refresh"가 아닌 "갱신") + 이모지 🔄로 명확한 시각 신호. localStorage.removeItem은 silent — 캐시 부재 상태에서도 안전.
+
+#### REQ-NT3-013: 빠른 조회 모드 advisory (v1.0.3 amendment)
+
+**WHEN** ThemeAnalysis 컴포넌트가 정상 데이터를 표시 중이고 (`!loading && !error && data`) `mode === 'quick'`이면, **the system shall** render a visible advisory container above the ThemeDetailPanel area with text: "빠른 조회 모드는 테마 설명과 종목 편입설명을 포함하지 않습니다. 자세한 정보는 위의 [전체 조회]를 클릭해 주세요 (약 30초 소요)."
+
+**WHEN** `mode === 'full'` (default)이면, **the system shall not** render the advisory.
+
+**Rationale**: quick 모드 사용자가 "테마 설명이 안 보이는 이유"를 즉시 인지하고 전체 조회로 전환할 수 있도록 명확한 안내 제공. data-testid="theme-quick-advisory"로 vitest 검증.
+
+#### REQ-NT3-011: 주도주 섹션 제거 (v1.0.2 amendment)
+
+**The system shall not** render the "주도주" (leader) section in `ThemeDetailPanel.tsx`, including the section header and any leader cards, regardless of whether `leaders` prop contains items.
+
+**The system shall** preserve the `leaders` prop as optional in `ThemeDetailPanel`'s interface for backward compatibility with existing call sites (`ThemeAnalysis.tsx` 호출부 무수정).
+
+**Rationale**: 사용자 신고 — 주도주 섹션이 테마명 직후 가장 위에 위치하여 네이버 모바일(스크린샷 2)의 "테마 설명 우선" UX와 어긋남. 주도주 정보는 종목 테이블에 모든 종목 표시되므로 별도 섹션 불필요 (rank 정보는 v1.0.2에서 자연스럽게 사라짐 — 추후 종목 테이블에 통합 가능). data-testid="leader-inclusion-reason-body" 미렌더링 + "주도주" 텍스트 미렌더링으로 vitest 검증.
+
+### 3.2 Non-Functional Requirements
+
+#### REQ-NT3-NF-001: V2 endpoint failure 처리 — UI 분기 최소화
+
+**The system shall** implement V2 endpoint failure handling (REQ-NT3-007) with no more than 2 conditional UI branches:
+- branch 1: error state 렌더링 (메시지 + retry 버튼)
+- branch 2: 정상 응답 렌더링 (기존 ThemeRankingTable + ThemeDetailPanel)
+
+**The system shall not** introduce V1 fallback branches, environment-variable toggle branches, or race-based dual-fetch logic.
+
+**Rationale**: D-1 결정. 복잡도 최소화로 회귀 risk 감소.
+
+#### REQ-NT3-NF-002: null/undefined description 렌더링 정책 (D-4)
+
+**WHEN** `theme.theme_description` or `stock.inclusion_reason` is `null`, `undefined`, or empty string, **the system shall** omit the related `title` attribute entirely (no placeholder text such as "—" or "(설명 없음)").
+
+**Rationale**: D-4 결정. 264개 테마 + 다수 종목 화면에서 placeholder 노이즈 회피.
+
+#### REQ-NT3-NF-003: V2 응답 시간 보존
+
+**The system shall** preserve V2 SPEC-002 NF-004 응답 시간 목표:
+- `/api/themes/v2/snapshot` SHALL respond within 30 seconds under nominal conditions
+- `/api/themes/v2/quick` SHALL respond within 10 seconds under nominal conditions
+
+**Rationale**: 본 SPEC 변경은 frontend swap + metadata alias 추가만 — V2 backend 호출 패턴/외부 호출 횟수 변경 없음.
+
+#### REQ-NT3-NF-004: frontend vitest baseline 보존
+
+**The system shall** ensure that adding new V2 endpoint mock tests does not introduce new test failures beyond the pre-existing ChartGrid baseline failure (1 fail).
+
+**Rationale**: vitest baseline 256/257 PASS — 신규 vitest 추가 후에도 ChartGrid 외 신규 fail 0 유지.
+
+### 3.3 Constraints
+
+#### REQ-NT3-C-001: V1 routes byte-identical 보존
+
+**The system shall not** modify the function signatures, response shapes, decorators, or paths of V1 routes `GET /api/themes/snapshot` and `GET /api/themes/quick` in `backend/routers/themes.py`.
+
+**The system shall** preserve V1 routes as immediately available rollback path during and after V2 frontend adoption.
+
+(Mirrors V2 SPEC REQ-NT2-R-003.)
+
+#### REQ-NT3-C-002: V1 backend 모듈 무수정
+
+**The system shall not** modify any file in `backend/services/naver_theme/` (V1 backend modules).
+
+**Rationale**: SPEC-001 무수정 정책 계승. V1 51 단위 테스트는 본 SPEC 작업 후에도 그대로 PASS (회귀 0).
+
+#### REQ-NT3-C-003: V2 backend metadata additive only
+
+**The system shall not** remove, rename, or change the dtype of existing V2 metadata fields (`data_source`, `generated_at`, `total_themes_seen`, `errors`).
+
+**The system shall** add V1 alias fields (REQ-NT3-005) as additional keys only.
+
+**Rationale**: V2 단위 테스트 AC-2 (`data_source == "naver_mobile_v2"` 검증)와 호환 보장. V2 SPEC-002 v1.0.1 amendment 패턴 (superset 검증).
+
+#### REQ-NT3-C-004: 신규 pip/npm 의존성 금지
+
+**The system shall not** introduce new entries to `requirements.txt`, `pyproject.toml`, `frontend/package.json`, or any dependency manifest.
+
+**The system shall** rely exclusively on existing dependencies:
+- backend: `requests`, `pandas`, `numpy`, `pydantic`, `fastapi`
+- frontend: `react`, `axios`, `vitest`, `@testing-library/react`
+
+**Rationale**: D-2 tooltip은 native HTML `title` 속성으로 구현 가능 → Radix Tooltip 등 신규 라이브러리 불필요. SPEC-002 정책 계승.
+
+#### REQ-NT3-C-005: bare except 금지
+
+**The system shall not** use bare `except:` or `except Exception:` clauses in any Python file modified by this SPEC.
+
+**The system shall** catch only specific exception types relevant to the operation (`requests.RequestException`, `requests.Timeout`, `json.JSONDecodeError`, `pydantic.ValidationError`, `KeyError`, `ValueError`).
+
+**Rationale**: SPEC-002 REQ-NT2-C-005 정책 계승. V2 service.py 수정 시 기존 exception handling 패턴 유지.
+
+#### REQ-NT3-C-006: V2 endpoint failure 시 V1 자동 폴백 금지
+
+**The system shall not** automatically fall back to V1 endpoints when V2 endpoint requests fail.
+
+**The system shall** display an error state and require explicit user action (retry button click) to re-attempt the V2 request.
+
+**Rationale**: D-1 결정. UI 분기 최소화 + V1↔V2 schema 차이로 인한 자동 폴백 복잡도 회피. V1 endpoint는 cohabitation으로 보존되지만 자동 호출은 금지.
+
+### 3.4 Routing Requirements
+
+#### REQ-NT3-R-001: V1 endpoints 등록 유지
+
+**The system shall** preserve V1 endpoints `GET /api/themes/snapshot` and `GET /api/themes/quick` registered in `backend/routers/themes.py` as a cohabitation rollback path.
+
+**The system shall not** delete, comment out, or modify V1 route definitions.
+
+#### REQ-NT3-R-002: V2 endpoints 등록 유지
+
+**The system shall** preserve V2 endpoints `GET /api/themes/v2/snapshot` and `GET /api/themes/v2/quick` registered in `backend/routers/themes.py`, serving V2 data with V1-compatible metadata structure (after REQ-NT3-005 alias addition).
+
+**Rationale**: SPEC-002 REQ-NT2-R-001/R-002에서 추가된 V2 routes를 본 SPEC 진행 중에도 무변경 보존.
+
+---
+
+## 4. Dependencies and Cohabitation
+
+### 4.1 V1·V2 cohabitation strategy (Option γ 계승)
+
+| Aspect | V1 (`backend/services/naver_theme/`) | V2 (`backend/services/naver_theme_v2/`) |
+|---|---|---|
+| Data source | finance.naver.com 데스크탑 정적 HTML | m.stock.naver.com `/front-api/...` JSON |
+| FastAPI route | `/api/themes/snapshot`, `/api/themes/quick` | `/api/themes/v2/snapshot`, `/api/themes/v2/quick` |
+| Module status | 무수정 (REQ-NT3-C-002) | metadata alias 추가 (REQ-NT3-005, REQ-NT3-C-003) |
+| Frontend impact | V1 호출 중지 (frontend swap) — backend 자체는 등록 유지 | V2가 frontend 신규 호출 대상 |
+| Rollback path | api/themes.ts URL을 V1으로 되돌리면 즉시 복귀 | — |
+
+### 4.2 SPEC 계승 관계
+
+- SPEC-NAVER-THEME-001 (V1, ship 완료): V1 backend + frontend ship의 baseline. 본 SPEC에서 무수정 보존.
+- SPEC-NAVER-THEME-002 (V2 backend, ship 완료, v1.0.1): V2 backend 모듈 + V2 routes 등록 완료. 본 SPEC의 hard prerequisite.
+- SPEC-NAVER-THEME-003 (본 SPEC): V2 frontend 채택 + V2 backend metadata V1 alias 추가.
+
+---
+
+## 5. Exclusions (What NOT to Build)
+
+본 SPEC 범위에서 **명시적으로 제외**되는 항목 (별도 SPEC에서 다룬다):
+
+| 항목 | 분류 | 사유 |
+|---|---|---|
+| 캐시 정책 (TTL, lru_cache) | 별도 SPEC (handoff §5 — "SPEC-NAVER-THEME-CACHE") | 본 SPEC 완료 후 V1+V2 양쪽 캐시 적용 정책 단순화 가능 |
+| V1 endpoint dead-code cleanup | 별도 SPEC | V1 cohabitation rollback path 보존 (REQ-NT3-R-001) |
+| Mobile hover 대체 UX (모바일 화면에서 theme_description 표시) | 별도 SPEC | native HTML `title`은 mobile touch 미동작. 본 SPEC desktop only 보장 |
+| Radix Tooltip 또는 custom Tooltip 컴포넌트 도입 | 별도 SPEC | 신규 의존성 추가 (REQ-NT3-C-004 위배). native `title` 속성으로 충분 |
+| stock_description 별도 컬럼/표시 (D-3 옵션 A — 마지막 컬럼 추가) | 별도 SPEC | D-3 결정으로 inclusion_reason 자리 재사용 — 신규 컬럼 표시는 미래 작업 |
+| theme_description 길이 제한 (line-clamp, truncation 정책) | 별도 SPEC | native HTML title 자동 wrap 의존. CSS 정책은 추후 |
+| V1↔V2 toggle UI (사용자가 V1/V2 선택) | 별도 SPEC 또는 미정 | D-1 결정으로 V2-only + 에러 retry. toggle 불필요 |
+| 환경변수 기반 V1/V2 swap (`VITE_USE_V2_API`) | 별도 SPEC | D-1 옵션 C 거부. 빌드 단계 결정으로 fallback 동작 X |
+| V2 응답 schema 검증 강화 (Pydantic response model 확장) | V2 SPEC-002 범위 | V2 backend ship 완료 시점에 결정됨 |
+| SPEC-001 V1 모듈 수정 또는 삭제 | 절대 금지 (REQ-NT3-C-002) | 무수정 정책 계승 |
+| frontend i18n (다국어) 지원 | 별도 SPEC | 본 SPEC는 한국어 description 표시만 |
+
+---
+
+## 6. Acceptance Criteria 요약
+
+세부 AC는 `acceptance.md` 참조. 총 15개 AC (V2 14-AC 스타일 mirror + D-1 retry 검증 1 추가).
+
+### Pass 조건 요약
+
+- AC-1 ~ AC-15: 자동 검증 (pytest + vitest)
+- frontend vitest baseline diff 0 (ChartGrid 기존 fail 그대로, 신규 fail 0)
+- V1 단위 테스트 51개 그대로 PASS (회귀 0건, REQ-NT3-C-002 검증)
+- V2 단위 테스트 24개 → metadata alias 추가 후 그대로 PASS (REQ-NT3-C-003 검증)
+- V1 routes byte-identical (REQ-NT3-C-001 검증)
+
+---
+
+## 7. Glossary
+
+| 용어 | 의미 |
+|---|---|
+| V1 endpoint | `/api/themes/snapshot`, `/api/themes/quick` (desktop HTML 크롤링 backend, SPEC-001) |
+| V2 endpoint | `/api/themes/v2/snapshot`, `/api/themes/v2/quick` (mobile JSON API backend, SPEC-002) |
+| theme_description | V2 mobile API `result.sectorDescription` — 테마 설명 (예: "각종 전선 및 전람(電纜)제조...") |
+| stock_description | V2 mobile API `result.items[].description` — 종목별 편입설명 (forward-compat 필드, 본 SPEC 미사용) |
+| inclusion_reason | V1/V2 ThemeStockItem의 편입사유 컬럼. V2 parser는 `inclusion_reason ← item.description`으로 매핑 → V2 endpoint 응답 시 자동으로 V2 description 노출 |
+| metadata V1 alias | V2 metadata에 추가되는 `collected_at`, `theme_count`, `stock_count`, `elapsed_sec` — frontend가 기대하는 V1-호환 필드명 |
+| Cohabitation | V1과 V2 endpoint 동시 등록. V2 frontend 채택 후에도 V1 즉시 rollback 가능 |
+| D-1 ~ D-4 | 사용자 결정 사항 (annotation cycle 사전 잠금) — 각각 에러 처리, tooltip 위치, description 표시 자리, null 처리 |
+| Tooltip | native HTML `title` 속성 기반 hover 도움말. Radix/custom 컴포넌트 미사용 |
+
+---
+
+## 8. References
+
+### 8.1 SPEC 문서
+
+- `.moai/specs/SPEC-NAVER-THEME-001/spec.md` (V1 v1.0.0 Approved)
+- `.moai/specs/SPEC-NAVER-THEME-002/spec.md` (V2 backend v1.0.0)
+- `.moai/specs/SPEC-NAVER-THEME-002/acceptance.md` (V2 14-AC v1.0.1)
+- `.moai/specs/SPEC-NAVER-THEME-002/plan.md` (V2 implementation plan)
+- `.moai/specs/SPEC-NAVER-THEME-002/handoff-frontend-v2.md` (Stage B 핸드오프, 488 lines, 본 SPEC의 핵심 입력)
+- `.moai/specs/SPEC-NAVER-THEME-003/research.md` (본 SPEC research — 4 결정 rationale + 작업 분량)
+- `.moai/specs/SPEC-NAVER-THEME-003/plan.md` (본 SPEC implementation plan)
+- `.moai/specs/SPEC-NAVER-THEME-003/acceptance.md` (본 SPEC 15-AC)
+
+### 8.2 외부 자원
+
+- V2 mobile endpoint (config.py 격리, SPEC-002에서 검증 완료):
+  - `https://m.stock.naver.com/front-api/stock/sectors/all` (list)
+  - `https://m.stock.naver.com/front-api/domestic/sector/item/list` (detail)
+- frontend vitest baseline: 256/257 PASS (ChartGrid 1 fail pre-existing, V2 무관)
+
+---
+
+Version: 1.0.0
+Status: Draft (Pending User Approval)
+Next phase: `/moai run SPEC-NAVER-THEME-003` (after approval + `/clear`)

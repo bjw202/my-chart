@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!-- Fixture strategy: Option B (Synthetic)
+     Live detail page (theme_id=178 전선) uses plain anchors without class="tltle",
+     but parser.py selects "td a.tltle". This synthetic fixture uses class="tltle" to
+     match the parser's CSS selector and allow SPEC-correct unit tests.
+     See divergence report in test_naver_theme_parser.py.
+     Encoding: EUC-KR (saved/read with encoding="euc-kr") -->
+<html>
+<head><title>네이버 금융 - 테마 - 전선</title></head>
+<body>
+<table class="type_5">
+<thead>
+<tr>
+  <th>종목명</th>
+  <th>편입사유</th>
+  <th>현재가</th>
+  <th>전일비</th>
+  <th>등락률</th>
+  <th>매수호가</th>
+  <th>매도호가</th>
+  <th>거래량</th>
+  <th>거래대금</th>
+  <th>전일거래량</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><a class="tltle" href="/item/main.naver?code=001440">대한전선</a></td>
+  <td>전선 제조 및 판매업체. 초고압 전력케이블 생산 및 에너지 인프라 핵심 기업</td>
+  <td>3,850</td>
+  <td>상승 150</td>
+  <td>+4.05%</td>
+  <td>3,850</td>
+  <td>3,855</td>
+  <td>5,234,120</td>
+  <td>1,234억</td>
+  <td>3,100,000</td>
+</tr>
+<tr>
+  <td><a class="tltle" href="/item/main.naver?code=006340">대원전선</a></td>
+  <td>전력 및 통신 케이블 제조업체. 국내 주요 전선 제조 기업 중 하나</td>
+  <td>15,050</td>
+  <td>상승 1,960</td>
+  <td>+14.97%</td>
+  <td>15,040</td>
+  <td>15,050</td>
+  <td>82,099,217</td>
+  <td>524억</td>
+  <td>85,728,928</td>
+</tr>
+<tr>
+  <td><a class="tltle" href="/item/main.naver?code=000500">가온전선</a></td>
+  <td>LS그룹 계열사. 전력케이블 및 통신케이블 생산 국내 3대 전선 전문 제조업체</td>
+  <td>241,500</td>
+  <td>상승 24,500</td>
+  <td>+11.29%</td>
+  <td>241,500</td>
+  <td>242,000</td>
+  <td>147,466</td>
+  <td>33,721</td>
+  <td>134,007</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

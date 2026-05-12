@@ -80,10 +80,19 @@ KRX_PW=your_krx_password
 2. "DB 업데이트" 버튼을 클릭합니다 (\~2,570종목 수집, 5-30분 소요)
 3. 필터를 적용하고 차트 그리드를 탐색합니다
 
-## 주요 기능
+## 주요 기능 (5탭 구성)
 
+### 1. Market Overview (시장 개요)
+- 주가지수, 섹터별 성과 개요
+
+### 2. Sector Analysis (섹터 분석)
+- 섹터 성과 트래킹, 섹터별 주도주
+
+### 3. Stock Explorer (종목 검색)
 - **필터 시스템**: 시가총액, 기간수익률(1D/1W/1M/3M), 기술적 패턴 빌더, RS점수, 시장, 섹터 필터
-- **차트 그리드**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선, 종가/KOSPI 비율), 마지막 캔들 5봉 여백
+
+### 4. Chart Grid (차트 그리드)
+- **차트**: TradingView Lightweight Charts (2x2 / 3x3), MA 오버레이, 볼륨바, RS 값 표시, RS Line (상대강도선, 종가/KOSPI 비율), 마지막 캔들 5봉 여백
 - **차트 헤더**: 종목명 · 종목코드 · 섹터그룹(대&gt;중) · 등락률 · RS 점수 한눈에 표시
 - **등락폭 측정**: 차트 위 두 지점 클릭으로 가격 등락률(%) 표시, 연속 측정 지원 (측정 완료 후 클릭만으로 즉시 새 측정 시작), 셀별 독립 동작 (아래 상세 설명 참고)
 - **종목 리스트**: 섹터 그룹별 가상화 리스트, 키보드 네비게이션
@@ -92,6 +101,24 @@ KRX_PW=your_krx_password
 - **DB 업데이트**: SSE 기반 진행률 스트리밍, 백그라운드 일괄 업데이트, DB 기준 최종 날짜 표시
 - **재무 분석 (FS 버튼)**: FnGuide 크롤링 기반 S-RIM 8섹션 재무 대시보드 (사업실적·건전성·대차대조표·수익률분해·이익워터폴·활동성·추세신호·5개질문)
 - **AI 기업 분석 (AI 버튼)**: Perplexity API 기반 실시간 AI 스윙 트레이더 리포트. 공간(Spaces) 수준의 깊이 있는 분석 (SSE 스트리밍 + 자동 저장 + 히스토리 관리)
+
+### 5. Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001/002/003 V1+V2
+
+**V1 (desktop HTML 크롤링, SPEC-NAVER-THEME-001)** — cohabitation 보존, 즉시 rollback 경로
+**V2 (mobile JSON API, SPEC-NAVER-THEME-002+003)** — 현재 frontend 호출 대상
+
+- **테마 목록**: 네이버 금융 테마 실시간 수집(V1: 데스크탑 HTML, V2: 모바일 m.stock.naver.com JSON), 강세 테마 상위 N개 추출
+- **테마 설명 tooltip**: V2 응답의 `theme_description`이 theme_name 셀 hover 시 native HTML title로 노출 (D-2, SPEC-003 REQ-NT3-004)
+- **테마 설명 본문 (prominent)**: 선택된 테마의 `theme_description`을 우측 상세 패널 상단에 큰 글씨 + 좌측 색 띠로 prominent하게 표시 (v1.0.2 amendment, REQ-NT3-009 강화)
+- **종목 테이블 + 편입설명**: 종목별 편입설명을 종목 행 다음에 본문 텍스트로 노출 + hover tooltip 동시 (v1.0.1 amendment, REQ-NT3-010)
+- **주도주 섹션 제거**: v1.0.2 amendment에서 별도 "주도주" 섹션 제거. 주도주 정보는 종목 테이블의 모든 종목으로 통합 (REQ-NT3-011)
+- **기본 모드 '전체 조회'**: v1.0.3 amendment에서 기본 진입 모드를 '빠른 조회'에서 '전체 조회'로 변경 (REQ-NT3-012). description은 V2 detail endpoint에서만 채워지므로 default를 full로 하여 사용자가 처음부터 description 노출. "빠른 조회" 토글 시 description이 표시되지 않음을 advisory 박스로 안내 (REQ-NT3-013).
+- **멀티테마 종목**: 2개 이상 테마에 동시 편입된 종목 분석
+- **에러 처리 (V2)**: V2 endpoint 503/timeout 시 사용자 친화적 에러 메시지 + 다시 시도 버튼 (V1 자동 폴백 X — D-1, SPEC-003 REQ-NT3-007)
+- **빠른 조회**: V2 `/api/themes/v2/quick` (≤10초) / 상세 조회: V2 `/api/themes/v2/snapshot` (~30초)
+- **rollback 경로**: V1 endpoints `/api/themes/snapshot`, `/api/themes/quick`은 등록 유지 — frontend `themes.ts` URL을 V1으로 되돌리면 즉시 복귀
+- **localStorage 캐시 + 🔄 갱신 버튼 (v1.0.5 amendment)**: 한 번 받은 데이터를 `localStorage`에 저장 (key: `theme-analysis-cache-{quick|full}`, schema versioned). 탭 전환/페이지 새로고침/모드 토글에서 즉시 표시 (~ 1ms). 새 데이터를 원할 때만 툴바의 `🔄 갱신` 버튼 클릭 → 캐시 무효화 + 새 fetch + 응답 캐시 재쓰기. 자동 만료 없음 — Chart Grid DB 수동 업데이트 모델과 일관성 (REQ-NT3-015, REQ-NT3-016)
+- **비개발자용 가이드**: 작업 배경, V1→V2 변천사, 4가지 결정(D-1~D-4) 친절 설명 → [docs/theme-analysis-guide.md](docs/theme-analysis-guide.md), 시리즈 회고/교훈 → [.moai/learnings/SPEC-NAVER-THEME-001-003-lessons.md](.moai/learnings/SPEC-NAVER-THEME-001-003-lessons.md)
 
 ## API 엔드포인트
 
@@ -107,6 +134,10 @@ KRX_PW=your_krx_password
 | POST | `/api/ai-report/{code}` | AI 종목 분석 리포트 생성 (Perplexity SSE 스트리밍) |
 | GET | `/api/ai-report/{code}/history` | 저장된 AI 분석 이력 목록 |
 | GET | `/api/ai-report/{code}/{filename}` | 저장된 AI 분석 파일 조회 |
+| GET | `/api/themes/snapshot` | V1 테마 분석 (데스크탑 HTML, cohabitation rollback 경로) |
+| GET | `/api/themes/quick` | V1 테마 분석 빠른 조회 (데스크탑 HTML, cohabitation rollback 경로) |
+| GET | `/api/themes/v2/snapshot` | V2 테마 분석 스냅샷 (모바일 JSON API 기반, 5종 DataFrame + V1-호환 metadata, ~30초) |
+| GET | `/api/themes/v2/quick` | V2 테마 분석 빠른 조회 (모바일 JSON API 기반, ≤10초) |
 
 ## 필터 유형
 
@@ -119,10 +150,10 @@ KRX_PW=your_krx_password
 
 ## 기술 스택
 
-- **백엔드**: Python 3.13, FastAPI, uvicorn, sse-starlette
+- **백엔드**: Python 3.13, FastAPI, uvicorn, sse-starlette, requests, beautifulsoup4 (테마 크롤링)
 - **프론트엔드**: React 19, TypeScript, Vite, TradingView Lightweight Charts, react-window
-- **데이터베이스**: SQLite (WAL mode)
-- **데이터 소스**: Naver Finance API, pykrx (한국거래소)
+- **데이터베이스**: SQLite (WAL mode, read-only 모드)
+- **데이터 소스**: Naver Finance API, pykrx (한국거래소), 네이버 금융 테마 페이지 (finance.naver.com/sise/theme.naver)
 
 ## 프로젝트 구조
 

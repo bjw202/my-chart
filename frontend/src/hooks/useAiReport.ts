@@ -28,7 +28,7 @@ interface UseAiReportReturn {
   history: HistoryItem[]
   /** 심층 분석 진행 상태 (v1.0.4) */
   progress: DeepProgress
-  /** 스트리밍 시작 (mode 생략 시 'perplexity' 기본값) */
+  /** 스트리밍 시작 (mode 생략 시 'fast' 기본값 — SPEC-AI-REPORT-003 Codex 기반) */
   startStream: (code: string, mode?: AiReportMode) => void
   /** 스트리밍 중단 및 상태 초기화 */
   abort: () => void
@@ -42,8 +42,9 @@ interface UseAiReportReturn {
 
 // ── SPEC-AI-REPORT-002 v1.0.4: 진행 상태 패널 기본값 ────────────────────────────
 
+// SPEC-AI-REPORT-003: perplexity 슬롯 → codex 슬롯
 const SOURCE_NAMES: readonly SourceName[] = [
-  'perplexity',
+  'codex',
   'brave',
   'tavily',
   'naver',
@@ -111,9 +112,9 @@ export function useAiReport(): UseAiReportReturn {
     })
   }, [])
 
-  // SPEC-AI-REPORT-002 D5: mode 파라미터 추가 (기본값 'perplexity', 기존 호출부 호환 유지)
+  // SPEC-AI-REPORT-003: mode 기본값 'fast' (Codex CLI 기반, 하위 호환 위해 라우터는 perplexity alias 수용)
   const startStream = useCallback(
-    (code: string, mode: AiReportMode = 'perplexity') => {
+    (code: string, mode: AiReportMode = 'fast') => {
       // 이전 스트림이 있으면 중단
       if (abortRef.current) {
         abortRef.current.abort()

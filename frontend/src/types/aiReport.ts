@@ -20,8 +20,8 @@ export type AiReportStatus = 'idle' | 'streaming' | 'done' | 'error' | 'loading-
 
 // ── SPEC-AI-REPORT-002 v1.0.4: 진행 상태 패널용 phase 이벤트 타입 ────────────────
 
-/** 5-소스 딥 리서치에서 수집 대상 소스 이름. */
-export type SourceName = 'perplexity' | 'brave' | 'tavily' | 'naver' | 'youtube'
+/** 5-소스 딥 리서치에서 수집 대상 소스 이름 (SPEC-AI-REPORT-003: perplexity → codex). */
+export type SourceName = 'codex' | 'brave' | 'tavily' | 'naver' | 'youtube'
 
 /** 백엔드 SSE `event: phase` 이벤트의 JSON payload 타입. */
 export type PhaseEvent =
@@ -38,10 +38,14 @@ export type PhaseEvent =
     }
   | { phase: 'collecting_done'; successful: number; total: number }
   | { phase: 'staging' }
+  | { phase: 'staging_prepared' }
   | { phase: 'staging_done' }
   | { phase: 'synthesizing' }
   | { phase: 'synthesis_start'; model: string }
   | { phase: 'synthesis_first_chunk' }
+  // SPEC-AI-REPORT-003 Fast Mode Codex 전환
+  | { phase: 'codex_fast_start' }
+  | { phase: 'codex_fast_progress'; message: string }
 
 /** 단일 소스 진행 상태 (ProgressPanel 렌더용). */
 export interface SourceProgress {

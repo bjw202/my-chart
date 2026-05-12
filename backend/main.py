@@ -29,6 +29,8 @@ from backend.routers.market import router as market_router
 from backend.routers.screen import router as screen_router
 from backend.routers.sectors import router as sectors_router
 from backend.routers.stage import router as stage_router
+from backend.routers.stocks import stocks_router
+from backend.routers.themes import router as themes_router
 from backend.services.deep_research_service import (
     _cleanup_stale_staging_dirs,
     _load_synthesis_prompt,
@@ -51,22 +53,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     get_sector_registry()
     logger.info("Registries loaded. Server ready.")
 
-    # v1.1.5: AI Report 프롬프트 템플릿 검증 (fail-fast)
+    # SPEC-AI-REPORT-003: Codex 프롬프트 템플릿 검증 (fail-fast)
     # 파일 부재/플레이스홀더 부재 시 서버 시작 즉시 중단 → 첫 요청 500 회피
     try:
-        from backend.services.ai_report_service import _load_prompt_template
+        from backend.services.codex_cli_runner import load_codex_prompt
 
-        template = _load_prompt_template()
-        logger.info("AI Report 프롬프트 로드 완료 (%d chars)", len(template))
+        template = load_codex_prompt(code="000000", stock_name="검증용")
+        logger.info("Codex 프롬프트 로드 완료 (%d chars)", len(template))
     except (FileNotFoundError, ValueError) as e:
-        logger.error("AI Report 프롬프트 검증 실패: %s", e)
+        logger.error("Codex 프롬프트 검증 실패: %s", e)
         raise
 
-    # @MX:NOTE Deep-mode lifespan block — claude binary optional, synthesis prompt required. /tmp cleanup is best-effort.
-    # v1.2.0 Phase D3: Deep 분석 모드 가용성 게이트 (NFR-008)
-    # claude CLI 없으면 경고만 (Perplexity 모드는 정상 운영)
+    # @MX:NOTE Fast/Deep 양모드 lifespan block — codex binary required, claude binary required for Deep.
+    # SPEC-AI-REPORT-003 NFR-001: codex 바이너리 부재 시 Fast Mode 비활성 (경고), claude 없으면 Deep 비활성.
+    if shutil.which("codex") is None:
+        logger.warning("codex CLI 미설치: Fast Mode 비활성화. `codex login` 이후 사용 가능.")
     if shutil.which("claude") is None:
-        logger.warning("claude CLI 미설치: Deep 분석 모드 비활성화. Perplexity 모드는 정상 운영.")
+        logger.warning("claude CLI 미설치: Deep 분석 모드 비활성화. Fast 모드는 codex 설치 시 정상 운영.")
 
     # Deep 합성 프롬프트 fail-fast (FR-010): 파일 없으면 서버 시작 즉시 중단
     try:
@@ -111,6 +114,8 @@ app.include_router(market_router, prefix="/api")
 app.include_router(screen_router, prefix="/api")
 app.include_router(sectors_router, prefix="/api")
 app.include_router(stage_router, prefix="/api")
+app.include_router(themes_router, prefix="/api")
+app.include_router(stocks_router)
 
 
 @app.get("/health")
