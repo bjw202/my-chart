@@ -71,7 +71,7 @@ KRX_PW=your_krx_password
 만약 KRX 로그인이 실패하거나 환경변수가 설정되지 않으면:
 
 1. pykrx 호출 시도 (인증 없음)
-2. 실패 시 `Input/sectormap.xlsx`의 D-day 컬럼 사용
+2. 실패 시 `Input/sectormap-original.xlsx`의 D-day 컬럼 사용
 3. 폴백 데이터도 없으면 빈 DataFrame 반환
 
 ### 첫 실행
@@ -188,9 +188,8 @@ pytest tests/ -q
 
 | 파일 | 출처 | 용도 |
 | --- | --- | --- |
-| `sectormap.xlsx` | [세종데이터](https://www.sejongdata.com/) | 종목코드, 종목명, 시장(KOSPI/KOSDAQ), 섹터 분류(산업명 대/중, 주요제품) |
+| `sectormap-original.xlsx` | [세종데이터](https://www.sejongdata.com/) | 종목코드, 종목명, 시장(KOSPI/KOSDAQ), 섹터 분류(산업명 대/중, 주요제품) + 재무/주가 지표 (53 컬럼). `my_chart/registry.py:_load_sectormap()`이 header=8로 로드하여 6 컬럼만 사용. **단일 source — 이전 sectormap.xlsx는 통합 후 폐기**. |
 | `basic_data.xlsx` | [KRX 정보데이터시스템](https://data.krx.co.kr/) | 상장주식수 (시가총액 계산에 사용: 종가 x 상장주식수) |
-| `sectormap_original.xlsx` | 세종데이터 (원본) | 백업용 원본 파일 (코드에서 직접 사용하지 않음) |
 
 - KOSPI 주식 (\~833개)
 - KOSDAQ 주식 (\~1,719개)
