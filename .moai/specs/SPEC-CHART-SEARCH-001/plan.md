@@ -1,10 +1,10 @@
-# SPEC-CHART-SEARCH-001 — Implementation Plan
+# SPEC-CHART-SEARCH-001 — Implementation Plan (v2.0.0)
 
 문서 분류: Plan (manager-spec, Phase 1)
-SPEC 버전: 1.0.0 (Draft, amendment 1 applied 2026-05-11)
+SPEC 버전: 2.0.0 (BREAKING amendment, Draft)
 Development mode: TDD (RED → GREEN → REFACTOR)
-작성일: 2026-05-11
-업데이트: 2026-05-11 (audit iteration 1: I-1~I-6 + Q-1~Q-7 smart defaults)
+작성일: 2026-05-11 (v1.0.0)
+업데이트: 2026-05-12 (v2.0.0 BREAKING amendment — modal 폐기, ChartGrid 통합 패턴 도입)
 연관 문서: `spec.md`, `acceptance.md`, `research.md`, `spec-compact.md`
 
 ## HISTORY
@@ -12,260 +12,211 @@ Development mode: TDD (RED → GREEN → REFACTOR)
 | 일자 | 변경 |
 | --- | --- |
 | 2026-05-11 | v1.0.0 초안 작성 (manager-spec) |
-| 2026-05-11 | Amendment 1 — I-1~I-6 + Q-1~Q-7 smart defaults 반영. 신규 task T2b(alias 사전), T5a(focus trap helper) 추가. R-2 mitigation에 React.memo 주(主) 기법으로 명시(I-6). timeframe 파라미터 `'daily'/'weekly'` 단일 통일(I-3). |
+| 2026-05-11 | Amendment 1 — I-1~I-6 + Q-1~Q-7 smart defaults 반영. T2b(alias), T5a(focus trap) 추가. |
+| 2026-05-12 | **v2.0.0 BREAKING amendment** — modal 패턴 폐기, ChartGrid 통합 주입 패턴 도입. 신규 task T9 (modal 자산 제거), T10 (stocks union 메커니즘), T11 (scroll + highlight), T12 (ChartGrid props 확장), T13 (integration tests). v1.0.0 T1~T4 (backend, hangul, hook, SearchBox)는 그대로 활용. T5~T8 (modal, integration, perf RED/GREEN)는 폐기 또는 재작성. |
 
 ---
 
-## 1. Implementation Strategy
+## 1. Implementation Strategy (v2.0.0)
 
 ### 1.1 핵심 결정
 
-| 결정 | 값 | 근거 |
-| --- | --- | --- |
-| 검색 결과 표시 위치 | `ReactDOM.createPortal(modal, document.body)` 포털 | research §4.3 — ChartGrid 부모 re-render 영향 0 |
-| 모달 호스트 컴포넌트 | `AppContent.tsx` (ChartGrid sibling) | research §4.3 — `selectedStock` state를 ChartGrid 외부에 두어 ChartGrid 트리 격리 |
-| 검색 매칭 자료구조 | naive array + `filter+sort` | research §5.3 — 2546개 규모에서 trie 이득 측정 불가 |
-| 한글 초성 라이브러리 | 자체 구현 (47 LOC) | NFR-CONST-001 — 외부 라이브러리 0 |
-| Cherry-pick 절차 | `git show feat/SPEC-CHART-NAV-001:<path> > <path>` 파일 단위 | research §2.3 — monolithic commit conflict 회피 |
-| Development methodology | TDD | `.moai/config/sections/quality.yaml` `development_mode: tdd` |
+| 결정 | v1.0.0 값 | v2.0.0 값 | 근거 |
+| --- | --- | --- | --- |
+| 검색 결과 표시 위치 | `ReactDOM.createPortal(modal, document.body)` portal | ChartGrid 표시 stocks 배열에 주입 (prepend 또는 기존 cell scroll) | 사용자 라이브 피드백 — modal 격리감이 mental model과 어긋남. ChartGrid UX 가치 활용 우선. |
+| 검색 결과 ↔ 필터 결과 분리 | modal subtree (시각적 분리) | `displayedStocks` 배열 union, `screenState.request` deep-equal (논리적 분리) | filter state 보존 invariant 유지 (MP-3). ChartGrid stocks 배열은 derived state로 분리. |
+| 중복 처리 | N/A (modal 재오픈) | scroll + highlight only (no prepend duplicate) | 사용자 결정 V2-Q2. |
+| Highlight 스타일 | N/A | 셀 테두리 2~3초 CSS keyframes border-flash | 사용자 결정 V2-Q3. |
+| 검색 종목 timeframe | modal 자체 토글 | ChartGrid 현재 timeframe 그대로 사용 (별도 토글 없음) | v2.0.0 EX-17. |
+| 호스트 컴포넌트 | `AppContent.tsx` (modal sibling) | `AppContent.tsx` (`searchedStock` state → `injectedStock` prop forwarding) | search box → AppContent → ChartGrid prop drilling. |
+| Development methodology | TDD | TDD (변경 없음) | `.moai/config/sections/quality.yaml`. |
 
 ### 1.2 외부 의존성 (변경 0)
 
-| 영역 | 라이브러리 | 비고 |
-| --- | --- | --- |
-| Backend | `fastapi`, `pydantic`, `sqlite3` (stdlib) | 기존 사용 중 |
-| Frontend | `react`, `axios` (있다면 fetch도 가능), `lightweight-charts`, `vitest`, `@testing-library/react` | 기존 사용 중 |
-| 한글 매칭 | (자체 구현) | `frontend/src/utils/hangul.ts` |
+NFR-CONST-001 강제: `package.json`, `requirements.txt` diff에서 신규 dependency 0건 확인.
 
-NFR-CONST-001 강제: `package.json`, `requirements.txt`/`pyproject.toml` diff에서 신규 dependency 0건 확인.
+Highlight CSS animation은 자체 keyframes로 구현 (no framer-motion, no react-spring 등).
+
+### 1.3 archive 보존 정책
+
+v1.0.0 modal 자산은 `feat/SPEC-CHART-SEARCH-001` 브랜치에 보존:
+- `StockSearchModal.tsx`
+- `useFocusTrap.ts`
+- `StockSearchModal.test.tsx`
+- `ChartGrid.perf.test.tsx` (modal-coupled scenarios)
+- evaluator-active iter 2 PASS 84/100 평가 결과
+
+본 SPEC v2.0.0은 새 브랜치 `feat/SPEC-CHART-SEARCH-001-v2`에서 작업. v3 후보(sidebar/route) 검토 시 archive 참고 가능.
 
 ---
 
-## 2. File Change Matrix
+## 2. File Change Matrix (v2.0.0)
 
-### 2.1 Backend (3 new + 1 modify + 1 test new)
+### 2.1 Backend (변경 없음, v1.0.0 그대로)
 
-| # | 파일 | Delta | LOC (예상) | TDD 단계 | 매핑 REQ |
+| # | 파일 | Delta | 비고 |
+| --- | --- | --- | --- |
+| B1 | `backend/routers/stocks.py` | [EXISTING] | v1.0.0 그대로 |
+| B2 | `backend/services/stocks_master_service.py` | [EXISTING] | v1.0.0 그대로 |
+| B3 | `backend/main.py` | [EXISTING] | v1.0.0 그대로 |
+| B4 | `backend/tests/test_stocks_master.py` | [EXISTING] | v1.0.0 그대로 |
+
+### 2.2 Frontend Util (변경 없음, v1.0.0 그대로)
+
+| # | 파일 | Delta | 비고 |
+| --- | --- | --- | --- |
+| F1 | `frontend/src/utils/hangul.ts` | [EXISTING] | v1.0.0 그대로 |
+| F1b | `frontend/src/utils/hangul-aliases.ts` | [EXISTING] | v1.0.0 그대로 |
+| F2 | `frontend/src/utils/__tests__/hangul.test.ts` | [EXISTING] | v1.0.0 그대로 |
+
+### 2.3 Frontend API + Hook (변경 없음, v1.0.0 그대로)
+
+| # | 파일 | Delta | 비고 |
+| --- | --- | --- | --- |
+| F3 | `frontend/src/api/stocks.ts` | [EXISTING] | v1.0.0 그대로 |
+| F4 | `frontend/src/hooks/useStockMaster.ts` | [EXISTING] | v1.0.0 그대로 |
+| F5 | `frontend/src/hooks/__tests__/useStockMaster.test.ts` | [EXISTING] | v1.0.0 그대로 |
+
+### 2.4 Frontend Components — v2.0.0 변경
+
+| # | 파일 | Delta | LOC | TDD Task | 매핑 REQ |
 | --- | --- | --- | --- | --- | --- |
-| B1 | `backend/routers/stocks.py` | [NEW] | +52 | T1-GREEN | REQ-DATA-001, REQ-DATA-003 |
-| B2 | `backend/services/stocks_master_service.py` | [NEW] | +65 | T1-GREEN | REQ-DATA-002 |
-| B3 | `backend/main.py` | [MODIFY] | +2 | T1-GREEN | REQ-DATA-001 (라우터 등록) |
-| B4 | `backend/tests/test_stocks_master.py` | [NEW] | +120 | T1-RED | AC-DATA-001 ~ 004 |
+| F6 | `frontend/src/components/ChartGrid/StockSearchBox.tsx` | [EXISTING] | (재사용) | — | REQ-SEARCH-001~006 |
+| F7 | `frontend/src/components/ChartGrid/__tests__/StockSearchBox.test.tsx` | [EXISTING] | (재사용) | — | AC-SEARCH-* |
+| **F8** | `frontend/src/components/ChartGrid/StockSearchModal.tsx` | **[REMOVE]** | -250 | **T9** | (v1.0.0 폐기) |
+| **F9** | `frontend/src/components/ChartGrid/__tests__/StockSearchModal.test.tsx` | **[REMOVE]** | -180 | **T9** | (v1.0.0 폐기) |
+| **F10** | `frontend/src/components/ChartGrid/useFocusTrap.ts` | **[REMOVE]** | -30 | **T9** | (modal 폐기로 불필요) |
+| **F11** | `frontend/src/components/ChartGrid/ChartGrid.tsx` | **[MODIFY]** | +50 (props 확장 + scroll/highlight effect) | **T10, T11, T12** | REQ-INTEGRATE-001~003, REQ-PERF-001/002 |
+| **F12** | `frontend/src/AppContent.tsx` | **[MODIFY]** | -15 (modal mount 제거) +10 (`injectedStock` prop 전달) = net -5 | **T9, T12** | REQ-INTEGRATE-001, REQ-INTEGRATE-004 |
+| **F13** | `frontend/src/components/ChartGrid/cellHighlight.css` (or inline) | **[NEW]** | +30 (`@keyframes border-flash` + `.cell-search-highlight` class) | **T11** | REQ-INTEGRATE-002/003, §4 row 7 |
+| **F14** | `frontend/src/components/ChartGrid/__tests__/ChartGrid.integration.test.tsx` | **[NEW]** | +250 (6+ scenarios) | **T13** | AC-INTEGRATE-001~006 |
+| **F15** | `frontend/src/components/ChartGrid/__tests__/ChartGrid.perf.test.tsx` | **[MODIFY]** | modal-coupled 부분 제거 + integration-aware 시나리오 보강 | **T13** | MP-1/MP-2 검증 (재정의) |
 
-### 2.2 Frontend Util (2 new + 2 test new)
+### 2.5 합계 (v2.0.0)
 
-| # | 파일 | Delta | LOC | TDD 단계 | 매핑 REQ |
-| --- | --- | --- | --- | --- | --- |
-| F1 | `frontend/src/utils/hangul.ts` | [NEW] | +60 (archive 47 + alias score 5 분기 +13) | T2-GREEN | REQ-SEARCH-003 (score 1, 5) |
-| F1b | `frontend/src/utils/hangul-aliases.ts` (Q-1 신규) | [NEW] | ~50 (50종 mapping) | T2b-GREEN | REQ-SEARCH-003 (score 5 alias) |
-| F2 | `frontend/src/utils/__tests__/hangul.test.ts` | [NEW] | +100 (alias 케이스 +20) | T2-RED, T2b-RED | AC-SEARCH-005, 006, 011 (신규) |
-
-> `frontend/src/utils/` 디렉토리 자체가 신규.
-> Q-1 결정에 따라 `hangul-aliases.ts`(50종 ko↔en hardcoded 사전) 신규 추가. 50종 selection은 시가총액 상위 + 외국인 거래 비중 상위 기준으로 manager-spec/run 단계에서 최종 확정. JSON 대신 TS export로 type safety 확보.
-
-### 2.3 Frontend API + Hook (2 new + 1 test new)
-
-| # | 파일 | Delta | LOC | TDD 단계 | 매핑 REQ |
-| --- | --- | --- | --- | --- | --- |
-| F3 | `frontend/src/api/stocks.ts` | [NEW] | +25 | T3-GREEN | REQ-SEARCH-002, REQ-SEARCH-006 |
-| F4 | `frontend/src/hooks/useStockMaster.ts` | [NEW] | +42 | T3-GREEN | REQ-SEARCH-002 (cachedPromise) |
-| F5 | `frontend/src/hooks/__tests__/useStockMaster.test.ts` | [NEW] | +100 | T3-RED | AC-SEARCH-002, AC-SEARCH-007 |
-
-### 2.4 Frontend Components (2 new + 2 modify + 2 test new)
-
-| # | 파일 | Delta | LOC | TDD 단계 | 매핑 REQ |
-| --- | --- | --- | --- | --- | --- |
-| F6 | `frontend/src/components/ChartGrid/StockSearchBox.tsx` | [NEW] | ~180 | T4-GREEN | REQ-SEARCH-001, 003, 004, 005, 006 |
-| F7 | `frontend/src/components/ChartGrid/__tests__/StockSearchBox.test.tsx` | [NEW] | +200 | T4-RED | AC-SEARCH-001 ~ 008 |
-| F8 | `frontend/src/components/ChartGrid/StockSearchModal.tsx` | [NEW] | ~250 | T5-GREEN | REQ-MODAL-001 ~ 004, REQ-PERF-002 |
-| F9 | `frontend/src/components/ChartGrid/__tests__/StockSearchModal.test.tsx` | [NEW] | +180 | T5-RED | AC-MODAL-001 ~ 008 |
-| F10 | `frontend/src/components/ChartGrid/ChartGrid.tsx` | [MODIFY] | +5 | T6-GREEN | REQ-SEARCH-001 (mount만) |
-| F11 | `frontend/src/AppContent.tsx` | [MODIFY] | +15 | T6-GREEN | REQ-MODAL-001, REQ-PERF-001 (modal host) |
-
-### 2.5 Performance Invariant Tests (1 new)
-
-| # | 파일 | Delta | LOC | TDD 단계 | 매핑 REQ |
-| --- | --- | --- | --- | --- | --- |
-| F12 | `frontend/src/components/ChartGrid/__tests__/ChartGrid.perf.test.tsx` | [NEW] | +120 | T7-RED + T8-GREEN | REQ-PERF-001, REQ-PERF-002, MP-1, MP-2 |
-
-### 2.6 합계
-
-- 신규: 11개 파일 (backend 2 + tests 1 + frontend src 6 + frontend tests 4 = 13개. 위 매트릭스 재집계 기준)
-- 수정: 3개 파일 (`backend/main.py`, `ChartGrid.tsx`, `AppContent.tsx`)
+- 제거: 3개 파일 (`StockSearchModal.tsx`, `StockSearchModal.test.tsx`, `useFocusTrap.ts`)
+- 수정: 3개 파일 (`ChartGrid.tsx`, `AppContent.tsx`, `ChartGrid.perf.test.tsx`)
+- 신규: 2개 파일 (`cellHighlight.css`, `ChartGrid.integration.test.tsx`)
 - 외부 라이브러리 추가: 0
 
 ---
 
-## 3. TDD Task Decomposition (T1 ~ T8)
+## 3. TDD Task Decomposition (T9 ~ T13, v2.0.0 신규)
 
-각 task는 RED → GREEN → REFACTOR 사이클을 1회 수행한다. RED 단계에서 작성된 테스트가 실패함을 확인한 후 GREEN으로 진입한다.
+> v1.0.0 T1~T4 (backend, hangul, hook, SearchBox)는 그대로 유지. T5~T8 (modal 관련)은 T9에서 일괄 제거.
 
-### T1: Backend `GET /api/stocks/master` endpoint
-
-| 단계 | 작업 |
-| --- | --- |
-| RED | `backend/tests/test_stocks_master.py` 작성: 정상 200, 빈 stock_meta 503, stock_meta 부재 503, ETag 헤더 존재, `Cache-Control: max-age=300`, name IS NOT NULL 정렬 검증. pytest fixture로 임시 SQLite DB 생성. |
-| GREEN | archive `feat/SPEC-CHART-NAV-001:backend/routers/stocks.py` + `backend/services/stocks_master_service.py` 파일 단위 cherry-pick. `backend/main.py`에 `from backend.routers.stocks import stocks_router` + `app.include_router(stocks_router)` 2 line 추가. |
-| REFACTOR | mode=ro URI 검증 (SELECT-only invariant 강제), bare except 없음 확인. |
-| Exit | `pytest backend/tests/test_stocks_master.py` 4 PASS. |
-| 매핑 | REQ-DATA-001, 002, 003 |
-
-### T2: Hangul utility (초성 추출 + 4단계 매칭)
+### T9: v1.0.0 modal 자산 제거 + AppContent modal mount 코드 삭제
 
 | 단계 | 작업 |
 | --- | --- |
-| RED | `frontend/src/utils/__tests__/hangul.test.ts` 작성: `extractInitialConsonants('삼성전자') === 'ㅅㅅㅈㅈ'`, `extractInitialConsonants('한화솔루션') === 'ㅎㅎㅅㄹㅅ'`, ASCII 통과(`'A' → 'A'`), 숫자 통과(`'1' → '1'`). `matchesQuery` 4단계 score 검증 (코드 prefix `'005'` → score 4, 종목명 prefix `'삼성'` → score 3, substring `'전자'` → score 2, 초성 `'ㅅㅅㅈㅈ'` → score 1). 동점 tiebreaker `localeCompare`. |
-| GREEN | archive `feat/SPEC-CHART-NAV-001:frontend/src/utils/hangul.ts` 파일 단위 cherry-pick. `(code - 0xAC00) / 588` 알고리즘. |
-| REFACTOR | tiebreaker `name.localeCompare(other.name)` 추가가 archive에 없다면 보강. |
-| Exit | `npm test -- hangul` PASS. |
-| 매핑 | REQ-SEARCH-003 (score 1~4) |
+| RED (negative) | (선택) 기존 modal-coupled vitest가 v2.0.0 환경에서 fail함을 확인 후 제거. 또는 즉시 삭제. |
+| GREEN | `StockSearchModal.tsx`, `useFocusTrap.ts`, `StockSearchModal.test.tsx` 파일 삭제. `AppContent.tsx`에서 `<StockSearchModal>` 마운트 코드 제거 (조건부 렌더 제거). `ChartGrid.perf.test.tsx` 내 modal-coupled 시나리오 (portal scope assertion 등) 제거. |
+| REFACTOR | `AppContent.tsx`에 남은 `selectedStock` state는 일단 유지 (T12에서 `injectedStock` semantics로 재의미화). |
+| Exit | `npm test` 통과 (modal 관련 테스트 제거 후 다른 테스트 영향 없음 확인). |
+| 매핑 | (v1.0.0 모달 제거) |
 
-### T2b: English alias dictionary (Q-1 신규 task)
-
-| 단계 | 작업 |
-| --- | --- |
-| RED | T2 `hangul.test.ts`에 alias 케이스 추가. `matchesQuery({name: '삼성전자', code: '005930'}, 'samsung')` → score 5. `matchesQuery({name: 'SK하이닉스', code: '000660'}, 'sk hynix')` → score 5. 사전에 없는 영문 입력(`'unknown'`)은 score 0 (matched: false). lowercase + trim 정규화 검증. |
-| GREEN | `frontend/src/utils/hangul-aliases.ts` 작성. 50종 hardcoded export. 형식: `export const STOCK_ALIASES: Record<string, string[]> = { '삼성전자': ['samsung', 'samsung electronics'], 'SK하이닉스': ['sk hynix'], ... }`. `matchesQuery`에 alias prefix score 5 분기 추가 (입력값을 lowercase + trim 후 alias 사전 lookup → prefix match 확인). 50종 선정 리스트는 spec.md REQ-SEARCH-003 alias 사양 + manager-spec/run 단계 확정. |
-| REFACTOR | alias 사전 lookup을 효율화 — Map 또는 reverse-index. 단, 50종 규모에서는 linear scan도 < 1 ms이므로 yagni 허용. |
-| Exit | `npm test -- hangul` (alias 케이스 포함) PASS. AC-SEARCH-011 PASS. |
-| 매핑 | REQ-SEARCH-003 (score 5 alias), AC-SEARCH-011 |
-
-### T3: `useStockMaster` hook + API
+### T10: ChartGrid `injectedStock` prop + stocks union 메커니즘 (REQ-INTEGRATE-001/003)
 
 | 단계 | 작업 |
 | --- | --- |
-| RED | `frontend/src/hooks/__tests__/useStockMaster.test.ts` 작성: 첫 호출 시 `fetchStockMaster` 1회 호출, 동일 hook 재호출 시 추가 fetch 0, 503 응답 시 `error: Error('stock_meta_not_ready')` 노출, ETag 헤더 mock. |
-| GREEN | archive `feat/SPEC-CHART-NAV-001:frontend/src/api/stocks.ts` + `frontend/src/hooks/useStockMaster.ts` cherry-pick. module-level `cachedPromise` 보존. |
-| REFACTOR | TypeScript strict 모드 호환 확인. |
-| Exit | `npm test -- useStockMaster` PASS. |
-| 매핑 | REQ-SEARCH-002, REQ-SEARCH-006 |
+| RED | `ChartGrid.integration.test.tsx`에 작성: `<ChartGrid injectedStock={...} stocks={[A, B, C]} />` 마운트 → `displayedStocks` 검증. case A — `injectedStock.code`가 stocks에 없음 → `displayedStocks = [injectedStock, A, B, C]`. case B — `injectedStock.code`가 stocks에 있음 → `displayedStocks = stocks` (prepend 안 함, scroll은 T11). case C — `injectedStock === null` → `displayedStocks = stocks`. `data-testid="chart-cell-injected-{code}"`가 prepend 시 첫 cell에 부여됨. |
+| GREEN | `ChartGrid.tsx` props 인터페이스에 `injectedStock?: StockMasterItem \| null` 추가. ChartGrid 내부에서 `displayedStocks` 계산: `useMemo(() => injectedStock && !stocks.find(s => s.code === injectedStock.code) ? [injectedStock, ...stocks] : stocks, [injectedStock, stocks])`. cell render 시 첫 cell이 `injectedStock`이면 `data-testid="chart-cell-injected-{code}"` 부여. 기존 cell key (`stock.code`)는 그대로 유지 → React reconciliation이 기존 cells 재사용. |
+| REFACTOR | useMemo dependency 최소화. injectedStock 비교는 code 기반만 (전체 object compare 불필요). |
+| Exit | RED 시나리오 6개 PASS. `useScreen().screenState.request`는 어디서도 mutate되지 않음 검증 (deep-equal). |
+| 매핑 | REQ-INTEGRATE-001/003, AC-INTEGRATE-001 |
 
-### T4: `StockSearchBox` component
-
-| 단계 | 작업 |
-| --- | --- |
-| RED | `frontend/src/components/ChartGrid/__tests__/StockSearchBox.test.tsx` 작성. 시나리오: 입력 → debounce 150 ms 대기 → listbox 후보 노출. "삼" 입력 → 삼성전자 prefix 매치 score 3. "005" → 005930 등 코드 매치 score 4. "ㅅㅅㅈㅈ" → 삼성전자 초성 매치 score 1. 0건 → "검색 결과 없음". 503 → input disabled + placeholder "DB 업데이트 필요". ArrowDown/ArrowUp/Enter/Escape 키보드 navigation. `onSelect` prop 호출 검증. |
-| GREEN | archive `StockSearchBox.tsx`(154 LOC) 기반으로 신규 작성. 변경: `useTab` import 제거, `navigateToTab` 호출 제거, `onSelect: (item: StockMasterItem) => void` prop 추가. 키보드 navigation 신규 추가(ArrowDown/Up/Enter/Escape + `aria-activedescendant`). a11y aria 속성 보강(`aria-autocomplete="list"`, `aria-controls`, `aria-expanded`). debounce 150 ms 유지. MAX_RESULTS=8 유지. |
-| REFACTOR | useMemo 도입 검토 (매 debounce tick마다 sort+slice 비용 측정 후). a11y `aria-live` "검색 결과 N건" 영역 추가. |
-| Exit | `npm test -- StockSearchBox` PASS. |
-| 매핑 | REQ-SEARCH-001 ~ 006 |
-
-### T5: `StockSearchModal` component
+### T11: 자동 scroll + highlight CSS animation (REQ-INTEGRATE-002/003)
 
 | 단계 | 작업 |
 | --- | --- |
-| RED | `frontend/src/components/ChartGrid/__tests__/StockSearchModal.test.tsx` 작성. 시나리오: portal mount → `document.body` 자식으로 modal 노드 존재 검증 (MP-4). Esc 키 → onClose 호출. 백드롭 클릭 → onClose. 닫기 버튼 클릭 → onClose. `role="dialog" aria-modal="true"`. 초기 focus는 `stock-search-modal-content` (I-4 row 14). focus trap(Tab key가 modal 밖으로 나가지 않음). modal 닫힐 때 trigger ref로 focus 복귀(mock `triggerRef`). modal initial timeframe은 prop으로 전달된 ChartGrid 마지막 timeframe 계승 (없으면 `'daily'`) — AC-MODAL-009. timeframe 토글 → 새 fetch 호출, API 파라미터 `'daily'/'weekly'` (I-3). 차트 useEffect는 modal 열림당 1회만 호출(REQ-PERF-002 검증, `console.count` mock). |
-| GREEN | 신규 작성. `ReactDOM.createPortal(<div>...modal markup...</div>, document.body)`. `frontend/src/components/AnalysisModal.tsx:810`, `frontend/src/components/AiReportModal.tsx:340` 마크업 패턴 답습 (Q-5: 기존 모달 scaffolding 채택). modal-content `<div tabIndex={-1} data-testid="stock-search-modal-content">`. lightweight-charts 인스턴스를 modal body에 자체 mount. 차트 useEffect는 dep `[selectedStock.code, timeframe]`, 본문에 cancelled flag 패턴(archive `df3ca36`). Initial timeframe은 prop `initialTimeframe: 'daily' \| 'weekly'`로 받는다 (Q-7 I-2). |
-| REFACTOR | scroll lock(body `overflow:hidden`) on/off. modal close handler에 `onClose()` 콜백 호출 + StockSearchBox input clear 신호 위임 (Q-4 REQ-MODAL-002 step 4) — AppContent host가 `selectedStock = null` + `clearSearchInput` 양쪽 처리. |
-| Exit | `npm test -- StockSearchModal` PASS (AC-MODAL-001~009 + AC-MODAL-010). |
-| 매핑 | REQ-MODAL-001 ~ 004, REQ-PERF-002, Q-7 timeframe, Q-4 input clear |
+| RED | `ChartGrid.integration.test.tsx`에 작성: case A — `injectedStock` 변경 (existing in stocks) → ChartGrid의 `setCurrentPage`가 해당 stock의 page index로 호출됨 (mock spy). case B — `injectedStock` 변경 (not in stocks, prepend) → 첫 cell outer container에 `cell-search-highlight` class 추가됨. case C — 2~3초 후 `cell-search-highlight` class가 자동 제거됨 (vitest `vi.useFakeTimers` + advance 3000 ms). case D — useEffect cleanup 시 `clearTimeout` 호출 (unmount during animation 검증). |
+| GREEN | (1) `ChartGrid.tsx`에 `useEffect(() => { ... }, [injectedStock])` 추가: `injectedStock`이 변경되면 (a) `stocks.findIndex(s => s.code === injectedStock.code)` 또는 `displayedStocks.findIndex(...)`로 target index 계산 (b) `setCurrentPage(Math.floor(targetIndex / pageSize))` 호출 (c) ref로 target cell outer container element 찾고 `classList.add('cell-search-highlight')` (d) `setTimeout` 등록 + cleanup에 `clearTimeout`. (2) `cellHighlight.css` (또는 inline `<style>`)에 `@keyframes border-flash` 정의 (blue glow, 2.5s duration) + `.cell-search-highlight { animation: border-flash 2.5s ease-in-out; }`. |
+| REFACTOR | css 파일 vs inline style 결정 — 프로젝트 컨벤션에 맞춰 정함. setTimeout duration은 2500ms로 고정 (사용자 결정 "2~3초"). animation iteration 3회 (≈ 833ms each) 또는 single 2.5s에 ease-in-out — 시각적으로 매력적인 쪽으로. |
+| Exit | RED 시나리오 4개 PASS. highlight class가 정확히 2.5s 후 제거됨. |
+| 매핑 | REQ-INTEGRATE-002/003, AC-INTEGRATE-002, AC-INTEGRATE-004 |
 
-### T5a: Focus trap helper (Q-5 — 기존 AnalysisModal 패턴 확인 후 결정)
-
-| 단계 | 작업 |
-| --- | --- |
-| Pre-check | `frontend/src/components/AnalysisModal.tsx` + `AiReportModal.tsx`를 정독하여 기존 focus trap 구현이 존재하는지 확인. 존재 시 그대로 답습, 부재 시 본 task로 신규 헬퍼 작성. |
-| RED (조건부) | 기존 모달이 focus trap 미구현 시 신규 헬퍼 `frontend/src/components/ChartGrid/useFocusTrap.ts` 단위 테스트 작성. Tab 순환 / Shift+Tab 역순환 / modal 외부 focusable 무시. |
-| GREEN (조건부) | `useFocusTrap(modalContentRef)` 훅 작성. ~30 LOC. modal mount 시 first focusable element 찾기 → Tab keydown event 가로채기 → first/last 순환. |
-| REFACTOR | T5 `StockSearchModal`에서 `useFocusTrap` 호출 통합. 기존 AnalysisModal에도 적용 가능하지만 본 SPEC scope 밖 (refactor 별도 SPEC). |
-| Exit | AC-MODAL-002 focus trap 시나리오 PASS. |
-| 매핑 | NFR-A11Y-001, Q-5 |
-
-### T6: Integration into `ChartGrid` + `AppContent`
+### T12: ChartGrid props 확장 + AppContent prop forwarding
 
 | 단계 | 작업 |
 | --- | --- |
-| RED | `frontend/src/components/ChartGrid/__tests__/ChartGrid.perf.test.tsx`의 일부 시나리오 작성 (selectedStock state 전달, modal mount 위치 검증). DOM scope assertion: ChartGrid container 내부에 `data-testid="stock-search-modal"` 없음 (MP-4). AC-MODAL-009 — modal mount 시 initialTimeframe이 ChartGrid 현재 timeframe과 일치. AC-SEARCH-012 — modal close 후 search input 값 비어있음 (Q-4). |
-| GREEN | `ChartGrid.tsx`: toolbar 좌측에 `<StockSearchBox onSelect={props.onSelectStock} ref={searchBoxRef} />` 추가, `onSelectStock` prop 수신. ChartGrid의 현재 `timeframe` state를 `props.onSelectStock(stock, currentTimeframe)` 시그니처로 함께 전달하거나, 또는 `props.currentTimeframeRef` read-only ref로 expose (선택은 GREEN 단계). 그 외 ChartGrid 로직 변경 0. `AppContent.tsx`: `const [selectedStock, setSelectedStock] = useState<StockMasterItem \| null>(null);` + `const [selectedTimeframe, setSelectedTimeframe] = useState<'daily' \| 'weekly'>('daily');` 추가. `<ChartGrid onSelectStock={(stock, tf) => { setSelectedStock(stock); setSelectedTimeframe(tf ?? 'daily'); }} />`. `{selectedStock && <StockSearchModal stock={selectedStock} initialTimeframe={selectedTimeframe} onClose={handleModalClose} />}` 조건부 렌더. `handleModalClose`는 `selectedStock=null` + `searchBoxRef.current?.clearInput()` 호출 (Q-4). |
-| REFACTOR (I-6 주(主) mitigation) | **`React.memo`를 `ChartGrid` 컴포넌트에 적용** — `AppContent`의 `selectedStock` state 변경이 ChartGrid subtree로 전파되지 않도록 referential equality 보존. props로 전달되는 `onSelectStock`은 `useCallback`으로 안정화. ChartGrid 내부의 children에 전달되는 prop도 `useCallback`/`useMemo`로 referential equality 유지. 이는 R-2 (AppContent re-render → modal subtree 리렌더) 차단의 **주 기법**이며, `useCallback` 단독으로는 충분치 않다 (R-2 mitigation은 §6 참조). |
-| Exit | `npm test -- ChartGrid` 회귀 PASS + 신규 통합 테스트 PASS + AC-MODAL-009 + AC-SEARCH-012 PASS. |
-| 매핑 | REQ-SEARCH-001, REQ-MODAL-001 (timeframe lifting), REQ-PERF-001, Q-4 input clear, Q-7 timeframe inherit |
+| RED | `ChartGrid.integration.test.tsx`에 작성: `<AppContent />` 통합 마운트 → search → ChartGrid `injectedStock` prop 수신 검증. `useScreen().screenState.request` 객체 reference가 검색 전후 동일 (vitest `expect(reqBefore).toBe(reqAfter)` 또는 deep-equal). React.memo가 ChartGrid에 적용되어 있어 다른 prop 변경 시 ChartGrid 재렌더 차단 검증 (React Profiler API). |
+| GREEN | (1) `AppContent.tsx`: 기존 `selectedStock` state를 `searchedStock`으로 rename (또는 그대로 유지). `<ChartGrid onSelectStock={(stock) => setSearchedStock(stock)} injectedStock={searchedStock} ... />`. `<StockSearchModal>` 마운트 코드는 T9에서 이미 제거됨. (2) `ChartGrid.tsx`: props 인터페이스에 `injectedStock?: StockMasterItem \| null` 추가. React.memo는 v1.0.0에서 이미 적용되어 있으므로 유지. `onSelectStock` prop은 `useCallback`으로 안정화 (AppContent에서). |
+| REFACTOR | `searchedStock` state는 검색 후 명시적으로 reset할 필요 없음 (다음 검색이 자연스럽게 대체). 단, ChartGrid filter 변경 시 `searchedStock`을 자동 reset할지 여부는 향후 결정 — v2.0.0 기본은 reset하지 않음 (사용자가 명시적으로 새 검색하기 전까지 첫 cell 유지). |
+| Exit | RED 시나리오 PASS. `useScreen.request` deep-equal 보존 검증 PASS. |
+| 매핑 | REQ-INTEGRATE-001/004, AC-INTEGRATE-003 |
 
-### T7: Anti-regression performance tests (RED)
-
-| 단계 | 작업 |
-| --- | --- |
-| RED | `frontend/src/components/ChartGrid/__tests__/ChartGrid.perf.test.tsx` 본격 작성. 시나리오: (a) React Profiler API로 ChartGrid commit count 측정 baseline → modal 열기 → ChartGrid scroll → modal 닫기. baseline 대비 추가 commit 0회 검증(MP-1). (b) ChartCell mock의 useEffect 호출 횟수 측정 — modal open/close 동안 추가 호출 0(MP-2). (c) `useScreen().screenState.request` deep-equal 검증(MP-3). |
-| Exit | RED 테스트가 의도대로 실패하는지 확인 (T6에서 작성한 통합 코드가 이미 실패 또는 PASS 중 하나). 이 단계의 목표는 invariant lock-in. |
-| 매핑 | REQ-PERF-001, REQ-PERF-002, MP-1, MP-2, MP-3 |
-
-### T8: Anti-regression performance — GREEN/REFACTOR
+### T13: Integration tests + anti-regression performance tests
 
 | 단계 | 작업 |
 | --- | --- |
-| GREEN | T7에서 실패하는 테스트를 PASS로 만들기 위한 미세 조정. 주로 `useCallback` / `useMemo` / portal 호스트 위치 보정. |
-| REFACTOR | StrictMode dev에서 ChartCell useEffect 2회 호출 케이스 명시적 허용 — instrumentation에서 `process.env.NODE_ENV === 'development'` 분기. modal 차트 useEffect의 cancelled flag 패턴 검증. |
-| Exit | T7 4개 시나리오 + T1~T6 회귀 모두 PASS. 자동완성 latency 단위 테스트 PASS (NFR-PERF-001). |
-| 매핑 | REQ-PERF-001, REQ-PERF-002, NFR-PERF-001, NFR-PERF-002 |
+| RED | `ChartGrid.integration.test.tsx`에 6+ 통합 시나리오 작성: (1) 필터 결과에 없는 종목 검색 → prepend + highlight, (2) 필터 결과에 있는 종목 검색 → scroll + highlight, prepend 0, (3) 검색 후 `useScreen().request` deep-equal, (4) 검색 후 ChartGrid React.memo re-render count baseline 대비 +0~1, (5) 검색 후 기존 ChartCells의 useEffect 재실행 0 (cell key 동일성 검증 — instance reuse 확인), (6) highlight CSS class 2.5s 후 자동 제거. `ChartGrid.perf.test.tsx`의 modal-coupled 시나리오 제거 + integration-aware 시나리오로 재작성. |
+| GREEN | T10~T12 GREEN에서 이미 구현된 코드로 PASS 되어야 함. 실패 시 fix. ChartCell instance reuse 검증은 `ChartCell` mock spy에 cell key tracking 추가 — 동일 key의 cell은 effect 재호출 안 됨. |
+| REFACTOR | StrictMode dev에서 새로 prepend된 cell의 useEffect 2회 호출 케이스 명시적 허용 — instrumentation 분기. 기존 cells에 대해서는 0회 strict (cell key 동일성으로 보장됨). |
+| Exit | 6+ 통합 시나리오 PASS + 기존 vitest 전체 PASS (modal 관련 제거 후). |
+| 매핑 | REQ-INTEGRATE-001~004, REQ-PERF-001/002, MP-1, MP-2, MP-3, MP-4 |
 
-### 3.1 Task 순서 그래프 (amendment 1: T2b, T5a 추가)
+### 3.1 Task 순서 그래프 (v2.0.0)
 
 ```
-T1 (backend) ──┐
-T2 (hangul) ───→ T2b (alias) ──┐
-                               ├─→ T3 (hook) ──→ T4 (SearchBox) ──→ T6 (integration) ──→ T7 (perf RED) ──→ T8 (perf GREEN)
-T1 ────────────────────────────┘                              ↗
-                                                              │
-                                T5 (Modal) ────→ T5a (focus trap helper, 조건부) ┘
+v1.0.0 그대로 유지: T1 (backend), T2 (hangul), T2b (alias), T3 (hook), T4 (SearchBox)
+v1.0.0 폐기: T5 (modal), T5a (focus trap), T7 (perf RED modal), T8 (perf GREEN modal)
+v2.0.0 신규:
+  T9 (modal 자산 제거) ─→ T10 (stocks union) ─→ T11 (scroll + highlight) ─→ T12 (props 확장) ─→ T13 (integration tests)
 ```
 
-- T1·T2는 독립이므로 병렬 가능.
-- T2b는 T2 의존 (alias 사전 + matchesQuery score 5 분기는 T2 이후).
-- T3은 T1(API endpoint)에 의존.
-- T4는 T2b·T3 의존.
-- T5는 독립적이지만 lightweight-charts 패턴 검증 위해 T4 이후 권장.
-- T5a는 T5 Pre-check 단계에서 기존 AnalysisModal이 focus trap을 가지지 않을 때만 진행. 가진 경우 T5a skip하고 T5 REFACTOR에서 그대로 답습.
-- T6은 T4·T5(·T5a) 모두 의존.
-- T7·T8은 T6 이후.
+- T9는 다른 task와 독립적으로 먼저 수행 (cleanup).
+- T10은 T9 이후 (stocks union 메커니즘 구현).
+- T11은 T10 이후 (scroll + highlight, cell ref 필요).
+- T12는 T10/T11과 병렬 가능하지만 순차 권장.
+- T13은 T10/T11/T12 모두 이후.
 
 ---
 
-## 4. MX Tag Plan
+## 4. MX Tag Plan (v2.0.0)
 
 | 파일 | 태그 | 사유 |
 | --- | --- | --- |
-| `frontend/src/components/ChartGrid/StockSearchBox.tsx` | `@MX:ANCHOR` | ChartGrid 검색 진입점. ChartGrid + AppContent 양쪽에서 참조 가능 (fan_in ≥ 2 예상). public prop 인터페이스(`onSelect`). |
-| `frontend/src/utils/hangul.ts` | `@MX:NOTE` | `(code - 0xAC00) / 588` 산식 + 4단계 score 매칭 — 도메인 비즈니스 로직. 참조: Wikipedia Hangul Syllables. |
-| `frontend/src/components/ChartGrid/StockSearchModal.tsx` | `@MX:NOTE` + `@MX:WARN` (race guard 영역) | (a) portal mount + z-index/scroll lock/focus management — 복잡 invariant. (b) cancelled flag 패턴 영역은 `@MX:WARN` + `@MX:REASON: archive df3ca36 race race`. |
-| `frontend/src/hooks/useStockMaster.ts` | `@MX:NOTE` | module-level `cachedPromise` — SPA 세션 1회 fetch invariant. 향후 `DbUpdateButton` 연동(Q-6) 시 reset 분기 위치. |
-| `backend/services/stocks_master_service.py` | `@MX:ANCHOR` | `list_stock_master` public API. mode=ro URI invariant. |
-
-MX tag는 RED → GREEN → REFACTOR 사이클의 GREEN/REFACTOR 단계에서 추가한다. RED 단계의 테스트 자체는 `@MX:TODO` 사용 가능(테스트 작성 → GREEN 통과 시 제거).
+| `frontend/src/components/ChartGrid/StockSearchBox.tsx` | `@MX:ANCHOR` (유지) | ChartGrid 검색 진입점. fan_in ≥ 3 예상 (ChartGrid + 향후 다른 곳). public prop 인터페이스(`onSelect`). |
+| `frontend/src/utils/hangul.ts` | `@MX:NOTE` (유지) | 한글 초성 산식 + 5단계 score 매칭 비즈니스 로직. |
+| `frontend/src/utils/hangul-aliases.ts` | `@MX:NOTE` (유지) | 50종 영문 alias 사전. |
+| `frontend/src/components/ChartGrid/StockSearchModal.tsx` | DELETED | v2.0.0에서 파일 제거. v1.0.0 @MX:NOTE + @MX:WARN race guard 태그는 함께 사라짐. |
+| `frontend/src/components/ChartGrid/useFocusTrap.ts` | DELETED | v2.0.0에서 파일 제거. |
+| `frontend/src/components/ChartGrid/ChartGrid.tsx` | `@MX:ANCHOR` (강화) | fan_in ≥ 3 (AppContent + 다른 호스트들). `injectedStock` prop + scroll/highlight effect 추가로 invariant 강화. |
+| `frontend/src/AppContent.tsx` | `@MX:NOTE` | `searchedStock` state lift + ChartGrid prop forwarding 패턴 기록. |
+| `frontend/src/components/ChartGrid/cellHighlight.css` | (CSS 파일은 @MX 미적용) | — |
 
 ---
 
-## 5. Reference Implementations (research에서 발견)
+## 5. Reference Implementations (v2.0.0)
 
-run phase에서 다음 file:line 코드 패턴을 그대로 답습한다.
+run phase에서 다음 패턴을 참조:
 
 | 패턴 | 참조 위치 | 사용 시 |
 | --- | --- | --- |
-| `ReactDOM.createPortal(modal, document.body)` | `frontend/src/components/AnalysisModal.tsx:810` | T5 modal portal mount |
-| `role="dialog" aria-modal="true" aria-labelledby` | `frontend/src/components/AnalysisModal.tsx:757-758` | T5 a11y |
-| Esc 키 onClose | `frontend/src/components/AnalysisModal.tsx:738` (Esc handler 패턴) | T5 keyboard close |
-| 백드롭 클릭 close | `frontend/src/components/AnalysisModal.tsx`, `AiReportModal.tsx:340` | T5 |
-| `useCallback` for stable handler | `frontend/src/components/ChartGrid/ChartGrid.tsx:56` (`handlePageChange`) | T6 `onSelectStock` |
-| cancelled flag race guard | archive commit `df3ca36` `ChartCell.tsx:+6` | T5 modal chart useEffect |
-| `read-only sqlite URI` | archive `backend/services/stocks_master_service.py` | T1 |
-| ETag from `MAX(last_updated)` | archive `backend/routers/stocks.py` | T1 |
+| React.memo with custom areEqual | `frontend/src/components/ChartGrid/ChartGrid.tsx` (v1.0.0 commit 5ca5335) | T12 ChartGrid 재렌더 차단 |
+| `useCallback` for stable handler | `frontend/src/components/ChartGrid/ChartGrid.tsx:56` (`handlePageChange`) | T12 `onSelectStock`, AppContent에서 전달 |
+| `useMemo` for derived state | (project-wide 패턴) | T10 `displayedStocks` 계산 |
+| ChartGrid `setCurrentPage` + page index 계산 | 기존 ChartGrid 페이징 로직 | T11 자동 scroll |
+| CSS keyframes border animation | (general web pattern — research에서 발견된 일반 패턴, 라이브러리 불필요) | T11 `@keyframes border-flash` |
+| `ReactDOM.createPortal` race guard (cancelled flag) | archive `feat/SPEC-CHART-NAV-001` commit `df3ca36` | v2에서는 modal 없으므로 직접 사용 안 하지만, ChartCell의 race guard 패턴 참조용 |
+| `read-only sqlite URI` | `backend/services/stocks_master_service.py` (v1.0.0) | T1 (v1.0.0 그대로 유지) |
 
 ---
 
-## 6. Risks + Mitigation
-
-research §8에서 식별된 risk를 acceptance 시나리오로 lock-in한다.
+## 6. Risks + Mitigation (v2.0.0)
 
 | Risk | 출처 | Mitigation 위치 | Severity |
 | --- | --- | --- | --- |
-| R-1: 모달 차트도 부모 re-render로 fetch race 발생 | research §4.4 | T5 cancelled flag 패턴 + T7 perf 테스트(MP-2) | High |
-| R-2: AppContent 자체 re-render 시 modal subtree 리렌더 | research §4.3 잔여 위험 | **주(主) mitigation (I-6): `React.memo`를 `ChartGrid` 컴포넌트에 적용** — AppContent의 `selectedStock`/`selectedTimeframe` state 변경이 ChartGrid subtree를 흔들지 않도록 referential equality로 차단. 보조: ChartGrid에 전달되는 child props(`onSelectStock` 등)을 `useCallback`/`useMemo`로 안정화. 추가: StockSearchModal 내부에서 useScreen·useTab 직접 구독 금지(AC-ARCH-003). 검증: T6 React Profiler commit count 측정 + MP-1 must-pass. | High |
-| R-3: 동점 score 정렬 불안정 → 결과 순서 흔들림 | research §8.10 | T2 REFACTOR에서 `localeCompare` tiebreaker 추가 | Medium |
-| R-4: 한글 복자모 매칭 누락 (ㅅ → ㅆ) | research §8.7 | 본 SPEC v1.0.0은 archive 그대로. 사용자 피드백 후 v2에서 보완. | Low |
-| R-5: focus trap 구현 누락 | research §6.3 a11y | T5 REFACTOR Q-5 결정 후 적용 | Medium |
-| R-6: 모바일 toolbar 가로 스크롤 (220 px input 추가) | research §8.9 | EX-16으로 scope 밖. 데스크탑 우선. | Low |
-| R-7: archive cherry-pick conflict | research §2.3 | 파일 단위 `git show`로 우회 | Low |
-| R-8: 모달 호스트가 ChartGrid 자식이 되면 격리 invariant 깨짐 | research §4.3 | T6에서 AppContent에 modal 마운트, MP-4 DOM scope 테스트로 강제 | Critical |
-| R-9: `cachedPromise` 무효화 시점 미정 (DB 업데이트 후) | research §7.3 | Q-6 미해결. v1.0.0은 SPA 세션 1회 fetch로 ship, 후속 amendment에서 보완. | Medium |
+| ~~R-1 (modal subtree leak)~~ | — | (modal 폐기로 불필요) | — |
+| R-2 (재정의): ChartGrid re-render | research §4.3 잔여 위험 | **`React.memo(ChartGrid)`로 referential equality 보존** — AppContent의 `searchedStock` state 변경이 ChartGrid에 prop으로 전달될 때 cascade 1회 발생은 의도된 동작 (highlight 위해 필요). 다른 props 변경 시 cascade 차단. 기존 cells의 useEffect 재실행 0회는 cell key 동일성으로 보장 (React reconciliation). MP-1 honest threshold +1 ≤ 2 허용. | High |
+| R-3 (재정의): highlight CSS animation 중단/cleanup | v2.0.0 신규 | useEffect cleanup으로 `classList.remove('cell-search-highlight')` + `setTimeout` clearTimeout 보장. unmount during animation 시에도 메모리 누수 0. animation 중 새 검색 발생 시 이전 highlight class 즉시 제거 → 새 cell에 적용. T11 RED scenario D로 검증. | Medium |
+| R-4 (신규): page index 계산 edge case | v2.0.0 신규 | 검색 종목이 마지막 페이지의 마지막 셀일 때, stocks가 0개일 때, pageSize가 변경될 때 등. T11 GREEN에서 boundary check 필수 — `targetIndex < 0` 처리, `pageSize === 0` 처리. | Medium |
+| R-5 (신규): prepend duplicate detection | v2.0.0 신규 | code 기반 비교 (`stocks.find(s => s.code === injectedStock.code)`)가 충분. code는 unique invariant. T10 case B로 검증. | Low |
+| R-6 (재정의): React reconciliation 미보장 | v2.0.0 신규 | cell key가 `stock.code`로 안정하면 React가 동일 key의 instance를 재사용. prepend 시 새 key 추가일 뿐 기존 keys 동일성 보존. 단, key prop을 잊거나 index를 key로 쓰면 R-6 발생. T13 case 5에서 instance reuse 검증 (ChartCell mock spy with cell key tracking). | High |
+| R-7 (재정의): archive cherry-pick 부담 | v1.0.0 유지 | v2.0.0은 v1.0.0의 backend + hangul + hook + SearchBox 자산을 그대로 활용. archive cherry-pick 추가 작업 없음. | Low |
+| R-8 (재정의): 검색 동선이 filter state mutate | research §4.3 | **MP-4 강화**: `AppContent.tsx`, `ChartGrid.tsx`, `StockSearchBox.tsx`에서 `useScreen()` setter 또는 `applyFilters()` 호출이 검색 동선에서 발생하지 않음을 정적 grep으로 검증. AC-ARCH-001. | Critical |
+| R-9 (재정의): cachedPromise 무효화 | v1.0.0 유지 | EX-12로 scope 외. | Medium |
+| R-10 (v2 신규): 사용자 mental model drift 재발 | v2.0.0 신규 | lesson #7 lock-in. ship 후 2주 사용자 검증 (§2.4 폐기 기준). 만약 v2도 drift 발생 시 v3 후보(sidebar/route) 별도 SPEC 검토. | High |
 
 ---
 
@@ -273,72 +224,93 @@ research §8에서 식별된 risk를 acceptance 시나리오로 lock-in한다.
 
 ### 7.1 Unit (Vitest + pytest)
 
-- Backend: `pytest backend/tests/test_stocks_master.py` (T1)
-- Frontend hangul: `npm test -- hangul` (T2)
-- Frontend hook: `npm test -- useStockMaster` (T3)
-- Frontend component: `npm test -- StockSearchBox StockSearchModal` (T4, T5)
-- Frontend perf: `npm test -- ChartGrid.perf` (T7, T8)
+- Backend: `pytest backend/tests/test_stocks_master.py` (v1.0.0 그대로, 8 PASS)
+- Frontend hangul: `npm test -- hangul` (v1.0.0 그대로)
+- Frontend hook: `npm test -- useStockMaster` (v1.0.0 그대로)
+- Frontend SearchBox: `npm test -- StockSearchBox` (v1.0.0 그대로)
 
-### 7.2 Integration (vitest, JSDOM)
+### 7.2 Integration (vitest, JSDOM, v2.0.0 신규)
 
-- T6 integration test: ChartGrid + AppContent 함께 마운트, 검색 선택 → modal 마운트 위치 검증.
+- `ChartGrid.integration.test.tsx` — 6+ 시나리오 (T13):
+  1. 필터 결과에 없는 종목 검색 → prepend + highlight
+  2. 필터 결과에 있는 종목 검색 → scroll + highlight, prepend 0
+  3. 검색 후 `useScreen().request` deep-equal
+  4. 검색 후 ChartGrid React.memo re-render count baseline +0~1
+  5. 검색 후 기존 ChartCells useEffect 재실행 0 (cell key 동일성)
+  6. highlight CSS class 2.5s 후 자동 제거
 
 ### 7.3 Manual / e2e (optional Playwright)
 
-- 시나리오 1: 검색 → 선택 → 모달 → Esc 닫기 → focus 복귀
-- 시나리오 2: 503 응답 시 input disabled + tooltip
-- 시나리오 3: ChartGrid scroll FPS 측정 (DevTools Performance)
+- 시나리오 1: 검색 → 선택 → ChartGrid 첫 셀 prepend → highlight 깜박임 종료
+- 시나리오 2: 검색 → 선택 (필터에 있음) → scroll to page + highlight
+- 시나리오 3: 503 응답 시 input disabled + tooltip
+- 시나리오 4: ChartGrid scroll FPS 측정 (DevTools Performance)
 
-### 7.4 라이브 검증 (ship 후 2주)
+### 7.4 라이브 검증 (ship 후 2주, lesson #7 lock-in)
 
-- §3.3 만족 신호 측정
-- §3.4 폐기 기준 위반 시 rollback 검토
+- §2.3 만족 신호 측정 (성공-1, 성공-2, 성공-3, 성공-5)
+- §2.4 폐기 기준 위반 시 v3 후보 별도 SPEC 검토 (sidebar/route)
+- **mental model drift 재발 여부 확인** — 사용자 피드백 1주 추적
+
+### 7.5 v2.0.0 폐기 기준 명시 (lesson #7)
+
+| 조건 | 임계값 | 액션 |
+| --- | --- | --- |
+| 사용자 세션당 검색 횟수 | < 1.0회 (2주 평균) | v3 후보 별도 SPEC 검토 |
+| 검색 → ChartGrid 표시 latency | > 1000 ms | 성능 회귀 분석, fix 또는 폐기 |
+| MP-1 ~ MP-5 invariant 위반 | 1건 이상 | 즉시 hotfix |
+| 사용자 mental model drift 신호 | 명시적 "이것도 원하는 게 아님" 피드백 | v3 후보 별도 SPEC |
 
 ---
 
-## 8. Rollback Strategy
+## 8. Rollback Strategy (v2.0.0)
 
-본 SPEC ship 후 사용자 가치 재평가에서 폐기 결정 시:
+본 SPEC v2.0.0 ship 후 폐기 결정 시:
 
-1. 새 git branch에서 작업했다면 `chore/integrated-main-merge-2026-04-25`로 checkout.
-2. 작업 branch는 `feat/SPEC-CHART-SEARCH-001` 명명, 9 commits 이내 archive 보존(SPEC-CHART-NAV-001 패턴 답습).
-3. `.moai/specs/SPEC-CHART-SEARCH-001/` 산출물은 chore 브랜치에 남기되 `spec.md` frontmatter `status: Rolled-back` 갱신.
-4. `retrospective.md` 신규 작성.
-5. `lessons.md` 신규 lesson 추가 (Lesson #8 후보).
+1. 새 git branch `feat/SPEC-CHART-SEARCH-001-v2` archive 보존 (commits 그대로).
+2. **v1.0.0 modal 패턴 부활은 NO** — 이미 사용자가 거부함.
+3. v3.0.0 후보 패턴:
+   - **Option A**: Sidebar fixed panel (검색 종목 차트를 ChartGrid 우측 사이드바에 고정 표시)
+   - **Option B**: 별도 route (`/chart/:code` 페이지로 navigation)
+   - **Option C**: 기능 자체 폐기 (Search 자체가 가치 없다는 결론 시)
+4. v3 후보는 별도 SPEC으로 분리. `.moai/specs/SPEC-CHART-SEARCH-002/`로 신규 작성.
+5. `retrospective.md` v2.0.0 신규 작성. lesson #7 강화 사례 #2로 추가 (NAV-001 rollback + v1.0.0 closure + v2.0.0 폐기 = 3-stage mental model drift).
+6. `lessons.md` lesson #7 강화 — "modal 격리도 아니고 stocks union도 아니라면 v3 후보 카탈로그 + 사전 사용자 검증 의무" 추가.
 
-archive 활용: 모달 격리 패턴이 검증되었다면 그 자체는 재사용 가능 자산이므로 별도 SPEC에서 재호출 가능.
+archive 활용: v2.0.0 stocks union 패턴이 다른 SPEC에서 재호출 가능.
 
 ---
 
 ## 9. Acceptance Gate (manager-quality 위임)
 
-T1 ~ T8 완료 후 다음을 manager-quality 또는 evaluator-active에 위임:
+T9 ~ T13 완료 후 다음을 manager-quality 또는 evaluator-active에 위임:
 
-- [ ] TRUST 5 Tested: 85% 이상 coverage (신규 코드 한정)
+- [ ] TRUST 5 Tested: 85% 이상 coverage (신규/수정 코드 한정)
 - [ ] TRUST 5 Readable: ruff / eslint clean
 - [ ] TRUST 5 Unified: black / prettier 통과
-- [ ] TRUST 5 Secured: SELECT-only (REQ-DATA-002) 강제, bare except 0
-- [ ] TRUST 5 Trackable: conventional commit + SPEC ID 참조
-- [ ] MP-1 ~ MP-5 must-pass 검증
+- [ ] TRUST 5 Secured: SELECT-only (REQ-DATA-002) 강제 유지, bare except 0
+- [ ] TRUST 5 Trackable: conventional commit + SPEC ID 참조 (`SPEC-CHART-SEARCH-001 v2.0.0`)
+- [ ] MP-1 ~ MP-5 must-pass 검증 (v2.0.0 재정의 기준 적용)
 - [ ] NFR-PERF-001 ~ 005 측정 결과 acceptance.md에 기록
+- [ ] modal 자산 파일 3개 (`StockSearchModal.tsx`, `StockSearchModal.test.tsx`, `useFocusTrap.ts`) 제거 확인
+- [ ] `ChartGrid.integration.test.tsx` 6+ 시나리오 모두 PASS
 
 ---
 
-## 10. Decisions Resolved (Annotation cycle iteration 1)
+## 10. Decisions Resolved (v2.0.0 annotation cycle)
 
-`spec.md §9 v1.0 Decisions` 표 참조. Q-1 ~ Q-7 7건 일괄 smart default 적용 완료. status `Draft` 유지(amendment 1 적용 후 run phase 진입 가능).
+`spec.md §9 v2.0 Decisions` 표 참조. V2-Q1 ~ V2-Q6 6건 모두 사용자 명시 결정 완료. 추가 annotation cycle 불필요.
 
 | Q | 결정 | plan.md 반영 위치 |
 | --- | --- | --- |
-| Q-1 | alias 사전 50종 채택 | T2b 신규 task, F1b 신규 파일 |
-| Q-2 | Cmd/Ctrl+K 제외 | (작업 없음) |
-| Q-3 | empty state 링크 제외 | (작업 없음) |
-| Q-4 | modal close → input 초기화 | T5 REFACTOR + T6 GREEN(`handleModalClose`) |
-| Q-5 | AnalysisModal 패턴 답습 + focus trap 헬퍼 조건부 신규 | T5 GREEN + T5a 조건부 task |
-| Q-6 | DbUpdateButton cache invalidation 제외 | (작업 없음) |
-| Q-7 | modal initial timeframe = ChartGrid 마지막 | T5 GREEN(`initialTimeframe` prop) + T6 GREEN(`selectedTimeframe` state lifting) |
+| V2-Q1 | 검색 결과 표시 위치 = ChartGrid 첫 셀 prepend | T10, T12 |
+| V2-Q2 | 중복 처리 = scroll + highlight only | T11 |
+| V2-Q3 | Highlight 스타일 = 셀 테두리 2~3초 깜박임 | T11, F13 (cellHighlight.css) |
+| V2-Q4 | modal 패턴 폐기 | T9 (제거) |
+| V2-Q5 | 검색 종목 timeframe = ChartGrid 현재 timeframe 그대로 (별도 토글 없음) | EX-17, T11에서 timeframe 토글 코드 미작성 |
+| V2-Q6 | 검색 종목 차트 닫기 동선 없음 | EX-18, T12에서 close handler 미작성 |
 
 ---
 
-Version: 1.0.0
-Last Updated: 2026-05-11
+Version: 2.0.0
+Last Updated: 2026-05-12
