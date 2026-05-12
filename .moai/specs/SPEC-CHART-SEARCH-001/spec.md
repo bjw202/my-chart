@@ -1,7 +1,7 @@
 ---
 id: SPEC-CHART-SEARCH-001
 title: 종목 검색 + 한국어 자동완성 + ChartGrid 통합 주입
-status: Draft
+status: Implemented
 version: 2.0.0
 owner: bjw2002
 created: 2026-05-11
@@ -22,7 +22,7 @@ lifecycle: spec-first
 | SPEC ID | SPEC-CHART-SEARCH-001 |
 | 제목 | 종목 검색 + 한국어 자동완성 + ChartGrid 통합 주입 |
 | 생성일 | 2026-05-11 |
-| 상태 | Draft (v2.0.0) |
+| 상태 | Implemented (v2.0.0) |
 | 버전 | 2.0.0 |
 | 우선순위 | High |
 | Owner | bjw2002 |
@@ -43,6 +43,7 @@ lifecycle: spec-first
 | 2026-05-11 | v1.0.0 Implemented | manager-docs | 12 commits 구현 완료. evaluator-active iter 2 PASS (84/100). 352 frontend vitest + 8 backend pytest PASS, LSP 0. Anti-regression MP-1~MP-5 검증 완료. SPEC-CHART-NAV-001 rollback 재발 방지 invariant 충족. |
 | 2026-05-12 | v2.0.0 (BREAKING amendment) | manager-spec | 라이브 사용 후 mental model drift 발견 (PR #6 closed). modal 격리 패턴(REQ-MODAL-001~004) 폐기, ChartGrid 통합 패턴(REQ-INTEGRATE-001~004) 도입. 검색 종목을 ChartGrid 표시 stocks에 주입(필터 결과에 있으면 scroll+highlight, 없으면 prepend), filter state는 deep-equal 보존. v1.0.0 modal 자산은 archive `feat/SPEC-CHART-SEARCH-001` 브랜치에 보존. lesson #7 사례 — plan 단계 mental model이 라이브 가치와 어긋남. |
 | 2026-05-12 | v2.0.0 (audit iter 1 minor improvements) | manager-spec | I-1/I-2/I-7 audit iter 1 minor improvements applied. plan-auditor frontmatter false positive (D-1/D-2)는 본 프로젝트 컨벤션 확인 후 무효 처리(labels/created field 기존 SPEC 컨벤션 유지). I-1: REQ-PERF-001 wording 명확화 — unrelated state change vs `injectedStock` prop change 구분, ChartGrid가 `useScreen()` 직접 호출 안 함 전제 명시. I-2: AC-INTEGRATE-005 시나리오를 현실 cascade source 3종 (FilterBar typing / currentPage 변경 / `injectedStock` 변경)으로 교체. I-7: AC-INTEGRATE-001에 prepend 후 `setCurrentPage(0)` reset 동작 추가 (currentPage > 0 조건부). |
+| 2026-05-12 | v2.0.0 Implemented | manager-docs | 11 commits (f17d8a0 base ~ ade8718 final) 구현 완료. evaluator-active iter 1 FAIL 80/100 (H-1/H-2/M-1/M-2) → 후속 fix commits로 모두 해결: 34128ad(H-1 testid scroll case), 4af5a3a(H-2 DOM identity reuse check), e31138f(M-1 Profiler cascade count), 8a557cd(M-2 useEffect dep). 추가 라이브 차트 wrapper root cause: e93dc15→ade8718(`display: contents` 정정). 라이브 사용자 검증 PASS (검색 박스 + autocomplete + ChartGrid 주입 + scroll + highlight 정상). Anti-regression MP-1~MP-5 충족, SPEC-CHART-NAV-001 rollback 재발 방지 invariant 유지. |
 
 ---
 
@@ -430,11 +431,87 @@ v1.0 Q-1~Q-7 결정사항은 그대로 유지 (alias 50종, 키보드 nav, 5단�
 | V2-Q5 | **검색 종목 차트의 timeframe = ChartGrid 현재 timeframe 그대로** (별도 토글 없음). 기존 cells의 timeframe 환경과 일치. | EX-17 | **제외 (timeframe 토글)** |
 | V2-Q6 | **검색 종목 차트 닫기 동선 없음**. ChartGrid 내부 통합이므로 다음 검색 또는 필터 변경 시 자연스럽게 대체. | EX-18 | **제외 (close 동선)** |
 
-status는 `Draft (v2.0.0)` 유지 (annotation cycle resolved, run phase 진입 가능).
+status는 v2.0.0 Implemented (라이브 사용자 검증 PASS, 2026-05-12).
 
 ---
 
-## 10. References
+## 10. Implementation Notes (v2.0.0)
+
+### 10.1 구현 요약
+
+| 항목 | 값 |
+| --- | --- |
+| 구현 commits | 11개 (`f17d8a0` base ~ `ade8718` final, feat/SPEC-CHART-SEARCH-001-v2 branch) |
+| 신규 파일 | `frontend/src/components/ChartGrid/StockSearchBox.tsx` + `__tests__/StockSearchBox.test.tsx` |
+| 수정 파일 | `frontend/src/components/ChartGrid/ChartGrid.tsx` (통합 주입 + Profiler), `ChartCell.tsx` (data-code), 통합 테스트 파일들 |
+| 백엔드 | `backend/routers/stocks.py` + `backend/services/stocks_master_service.py` (v1 cherry-pick 재활용, 변경 없음) |
+| 테스트 | frontend vitest 350+ PASS, backend pytest 8 PASS, LSP 0 |
+| 의존성 추가 | 0 (NFR-CONST-001 충족) |
+| 사용자 라이브 검증 | PASS (2026-05-12, "잘된다") |
+
+### 10.2 Commit chain (시간순)
+
+| 순서 | Commit | 역할 |
+| --- | --- | --- |
+| 1 | `f17d8a0` | v2.0.0 base — backend + reusable frontend cherry-pick from v1 archive |
+| 2 | `2036211` | SPEC v2.0.0 amendment 문서 (modal 폐기 + ChartGrid 통합 패턴) |
+| 3 | `6f445fd` | T10~T12 ChartGrid v2.0.0 통합 주입 패턴 (feat) |
+| 4 | `4303fdd` | T13~T15 AC-INTEGRATE-001~006 통합 테스트 + 회귀 검증 (test) |
+| 5 | `34128ad` | H-1 fix — AC-INTEGRATE-002 chart-cell-injected testid for scroll case |
+| 6 | `4af5a3a` | H-2 fix — MP-2 DOM identity reuse check (theater test 교체) |
+| 7 | `e31138f` | M-1 fix — AC-INTEGRATE-005 Profiler 기반 cascade count |
+| 8 | `8a557cd` | M-2 fix — highlight useEffect dep stabilization |
+| 9 | `e93dc15` | 라이브 차트 미표시 1차 fix (root cause 오진) — wrapper height CSS |
+| 10 | `ade8718` | 라이브 차트 미표시 root cause **정정** — wrapper `display: contents` + highlight target 자식 `.chart-cell` 이동 |
+| 11 | — | (e2e 검증 + 사용자 PASS 확인) |
+
+### 10.3 Defect resolution chain
+
+evaluator-active iter 1 (2026-05-12) verdict: **FAIL 80/100** — 4 defects identified.
+
+| ID | Severity | 원인 | Fix commit | 검증 |
+| --- | --- | --- | --- | --- |
+| H-1 | High | AC-INTEGRATE-002 `chart-cell-injected-{code}` testid가 scroll case에서 미부여 | `34128ad` | Integration test에서 scroll case testid 존재 확인 |
+| H-2 | High | MP-2 invariant 검증이 trivially-true assertion (theater test) | `4af5a3a` | DOM element reference equality 검사로 교체 — `React.memo + key=code` reconciliation 실제 보장 |
+| M-1 | Medium | AC-INTEGRATE-005 scenario (a) trivially-true 조건 | `e31138f` | React Profiler `onRender` callback 기반 cascade count 측정 (FilterBar typing / currentPage / `injectedStock` 각각 시뮬레이션) |
+| M-2 | Medium | highlight useEffect `displayedStocks` dep로 인한 불필요 재실행 | `8a557cd` | useEffect once invariant 테스트 추가, dep array 안정화 |
+
+추가로 plan-auditor iter 1의 D-1/D-2(labels/created_at frontmatter) 지적은 **false positive 처리**: 본 프로젝트 SPEC 컨벤션은 `created` 사용 + labels 미사용으로 통일되어 있어 audit 기준이 잘못 적용된 사례. v2 HISTORY row에 명시.
+
+### 10.4 라이브 차트 wrapper root cause (회고)
+
+`6f445fd`로 ChartGrid 통합 주입 패턴을 적용한 직후 라이브에서 차트가 표시되지 않는 회귀 발견. 다음 두 차례 fix.
+
+**1차 (오진, `e93dc15`)**: wrapper div에 `style={{ height: '100%', minHeight: 0 }}` 적용. CSS Grid `align-self: stretch`는 grid item(wrapper) 자신에만 적용되고 자식 `.chart-cell`은 inherit 안 받음 → 여전히 차트 영역 0px.
+
+**2차 (정정, `ade8718`)**: wrapper에 `style={{ display: 'contents' }}` 적용. wrapper를 layout tree에서 제거하여 `.chart-cell`이 직접 grid item이 되도록 변경. 동시에 `data-highlight-target`을 wrapper 대신 자식 `.chart-cell` 자체에 부여하도록 useEffect querySelector 변경.
+
+**교훈**: smoking gun(첫 가설)에 prematurely commit하면 진짜 root cause를 놓친다. CSS Grid에서 wrapper-child 관계의 layout property 상속 규칙(또는 비상속 규칙)을 확인하는 것이 우선.
+
+### 10.5 Anti-regression 검증 (MP-1 ~ MP-5)
+
+SPEC-CHART-NAV-001 rollback 재발 방지 invariant 전수 충족.
+
+| ID | 검증 방법 | 상태 |
+| --- | --- | --- |
+| MP-1 (ChartGrid parent re-render 0 on unrelated state) | React Profiler cascade count test (`e31138f`) | PASS |
+| MP-2 (existing ChartCell instances reuse on prepend) | DOM identity reuse check (`4af5a3a`) | PASS |
+| MP-3 (no `applyFilters` call from search path) | Static grep test in `ChartGrid.tsx` | PASS (0 matches) |
+| MP-4 (no `setRequest` / `useScreen()` direct call in ChartGrid) | Static grep test | PASS |
+| MP-5 (no new npm/pip dependencies) | `git diff package.json requirements.txt` | PASS (0 entries) |
+
+### 10.6 후속 항목 (별도 작업)
+
+| 항목 | 상태 | 처리 |
+| --- | --- | --- |
+| origin push + main PR | Pending | 본 sync 다음 단계 (별도 사용자 승인 후) |
+| v1.0.0 modal archive 정리 | Done | `feat/SPEC-CHART-SEARCH-001` branch에 영구 보존, README 언급 |
+| sectormap unification 통합 | Separate branch | `chore/integrated-main-merge-2026-04-25` 별도 작업 (`9e21762`). v2 → main → chore rebase 단계에서 자연 통합 |
+| backend `--reload` 운영 권고 | Open | dev server 운영 가이드 별도 (현재 SPEC scope 외) |
+
+---
+
+## 11. References
 
 - `.moai/specs/SPEC-CHART-SEARCH-001/plan.md` (v2.0.0) — TDD task decomposition + file change matrix + risk register
 - `.moai/specs/SPEC-CHART-SEARCH-001/acceptance.md` (v2.0.0) — Given/When/Then scenarios + must-pass criteria
@@ -449,5 +526,5 @@ status는 `Draft (v2.0.0)` 유지 (annotation cycle resolved, run phase 진입 �
 ---
 
 Version: 2.0.0 (BREAKING amendment)
-Status: Draft
+Status: Implemented (2026-05-12, 라이브 사용자 검증 PASS)
 Last Updated: 2026-05-12
