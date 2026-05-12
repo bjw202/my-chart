@@ -275,22 +275,21 @@ function ChartGridInner({
 
           return (
             // data-highlight-target: highlight useEffect가 DOM 요소를 찾기 위한 marker
+            // data-testid: 테스트용 — injected prepend cell 식별
             <div
               key={stock.code}
               data-highlight-target={
                 injectedStock?.code === stock.code ? stock.code : undefined
               }
+              data-testid={testId}
             >
               <ChartCell
-                key={stock.code}
                 stock={stock}
                 isSelected={selectedIndex === stockIndex}
                 onClick={() => {
                   /* StockList click navigates; chart click just highlights */
                 }}
                 timeframe={timeframe}
-                // data-testid를 ChartCell에 전달 (ChartCell이 지원하면)
-                {...(testId ? { 'data-testid': testId } : {})}
               />
             </div>
           )
