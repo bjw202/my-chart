@@ -165,7 +165,7 @@ stock_meta:
 | Period returns | Computed from OHLCV | Stored in DB |
 | RS scores | Computed vs KOSPI | weekly_rs.db |
 | Market cap | pykrx API (runtime) | NOT stored |
-| Stock metadata | pykrx + sectormap.xlsx | Runtime cache |
+| Stock metadata | pykrx + sectormap-original.xlsx | Runtime cache |
 
 ### Target State (Web Service)
 
@@ -175,7 +175,7 @@ stock_meta:
 | Technical indicators | Computed | DB | `/api/screen` filters |
 | RS scores | Computed | DB | `/api/screen` RS filter |
 | Market cap | pykrx (batch) | DB | `/api/screen` market cap filter |
-| Sector info | sectormap.xlsx | Runtime cache | `/api/sectors` |
+| Sector info | sectormap-original.xlsx | Runtime cache | `/api/sectors` |
 
 ### Key Decision: DB Update Includes Market Cap
 

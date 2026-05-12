@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (chore — sectormap unification, 2026-05-12)
+
+- **`Input/sectormap-original.xlsx` 단일 source 통합** (commit `face1ac`)
+  - 이전: `Input/sectormap.xlsx`(6 컬럼 추출본, 2552 종목) + `Input/sectormap_original.xlsx`(원본, 백업) 이중 관리
+  - 이후: `Input/sectormap-original.xlsx`(원본 53 컬럼, 2556 종목) 단일 source. `sectormap.xlsx` 폐기
+  - `my_chart/config.py`: `SECTORMAP_PATH` → `sectormap-original.xlsx`
+  - `my_chart/registry.py:_load_sectormap()`:
+    - `header=8` (앞 row 0~7은 데이터 설명 주석)
+    - 한글/개행 컬럼명 → 영문 rename (`종목\n코드`→`Code`, `종목명`→`Name`, `시장`→`Market`)
+    - 6 컬럼만 select (53 → 6, 메모리 88% 절약)
+    - downstream 코드(`get_stock_registry`, `get_sector_registry`, `meta_service`, `sector_advanced`, `stage_service`, `screen_service`) 변경 0
+  - 종목 데이터: 2552 → 2556 (+13 신규 KONEX/SPAC, -9 구버전 폐지). 6 핵심 컬럼 99.5%+ 일치 (Market 1건만 시장 이동 차이)
+  - 검증: pytest `tests/test_config.py` 10/10 PASS + registry load 정상 + backend `/api/stocks/master` HTTP 200
+  - Follow-up (운영): backend dev server reload + `meta_service.rebuild_stock_meta()` 실행으로 stock_meta 테이블 갱신 필요
+
 ### Added (SPEC-NAVER-THEME-001)
 
 - **네이버 금융 테마 분석 모듈** (SPEC-NAVER-THEME-001 v1.0.0)
