@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, cleanup } from '@testing-library/react'
-import React from 'react'
+import React, { Profiler, useCallback } from 'react'
 import type { StockItem } from '../../../types/stock'
 import type { StockMasterItem } from '../../../api/stocks'
 
@@ -544,39 +544,55 @@ describe('T13/T14: Full integration — AC-INTEGRATE-005 (3 cascade scenarios)',
     cleanup()
   })
 
-  it('AC-INTEGRATE-005 scenario (a): filterResults reference 동일 시 ChartGrid cascade 없음', () => {
-    // React.memo: 같은 filterResults reference로 rerender → ChartGrid 재렌더 없음
-    let chartGridRenderCount = 0
+  it('AC-INTEGRATE-005 scenario (a): React Profiler — filterResults reference 동일 + onSelectStock stable → ChartGrid 내부 재렌더 0회', () => {
+    // React Profiler + useChartGrid 호출 횟수 이중 검증
+    // 검증 방법:
+    //   1. Profiler onRender id를 체크해 ChartGrid 서브트리 commit 여부 확인
+    //   2. mockUseChartGrid 호출 횟수로 ChartGrid 내부 실행 여부 확인 (결정적 증거)
+    const profilerIds: string[] = []
+    const onRender = (id: string) => {
+      profilerIds.push(id)
+    }
 
-    // ChartGrid 렌더를 추적하는 wrapper 구성
-    // ChartGrid는 React.memo이므로 props가 동일하면 재렌더 안 됨
     const stableFilterResults = [stockA, stockB]
+    const stableOnSelectStock = vi.fn() // 동일 reference 유지
 
     const { rerender } = render(
-      <ChartGrid
-        filterResults={stableFilterResults}
-        injectedStock={null}
-        onSelectStock={vi.fn()}
-      />,
+      <Profiler id="chart-grid-memo" onRender={onRender}>
+        <ChartGrid
+          filterResults={stableFilterResults}
+          injectedStock={null}
+          onSelectStock={stableOnSelectStock}
+        />
+      </Profiler>,
     )
-    chartGridRenderCount = mockUseChartGrid.mock.calls.length
 
-    // filterResults reference 동일하게 rerender (props shallow equal)
+    // 최초 mount: useChartGrid 호출됨
+    const callCountAfterMount = mockUseChartGrid.mock.calls.length
+    expect(callCountAfterMount).toBeGreaterThan(0) // ChartGrid mount 확인
+    expect(profilerIds).toContain('chart-grid-memo') // Profiler가 mount를 캡처함
+
+    profilerIds.length = 0 // reset for rerender phase
+
+    // props 완전 동일: same ref filterResults + null + same ref onSelectStock
     rerender(
-      <ChartGrid
-        filterResults={stableFilterResults} // 동일 reference
-        injectedStock={null}
-        onSelectStock={vi.fn()}
-      />,
+      <Profiler id="chart-grid-memo" onRender={onRender}>
+        <ChartGrid
+          filterResults={stableFilterResults} // 동일 reference
+          injectedStock={null}
+          onSelectStock={stableOnSelectStock} // 동일 reference
+        />
+      </Profiler>,
     )
 
-    // React.memo shallow equal: filterResults 동일, injectedStock 동일 → 재렌더 없음
-    // useChartGrid 호출 횟수가 증가하지 않아야 함 (재렌더 없으면 호출도 없음)
-    // NOTE: React.memo는 props shallow equal이 true면 재렌더 skip
-    // 단, vi.fn()으로 만든 onSelectStock은 매 rerender마다 새 reference → cascade 발생
-    // 이를 방지하려면 useCallback 사용 필요
-    // 현재 테스트에서는 filterResults reference 동일성 검증에 집중
-    expect(mockUseChartGrid.mock.calls.length).toBeGreaterThan(0) // 최초 렌더 확인
+    // React.memo shallow equal: 3개 props 모두 동일 → ChartGrid 내부 재실행 없음
+    // useChartGrid 호출 횟수가 증가하지 않아야 함 (내부 재실행이 없다는 결정적 증거)
+    const callCountAfterRerender = mockUseChartGrid.mock.calls.length
+    expect(callCountAfterRerender).toBe(callCountAfterMount) // ← 핵심: cascade 0
+
+    // Profiler는 Profiler wrapper 자체의 commit에도 fire되므로 profilerIds.length == 1 허용
+    // ChartGrid 내부가 skip되어도 Profiler wrapper(React.memo 외부)는 commit됨
+    expect(profilerIds.length).toBeLessThanOrEqual(1) // ChartGrid skip, Profiler only
   })
 
   it('AC-INTEGRATE-005 scenario (b): currentPage prop 변경 → ChartGrid 재렌더 +1 (의도된 cascade)', () => {
