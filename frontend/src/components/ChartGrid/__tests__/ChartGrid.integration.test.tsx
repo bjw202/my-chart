@@ -353,6 +353,37 @@ describe('T11: ChartGrid scroll + highlight on injectedStock change', () => {
     expect(mockGoToPage).toHaveBeenCalledWith(1)
   })
 
+  it('AC-INTEGRATE-002 scroll case: filterResults에 있는 injectedStock 셀에도 chart-cell-injected testid 부여됨', () => {
+    // stockTarget이 filterResults에 있는 경우 → scroll (prepend 아님)
+    // 해당 셀에도 data-testid="chart-cell-injected-{code}" 부여되어야 함 (H-1 fix)
+    const stockTarget = makeStock('SCROLL-T')
+    const filterResults = [makeStock('SCROLL-1'), makeStock('SCROLL-2'), stockTarget]
+
+    mockUseChartGrid.mockImplementation((stocks: StockItem[]) => ({
+      currentPage: 0,
+      gridSize: 4,
+      totalPages: 1,
+      visibleStocks: stocks.slice(0, 4),
+      goToPage: mockGoToPage,
+      toggleGridSize: vi.fn(),
+    }))
+
+    render(
+      <ChartGrid
+        filterResults={filterResults}
+        injectedStock={makeMasterItem(stockTarget.code)} // filterResults에 이미 있음 → scroll 케이스
+        onSelectStock={vi.fn()}
+      />,
+    )
+
+    // scroll 케이스에서도 testid 부여됨 (prepend 없음이지만 testid는 있어야 함)
+    expect(screen.getByTestId(`chart-cell-injected-${stockTarget.code}`)).toBeInTheDocument()
+
+    // prepend 없음 — displayedStocks length == filterResults length
+    const callArg = mockUseChartGrid.mock.calls[0][0]
+    expect(callArg).toHaveLength(filterResults.length)
+  })
+
   it('AC-INTEGRATE-004: injectedStock 변경 시 해당 셀에 cell-search-highlight class 추가됨', () => {
     // useChartGrid에서 visibleStocks[0]이 injectedStock인 케이스
     const filterResults: StockItem[] = []
@@ -649,12 +680,13 @@ describe('T13/T14: Full integration — AC-INTEGRATE-006 (cell key 동일성으�
       />,
     )
 
-    // stockA가 딱 1번만 렌더됨
-    const stockACells = document.querySelectorAll(`[data-testid="chart-cell-${stockA.code}"]`)
-    expect(stockACells).toHaveLength(1)
+    // stockA가 중복 없이 렌더됨 (prepend 없으므로 displayedStocks == filterResults)
+    const callArg = mockUseChartGrid.mock.calls[0][0]
+    const aCount = callArg.filter((s: StockItem) => s.code === stockA.code).length
+    expect(aCount).toBe(1)
 
-    // injected testid는 없음 (prepend 안 됨)
-    expect(document.querySelector(`[data-testid="chart-cell-injected-${stockA.code}"]`)).toBeNull()
+    // scroll 케이스: injected testid 존재 (H-1 fix — scroll도 testid 부여)
+    expect(screen.getByTestId(`chart-cell-injected-${stockA.code}`)).toBeInTheDocument()
   })
 
   it('AC-ARCH-001 (MP-4): 검색 injection 시 applyFilters / setRequest 0회 호출', () => {

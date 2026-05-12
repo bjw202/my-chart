@@ -263,13 +263,16 @@ function ChartGridInner({
       >
         {visibleStocks.map((stock, slotIndex) => {
           const stockIndex = currentPage * gridSize + slotIndex
-          // prepend된 종목 여부 확인
+          // injectedStock과 일치하는 모든 경우 testid 부여 (prepend + scroll 모두)
+          // AC-INTEGRATE-002: scroll 케이스에서도 data-testid="chart-cell-injected-{code}" 필요
+          const isInjectedTarget = injectedStock?.code === stock.code
           const isInjectedPrepend =
-            injectedStock?.code === stock.code &&
+            isInjectedTarget &&
             displayedStocks[0]?.code === stock.code &&
             !enrichedFilterResults.some((s) => s.code === stock.code)
+          void isInjectedPrepend // 향후 prepend 전용 스타일링에 활용 가능
 
-          const testId = isInjectedPrepend
+          const testId = isInjectedTarget
             ? `chart-cell-injected-${stock.code}`
             : undefined
 
