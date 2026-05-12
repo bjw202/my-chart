@@ -749,7 +749,7 @@ describe('Regression (2026-05-12): cell wrapper height CSS Grid chain', () => {
     vi.resetAllMocks()
   })
 
-  it('cell wrapper div에 style.height === "100%" 및 minHeight === 0 적용 — chart-cell-canvas height 0 회귀 방지', async () => {
+  it('cell wrapper div에 style.display === "contents" 적용 — CSS Grid item이 .chart-cell 자체가 되도록', async () => {
     const { ChartGrid } = await import('../ChartGrid')
     const onSelectStock = vi.fn()
     const stockA = makeStock('LIVEFIX-A', '회귀종목A')
@@ -769,8 +769,10 @@ describe('Regression (2026-05-12): cell wrapper height CSS Grid chain', () => {
     const wrapper = cellInner!.parentElement as HTMLElement
     expect(wrapper).not.toBeNull()
 
-    // CSS Grid layout chain 보존을 위한 핵심 invariant
-    expect(wrapper.style.height).toBe('100%')
-    expect(wrapper.style.minHeight).toBe('0px')
+    // display: contents — wrapper의 box를 layout 트리에서 제거 → 자식 .chart-cell이 grid item 됨.
+    // 회귀 방지: 첫 fix(height: 100% + minHeight: 0)는 wrapper 자체 stretch만 했으나
+    // wrapper가 block container라 자식에게 height 전달 못함 → chart-cell-canvas height 0.
+    // 향후 wrapper의 display를 다시 block/flex로 바꾸면 이 test가 RED.
+    expect(wrapper.style.display).toBe('contents')
   })
 })

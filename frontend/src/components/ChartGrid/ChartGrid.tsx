@@ -186,19 +186,24 @@ function ChartGridInner({
     // AC-INTEGRATE-002: 기존 종목 → 해당 page로 이동
     goToPage(targetPage)
 
-    // highlight: data-highlight-target 속성으로 DOM 요소 찾기
+    // highlight: data-highlight-target wrapper의 자식 .chart-cell에 className 적용.
+    // @MX:WARN [AUTO] wrapper는 display: contents이므로 box-shadow가 wrapper에 적용되면 표시 안 됨.
+    // @MX:REASON wrapper(display:contents)는 layout-invisible → CSS box-shadow는 box 있는 element에만
+    //   적용. 따라서 wrapper의 자식 .chart-cell(border + display:flex)에 className 부착해야
+    //   border-flash keyframes의 box-shadow가 시각적으로 보임.
     // DOM 업데이트 후 highlight 적용
     // setTimeout(0) 사용: jsdom에서 requestAnimationFrame이 실행되지 않을 수 있음
     const applyId = setTimeout(() => {
-      const target = document.querySelector(`[data-highlight-target="${injectedStock.code}"]`)
-      if (target) {
-        target.classList.remove('cell-search-highlight')
+      const wrapper = document.querySelector(`[data-highlight-target="${injectedStock.code}"]`)
+      const cell = wrapper?.querySelector('.chart-cell') ?? wrapper
+      if (cell) {
+        cell.classList.remove('cell-search-highlight')
         // reflow 강제 (animation restart)
-        void (target as HTMLElement).offsetWidth
-        target.classList.add('cell-search-highlight')
+        void (cell as HTMLElement).offsetWidth
+        cell.classList.add('cell-search-highlight')
 
         highlightTimeoutRef.current = setTimeout(() => {
-          target.classList.remove('cell-search-highlight')
+          cell.classList.remove('cell-search-highlight')
           highlightTimeoutRef.current = null
         }, 2500)
       }
@@ -209,8 +214,9 @@ function ChartGridInner({
       if (highlightTimeoutRef.current) {
         clearTimeout(highlightTimeoutRef.current)
         highlightTimeoutRef.current = null
-        const target = document.querySelector(`[data-highlight-target="${injectedStock.code}"]`)
-        target?.classList.remove('cell-search-highlight')
+        const wrapper = document.querySelector(`[data-highlight-target="${injectedStock.code}"]`)
+        const cell = wrapper?.querySelector('.chart-cell') ?? wrapper
+        cell?.classList.remove('cell-search-highlight')
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -284,15 +290,17 @@ function ChartGridInner({
           return (
             // data-highlight-target: highlight useEffect가 DOM 요소를 찾기 위한 marker
             // data-testid: 테스트용 — injected prepend cell 식별
-            // @MX:WARN [AUTO] CSS Grid layout chain 보존 — wrapper div가 ChartCell의 grid item 자리를
-            //   대신 차지하면서 기본 height:auto가 ChartCell→chart-cell-canvas의 height를 0으로 만든다.
-            // @MX:REASON 부모 ChartGrid는 display:grid + grid-template-rows로 cell height 분배.
-            //   wrapper에 height:100% + minHeight:0 명시해야 자식이 grid track height를 inherit 받는다.
-            //   minHeight:0은 CSS Grid item의 implicit min-height:auto가 overflow를 막아 height stretch
-            //   를 차단하는 케이스 방어 (lightweight-charts canvas 0 height 버그 root cause).
+            // @MX:WARN [AUTO] wrapper div는 layout-invisible (display: contents)로 둔다.
+            // @MX:REASON 첫 fix(height: 100% + minHeight: 0)는 wrapper 자체 stretch는 되었으나,
+            //   wrapper가 default `display: block` container라 자식 `.chart-cell`에게 부모 height를
+            //   전달하지 못해 chart-cell-canvas height = 0이 유지됨. lightweight-charts가 0 height
+            //   chart 인스턴스 생성 → 캔들 미표시.
+            //   `display: contents`로 wrapper의 box를 layout 트리에서 제거 → `.chart-cell`이 직접
+            //   CSS Grid item이 되어 chore base와 동일한 grid stretch 경로가 복원된다.
+            //   DOM 노드는 유지되므로 data-highlight-target querySelector와 data-testid 모두 정상 작동.
             <div
               key={stock.code}
-              style={{ height: '100%', minHeight: 0 }}
+              style={{ display: 'contents' }}
               data-highlight-target={
                 injectedStock?.code === stock.code ? stock.code : undefined
               }
