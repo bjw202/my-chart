@@ -68,7 +68,7 @@ export function AppContent(): ReactElement {
 
       {/* Chart Grid tab - default active; preserves existing FilterBar + ChartGrid + StockList layout */}
       <div className="tab-content" style={{ display: activeTab === 'chart-grid' ? 'flex' : 'none' }}>
-        <FilterBar />
+        <FilterBar onReset={() => setSearchedStock(null)} />
         <main className="app-main">
           <ChartGrid
             filterResults={filterResults}

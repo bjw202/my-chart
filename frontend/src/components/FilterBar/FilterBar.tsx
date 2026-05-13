@@ -28,7 +28,16 @@ function getInitialStateFromUrl(): ScreenRequest {
   return DEFAULT_SCREEN_REQUEST
 }
 
-export function FilterBar(): React.ReactElement {
+interface FilterBarProps {
+  /**
+   * 초기화 트리거 콜백. 초기화 버튼 클릭 또는 활성 preset 칩 재클릭 시 호출된다.
+   * AppContent의 searchedStock 같은 외부 stale state를 함께 reset할 때 사용한다.
+   * Bug fix (2026-05-12): 초기화 후 검색 종목이 stale로 남아 2차 검색이 무반응이 되는 회귀 차단.
+   */
+  onReset?: () => void
+}
+
+export function FilterBar({ onReset }: FilterBarProps = {}): React.ReactElement {
   const { applyFilters, clearResults } = useScreen()
   // URL에서 초기 프리셋을 읽어 local 초기 상태 설정
   const [local, setLocal] = useState<ScreenRequest>(getInitialStateFromUrl)
@@ -89,6 +98,7 @@ export function FilterBar(): React.ReactElement {
   const handleReset = (): void => {
     setLocal(DEFAULT_SCREEN_REQUEST)
     clearResults()
+    onReset?.()
   }
 
   // REQ-PST-003: 비활성 칩 클릭 — merged 상태로 applyFilters 1회 호출

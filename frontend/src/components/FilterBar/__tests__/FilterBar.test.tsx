@@ -211,6 +211,49 @@ describe('FilterBar — PresetChips 통합 (SPEC-PRESET-001)', () => {
     })
   })
 
+  // RED: 초기화 버튼 클릭 시 onReset 콜백이 호출되어야 한다 (검색 종목 stale state 방지)
+  // Reproduction: 검색 종목 주입 후 초기화 → searchedStock도 reset되어야 다음 검색이 정상 동작
+  it('초기화 버튼 클릭 시 onReset 콜백이 호출된다 (searchedStock reset)', async () => {
+    const user = userEvent.setup()
+    const onReset = vi.fn()
+
+    render(
+      <ScreenProvider>
+        <FilterBar onReset={onReset} />
+      </ScreenProvider>,
+    )
+
+    const resetBtn = screen.getByText('초기화')
+    await user.click(resetBtn)
+
+    expect(onReset).toHaveBeenCalledTimes(1)
+  })
+
+  // RED: 활성 preset 칩 재클릭 시에도 onReset 콜백이 호출되어야 한다 (handlePresetClear = handleReset)
+  it('활성 preset 칩 재클릭 시에도 onReset 콜백이 호출된다', async () => {
+    const user = userEvent.setup()
+    const onReset = vi.fn()
+    const breakout = FILTER_PRESETS.find((p) => p.id === 'breakout_init')!
+
+    render(
+      <ScreenProvider>
+        <FilterBar onReset={onReset} />
+      </ScreenProvider>,
+    )
+
+    // 프리셋 적용 → 활성화
+    const chipBtn = screen.getByRole('button', { name: breakout.label })
+    await user.click(chipBtn)
+    await waitFor(() => {
+      expect(chipBtn).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    // 활성 칩 재클릭 → onReset 호출
+    await user.click(chipBtn)
+
+    expect(onReset).toHaveBeenCalledTimes(1)
+  })
+
   // C4: 알 수 없는 preset id는 조용히 무시 (A9)
   it('C4: 알 수 없는 ?preset=unknown URL은 조용히 무시하고 기본 상태를 유지한다', async () => {
     window.history.replaceState(null, '', '/?preset=unknown-id-that-does-not-exist')
