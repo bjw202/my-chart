@@ -264,7 +264,17 @@ def price_daily_db(
 
     all_rows: list[tuple] = []
     done_count = 0
+    # @MX:ANCHOR: [AUTO] column-name 기반 INSERT — _DAILY_COLS 순서가 라이브 stock_prices
+    #             컬럼 순서와 달라도 안전하게 매핑된다.
+    # @MX:REASON: positional `VALUES (?, ?, ...)` 패턴은 _DAILY_COLS 중간에 신규 컬럼이
+    #             삽입되고(SMA5 idx 13) ALTER ADD COLUMN은 항상 테이블 끝에 append하는
+    #             경우 모든 후속 컬럼이 시프트되어 무음 데이터 오염이 발생한다
+    #             (SPEC-SMA5-FILTER-001 v1.0.4 라이브 회귀 사례 — 2026-05-26).
+    column_list = ", ".join(_DAILY_COLS)
     placeholders = ", ".join(["?"] * len(_DAILY_COLS))
+    insert_sql = (
+        f"INSERT OR REPLACE INTO stock_prices ({column_list}) VALUES ({placeholders})"
+    )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
@@ -282,20 +292,14 @@ def price_daily_db(
             if done_count % 50 == 0:
                 print(f"  [{done_count}/{total}] fetched, inserting batch...")
                 all_rows.sort(key=lambda r: (r[0], r[1]))
-                conn.executemany(
-                    f"INSERT OR REPLACE INTO stock_prices VALUES ({placeholders})",
-                    all_rows,
-                )
+                conn.executemany(insert_sql, all_rows)
                 conn.commit()
                 all_rows = []
 
     # Final batch
     if all_rows:
         all_rows.sort(key=lambda r: (r[0], r[1]))
-        conn.executemany(
-            f"INSERT OR REPLACE INTO stock_prices VALUES ({placeholders})",
-            all_rows,
-        )
+        conn.executemany(insert_sql, all_rows)
         conn.commit()
 
     conn.close()

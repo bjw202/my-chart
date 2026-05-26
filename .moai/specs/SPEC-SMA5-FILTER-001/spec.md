@@ -1,9 +1,9 @@
 ---
 id: SPEC-SMA5-FILTER-001
-version: 1.0.3
+version: 1.0.4
 status: Implemented
 created: 2026-05-25
-updated: 2026-05-26
+updated: 2026-05-27
 author: jw
 priority: medium
 issue_number: 0
@@ -19,6 +19,7 @@ issue_number: 0
 | 1.0.1 | 2026-05-25 | jw | plan-audit (review-1) 반영: 컬럼명↔값 정렬 AC 추가(D2), plan.md 테스트 경로 정정(D3), 삽입 위치 \[HARD\] 확정(D4), REQ 본문 구현 세부 제거(D5), AC-5 WHERE 문자열 괄호 보정(D6). 감사의 frontmatter 지적(D1: `created_at`/`labels`)은 프로젝트 house-style(8필드 표준: id/version/status/created/updated/author/priority/issue_number — 형제 SPEC 전부 `created` 사용·`labels` 미사용)에 따라 의도적으로 미적용 — known false-positive. |
 | 1.0.2 | 2026-05-26 | jw | TDD 구현 완료 (manager-tdd): AC-1\~AC-9 전부 GREEN, 회귀 0 (baseline 9→8, stale `==27` 정정 + 신규 +10 통과). daily.py SMA5(idx 13)/FromSMA5(idx 23) 3개 정합지점 + meta_service.py 끝-append(Minervini d\[8..10\] 보존) + screen.py/screen_service.py 화이트리스트 + 프론트엔드 드롭다운. status: Implemented. commit 060640f. |
 | 1.0.3 | 2026-05-26 | jw | 라이브 검증 후속 수정: 레거시 stock_meta(sma5 컬럼 누락)로 'SMA5 &gt; EMA20' 패턴이 0건 반환되는 이슈 발견. `_STOCK_META_DDL`은 `CREATE TABLE IF NOT EXISTS` 라 기존 26-col 테이블에 sma5가 자동 추가되지 않는 사각지대. `_MINERVINI_META_COLS`에 'sma5' 추가하여 daily.py SMA5 ALTER 패턴과 대칭하는 self-healing 회복. reproduction test 1건 추가 (585 passed, 회귀 0). 라이브 DB는 사용자가 `POST /api/db/update`로 SMA5 재계산 트리거 필요. |
+| 1.0.4 | 2026-05-27 | jw | **라이브 검증 2차 회귀 수정**: 레거시 30-col stock_prices에 ALTER ADD COLUMN으로 SMA5/FromSMA5가 끝(idx 30, 31)에 append되는 한편 코드 `_DAILY_COLS`는 idx 13/23에 두어, positional `INSERT OR REPLACE INTO stock_prices VALUES (?,...)` 시 idx 13\~31 컬럼 전체가 한 칸씩 시프트되어 무음 데이터 오염 발생. RS_Line 컬럼에 Range 값이, SMA5 컬럼에 LOW_52W 값이 저장돼 차트 자주색 RS선이 비정상 변동(실은 FromSMA50 %)으로 표시되고 1.3M 행이 부패. daily.py INSERT를 column-name 기반(`INSERT OR REPLACE INTO stock_prices (col1, col2, ...) VALUES (?,...)`)으로 수정해 라이브 컬럼 순서와 `_DAILY_COLS` 순서가 달라도 안전 매핑. legacy-ALTER 시나리오 재현 테스트 신규 추가(`test_legacy_db_with_altered_columns_inserts_to_correct_columns`). AC-9가 fresh-DDL만 검증해 놓친 사각지대 보완. 라이브 DB는 /api/db/update 재실행으로 2년치 가격 재fetch → 부패 행이 정상 컬럼으로 덮어쓰여진다. Lesson #8 등록. |
 
 ---
 

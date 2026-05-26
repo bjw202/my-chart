@@ -344,3 +344,98 @@ class TestColumnAlignmentRoundTrip:
         assert db_row[2] == pytest.approx(expected["SMA21"], rel=1e-9), "SMA21 컬럼 오염"
         assert db_row[3] == pytest.approx(expected["SMA50"], rel=1e-9), "SMA50 컬럼 오염"
         assert db_row[4] == pytest.approx(expected["FromSMA50"], rel=1e-9), "FromSMA50 컬럼 오염"
+
+    def test_legacy_db_with_altered_columns_inserts_to_correct_columns(self, monkeypatch):
+        """SPEC-SMA5-FILTER-001 v1.0.4 follow-up: 레거시 DB 컬럼 시프트 회귀 방지 게이트.
+
+        근본 문제 (2026-05-26 라이브 검증 회귀):
+        - daily.py가 _DAILY_COLS 중간(idx 13)에 SMA5를 삽입했지만 ALTER ADD COLUMN은
+          기존 30-col stock_prices의 끝에 SMA5/FromSMA5를 append → 라이브 컬럼 순서가
+          _DAILY_COLS와 어긋남.
+        - positional INSERT (`VALUES (?, ?, ...)`)를 쓰면 placeholder idx 13의 값(SMA5)이
+          라이브 idx 13(SMA21)에 들어가는 등 idx 13~31 전체가 한 칸씩 시프트되어
+          무음 데이터 오염이 발생한다.
+
+        본 테스트는 정확히 그 시나리오(legacy 30-col DDL + ALTER end-append)를 재현하고,
+        column-name 기반 INSERT가 라이브 컬럼 순서와 무관하게 올바른 컬럼에 값을 쓰는지
+        검증한다. AC-9의 fresh-DDL 한정 사각지대를 메운다.
+        """
+        import sqlite3
+
+        from my_chart.db.daily import _DAILY_COLS
+
+        # pre-SMA5 30-col 스키마 — 2026-05-25 이전 운영 DB와 동일 순서
+        LEGACY_DDL = """
+        CREATE TABLE stock_prices (
+            Name TEXT NOT NULL,
+            Date TEXT NOT NULL,
+            Open REAL, High REAL, Low REAL, Close REAL, Change REAL, High52W REAL,
+            Volume REAL, Volume20MA REAL, VolumeWon REAL,
+            EMA10 REAL, EMA20 REAL,
+            SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA200 REAL,
+            DailyRange REAL, HLC REAL,
+            FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
+            Range REAL, ADR20 REAL, RS_Line REAL,
+            SMA150 REAL, LOW_52W REAL, SMA200_20D_AGO REAL,
+            PRIMARY KEY (Name, Date)
+        )
+        """
+        conn = sqlite3.connect(":memory:")
+        try:
+            conn.execute(LEGACY_DDL)
+
+            # 멱등 ALTER 시뮬레이션 (daily.py L81-87 패턴) — SMA5/FromSMA5만 누락 상태
+            conn.execute("ALTER TABLE stock_prices ADD COLUMN SMA5 REAL")
+            conn.execute("ALTER TABLE stock_prices ADD COLUMN FromSMA5 REAL")
+
+            # 라이브 시나리오 전제: 컬럼이 끝에 append됐는지 확인
+            live_cols = [r[1] for r in conn.execute("PRAGMA table_info(stock_prices)").fetchall()]
+            assert live_cols[30] == "SMA5", f"테스트 전제: SMA5는 idx 30에 위치 (실제: {live_cols[30]})"
+            assert live_cols[31] == "FromSMA5", f"테스트 전제: FromSMA5는 idx 31에 위치 (실제: {live_cols[31]})"
+            assert live_cols[13] == "SMA21", "테스트 전제: 라이브 idx 13은 SMA21 (코드는 SMA5라고 가정)"
+            assert live_cols[26] == "RS_Line", "테스트 전제: 라이브 idx 26은 RS_Line"
+
+            # distinct 값을 가진 row 생성 (AC-9 동일 헬퍼)
+            rows = self._build_distinct_rows(monkeypatch)
+            last = rows[-1]
+
+            # daily.py와 동일한 column-name INSERT 사용 (fix 후 코드 경로)
+            column_list = ", ".join(_DAILY_COLS)
+            placeholders = ", ".join(["?"] * len(_DAILY_COLS))
+            insert_sql = (
+                f"INSERT OR REPLACE INTO stock_prices ({column_list}) "
+                f"VALUES ({placeholders})"
+            )
+            conn.executemany(insert_sql, rows)
+            conn.commit()
+
+            # 검증: 각 컬럼이 자기 값을 보유 (시프트 0)
+            idx = {c: _DAILY_COLS.index(c) for c in
+                   ("Name", "Date", "SMA5", "FromSMA5", "SMA21", "SMA50",
+                    "FromSMA50", "Range", "RS_Line")}
+            expected = {c: last[idx[c]] for c in
+                        ("SMA5", "FromSMA5", "SMA21", "SMA50", "FromSMA50", "Range", "RS_Line")}
+
+            db_row = conn.execute(
+                "SELECT SMA5, FromSMA5, SMA21, SMA50, FromSMA50, Range, RS_Line "
+                "FROM stock_prices WHERE Name = ? AND Date = ?",
+                (last[idx["Name"]], last[idx["Date"]]),
+            ).fetchone()
+
+            assert db_row[0] == pytest.approx(expected["SMA5"], rel=1e-9), (
+                f"레거시 DB에서 SMA5 시프트 오염 — 기대 {expected['SMA5']}, 실제 {db_row[0]}"
+            )
+            assert db_row[1] == pytest.approx(expected["FromSMA5"], rel=1e-9), (
+                f"레거시 DB에서 FromSMA5 시프트 오염 — 기대 {expected['FromSMA5']}, 실제 {db_row[1]}"
+            )
+            assert db_row[2] == pytest.approx(expected["SMA21"], rel=1e-9), "SMA21 시프트"
+            assert db_row[3] == pytest.approx(expected["SMA50"], rel=1e-9), "SMA50 시프트"
+            assert db_row[4] == pytest.approx(expected["FromSMA50"], rel=1e-9), "FromSMA50 시프트"
+            assert db_row[5] == pytest.approx(expected["Range"], rel=1e-9), (
+                f"Range 시프트 — 라이브 회귀(자주색 RS선 wild 패턴)의 직접 원인"
+            )
+            assert db_row[6] == pytest.approx(expected["RS_Line"], rel=1e-9), (
+                f"RS_Line 시프트 — 사용자 차트의 RS 자주색 선이 Range 값으로 보이게 한 정확한 메커니즘"
+            )
+        finally:
+            conn.close()
