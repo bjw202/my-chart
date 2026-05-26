@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS stock_meta (
     last_updated TEXT,
     sma150 REAL,
     low52w REAL,
-    sma200_20d_ago REAL
+    sma200_20d_ago REAL,
+    sma5 REAL
 )
 """
 
@@ -156,24 +157,33 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
         c in daily_price_cols for c in ("SMA150", "LOW_52W", "SMA200_20D_AGO")
     )
 
+    # @MX:WARN: [AUTO] stock_prices SELECT ↔ stock_meta INSERT 위치 정합성 (SPEC-SMA5-FILTER-001 §1-B).
+    #           sma5는 daily.py와 달리 SELECT/DDL/INSERT 모두 "맨 끝"에 둔다.
+    # @MX:REASON: Minervini 가드가 d[8]/d[9]/d[10]을 위치로 읽으므로(아래 INSERT 튜플 참조),
+    #             sma5를 SELECT 중간에 끼우면 인덱스가 시프트되어 무음 오염이 발생한다.
+    #             끝에 append하면 기존 인덱스(d[8..10])가 보존된다. SMA5는 daily_by_name index 11.
+    has_sma5_price_col = "SMA5" in daily_price_cols
     if has_minervini_price_cols:
+        sma5_select = ", SMA5" if has_sma5_price_col else ""
         daily_rows = conn.execute(
-            """SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W,
-                      SMA150, LOW_52W, SMA200_20D_AGO
+            f"""SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W,
+                      SMA150, LOW_52W, SMA200_20D_AGO{sma5_select}
                FROM stock_prices
                WHERE Date = ?""",
             (latest_daily_date,),
         ).fetchall()
     else:
         # 레거시 경로: 신규 컬럼 없이 기존 컬럼만 조회
+        sma5_select = ", SMA5" if has_sma5_price_col else ""
         daily_rows = conn.execute(
-            """SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W
+            f"""SELECT Name, Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W{sma5_select}
                FROM stock_prices
                WHERE Date = ?""",
             (latest_daily_date,),
         ).fetchall()
     # daily_by_name: Name -> (Close, Change, EMA10, EMA20, SMA50, SMA100, SMA200, High52W
-    #                         [, SMA150, LOW_52W, SMA200_20D_AGO] — 신규 컬럼 있으면 포함)
+    #                         [, SMA150, LOW_52W, SMA200_20D_AGO] — Minervini 컬럼 있으면 포함
+    #                         [, SMA5] — SMA5 컬럼 있으면 항상 맨 끝)
     daily_by_name: dict[str, tuple] = {r[0]: r[1:] for r in daily_rows}
 
     # --- Attach weekly DB and load weekly snapshot ---
@@ -265,16 +275,32 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
     now_str = datetime.datetime.now().isoformat()
     rows_to_insert: list[tuple] = []
 
+    # @MX:WARN: [AUTO] sma5는 SELECT 분기에 따라 daily_by_name 튜플 위치가 다르다.
+    #           Minervini 분기 → index 11(맨 끝), 레거시 분기 → index 8(맨 끝).
+    # @MX:REASON: 위치를 잘못 읽으면 sma150/sma5가 뒤섞여 무음 오염된다. 분기 상태로
+    #             명시 계산해 len(d) 모호성을 제거한다(레거시+SMA5 케이스 corruption 방지).
+    if has_sma5_price_col:
+        sma5_idx = 11 if has_minervini_price_cols else 8
+    else:
+        sma5_idx = None
+
     for name, sector_info in sector_by_name.items():
         if name not in daily_by_name:
             # No daily data → skip (delisted, newly listed, or missing)
             continue
 
         # d 인덱스: (Close[0], Change[1], EMA10[2], EMA20[3], SMA50[4], SMA100[5],
-        #            SMA200[6], High52W[7], SMA150[8], LOW_52W[9], SMA200_20D_AGO[10])
+        #            SMA200[6], High52W[7], SMA150[8], LOW_52W[9], SMA200_20D_AGO[10], SMA5[11])
+        #           (Minervini 컬럼 없는 레거시 분기에서는 High52W[7] 다음이 SMA5[8])
         d = daily_by_name[name]
         w = weekly_by_name.get(name)  # (CHG_1W, CHG_1M, CHG_3M, SMA10, SMA20, SMA40) or None
         code = sector_info["code"]
+
+        # Minervini 컬럼은 신규 SELECT 분기에서만 존재 (레거시 분기에서는 항상 None)
+        sma150 = d[8] if has_minervini_price_cols and len(d) > 8 else None
+        low52w = d[9] if has_minervini_price_cols and len(d) > 9 else None
+        sma200_20d_ago = d[10] if has_minervini_price_cols and len(d) > 10 else None
+        sma5 = d[sma5_idx] if sma5_idx is not None and len(d) > sma5_idx else None
 
         rows_to_insert.append((
             code,
@@ -300,15 +326,16 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             w[4] if w else None,  # sma20_w
             w[5] if w else None,  # sma40_w
             now_str,
-            d[8] if len(d) > 8 else None,   # sma150 (REQ-MIN-001)
-            d[9] if len(d) > 9 else None,   # low52w (REQ-MIN-002)
-            d[10] if len(d) > 10 else None, # sma200_20d_ago (REQ-MIN-003)
+            sma150,           # sma150 (REQ-MIN-001)
+            low52w,           # low52w (REQ-MIN-002)
+            sma200_20d_ago,   # sma200_20d_ago (REQ-MIN-003)
+            sma5,             # sma5 (SPEC-SMA5-FILTER-001 REQ-SMA5-003) — 맨 끝 append
         ))
 
     conn.execute("DELETE FROM stock_meta")
     conn.executemany(
         """INSERT OR REPLACE INTO stock_meta
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         rows_to_insert,
     )
     conn.commit()

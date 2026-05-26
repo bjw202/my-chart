@@ -342,3 +342,97 @@ class TestScreenStocks:
         result = screen_stocks(req, ":memory:")
         codes = [s.code for sg in result.sectors for s in sg.stocks]
         assert "999999" not in codes  # NULL market_cap excluded by WHERE NULL >= 1 → False
+
+
+# ---------------------------------------------------------------------------
+# SPEC-SMA5-FILTER-001: SMA5 indicator screening (AC-5 / AC-6)
+# ---------------------------------------------------------------------------
+
+
+def _make_stock_meta_db_with_sma5(stocks: list[dict]) -> sqlite3.Connection:
+    """In-memory stock_meta with an sma5 column (mirrors production DDL extension)."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.execute(
+        """CREATE TABLE stock_meta (
+            code TEXT PRIMARY KEY,
+            name TEXT,
+            market TEXT,
+            market_cap INTEGER,
+            sector_major TEXT,
+            sector_minor TEXT,
+            product TEXT,
+            close REAL,
+            change_1d REAL,
+            ema10 REAL,
+            ema20 REAL,
+            sma50 REAL,
+            sma100 REAL,
+            sma200 REAL,
+            rs_12m REAL,
+            sma5 REAL,
+            last_updated TEXT
+        )"""
+    )
+    for s in stocks:
+        conn.execute(
+            """INSERT INTO stock_meta
+               (code,name,market,market_cap,sector_major,close,change_1d,
+                ema10,ema20,sma50,sma100,sma200,rs_12m,sma5,last_updated)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                s["code"], s["name"], s["market"], s.get("market_cap"),
+                s.get("sector_major", "전기전자"),
+                s.get("close", 100000.0), s.get("change_1d", 1.5),
+                s.get("ema10", 95000.0), s.get("ema20", 90000.0),
+                s.get("sma50", 85000.0), s.get("sma100", 80000.0),
+                s.get("sma200", 75000.0), s.get("rs_12m", 80.0),
+                s.get("sma5", 98000.0),
+                "2026-02-28T00:00:00",
+            ),
+        )
+    conn.commit()
+    return conn
+
+
+class TestSMA5Pattern:
+    """AC-5: Close > SMA5 패턴이 정확한 WHERE 절을 생성하고 매칭 종목을 반환한다."""
+
+    def test_sma5_pattern_builds_expected_where(self):
+        """AC-5: 단일 패턴은 항상 외곽 괄호로 감싸여 정확히 '(close > sma5 * ?)' 생성."""
+        pattern = PatternCondition(
+            indicator_a="Close", operator="gt", indicator_b="SMA5", multiplier=1.0
+        )
+        req = ScreenRequest(patterns=[pattern])
+        where, params = _build_where(req)
+        assert where == "(close > sma5 * ?)"
+        assert params == [1.0]
+
+    def test_sma5_pattern_returns_matching_stock(self):
+        """AC-5: close > sma5 를 만족하는 종목 A(close=110, sma5=100)가 결과에 포함된다."""
+        stocks = [
+            {"code": "000001", "name": "종목A", "market": "KOSPI",
+             "market_cap": 100000, "close": 110.0, "sma5": 100.0},
+            {"code": "000002", "name": "종목B", "market": "KOSPI",
+             "market_cap": 100000, "close": 90.0, "sma5": 100.0},
+        ]
+        conn = _make_stock_meta_db_with_sma5(stocks)
+        import backend.services.screen_service as svc
+        orig = svc.get_db_conn
+        svc.get_db_conn = lambda _path: conn
+        try:
+            pattern = PatternCondition(
+                indicator_a="Close", operator="gt", indicator_b="SMA5", multiplier=1.0
+            )
+            req = ScreenRequest(patterns=[pattern])
+            result = screen_stocks(req, ":memory:")
+        finally:
+            svc.get_db_conn = orig
+            conn.close()
+
+        codes = [s.code for sg in result.sectors for s in sg.stocks]
+        assert "000001" in codes  # close(110) > sma5(100) → True
+        assert "000002" not in codes  # close(90) > sma5(100) → False
+
+    def test_sma5_in_indicator_column_map(self):
+        """AC-6: SMA5가 _INDICATOR_COLUMN에 'sma5'로 매핑된다."""
+        assert _INDICATOR_COLUMN["SMA5"] == "sma5"

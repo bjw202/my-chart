@@ -4,7 +4,7 @@ import type { IndicatorName, PatternCondition, CompareOperator } from '../../typ
 // Exact whitelist - must match backend IndicatorName Literal
 const INDICATORS: IndicatorName[] = [
   'Close', 'Open', 'High', 'Low',
-  'EMA10', 'EMA20', 'SMA50', 'SMA100', 'SMA200',
+  'EMA10', 'EMA20', 'SMA5', 'SMA50', 'SMA100', 'SMA200',
 ]
 
 const OPERATORS: { value: CompareOperator; label: string }[] = [

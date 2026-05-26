@@ -7,6 +7,7 @@ export type IndicatorName =
   | 'Low'
   | 'EMA10'
   | 'EMA20'
+  | 'SMA5'
   | 'SMA50'
   | 'SMA100'
   | 'SMA200'

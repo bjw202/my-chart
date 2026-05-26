@@ -29,13 +29,18 @@ logger = logging.getLogger(__name__)
 MAX_WORKERS = 10
 API_THROTTLE_SLEEP = 0.1
 
+# @MX:WARN: [AUTO] 위치 기반 executemany — _DAILY_COLS / CREATE TABLE / INSERT 값 튜플
+#           3개 지점의 컬럼 순서가 정확히 일치해야 한다. SMA5/FromSMA5는 EMA20/FromEMA20
+#           바로 뒤에 삽입한다 (SPEC-SMA5-FILTER-001 §1-A 확정 위치).
+# @MX:REASON: 셋 중 하나라도 순서가 어긋나면 SQLite가 오류 없이 다른 컬럼 값을 받아
+#             무음 데이터 오염이 발생한다(전부 REAL). AC-9 round-trip 게이트로만 검출된다.
 _DAILY_COLS = (
     "Name", "Date", "Open", "High", "Low", "Close",
     "Change", "High52W",
     "Volume", "Volume20MA", "VolumeWon",
-    "EMA10", "EMA20", "SMA21", "SMA50", "EMA65", "SMA100", "SMA200",
+    "EMA10", "EMA20", "SMA5", "SMA21", "SMA50", "EMA65", "SMA100", "SMA200",
     "DailyRange", "HLC",
-    "FromEMA10", "FromEMA20", "FromSMA50", "FromSMA200",
+    "FromEMA10", "FromEMA20", "FromSMA5", "FromSMA50", "FromSMA200",
     "Range", "ADR20",
     "RS_Line",
     "SMA150", "LOW_52W", "SMA200_20D_AGO",
@@ -60,9 +65,9 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
             Open REAL, High REAL, Low REAL, Close REAL,
             Change REAL, High52W REAL,
             Volume REAL, Volume20MA REAL, VolumeWon REAL,
-            EMA10 REAL, EMA20 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA200 REAL,
+            EMA10 REAL, EMA20 REAL, SMA5 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA200 REAL,
             DailyRange REAL, HLC REAL,
-            FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
+            FromEMA10 REAL, FromEMA20 REAL, FromSMA5 REAL, FromSMA50 REAL, FromSMA200 REAL,
             Range REAL, ADR20 REAL,
             RS_Line REAL,
             SMA150 REAL,
@@ -77,9 +82,12 @@ def _ensure_daily_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_daily_date ON stock_prices(Date)"
     )
+    # @MX:NOTE: [AUTO] CREATE TABLE IF NOT EXISTS는 기존 테이블을 변경하지 않으므로,
+    #           신규 컬럼은 반드시 이 멱등 ALTER 루프로 추가해야 한다 (SPEC-SMA5-FILTER-001 §2.2).
+    #           SMA5/FromSMA5를 누락하면 기존 DB에 32요소 INSERT가 컬럼 수 불일치로 실패한다.
     # 기존 테이블에 누락된 컬럼 멱등 추가 (PRAGMA 기반 guard)
     existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(stock_prices)").fetchall()}
-    for col in ("SMA100", "RS_Line", "SMA150", "LOW_52W", "SMA200_20D_AGO"):
+    for col in ("SMA5", "FromSMA5", "SMA100", "RS_Line", "SMA150", "LOW_52W", "SMA200_20D_AGO"):
         if col not in existing_cols:
             try:
                 conn.execute(f"ALTER TABLE stock_prices ADD COLUMN {col} REAL")
@@ -129,6 +137,8 @@ def _fetch_daily_stock(
         price["Volume20MA"] = price["Volume"].rolling(window=20).mean()
         price["EMA10"] = price["Close"].ewm(span=10).mean()
         price["EMA20"] = price["Close"].ewm(span=20).mean()
+        # SMA5: 5일 단순이동평균 (SPEC-SMA5-FILTER-001 REQ-SMA5-002). 5거래일 미만은 NaN.
+        price["SMA5"] = price["Close"].rolling(window=5).mean()
         price["SMA21"] = price["Close"].rolling(window=21).mean()
         price["SMA50"] = price["Close"].rolling(window=50).mean()
         price["EMA65"] = price["Close"].ewm(span=65).mean()
@@ -147,6 +157,8 @@ def _fetch_daily_stock(
         price["High_52w"] = price["HIGH_52W"]
         price["FromEMA10(%)"] = (price["Close"] - price["EMA10"]) / price["EMA10"] * 100
         price["FromEMA20(%)"] = (price["Close"] - price["EMA20"]) / price["EMA20"] * 100
+        # FromSMA5(%): SMA5 이격도 (SPEC-SMA5-FILTER-001 REQ-SMA5-002). SMA5가 NaN이면 NaN 전파.
+        price["FromSMA5(%)"] = (price["Close"] - price["SMA5"]) / price["SMA5"] * 100
         price["FromSMA50(%)"] = (price["Close"] - price["SMA50"]) / price["SMA50"] * 100
         price["FromSMA200(%)"] = (
             (price["Close"] - price["SMA200"]) / price["SMA200"] * 100
@@ -193,6 +205,7 @@ def _fetch_daily_stock(
                 float(r["VolumeWon"]),
                 float(r["EMA10"]),
                 float(r["EMA20"]),
+                _to_float_or_none(r["SMA5"]),       # SMA5: 5거래일 미만 NaN→None (REQ-SMA5-006)
                 float(r["SMA21"]),
                 float(r["SMA50"]),
                 float(r["EMA65"]),
@@ -202,6 +215,7 @@ def _fetch_daily_stock(
                 float(r["HLC"]),
                 float(r["FromEMA10(%)"]),
                 float(r["FromEMA20(%)"]),
+                _to_float_or_none(r["FromSMA5(%)"]),  # SMA5 NaN 전파 시 None (REQ-SMA5-006)
                 float(r["FromSMA50(%)"]),
                 float(r["FromSMA200(%)"]),
                 float(r["Range"]),
