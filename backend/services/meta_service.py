@@ -49,9 +49,12 @@ CREATE TABLE IF NOT EXISTS stock_meta (
 )
 """
 
-# REQ-MIN-008: Minervini 신규 컬럼 목록 (stock_meta)
-# 멱등 ALTER로 레거시 DB에 누락된 컬럼만 추가
-_MINERVINI_META_COLS = ("sma150", "low52w", "sma200_20d_ago")
+# REQ-MIN-008 + SPEC-SMA5-FILTER-001 follow-up (2026-05-26):
+# stock_meta 레거시 DB 마이그레이션 대상 컬럼. _STOCK_META_DDL은 CREATE TABLE IF NOT EXISTS이므로
+# 기존 테이블은 신규 컬럼이 자동 추가되지 않는다. 멱등 ALTER 루프로 누락된 컬럼만 추가한다.
+# sma5는 SPEC-SMA5-FILTER-001 ship 후 라이브 검증에서 'no such column: sma5' 오류로
+# SMA5 패턴 필터가 0건 반환된 사례를 반영해 추가됨 (daily.py SMA5 ALTER 패턴과 대칭).
+_MINERVINI_META_COLS = ("sma150", "low52w", "sma200_20d_ago", "sma5")
 
 _INDEX_DDLS = [
     "CREATE INDEX IF NOT EXISTS idx_meta_sector ON stock_meta(sector_major)",

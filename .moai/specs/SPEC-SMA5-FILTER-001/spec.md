@@ -1,6 +1,13 @@
 ---
-
-## id: SPEC-SMA5-FILTER-001 version: 1.0.2 status: Implemented created: 2026-05-25 updated: 2026-05-26 author: jw priority: medium issue_number: 0
+id: SPEC-SMA5-FILTER-001
+version: 1.0.3
+status: Implemented
+created: 2026-05-25
+updated: 2026-05-26
+author: jw
+priority: medium
+issue_number: 0
+---
 
 # SPEC-SMA5-FILTER-001: SMA5 지표 추가 및 ChartGrid 필터 노출
 
@@ -10,6 +17,8 @@
 | --- | --- | --- | --- |
 | 1.0.0 | 2026-05-25 | jw | 초기 SPEC 작성. research.md(2026-05-25) 기반. 일봉 DB에 SMA5/FromSMA5 추가 + stock_meta.sma5 확장 + ChartGrid PatternBuilder 노출. development_mode: tdd. issue_number: 0 (GitHub integration OFF). |
 | 1.0.1 | 2026-05-25 | jw | plan-audit (review-1) 반영: 컬럼명↔값 정렬 AC 추가(D2), plan.md 테스트 경로 정정(D3), 삽입 위치 \[HARD\] 확정(D4), REQ 본문 구현 세부 제거(D5), AC-5 WHERE 문자열 괄호 보정(D6). 감사의 frontmatter 지적(D1: `created_at`/`labels`)은 프로젝트 house-style(8필드 표준: id/version/status/created/updated/author/priority/issue_number — 형제 SPEC 전부 `created` 사용·`labels` 미사용)에 따라 의도적으로 미적용 — known false-positive. |
+| 1.0.2 | 2026-05-26 | jw | TDD 구현 완료 (manager-tdd): AC-1\~AC-9 전부 GREEN, 회귀 0 (baseline 9→8, stale `==27` 정정 + 신규 +10 통과). daily.py SMA5(idx 13)/FromSMA5(idx 23) 3개 정합지점 + meta_service.py 끝-append(Minervini d\[8..10\] 보존) + screen.py/screen_service.py 화이트리스트 + 프론트엔드 드롭다운. status: Implemented. commit 060640f. |
+| 1.0.3 | 2026-05-26 | jw | 라이브 검증 후속 수정: 레거시 stock_meta(sma5 컬럼 누락)로 'SMA5 &gt; EMA20' 패턴이 0건 반환되는 이슈 발견. `_STOCK_META_DDL`은 `CREATE TABLE IF NOT EXISTS` 라 기존 26-col 테이블에 sma5가 자동 추가되지 않는 사각지대. `_MINERVINI_META_COLS`에 'sma5' 추가하여 daily.py SMA5 ALTER 패턴과 대칭하는 self-healing 회복. reproduction test 1건 추가 (585 passed, 회귀 0). 라이브 DB는 사용자가 `POST /api/db/update`로 SMA5 재계산 트리거 필요. |
 
 ---
 

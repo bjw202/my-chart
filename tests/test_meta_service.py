@@ -410,6 +410,75 @@ class TestRebuild:
         assert sp_sma5 == pytest.approx(distinct_sma5, rel=1e-12)
         assert meta_sma5 == pytest.approx(sp_sma5, rel=1e-12), "stock_meta.sma5 ≠ stock_prices.SMA5"
 
+    def test_legacy_stock_meta_without_sma5_gets_column_added_on_rebuild(self, tmp_path):
+        """SPEC-SMA5-FILTER-001 follow-up: 레거시 stock_meta(sma5 컬럼 없음)에 대해
+        멱등 ALTER가 sma5 컬럼을 자동 추가해야 한다.
+
+        User scenario (2026-05-26 라이브 검증): 기존 DB를 삭제하지 않고
+        /api/db/update만 실행한 경우 — daily.py의 ALTER 루프는 stock_prices에
+        SMA5/FromSMA5를 추가하지만, stock_meta의 _STOCK_META_DDL은
+        CREATE TABLE IF NOT EXISTS라 기존 26-col 스키마가 잔존 → SMA5 패턴 평가 시
+        'no such column: sma5' → 0건 반환. 멱등 ALTER로 self-healing 되어야 한다
+        (daily.py SMA5 ALTER 패턴과 대칭).
+        """
+        from backend.services.meta_service import _ensure_meta_minervini_columns
+
+        db_path = tmp_path / "legacy.db"
+        # pre-SMA5 stock_meta DDL — 2026-05-25 이전 운영 DB 스키마와 동일 (26 컬럼)
+        legacy_ddl = """
+        CREATE TABLE stock_meta (
+            code TEXT PRIMARY KEY,
+            name TEXT,
+            market TEXT,
+            market_cap INTEGER,
+            sector_major TEXT,
+            sector_minor TEXT,
+            product TEXT,
+            close REAL,
+            change_1d REAL,
+            ema10 REAL,
+            ema20 REAL,
+            sma50 REAL,
+            sma100 REAL,
+            sma200 REAL,
+            high52w REAL,
+            chg_1w REAL,
+            chg_1m REAL,
+            chg_3m REAL,
+            rs_12m REAL,
+            sma10_w REAL,
+            sma20_w REAL,
+            sma40_w REAL,
+            last_updated TEXT,
+            sma150 REAL,
+            low52w REAL,
+            sma200_20d_ago REAL
+        )
+        """
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.execute(legacy_ddl)
+            legacy_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()
+            }
+            assert "sma5" not in legacy_cols, "테스트 전제: pre-SMA5 스키마는 sma5가 없어야 함"
+
+            # When: 멱등 ALTER 호출
+            _ensure_meta_minervini_columns(conn)
+
+            # Then: sma5 컬럼이 자동 추가됨
+            migrated_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()
+            }
+            assert "sma5" in migrated_cols, (
+                "_ensure_meta_minervini_columns가 sma5를 ALTER로 추가해야 함 — "
+                "이 단언이 실패하면 사용자 시나리오('SMA5 > EMA20'가 0건 반환)가 재현됨"
+            )
+            # 멱등성 확인: 재호출해도 오류 없이 통과 (이미 추가된 컬럼은 무시)
+            _ensure_meta_minervini_columns(conn)
+        finally:
+            conn.close()
+
     def test_market_cap_is_null_when_pykrx_fails_and_no_dday_column(self, monkeypatch, tmp_path):
         """Regression: when pykrx fails and sectormap has no D-day column,
         market_cap should be NULL (not cause a crash).
