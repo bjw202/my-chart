@@ -25,6 +25,7 @@ export interface StockBubbleItem {
   stage_detail: string | null
   market_cap: number
   volume_ratio: number
+  sector_minor: string | null  // 산업명(중) — SPEC-SECTOR-MINOR-COLOR-001
 }
 
 export interface StockBubbleResponse {
