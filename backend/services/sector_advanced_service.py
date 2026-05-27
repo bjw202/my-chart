@@ -122,6 +122,7 @@ def get_stock_bubble(
             stage_detail=s.stage_detail,
             market_cap=s.market_cap,
             volume_ratio=s.volume_ratio,
+            sector_minor=s.sector_minor,  # SPEC-SECTOR-MINOR-COLOR-001
         )
         for s in stocks
     ]
