@@ -50,7 +50,8 @@ def _create_test_db() -> str:
             sector_major TEXT,
             sector_minor TEXT,
             market TEXT,
-            market_cap REAL
+            market_cap REAL,
+            product TEXT
         );
         CREATE TABLE relative_strength (
             Name TEXT,
@@ -86,13 +87,14 @@ def _create_test_db() -> str:
         ("한미약품", "헬스케어", "KOSDAQ", 5_000_000.0, 350000.0, 0.01),
     ]
 
-    # stock_meta 삽입
+    # stock_meta 삽입 (product 컬럼 포함, SPEC-STOCK-TOOLTIP-PRODUCT-001)
     meta_rows = []
     for name, sector, market, cap, _, _ in stocks:
         code = f"{hash(name) % 900000 + 100000:06d}"
-        meta_rows.append((name, code, sector, sector + "소그룹", market, cap))
+        product = f"{name} 주요제품"  # 테스트용 임의 product 값
+        meta_rows.append((name, code, sector, sector + "소그룹", market, cap, product))
     conn.executemany(
-        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?)",
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
         meta_rows,
     )
 
@@ -630,3 +632,477 @@ class TestDetectSectorTransitions:
         for alert in result.emerging_leaders + result.weakening_sectors:
             for signal in alert.signals:
                 assert isinstance(signal, str), f"시그널이 문자열이 아님: {signal!r}"
+
+
+# ---------------------------------------------------------------------------
+# SPEC-SECTOR-MINOR-COLOR-001: sector_minor 필드 전파 테스트 (RED 단계)
+# AC-1: StockBubbleItem 스키마에 sector_minor 필드 추가
+# AC-2: compute_stock_bubble / _get_stock_meta가 sector_minor 값을 올바르게 전파
+# ---------------------------------------------------------------------------
+
+def test_stock_bubble_response_includes_sector_minor() -> None:
+    """StockBubbleItem 스키마에 sector_minor 필드가 정의되어야 한다.
+
+    AC-1 검증:
+    - StockBubbleItem.model_fields에 'sector_minor' 키가 존재해야 한다.
+    - 해당 필드 타입이 Optional[str] (str | None) 호환이어야 한다.
+    """
+    from backend.schemas.sector_advanced import StockBubbleItem
+    import typing
+
+    # sector_minor 필드 존재 여부 확인
+    assert "sector_minor" in StockBubbleItem.model_fields, (
+        "StockBubbleItem에 'sector_minor' 필드가 없음 — AC-1 미충족"
+    )
+
+    # 타입이 Optional[str] (즉 str | None) 호환인지 확인
+    annotation = StockBubbleItem.model_fields["sector_minor"].annotation
+    # Optional[str] 또는 str | None 모두 허용
+    # Pydantic v2에서 model_fields의 annotation은 Union[str, None] 형태로 저장됨
+    origin = getattr(annotation, "__origin__", None)
+    args = getattr(annotation, "__args__", ())
+    assert origin is typing.Union and type(None) in args, (
+        f"sector_minor 필드 타입이 Optional[str]이 아님: {annotation!r}"
+    )
+
+
+def test_compute_stock_bubble_propagates_sector_minor() -> None:
+    """compute_stock_bubble 결과에 sector_minor 값이 올바르게 전파되어야 한다.
+
+    AC-1, AC-2 검증:
+    - 결과 StockBubble 객체에 sector_minor 속성이 존재해야 한다.
+    - stock_meta에 저장된 sector_minor 값이 결과에 그대로 반영되어야 한다.
+    """
+    from my_chart.analysis.sector_advanced import compute_stock_bubble
+
+    # sector_minor 값이 명시적으로 채워진 테스트 DB 생성
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    conn = sqlite3.connect(tmp.name)
+    conn.executescript("""
+        CREATE TABLE stock_prices (
+            Name TEXT, Date TEXT, Close REAL, Volume REAL,
+            SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL,
+            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL
+        );
+        CREATE TABLE stock_meta (
+            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
+            market TEXT, market_cap REAL, product TEXT
+        );
+        CREATE TABLE relative_strength (
+            Name TEXT, Date TEXT, RS_12M_Rating REAL
+        );
+    """)
+
+    # stock_meta에 sector_minor='반도체' 로 삼성전자 삽입
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("삼성전자", "005930", "IT", "반도체", "KOSPI", 400_000_000.0, None),
+    )
+    # stock_meta에 sector_minor='소프트웨어' 로 카카오 삽입
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("카카오", "035720", "IT", "소프트웨어", "KOSDAQ", 30_000_000.0, None),
+    )
+
+    # 12주 가격 데이터 삽입 (KOSPI 포함)
+    dates = [
+        "2024-01-05", "2024-01-12", "2024-01-19", "2024-01-26",
+        "2024-02-02", "2024-02-09", "2024-02-16", "2024-02-23",
+        "2024-03-01", "2024-03-08", "2024-03-15", "2024-03-22",
+    ]
+    for i, date in enumerate(dates):
+        # KOSPI 인덱스
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("KOSPI", date, 2500.0 + i * 10, 5_000_000.0,
+             2450.0, 2400.0, 2380.0, 0.005, 0.015, 0.04, 2600.0),
+        )
+        # 삼성전자
+        close_se = 70000.0 + i * 1400
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("삼성전자", date, close_se, 1_000_000.0 + i * 50_000,
+             close_se * 0.99, close_se * 0.97, close_se * 0.95,
+             0.02, 0.08, 0.24, close_se * 1.1),
+        )
+        # 카카오
+        close_kk = 55000.0 - i * 275
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("카카오", date, close_kk, 500_000.0 + i * 20_000,
+             close_kk * 0.99, close_kk * 0.97, close_kk * 0.95,
+             -0.005, -0.02, -0.06, close_kk * 1.05),
+        )
+        # RS 데이터
+        conn.execute(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            ("삼성전자", date, min(70.0 + i * 3, 100.0)),
+        )
+        conn.execute(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            ("카카오", date, max(40.0 - i * 2, 0.0)),
+        )
+
+    conn.commit()
+    conn.close()
+
+    result = compute_stock_bubble(tmp.name, sector_name="IT", period="1w")
+    assert len(result) > 0, "IT 섹터 결과가 비어있음"
+
+    # sector_minor 속성이 각 결과에 존재해야 한다 (AC-1, AC-2)
+    for item in result:
+        assert hasattr(item, "sector_minor"), (
+            f"StockBubble 객체에 'sector_minor' 속성이 없음: {item!r} — AC-1 미충족"
+        )
+
+    # 종목별 sector_minor 값이 stock_meta와 일치해야 한다 (AC-2)
+    name_to_sector_minor = {item.name: item.sector_minor for item in result}
+    if "삼성전자" in name_to_sector_minor:
+        assert name_to_sector_minor["삼성전자"] == "반도체", (
+            f"삼성전자 sector_minor 불일치: {name_to_sector_minor['삼성전자']!r} != '반도체'"
+        )
+    if "카카오" in name_to_sector_minor:
+        assert name_to_sector_minor["카카오"] == "소프트웨어", (
+            f"카카오 sector_minor 불일치: {name_to_sector_minor['카카오']!r} != '소프트웨어'"
+        )
+
+
+def test_compute_stock_bubble_sector_minor_null_fallback() -> None:
+    """sector_minor가 NULL인 종목의 결과값이 None이어야 한다.
+
+    AC-2 검증:
+    - stock_meta.sector_minor가 NULL인 종목은 결과 sector_minor가 None이어야 한다.
+    - sector_minor가 빈 문자열('')인 경우도 None으로 변환되어야 한다.
+    """
+    from my_chart.analysis.sector_advanced import compute_stock_bubble
+
+    # sector_minor가 NULL인 종목을 포함한 테스트 DB 생성
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    conn = sqlite3.connect(tmp.name)
+    conn.executescript("""
+        CREATE TABLE stock_prices (
+            Name TEXT, Date TEXT, Close REAL, Volume REAL,
+            SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL,
+            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL
+        );
+        CREATE TABLE stock_meta (
+            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
+            market TEXT, market_cap REAL, product TEXT
+        );
+        CREATE TABLE relative_strength (
+            Name TEXT, Date TEXT, RS_12M_Rating REAL
+        );
+    """)
+
+    # sector_minor=NULL 로 LG화학 삽입
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("LG화학", "051910", "화학", None, "KOSPI", 25_000_000.0, None),
+    )
+
+    dates = [
+        "2024-01-05", "2024-01-12", "2024-01-19", "2024-01-26",
+        "2024-02-02", "2024-02-09", "2024-02-16", "2024-02-23",
+        "2024-03-01", "2024-03-08", "2024-03-15", "2024-03-22",
+    ]
+    for i, date in enumerate(dates):
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("KOSPI", date, 2500.0 + i * 10, 5_000_000.0,
+             2450.0, 2400.0, 2380.0, 0.005, 0.015, 0.04, 2600.0),
+        )
+        close_lg = 450000.0 + i * 6750
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("LG화학", date, close_lg, 300_000.0 + i * 10_000,
+             close_lg * 0.99, close_lg * 0.97, close_lg * 0.95,
+             0.015, 0.06, 0.18, close_lg * 1.1),
+        )
+        conn.execute(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            ("LG화학", date, min(55.0 + i * 3, 100.0)),
+        )
+
+    conn.commit()
+    conn.close()
+
+    result = compute_stock_bubble(tmp.name, sector_name="화학", period="1w")
+    assert len(result) > 0, "화학 섹터 결과가 비어있음"
+
+    # LG화학의 sector_minor는 None이어야 한다 (AC-2 NULL 처리)
+    for item in result:
+        if item.name == "LG화학":
+            assert hasattr(item, "sector_minor"), (
+                "StockBubble에 'sector_minor' 속성이 없음"
+            )
+            assert item.sector_minor is None, (
+                f"LG화학 sector_minor가 None이 아님: {item.sector_minor!r} — AC-2 NULL fallback 미충족"
+            )
+            break
+    else:
+        pytest.fail("LG화학이 결과에 없음 — 테스트 데이터 문제")
+
+
+def test_get_stock_meta_includes_sector_minor() -> None:
+    """_get_stock_meta 결과 각 종목에 'sector_minor' 키가 존재해야 한다.
+
+    AC-2 보강 검증:
+    - _get_stock_meta 반환 dict의 각 value에 'sector_minor' 키가 있어야 한다.
+    - 기존 키(Code, sector_major, 시장구분, market_cap)는 여전히 존재해야 한다.
+    - 값은 stock_meta의 sector_minor 컬럼값 또는 None이어야 한다.
+    """
+    from my_chart.analysis.sector_advanced import _get_stock_meta
+
+    # sector_minor 값이 있는 종목과 없는 종목을 포함한 DB 생성
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    conn = sqlite3.connect(tmp.name)
+    conn.executescript("""
+        CREATE TABLE stock_meta (
+            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
+            market TEXT, market_cap REAL, product TEXT
+        );
+    """)
+    # sector_minor 있는 종목
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("삼성전자", "005930", "IT", "반도체", "KOSPI", 400_000_000.0, "메모리반도체"),
+    )
+    # sector_minor NULL인 종목
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("LG화학", "051910", "화학", None, "KOSPI", 25_000_000.0, None),
+    )
+    conn.commit()
+    conn.close()
+
+    result = _get_stock_meta(tmp.name)
+    assert len(result) > 0, "_get_stock_meta 결과가 비어있음"
+
+    for name, meta in result.items():
+        # 기존 키 유지 확인 (회귀 방지)
+        assert "Code" in meta, f"{name}: 'Code' 키 누락"
+        assert "sector_major" in meta, f"{name}: 'sector_major' 키 누락"
+        assert "시장구분" in meta, f"{name}: '시장구분' 키 누락"
+        assert "market_cap" in meta, f"{name}: 'market_cap' 키 누락"
+        # 신규 키 존재 확인 (AC-2)
+        assert "sector_minor" in meta, (
+            f"{name}: 'sector_minor' 키 누락 — AC-2 미충족"
+        )
+
+    # 삼성전자 sector_minor 값 일치 확인
+    assert result["삼성전자"]["sector_minor"] == "반도체", (
+        f"삼성전자 sector_minor 불일치: {result['삼성전자']['sector_minor']!r}"
+    )
+    # LG화학 sector_minor NULL → None 변환 확인
+    assert result["LG화학"]["sector_minor"] is None, (
+        f"LG화학 sector_minor가 None이 아님: {result['LG화학']['sector_minor']!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# SPEC-STOCK-TOOLTIP-PRODUCT-001: product 필드 전파 테스트 (RED 단계)
+# AC-1: StockBubbleItem 스키마에 product 필드 추가
+# AC-2: compute_stock_bubble / _get_stock_meta가 product 값을 올바르게 전파
+# ---------------------------------------------------------------------------
+
+def test_stock_bubble_response_includes_product() -> None:
+    """StockBubbleItem 스키마에 product 필드가 정의되어야 한다.
+
+    AC-1 검증:
+    - StockBubbleItem.model_fields에 'product' 키가 존재해야 한다.
+    - 해당 필드 타입이 Optional[str] (str | None) 호환이어야 한다.
+    - 필드명이 정확히 'product'이어야 한다 (REQ-STP-007, meta_service.py:229 일관성).
+    """
+    from backend.schemas.sector_advanced import StockBubbleItem
+    import typing
+
+    # product 필드 존재 여부 확인 (AC-1)
+    assert "product" in StockBubbleItem.model_fields, (
+        "StockBubbleItem에 'product' 필드가 없음 — AC-1 미충족"
+    )
+
+    # 타입이 Optional[str] (즉 str | None) 호환인지 확인 (AC-1)
+    annotation = StockBubbleItem.model_fields["product"].annotation
+    origin = getattr(annotation, "__origin__", None)
+    args = getattr(annotation, "__args__", ())
+    assert origin is typing.Union and type(None) in args, (
+        f"product 필드 타입이 Optional[str]이 아님: {annotation!r}"
+    )
+
+    # 명명 일관성 확인: 'main_product', 'mainProduct' 등 변형 없어야 함 (REQ-STP-007)
+    assert "main_product" not in StockBubbleItem.model_fields, (
+        "main_product 변형 필드가 존재함 — REQ-STP-007 명명 일관성 위반"
+    )
+
+
+def test_compute_stock_bubble_propagates_product() -> None:
+    """compute_stock_bubble 결과에 product 값이 올바르게 전파되어야 한다.
+
+    AC-2 검증:
+    - 결과 StockBubble 객체에 product 속성이 존재해야 한다.
+    - stock_meta에 저장된 product 값이 결과에 그대로 반영되어야 한다.
+    """
+    from my_chart.analysis.sector_advanced import compute_stock_bubble
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    conn = sqlite3.connect(tmp.name)
+    conn.executescript("""
+        CREATE TABLE stock_prices (
+            Name TEXT, Date TEXT, Close REAL, Volume REAL,
+            SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL,
+            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL
+        );
+        CREATE TABLE stock_meta (
+            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
+            market TEXT, market_cap REAL, product TEXT
+        );
+        CREATE TABLE relative_strength (
+            Name TEXT, Date TEXT, RS_12M_Rating REAL
+        );
+    """)
+
+    # stock_meta에 product 값이 있는 삼성전자 삽입
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("삼성전자", "005930", "IT", "반도체", "KOSPI", 400_000_000.0, "반도체용 메모리"),
+    )
+    # stock_meta에 product 값이 있는 카카오 삽입
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("카카오", "035720", "IT", "소프트웨어", "KOSDAQ", 30_000_000.0, "모바일 플랫폼"),
+    )
+
+    dates = [
+        "2024-01-05", "2024-01-12", "2024-01-19", "2024-01-26",
+        "2024-02-02", "2024-02-09", "2024-02-16", "2024-02-23",
+        "2024-03-01", "2024-03-08", "2024-03-15", "2024-03-22",
+    ]
+    for i, date in enumerate(dates):
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("KOSPI", date, 2500.0 + i * 10, 5_000_000.0,
+             2450.0, 2400.0, 2380.0, 0.005, 0.015, 0.04, 2600.0),
+        )
+        close_se = 70000.0 + i * 1400
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("삼성전자", date, close_se, 1_000_000.0 + i * 50_000,
+             close_se * 0.99, close_se * 0.97, close_se * 0.95,
+             0.02, 0.08, 0.24, close_se * 1.1),
+        )
+        close_kk = 55000.0 - i * 275
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("카카오", date, close_kk, 500_000.0 + i * 20_000,
+             close_kk * 0.99, close_kk * 0.97, close_kk * 0.95,
+             -0.005, -0.02, -0.06, close_kk * 1.05),
+        )
+        conn.execute(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            ("삼성전자", date, min(70.0 + i * 3, 100.0)),
+        )
+        conn.execute(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            ("카카오", date, max(40.0 - i * 2, 0.0)),
+        )
+
+    conn.commit()
+    conn.close()
+
+    result = compute_stock_bubble(tmp.name, sector_name="IT", period="1w")
+    assert len(result) > 0, "IT 섹터 결과가 비어있음"
+
+    # product 속성이 각 결과에 존재해야 한다 (AC-2)
+    for item in result:
+        assert hasattr(item, "product"), (
+            f"StockBubble 객체에 'product' 속성이 없음: {item!r} — AC-2 미충족"
+        )
+
+    # 종목별 product 값이 stock_meta와 일치해야 한다 (AC-2)
+    name_to_product = {item.name: item.product for item in result}
+    if "삼성전자" in name_to_product:
+        assert name_to_product["삼성전자"] == "반도체용 메모리", (
+            f"삼성전자 product 불일치: {name_to_product['삼성전자']!r} != '반도체용 메모리'"
+        )
+    if "카카오" in name_to_product:
+        assert name_to_product["카카오"] == "모바일 플랫폼", (
+            f"카카오 product 불일치: {name_to_product['카카오']!r} != '모바일 플랫폼'"
+        )
+
+
+def test_compute_stock_bubble_product_null_fallback() -> None:
+    """product가 NULL인 종목의 결과값이 None이어야 한다.
+
+    AC-2 검증:
+    - stock_meta.product가 NULL인 종목은 결과 product가 None이어야 한다.
+    """
+    from my_chart.analysis.sector_advanced import compute_stock_bubble
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    conn = sqlite3.connect(tmp.name)
+    conn.executescript("""
+        CREATE TABLE stock_prices (
+            Name TEXT, Date TEXT, Close REAL, Volume REAL,
+            SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL,
+            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL
+        );
+        CREATE TABLE stock_meta (
+            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
+            market TEXT, market_cap REAL, product TEXT
+        );
+        CREATE TABLE relative_strength (
+            Name TEXT, Date TEXT, RS_12M_Rating REAL
+        );
+    """)
+
+    # product=NULL 로 LG화학 삽입
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("LG화학", "051910", "화학", "정밀화학", "KOSPI", 25_000_000.0, None),
+    )
+
+    dates = [
+        "2024-01-05", "2024-01-12", "2024-01-19", "2024-01-26",
+        "2024-02-02", "2024-02-09", "2024-02-16", "2024-02-23",
+        "2024-03-01", "2024-03-08", "2024-03-15", "2024-03-22",
+    ]
+    for i, date in enumerate(dates):
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("KOSPI", date, 2500.0 + i * 10, 5_000_000.0,
+             2450.0, 2400.0, 2380.0, 0.005, 0.015, 0.04, 2600.0),
+        )
+        close_lg = 450000.0 + i * 6750
+        conn.execute(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("LG화학", date, close_lg, 300_000.0 + i * 10_000,
+             close_lg * 0.99, close_lg * 0.97, close_lg * 0.95,
+             0.015, 0.06, 0.18, close_lg * 1.1),
+        )
+        conn.execute(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            ("LG화학", date, min(55.0 + i * 3, 100.0)),
+        )
+
+    conn.commit()
+    conn.close()
+
+    result = compute_stock_bubble(tmp.name, sector_name="화학", period="1w")
+    assert len(result) > 0, "화학 섹터 결과가 비어있음"
+
+    for item in result:
+        if item.name == "LG화학":
+            assert hasattr(item, "product"), (
+                "StockBubble에 'product' 속성이 없음"
+            )
+            assert item.product is None, (
+                f"LG화학 product가 None이 아님: {item.product!r} — AC-2 NULL fallback 미충족"
+            )
+            break
+    else:
+        pytest.fail("LG화학이 결과에 없음 — 테스트 데이터 문제")

@@ -52,6 +52,8 @@ class SectorBubble:
     period_return: float     # 기간 수익률 (%)
 
 
+# @MX:NOTE: [AUTO] StockBubble에 sector_minor 필드 추가. API 응답에 산업명(중) 포함. 기본값 None으로 하위 호환성 유지.
+# @MX:SPEC: SPEC-SECTOR-MINOR-COLOR-001
 @dataclass
 class StockBubble:
     """종목 버블 차트용 데이터."""
@@ -64,6 +66,8 @@ class StockBubble:
     stage_detail: str | None # 스테이지 상세
     market_cap: float        # 시가총액
     volume_ratio: float      # 거래량 비율 (Volume / VolumeSMA10)
+    sector_minor: str | None = None  # 산업명(중) (SPEC-SECTOR-MINOR-COLOR-001)
+    product: str | None = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
 
 
 @dataclass
@@ -116,6 +120,10 @@ def _get_kospi_close_by_date(conn: sqlite3.Connection, dates: list[str]) -> dict
     return {r[0]: float(r[1] or 0.0) for r in rows}
 
 
+# @MX:NOTE: [AUTO] stock_meta SELECT에 sector_minor 컬럼 추가. sector_detail_service.py와 동일 패턴.
+# @MX:SPEC: SPEC-SECTOR-MINOR-COLOR-001
+# @MX:NOTE: [AUTO] stock_meta SELECT에 product(주요제품) 컬럼 추가. sector_minor와 동일 패턴.
+# @MX:SPEC: SPEC-STOCK-TOOLTIP-PRODUCT-001
 def _get_stock_meta(db_path: str | None = None) -> dict[str, dict[str, Any]]:
     """stock_meta에서 종목 메타데이터를 로드한다.
 
@@ -126,7 +134,7 @@ def _get_stock_meta(db_path: str | None = None) -> dict[str, dict[str, Any]]:
         db_path: 우선 시도할 DB 경로. None이면 daily DB 기본 경로 사용.
 
     Returns:
-        {Name: {Code, sector_major, 시장구분, market_cap}} 딕셔너리
+        {Name: {Code, sector_major, sector_minor, 시장구분, market_cap, product}} 딕셔너리
     """
     daily_fallback = f"{DEFAULT_DB_DAILY}.db"
     paths_to_try = [db_path, daily_fallback] if db_path else [daily_fallback]
@@ -137,16 +145,18 @@ def _get_stock_meta(db_path: str | None = None) -> dict[str, dict[str, Any]]:
         conn = _connect(path)
         try:
             rows = conn.execute(
-                "SELECT name, code, sector_major, market, market_cap FROM stock_meta"
+                "SELECT name, code, sector_major, sector_minor, market, market_cap, product FROM stock_meta"
             ).fetchall()
             if rows:
                 result: dict[str, dict[str, Any]] = {}
-                for name, code, sector, market, cap in rows:
+                for name, code, sector, sector_minor, market, cap, product in rows:
                     result[str(name)] = {
                         "Code": code or "",
                         "sector_major": sector or "",
+                        "sector_minor": sector_minor or None,  # SPEC-SECTOR-MINOR-COLOR-001
                         "시장구분": market or "",
                         "market_cap": float(cap or 0.0),
+                        "product": product or None,  # SPEC-STOCK-TOOLTIP-PRODUCT-001
                     }
                 return result
         except sqlite3.OperationalError:
@@ -624,6 +634,8 @@ def compute_stock_bubble(
             stage_detail=stage_result.detail,
             market_cap=round(cap, 0),
             volume_ratio=round(stage_result.volume_ratio, 4),
+            sector_minor=meta.get("sector_minor"),  # SPEC-SECTOR-MINOR-COLOR-001
+            product=meta.get("product"),             # SPEC-STOCK-TOOLTIP-PRODUCT-001
         ))
 
     return results

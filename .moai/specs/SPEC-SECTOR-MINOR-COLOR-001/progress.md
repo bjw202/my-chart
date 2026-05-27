@@ -1,0 +1,49 @@
+## SPEC-SECTOR-MINOR-COLOR-001 Progress
+
+- Started: 2026-05-27 (session run-001)
+- SPEC version: 1.0.1 (plan-auditor PASS 0.93)
+- Branch: feature/SPEC-SECTOR-MINOR-COLOR-001
+- Development mode: tdd
+- Harness level: standard (file>3 + multi-domain + spec_type:feature)
+- Scale-Based Mode: Standard Mode (manager-strategy + relevant expert + manager-quality)
+- Memory guard: disabled (skip Phase 0.5)
+- Detected language skills: moai-lang-python (backend), moai-lang-typescript (frontend), moai-domain-frontend
+- Delta markers: [MODIFY] x7 + [NEW] x2 (test + hook) — delta-aware routing active
+- Progression mode: stepwise approval (user confirmed)
+- Branch strategy: feature/SPEC- prefix (personal git-strategy)
+- Lessons applied: #1 hover policy, #2 prominence priority, #4 N/A, #7 baseline guidance
+- Phase 1 complete (manager-strategy): 4 검증 모두 PASS
+  - 검증 1: _get_stock_meta 6 호출자 전수 조사 → backward compatible
+  - 검증 2: STAGE_COLORS / DEFAULT_COLOR 외부 참조 0건 → 삭제 안전
+  - 검증 3: useMediaQuery / matchMedia 충돌 0건 → 신규 hook 도입 안전
+  - 검증 4: AC-1~AC-11 RED 가능, AC-12 pending 허용
+- 추가 발견 (긍정): backend test fixture(L51,486,522,611)에 이미 sector_minor TEXT 컬럼 존재 → 픽스처 SQL 변경 불필요
+- 권장: Task 7을 sub-step (7a 상수, 7b color map, 7c legend, 7d tooltip, 7e responsive)으로 분할 권장
+- 권장: useMediaQuery jsdom 환경 matchMedia mock 패턴 필수
+- Phase 2 RED-1 complete: backend/tests/test_sector_advanced.py +4 RED tests (L635/657/750/831), 4 FAIL 확인, 35 기존 PASS 유지
+- Phase 2 GREEN-1 complete: 3 파일 수정 (sector_advanced.py +12/-3, schemas +5/-0, services +1/-0), 39 PASS, 회귀 없음. 단 MX 태그 [AUTO] 비표준 형식 사용 → Phase 2.9에서 정규화 필요. Optional[str] 채택 (Python 3.13 typing.Union 호환성)
+- Phase 2 RED-2 complete: frontend/src/components/SectorAnalysis/__tests__/StockBubbleChart.test.tsx 신규 (560 lines, 26 tests). 20 FAIL + 6 PASS(회귀방지). tsc 0 errors. 기존 SectorAnalysis 3 파일 PASS 유지
+- dev server 상태: backend uvicorn PID 83736 (port 8000) + frontend Vite PID 83794 (port 5173) 둘 다 실행 중 → GREEN-2 완료 시 hot reload로 라이브 즉시 반영
+- Phase 2 GREEN-2 진입: Task 7 sub-step 7a/7b/7c/7d/7e 순차 구현
+- Phase 2 GREEN-2 complete: 3 파일 변경 (bubble.ts +1, useMediaQuery.ts NEW 27 lines, StockBubbleChart.tsx 206→256 +50 lines). STAGE_COLORS / DEFAULT_COLOR 완전 제거 확인. 26/26 PASS (20 RED→GREEN + 6 회귀방지). 기존 3 SectorAnalysis 테스트 PASS 유지. tsc 0 errors, ESLint 0 errors. 전체 frontend 381 PASS (2 pre-existing e2e fails 무관). MX 태그 protocol 표준 형식 (`// @MX:NOTE:` + `// @MX:SPEC:` 별행, `[AUTO]` 미사용). 설계: 단일 series + datapoint별 itemStyle.color (AC-4 테스트 구조 정합), tooltip은 params.data.sector_minor 직접 접근.
+- Vite HMR로 frontend 변경 즉시 라이브 반영 가능 (port 5173)
+- Phase 2.5-2.8a 평가 결과:
+  - manager-quality: WARNING (MX [AUTO] 정규화만 권장, 전반적 PASS)
+  - evaluator-active: **FAIL** (AC-6 legend click toggle CRITICAL — single series + scatter chart 한계 가설)
+- 라이브 검증 (사용자 이미지 clipboard_1779863650_26026.png, 3572×1300):
+  - ✅ AC-4 sector_minor 색상 분류 작동 (파랑+주황 2그룹)
+  - ✅ AC-8 tooltip 산업명(중) + Stage 라인 보존
+  - 🚨 **AC-5 + AC-6 + AC-7 모두 FAIL — 범례 자체가 화면에 표시되지 않음**
+- 근본 원인: ECharts scatter는 name-based chart 아님 → legend.data 항목이 series[i].name과만 매칭. 단일 series("종목 분포") + legend.data에 sector_minor 그룹명 → 매칭 실패 → silent 미렌더링
+- Fix 결정: multi-series 변환 + 테스트 단언 강화 + AC-9 rerender + useMediaQuery coverage + MX [AUTO] 정규화 + tooltip XSS hardening 일괄 진행 (manager-tdd 재위임)
+- Fix-Evaluate Cycle 1 complete: 6 fix (CRITICAL multi-series + 5 WARNING/INFO). Vitest 85 PASS (78 + 7 신규). StockBubbleChart 90% / useMediaQuery 85.71% coverage. tsc/eslint 0 errors. Backend pytest 39 PASS (회귀 없음).
+- 라이브 재검증 (clipboard_1779864961_24662.png, 반도체 섹터):
+  - ✅ AC-5 PASS — vertical legend 10 그룹 표시 (반도체_장비/소재/팹리스/설비/패키징/기타/테스트/디자인솔루션/메모리/Foundry)
+  - ✅ AC-7 PASS — 인텍플러스 hover → 반도체_장비 그룹 선명 / 다른 그룹 dim 라이브 확인
+  - ✅ AC-8 PASS — 산업명(중): 반도체_장비 + Stage: S2 (Stage 2 Strong) 라이브 확인
+  - 🟡 AC-6 미명시 라이브 클릭 — multi-series series.name === legend.data[i].name 매칭으로 ECharts 표준 자동 동작 보장
+- 사용자 의도 명확화: "주요제품 tooltip 표시"는 별도 SPEC-STOCK-TOOLTIP-PRODUCT-001 대상 (이전 결정 유지). sectormap-original.xlsx 산업명(대)/산업명(중)/주요제품 컬럼 중 마지막 항목 추가 작업.
+- 본 SPEC 마무리: evaluator-active Cycle 2 재평가 → Phase 3 git 커밋 (backend 1 + frontend 1) → 별도 SPEC plan 진입
+- Cycle 2 evaluator-active 결과: **PASS** (0.88 / 1.00, threshold 0.75). Functionality 92, Security 95, Craft 80, Consistency 90.
+- L17 @MX:NOTE [AUTO] prefix 1줄 사소 fix 완료
+- Phase 3 git commit 진입: backend 1 + frontend 1 (분리 ship, A7 backward compat)

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -35,6 +37,10 @@ class SectorBubbleResponse(BaseModel):
 # 종목 버블 스키마
 # ---------------------------------------------------------------------------
 
+# @MX:NOTE: [AUTO] StockBubbleItem API 계약 확장: sector_minor 필드 추가. 프론트엔드 버블 차트 색상 분류에 사용.
+# @MX:SPEC: SPEC-SECTOR-MINOR-COLOR-001
+# @MX:NOTE: [AUTO] StockBubbleItem.product 필드 추가. tooltip "주요제품" 라인 데이터 소스.
+# @MX:SPEC: SPEC-STOCK-TOOLTIP-PRODUCT-001
 class StockBubbleItem(BaseModel):
     """종목 버블 차트 단일 항목."""
 
@@ -46,6 +52,8 @@ class StockBubbleItem(BaseModel):
     stage_detail: str | None # 스테이지 상세
     market_cap: float        # 시가총액
     volume_ratio: float      # 거래량 비율
+    sector_minor: Optional[str] = None  # 산업명(중) (SPEC-SECTOR-MINOR-COLOR-001)
+    product: Optional[str] = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
 
 
 class StockBubbleResponse(BaseModel):

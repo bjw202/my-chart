@@ -1,13 +1,6 @@
 ---
-id: SPEC-SECTOR-MINOR-COLOR-001
-version: 1.0.1
-status: draft
-created: 2026-05-27
-updated: 2026-05-27
-author: jw
-priority: medium
-issue_number: 0
----
+
+## id: SPEC-SECTOR-MINOR-COLOR-001 version: 1.0.1 status: draft created: 2026-05-27 updated: 2026-05-27 author: jw priority: medium issue_number: 0
 
 # SPEC-SECTOR-MINOR-COLOR-001: StockBubbleChart 산업명(중) 색상·범례 (Stage 색상 100% 대체)
 
@@ -26,7 +19,7 @@ issue_number: 0
 
 - **프로젝트**: KR Stock Screener (FastAPI + React + SQLite)
 - **선행 리서치**: `.moai/specs/SPEC-SECTOR-MINOR-COLOR-001/research.md` (2026-05-27)
-- **목표**: Sector Analysis → Bubble 탭 → 섹터 클릭 시 등장하는 종목 드릴다운 뷰(`StockBubbleChart`)에서, Weinstein Stage 기준 색상·5-항목 범례를 **산업명(중) = `sector_minor`** 기준 동적 색상·범례로 100% 대체한다. Stage 정보는 tooltip 라인으로만 유지한다.
+- **목표**: Sector Analysis → Bubble 탭 → 섹터 클릭 시 등장하는 종목 드릴다운 뷰(`StockBubbleChart`)에서, Weinstein Stage 기준 색상·5-항목 범례를 **산업명(중) =** `sector_minor` 기준 동적 색상·범례로 100% 대체한다. Stage 정보는 tooltip 라인으로만 유지한다.
 - **배포 환경**: localhost 전용, 클라우드 미사용
 - **개발 방법론**: TDD (`.moai/config/sections/quality.yaml`의 `development_mode: tdd`) — acceptance 기준은 구체·검증 가능해야 하며 RED 테스트를 유도한다
 - **변경 성격**: BROWNFIELD (기존 컴포넌트 + 응답 모델 확장)
@@ -42,29 +35,29 @@ issue_number: 0
 
 | 경로 | 역할 | 본 SPEC에서의 역할 |
 | --- | --- | --- |
-| `my_chart/analysis/sector_advanced.py` `_get_stock_meta` (L119-156) | stock_meta SELECT | SELECT에 `sector_minor` 추가, 결과 dict 채움 [필수] |
-| `my_chart/analysis/sector_advanced.py` `StockBubble` dataclass (L55-66) | 종목 버블 dataclass | `sector_minor: str | None` 필드 추가 [필수] |
-| `my_chart/analysis/sector_advanced.py` `compute_stock_bubble` (L551-629) | 종목 버블 계산 본체 | `StockBubble` 생성 시 `sector_minor` 전달 [필수] |
-| `backend/schemas/sector_advanced.py` `StockBubbleItem` (L38-48) | Pydantic 응답 모델 | `sector_minor: str | None` 필드 추가 [필수] |
-| `backend/services/sector_advanced_service.py` `get_stock_bubble` (L97-134) | dataclass → Pydantic 변환 | 변환 시 `sector_minor=s.sector_minor` 전달 [필수] |
-| `frontend/src/types/bubble.ts` `StockBubbleItem` (L19-28) | 백엔드 응답 타입 미러 | `sector_minor: string | null` 추가 [필수] |
-| `frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` | 종목 버블 차트 컴포넌트 | 색상 매핑 / 범례 / tooltip 로직 교체 [필수] |
+| `my_chart/analysis/sector_advanced.py` `_get_stock_meta` (L119-156) | stock_meta SELECT | SELECT에 `sector_minor` 추가, 결과 dict 채움 \[필수\] |
+| `my_chart/analysis/sector_advanced.py` `StockBubble` dataclass (L55-66) | 종목 버블 dataclass | \`sector_minor: str |
+| `my_chart/analysis/sector_advanced.py` `compute_stock_bubble` (L551-629) | 종목 버블 계산 본체 | `StockBubble` 생성 시 `sector_minor` 전달 \[필수\] |
+| `backend/schemas/sector_advanced.py` `StockBubbleItem` (L38-48) | Pydantic 응답 모델 | \`sector_minor: str |
+| `backend/services/sector_advanced_service.py` `get_stock_bubble` (L97-134) | dataclass → Pydantic 변환 | 변환 시 `sector_minor=s.sector_minor` 전달 \[필수\] |
+| `frontend/src/types/bubble.ts` `StockBubbleItem` (L19-28) | 백엔드 응답 타입 미러 | \`sector_minor: string |
+| `frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` | 종목 버블 차트 컴포넌트 | 색상 매핑 / 범례 / tooltip 로직 교체 \[필수\] |
 
 ### 1.4 핵심 제약 (research.md §1, §4, §5, §6 요약)
 
-- **[HARD] Stage 색상 100% 대체**: 기존 `STAGE_COLORS` Record(L16-22)와 5-항목 stage 범례(L125-137)는 **완전 제거**한다. Stage 정보 자체는 tooltip 라인으로 보존한다(사용자 결정).
-- **[HARD] 결정성**: 같은 데이터셋에서 sector_minor → 색상 매핑은 항상 동일하다. 매핑 함수는 (count desc, name asc) 정렬 후 palette[0..9] 순차 할당.
-- **[HARD] 색상 팔레트**: Tableau 10 변형 10색 고정. "기타"는 별도 회색(`#9CA3AF`), 항상 범례 마지막.
-- **[HARD] NULL/누락 sector_minor**: `sector_detail_service.py:90` 패턴(`key = sector_minor or "기타"`)을 그대로 따른다.
-- **[HARD] 모바일 fallback**: hover emphasis는 데스크탑(>=768px) 전용. 모바일(<768px)은 범례를 차트 하단 수평 배치 + click-toggle만 동작.
-- **[HARD] 차트 영역 > 범례 영역 prominence**: grid.right 폭은 데스크탑 120~140px, 모바일은 grid.bottom 80px로 전환. 차트 영역은 항상 우선.
+- **\[HARD\] Stage 색상 100% 대체**: 기존 `STAGE_COLORS` Record(L16-22)와 5-항목 stage 범례(L125-137)는 **완전 제거**한다. Stage 정보 자체는 tooltip 라인으로 보존한다(사용자 결정).
+- **\[HARD\] 결정성**: 같은 데이터셋에서 sector_minor → 색상 매핑은 항상 동일하다. 매핑 함수는 (count desc, name asc) 정렬 후 palette\[0..9\] 순차 할당.
+- **\[HARD\] 색상 팔레트**: Tableau 10 변형 10색 고정. "기타"는 별도 회색(`#9CA3AF`), 항상 범례 마지막.
+- **\[HARD\] NULL/누락 sector_minor**: `sector_detail_service.py:90` 패턴(`key = sector_minor or "기타"`)을 그대로 따른다.
+- **\[HARD\] 모바일 fallback**: hover emphasis는 데스크탑(&gt;=768px) 전용. 모바일(&lt;768px)은 범례를 차트 하단 수평 배치 + click-toggle만 동작.
+- **\[HARD\] 차트 영역 &gt; 범례 영역 prominence**: grid.right 폭은 데스크탑 120\~140px, 모바일은 grid.bottom 80px로 전환. 차트 영역은 항상 우선.
 
 ---
 
 ## 2. Assumptions (가정)
 
 - A1. `daily DB stock_meta.sector_minor` 컬럼은 이미 존재한다. `sector_detail_service.py:67`이 동일 컬럼을 운영 중이며, 본 SPEC 범위에서 별도 컬럼 존재 가드는 추가하지 않는다(Exclusions).
-- A2. 적용 대상은 **종목 드릴다운 뷰(`StockBubbleChart.tsx`)뿐**이다. 대분류 섹터 버블(`SectorBubbleChart.tsx`), `BubbleChart.tsx`, RRG/Bump/히스토리 컴포넌트는 범위 밖.
+- A2. 적용 대상은 **종목 드릴다운 뷰(**`StockBubbleChart.tsx`**)뿐**이다. 대분류 섹터 버블(`SectorBubbleChart.tsx`), `BubbleChart.tsx`, RRG/Bump/히스토리 컴포넌트는 범위 밖.
 - A3. 일부 종목은 `sector_minor`가 NULL/빈 문자열일 수 있다 → "기타" 그룹으로 흡수.
 - A4. sector_minor 종류가 10을 초과하면 10번째 이후는 "기타"로 흡수한다(palette overflow → 회색 묶음). 단일 sector_major 내 sector_minor 10 초과 케이스는 드물지만 안전 fallback으로 정의한다.
 - A5. ECharts SVG 렌더러를 그대로 사용한다(기존 `opts={{ renderer: 'svg' }}`). 변경 없음.
@@ -103,8 +96,8 @@ The frontend `StockBubbleItem` TypeScript interface **shall** include the field 
 In the StockBubbleChart drill-down view, the bubble fill color of every stock **shall** be determined exclusively by its `sector_minor` value via a deterministic mapping function.
 
 - 정의: 매핑 함수 `f(stocks) = sort(unique(sector_minor or "기타"), by=(count desc, name asc))[:10] → palette[i]`. "기타" 그룹은 항상 회색 `#9CA3AF`. 10 초과 sector_minor는 "기타"로 흡수.
-- [HARD] 같은 `sector_minor`를 가진 모든 종목은 **정확히 동일한 fill color**를 받는다.
-- [HARD] 같은 데이터셋에서 매핑은 결정적이다(재렌더 시 색상 흔들림 없음).
+- \[HARD\] 같은 `sector_minor`를 가진 모든 종목은 **정확히 동일한 fill color**를 받는다.
+- \[HARD\] 같은 데이터셋에서 매핑은 결정적이다(재렌더 시 색상 흔들림 없음).
 - 검증: 동일 sector_minor 종목들의 `itemStyle.color` 배열이 정확히 동일. AC-4, AC-9.
 - 매핑: AC-4, AC-9.
 
@@ -126,7 +119,7 @@ The chart legend **shall** list each `sector_minor` group present in the current
 
 ### REQ-SBM-007 (Event-Driven) — 범례 hover 강조 (데스크탑 전용)
 
-**When** the user hovers over a legend item on a desktop viewport (>=768px), the system **shall** emphasize bubbles in that `sector_minor` group and dim the others via ECharts `emphasis.focus`.
+**When** the user hovers over a legend item on a desktop viewport (&gt;=768px), the system **shall** emphasize bubbles in that `sector_minor` group and dim the others via ECharts `emphasis.focus`.
 
 - 모바일 fallback: `<768px` 뷰포트에서는 hover emphasis가 동작하지 않는다(터치 환경 — 자연스러운 fallback). 범례는 클릭 토글로만 상호작용.
 - 검증: 데스크탑 뷰포트 시뮬레이션에서 hover 시 emphasis 스타일 변화 트리거. AC-7.
@@ -170,8 +163,8 @@ The chart rendering time at the 95th percentile for a dataset of 200+ stocks **s
 
 본 SPEC은 다음을 **구현하지 않는다**:
 
-- **대분류 섹터 버블(`SectorBubbleChart.tsx`)**: 변경 없음. 본 SPEC은 종목 드릴다운 뷰 전용.
-- **`BubbleChart.tsx` (별도 컴포넌트)**: 변경 없음.
+- **대분류 섹터 버블(**`SectorBubbleChart.tsx`**)**: 변경 없음. 본 SPEC은 종목 드릴다운 뷰 전용.
+- `BubbleChart.tsx` **(별도 컴포넌트)**: 변경 없음.
 - **RRG / Bump / 히스토리 / 트리맵 / SectorRankingTable / SectorDetailPanel**: 변경 없음.
 - **Stage classification 폐기**: Stage 자체는 tooltip에 보존. backend stage 계산 로직(`classify_stage`) 변경 없음.
 - **그리드 결과 테이블 / StockTable.tsx**: 변경 없음. 본 SPEC은 단일 차트 컴포넌트 한정.

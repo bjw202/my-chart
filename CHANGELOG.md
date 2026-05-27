@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (SPEC-SECTOR-MINOR-COLOR-001 v1.0.1, 2026-05-27)
+
+- **StockBubbleChart 종목 버블 차트 색상·범례 인코딩 교체** (commits `bebd3f1`, `7c5be67`)
+  - 이전: Weinstein Stage 4-항목 (S1 바닥/S2 상승/S3 천장/S4 하락 + 미분류) 기반 색상 매핑 + 정적 5-항목 범례
+  - 이후: sector_minor (산업명(중)) 기반 동적 색상 매핑 (Tableau 10 변형) + 동적 범례 (count desc, name asc, "기타" 마지막, palette overflow 흡수)
+  - 색상 결정성 보장 (정렬 키 명시 + rerender() 2-pass round-trip 단언)
+  - multi-series 변환으로 ECharts 표준 legend click toggle + hover emphasis 자동 동작
+  - 모바일 viewport (<768px) fallback: 범례 하단 horizontal scroll, grid.right=60 / grid.bottom=80 (차트 영역 prominence 우선)
+  - tooltip XSS hardening: escapeHtml 적용 (defensive coding, KRX 내부 DB 신뢰)
+  - 신규 useMediaQuery hook (외부 라이브러리 무도입, SSR 가드 + cleanup listener)
+  - Stage 정보는 tooltip `Stage: S{n} ({stage_detail})` 라인으로 보존 (REQ-SBM-008 회귀 방지)
+  - 검증: pytest 39/39 PASS, vitest 85/85 PASS, coverage StockBubbleChart 90% / useMediaQuery 85.71%, tsc + ESLint 0 errors
+  - evaluator-active Cycle 2 PASS (0.88/1.00): Functionality 92, Security 95, Craft 80, Consistency 90
+  - 라이브 PASS: AC-4 sector_minor 색상 / AC-5 동적 범례 10그룹 (반도체 섹터) / AC-7 hover emphasis dim / AC-8 산업명(중) tooltip + Stage 보존
+  - 후속: AC-12 200+ 종목 P95 baseline 측정은 라이브 measure pending (acceptance.md 명시 허용)
+
+### Added (SPEC-STOCK-TOOLTIP-PRODUCT-001 v1.0.0, 2026-05-27)
+
+- **StockBubbleChart tooltip 주요제품 라인 추가** (commit `b2ef257`)
+  - tooltip에 `주요제품: {value or "—"}` 라인 추가 (산업명(중) 라인 다음, Stage 라인 위)
+  - 데이터 소스: `Input/sectormap-original.xlsx` 산업명(대)/산업명(중)/**주요제품** 중 마지막 컬럼 → `stock_meta.product`
+  - Backend: `_get_stock_meta` SELECT 7-컬럼 확장 (sector_minor + product), `StockBubble.product`, `StockBubbleItem.product`, `compute_stock_bubble`/`get_stock_bubble` 전파
+  - Frontend: `bubble.ts`에 `product: string | null` 타입 미러, tooltip formatter `productLabel` (escapeHtml 적용), data 객체에 product 보존
+  - NULL/빈 product → `주요제품: —` fallback 표시
+  - AC-6 회귀 게이트: 직전 SPEC 산업명(중) 색상·범례·Stage tooltip 모두 보존 단언
+  - 검증: pytest 42/42 PASS (+3), vitest 97/97 PASS (+12), tsc + ESLint 0 errors
+  - 라이브 PASS: backend uvicorn `--reload` 재시작 후 tooltip 주요제품 라인 정상 표시 (사용자 확인)
+  - 운영 lesson: uvicorn dev server reload 명시 필요 (CLAUDE.local.md 강조 점)
+
 ### Changed (chore — sectormap unification, 2026-05-12)
 
 - **`Input/sectormap-original.xlsx` 단일 source 통합** (commit `face1ac`)
