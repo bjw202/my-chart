@@ -86,3 +86,18 @@ describe('PatternBuilder — 한도 5 (REQ-PST-008)', () => {
     expect(screen.getByText('+ 조건 추가')).toBeInTheDocument()
   })
 })
+
+describe('PatternBuilder — SMA5 지표 노출 (SPEC-SMA5-FILTER-001 AC-7)', () => {
+  // AC-7: indicator_a / indicator_b 드롭다운에 raw 라벨 "SMA5" 옵션이 존재한다
+  it('indicator 드롭다운에 "SMA5" 옵션이 렌더된다', () => {
+    render(
+      <PatternBuilder
+        {...defaultProps}
+        patterns={makePatterns(1)}
+      />
+    )
+    // indicator_a + indicator_b 두 select 모두 SMA5 option 보유 → 최소 2개
+    const sma5Options = screen.getAllByRole('option', { name: 'SMA5' })
+    expect(sma5Options.length).toBeGreaterThanOrEqual(2)
+  })
+})

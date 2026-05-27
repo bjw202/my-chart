@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 # Maps Pydantic Literal indicator names to actual stock_meta column names.
 # Column names are hardcoded here (not from user input) to prevent SQL injection.
 # Open/High/Low map to close since stock_meta uses only close for daily price.
+# @MX:ANCHOR: [AUTO] 스크리닝 화이트리스트 불변 계약 — IndicatorName Literal과 1:1 매핑.
+#             모든 SQL 컬럼 식별자는 오직 이 딕셔너리에서만 나온다(사용자 입력 차단).
+# @MX:REASON: fan_in 高 — _build_where 패턴 평가가 의존한다. Literal에 지표를 추가하면서
+#             이 매핑을 누락하면 test_indicator_column_map_covers_all_whitelist_values가
+#             즉시 차단하지만, 운영 중 KeyError로도 이어진다. 두 곳은 항상 동기화한다.
 _INDICATOR_COLUMN: dict[str, str] = {
     "Close": "close",
     "Open": "close",
@@ -27,6 +32,7 @@ _INDICATOR_COLUMN: dict[str, str] = {
     "Low": "close",
     "EMA10": "ema10",
     "EMA20": "ema20",
+    "SMA5": "sma5",
     "SMA50": "sma50",
     "SMA100": "sma100",
     "SMA200": "sma200",

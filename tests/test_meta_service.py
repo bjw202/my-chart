@@ -6,6 +6,7 @@ import datetime
 import sqlite3
 
 import pandas as pd
+import pytest
 
 from backend.services.meta_service import _business_days_since, _rebuild
 
@@ -288,6 +289,195 @@ class TestRebuild:
         assert row is not None
         # 500_000_000_000_000 원 / 100_000_000 = 5_000_000 억원
         assert row[0] == 5_000_000
+
+    def test_sma5_column_exists_and_value_copied(self, monkeypatch, tmp_path):
+        """SPEC-SMA5-FILTER-001 AC-4/REQ-SMA5-003: rebuild 후 stock_meta에 sma5가 존재하고
+        최신 일봉 날짜의 stock_prices.SMA5가 stock_meta.sma5로 복사된다.
+
+        이 테스트는 SMA5 + Minervini 컬럼을 포함한 daily DDL을 직접 정의해
+        meta_service의 신규 SELECT 분기(has_minervini_price_cols=True)를 탄다.
+        """
+        weekly_path = str(tmp_path / "weekly.db")
+        _create_weekly_db(weekly_path, self._DEFAULT_WEEKLY_STOCKS)
+
+        conn = sqlite3.connect(":memory:", check_same_thread=False)
+        conn.execute(
+            """CREATE TABLE stock_prices (
+                Name TEXT NOT NULL, Date TEXT NOT NULL,
+                Open REAL, High REAL, Low REAL, Close REAL,
+                Change REAL, High52W REAL,
+                Volume REAL, Volume20MA REAL, VolumeWon REAL,
+                EMA10 REAL, EMA20 REAL, SMA5 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL,
+                SMA100 REAL, SMA200 REAL,
+                DailyRange REAL, HLC REAL,
+                FromEMA10 REAL, FromEMA20 REAL, FromSMA5 REAL, FromSMA50 REAL, FromSMA200 REAL,
+                Range REAL, ADR20 REAL,
+                RS_Line REAL,
+                SMA150 REAL, LOW_52W REAL, SMA200_20D_AGO REAL,
+                PRIMARY KEY (Name, Date)
+            )"""
+        )
+        # 두 날짜를 넣어 "최신 일자" 복사를 검증한다 (오래된 날짜의 SMA5는 복사되면 안 됨).
+        conn.execute(
+            """INSERT INTO stock_prices
+               (Name, Date, Close, Change, EMA10, EMA20, SMA5, SMA50, SMA100, SMA200,
+                High52W, SMA150, LOW_52W, SMA200_20D_AGO)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ("삼성전자", "2026-02-27", 69000.0, 1.0, 68500.0, 68000.0, 67000.0,
+             65000.0, 64000.0, 63000.0, 75000.0, 62000.0, 50000.0, 62500.0),
+        )
+        conn.execute(
+            """INSERT INTO stock_prices
+               (Name, Date, Close, Change, EMA10, EMA20, SMA5, SMA50, SMA100, SMA200,
+                High52W, SMA150, LOW_52W, SMA200_20D_AGO)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ("삼성전자", "2026-02-28", 70000.0, 1.5, 69000.0, 68000.0, 71234.5,
+             65000.0, 64000.0, 63000.0, 75000.0, 62000.0, 50000.0, 62500.0),
+        )
+        conn.commit()
+
+        import backend.services.meta_service as svc
+        monkeypatch.setattr(svc, "get_sector_registry", lambda: _mock_sector_df())
+        monkeypatch.setattr(svc, "REFERENCE_STOCK", "삼성전자")
+
+        _rebuild(conn, weekly_path)
+
+        # 컬럼 존재 검증 (REQ-SMA5-003)
+        meta_cols = {r[1] for r in conn.execute("PRAGMA table_info(stock_meta)").fetchall()}
+        assert "sma5" in meta_cols
+
+        # 최신 일자(2026-02-28)의 SMA5(71234.5)가 복사되었는지 검증 (AC-4)
+        row = conn.execute(
+            "SELECT sma5 FROM stock_meta WHERE code = '005930'"
+        ).fetchone()
+        assert row is not None
+        assert row[0] == pytest.approx(71234.5, rel=1e-9)
+        conn.close()
+
+    def test_sma5_meta_roundtrip_matches_stock_prices(self, monkeypatch, tmp_path):
+        """SPEC-SMA5-FILTER-001 AC-9 (meta 정렬 검사): rebuild 후 stock_meta.sma5가
+        최신 일자 stock_prices.SMA5와 동일 값임을 read-back으로 단언한다 (SELECT/INSERT 정합성 증명).
+        """
+        weekly_path = str(tmp_path / "weekly.db")
+        _create_weekly_db(weekly_path, self._DEFAULT_WEEKLY_STOCKS)
+
+        conn = sqlite3.connect(":memory:", check_same_thread=False)
+        conn.execute(
+            """CREATE TABLE stock_prices (
+                Name TEXT NOT NULL, Date TEXT NOT NULL,
+                Open REAL, High REAL, Low REAL, Close REAL,
+                Change REAL, High52W REAL,
+                Volume REAL, Volume20MA REAL, VolumeWon REAL,
+                EMA10 REAL, EMA20 REAL, SMA5 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL,
+                SMA100 REAL, SMA200 REAL,
+                DailyRange REAL, HLC REAL,
+                FromEMA10 REAL, FromEMA20 REAL, FromSMA5 REAL, FromSMA50 REAL, FromSMA200 REAL,
+                Range REAL, ADR20 REAL,
+                RS_Line REAL,
+                SMA150 REAL, LOW_52W REAL, SMA200_20D_AGO REAL,
+                PRIMARY KEY (Name, Date)
+            )"""
+        )
+        distinct_sma5 = 54321.98765
+        conn.execute(
+            """INSERT INTO stock_prices
+               (Name, Date, Close, Change, EMA10, EMA20, SMA5, SMA50, SMA100, SMA200,
+                High52W, SMA150, LOW_52W, SMA200_20D_AGO)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ("삼성전자", "2026-02-28", 70000.0, 1.5, 69000.0, 68000.0, distinct_sma5,
+             65000.0, 64000.0, 63000.0, 75000.0, 62000.0, 50000.0, 62500.0),
+        )
+        conn.commit()
+
+        import backend.services.meta_service as svc
+        monkeypatch.setattr(svc, "get_sector_registry", lambda: _mock_sector_df())
+        monkeypatch.setattr(svc, "REFERENCE_STOCK", "삼성전자")
+
+        _rebuild(conn, weekly_path)
+
+        latest = conn.execute(
+            "SELECT MAX(Date) FROM stock_prices WHERE Name = '삼성전자'"
+        ).fetchone()[0]
+        sp_sma5 = conn.execute(
+            "SELECT SMA5 FROM stock_prices WHERE Name = '삼성전자' AND Date = ?",
+            (latest,),
+        ).fetchone()[0]
+        meta_sma5 = conn.execute(
+            "SELECT sma5 FROM stock_meta WHERE code = '005930'"
+        ).fetchone()[0]
+        conn.close()
+
+        assert sp_sma5 == pytest.approx(distinct_sma5, rel=1e-12)
+        assert meta_sma5 == pytest.approx(sp_sma5, rel=1e-12), "stock_meta.sma5 ≠ stock_prices.SMA5"
+
+    def test_legacy_stock_meta_without_sma5_gets_column_added_on_rebuild(self, tmp_path):
+        """SPEC-SMA5-FILTER-001 follow-up: 레거시 stock_meta(sma5 컬럼 없음)에 대해
+        멱등 ALTER가 sma5 컬럼을 자동 추가해야 한다.
+
+        User scenario (2026-05-26 라이브 검증): 기존 DB를 삭제하지 않고
+        /api/db/update만 실행한 경우 — daily.py의 ALTER 루프는 stock_prices에
+        SMA5/FromSMA5를 추가하지만, stock_meta의 _STOCK_META_DDL은
+        CREATE TABLE IF NOT EXISTS라 기존 26-col 스키마가 잔존 → SMA5 패턴 평가 시
+        'no such column: sma5' → 0건 반환. 멱등 ALTER로 self-healing 되어야 한다
+        (daily.py SMA5 ALTER 패턴과 대칭).
+        """
+        from backend.services.meta_service import _ensure_meta_minervini_columns
+
+        db_path = tmp_path / "legacy.db"
+        # pre-SMA5 stock_meta DDL — 2026-05-25 이전 운영 DB 스키마와 동일 (26 컬럼)
+        legacy_ddl = """
+        CREATE TABLE stock_meta (
+            code TEXT PRIMARY KEY,
+            name TEXT,
+            market TEXT,
+            market_cap INTEGER,
+            sector_major TEXT,
+            sector_minor TEXT,
+            product TEXT,
+            close REAL,
+            change_1d REAL,
+            ema10 REAL,
+            ema20 REAL,
+            sma50 REAL,
+            sma100 REAL,
+            sma200 REAL,
+            high52w REAL,
+            chg_1w REAL,
+            chg_1m REAL,
+            chg_3m REAL,
+            rs_12m REAL,
+            sma10_w REAL,
+            sma20_w REAL,
+            sma40_w REAL,
+            last_updated TEXT,
+            sma150 REAL,
+            low52w REAL,
+            sma200_20d_ago REAL
+        )
+        """
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.execute(legacy_ddl)
+            legacy_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()
+            }
+            assert "sma5" not in legacy_cols, "테스트 전제: pre-SMA5 스키마는 sma5가 없어야 함"
+
+            # When: 멱등 ALTER 호출
+            _ensure_meta_minervini_columns(conn)
+
+            # Then: sma5 컬럼이 자동 추가됨
+            migrated_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()
+            }
+            assert "sma5" in migrated_cols, (
+                "_ensure_meta_minervini_columns가 sma5를 ALTER로 추가해야 함 — "
+                "이 단언이 실패하면 사용자 시나리오('SMA5 > EMA20'가 0건 반환)가 재현됨"
+            )
+            # 멱등성 확인: 재호출해도 오류 없이 통과 (이미 추가된 컬럼은 무시)
+            _ensure_meta_minervini_columns(conn)
+        finally:
+            conn.close()
 
     def test_market_cap_is_null_when_pykrx_fails_and_no_dday_column(self, monkeypatch, tmp_path):
         """Regression: when pykrx fails and sectormap has no D-day column,

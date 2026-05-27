@@ -1,9 +1,10 @@
 """Stock and sector registry with lazy loading.
 
-Primary data source: sectormap_original.xlsx (2,500+ stocks with sector and financial info).
-Row 9 is the header row (skiprows=8 skips notes and merged headers).
-Columns '종목\n코드', '종목명', '시장' are renamed to Code, Name, Market on load.
-pykrx is used only for market cap queries where needed.
+Primary data source: sectormap-original.xlsx (2,500+ stocks with sector and financial info).
+Header is at row 8 (header=8 skips notes/주석 rows 0~7).
+한글/개행 컬럼명 '종목\n코드', '종목명', '시장' → 'Code', 'Name', 'Market'로 rename.
+사용하는 6개 컬럼만 select하여 메모리 사용 최소화 (전체 53 컬럼 중).
+pykrx는 시가총액 query 시에만 별도 호출 (이 모듈 scope 밖).
 """
 
 from __future__ import annotations
@@ -33,9 +34,34 @@ def _normalize_sector_column(series: pd.Series) -> pd.Series:
     )
 
 
+# @MX:ANCHOR: [AUTO] sectormap loader — fan_in 8+ (registry/meta_service/sector_advanced/screen_service/stage_service)
+# @MX:REASON: 한 곳에서 sectormap-original.xlsx를 로드하여 단일 source 원칙 유지.
+#   header=8 + 컬럼 rename은 본 함수에서만 처리되어야 downstream 코드 변경 0.
 def _load_sectormap() -> pd.DataFrame:
-    """Load sectormap.xlsx with English column headers (Code, Name, Market)."""
-    df = pd.read_excel(str(SECTORMAP_PATH))
+    """sectormap-original.xlsx 로드 → 영문 컬럼 6개 DataFrame 반환.
+
+    파일 구조 (sectormap-original.xlsx):
+    - row 0~7: 데이터 설명 주석 (header가 아님)
+    - row 8: 실제 header 행 ('종목\\n코드', '종목명', '시장', '산업명(대)', '산업명(중)', '주요제품', + 47개 재무/주가 컬럼)
+    - row 9+: 데이터 (2556 종목)
+
+    동작:
+    1. header=8로 실제 헤더 행 지정
+    2. 한글/개행 컬럼명 → 영문 (downstream 코드 변경 0 보장)
+    3. 사용 6 컬럼만 select (메모리 88% 절약, 47개 추가 컬럼 drop)
+    4. Code zfill(6) — 9, A0 같은 짧은/특수 코드도 6자리 정규화
+    5. 섹터 컬럼 정규화 (_normalize_sector_column)
+    """
+    # header=8: 앞 8개 row는 데이터 설명 주석 — 실제 컬럼명은 row 8
+    df = pd.read_excel(str(SECTORMAP_PATH), header=8)
+    # 한글/개행 컬럼명 → 영문 (downstream 호환)
+    df = df.rename(columns={
+        "종목\n코드": "Code",
+        "종목명": "Name",
+        "시장": "Market",
+    })
+    # 사용하는 6개 컬럼만 select (전체 53 컬럼 중) — 메모리 절약 + downstream 동일
+    df = df[["Code", "Name", "Market", "산업명(대)", "산업명(중)", "주요제품"]].copy()
     df["Code"] = df["Code"].astype(str).str.zfill(6)
     # 섹터 컬럼 정규화: 빈 값, nan, '-' 등을 '기타'로 처리
     for col in ["산업명(대)", "산업명(중)"]:
@@ -45,7 +71,7 @@ def _load_sectormap() -> pd.DataFrame:
 
 
 def get_stock_registry() -> pd.DataFrame:
-    """Lazily load stock registry from sectormap_original.xlsx.
+    """Lazily load stock registry from sectormap-original.xlsx.
 
     Returns DataFrame with columns: Code, Name, Market.
     Code is zero-padded to 6 digits.
@@ -59,7 +85,7 @@ def get_stock_registry() -> pd.DataFrame:
 
 
 def get_sector_registry() -> pd.DataFrame:
-    """Lazily load full sector registry from sectormap_original.xlsx."""
+    """Lazily load full sector registry from sectormap-original.xlsx."""
     global _df_sector
     if _df_sector is None:
         _df_sector = _load_sectormap()

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 # Whitelist of allowed indicator column names.
 # CRITICAL: This Literal type is the ONLY input accepted for SQL column references.
 # It prevents SQL injection in PatternCondition-based WHERE clauses.
-IndicatorName = Literal["Close", "Open", "High", "Low", "EMA10", "EMA20", "SMA50", "SMA100", "SMA200"]
+IndicatorName = Literal["Close", "Open", "High", "Low", "EMA10", "EMA20", "SMA5", "SMA50", "SMA100", "SMA200"]
 
 MarketName = Literal["KOSPI", "KOSDAQ"]
 
