@@ -104,7 +104,8 @@ kr-stock-screener/
 │       │   ├── useScreenResults.ts     # Filter state + API call
 │       │   ├── useDbUpdate.ts          # SSE-based update progress
 │       │   ├── useAnalysis.ts          # Financial analysis data fetching
-│       │   └── useAiReport.ts          # AI report SSE streaming + history hook
+│       │   ├── useAiReport.ts          # AI report SSE streaming + history hook
+│       │   └── useMediaQuery.ts        # Responsive viewport detection (SPEC-SECTOR-MINOR-COLOR-001)
 │       ├── types/
 │       │   ├── stock.ts
 │       │   ├── filter.ts
