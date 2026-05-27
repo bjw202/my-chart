@@ -26,6 +26,7 @@ export interface StockBubbleItem {
   market_cap: number
   volume_ratio: number
   sector_minor: string | null  // 산업명(중) — SPEC-SECTOR-MINOR-COLOR-001
+  product: string | null       // 주요제품 — SPEC-STOCK-TOOLTIP-PRODUCT-001
 }
 
 export interface StockBubbleResponse {

@@ -139,8 +139,9 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
             s.stage_detail ?? '',
             i, // 인덱스 (라벨 표시 여부 판단용)
           ],
-          // tooltip formatter에서 sector_minor 접근을 위한 보존
+          // tooltip formatter에서 sector_minor, product 접근을 위한 보존
           sector_minor: s.sector_minor ?? null,
+          product: s.product ?? null,  // SPEC-STOCK-TOOLTIP-PRODUCT-001
           label: {
             show: topNSet.has(i),
             formatter: s.name,
@@ -241,7 +242,9 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
         backgroundColor: '#16213e',
         borderColor: '#2d2d44',
         textStyle: { color: '#e5e7eb', fontSize: 12 },
-        formatter: (params: { data: { value: number[]; sector_minor?: string | null } }) => {
+        // @MX:NOTE: [AUTO] tooltip에 주요제품 라인 추가. escapeHtml 적용 (XSS hardening).
+        // @MX:SPEC: SPEC-STOCK-TOOLTIP-PRODUCT-001
+        formatter: (params: { data: { value: number[]; sector_minor?: string | null; product?: string | null } }) => {
           const d = params.data
           const val = d.value
           const name = escapeHtml(val[4] as unknown as string)
@@ -256,9 +259,12 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
           const sectorMinorLabel = d.sector_minor && d.sector_minor.trim()
             ? escapeHtml(d.sector_minor)
             : ETC_LABEL
+          // 주요제품 라인 (null/빈 문자열은 em-dash 표시, XSS 방어)
+          const productLabel = d.product && d.product.trim() ? escapeHtml(d.product) : '—'
           return [
             `<b>${name}</b>`,
             `산업명(중): ${sectorMinorLabel}`,
+            `주요제품: ${productLabel}`,
             `가격변동: ${sign}${priceChange}%`,
             `RS Rating: ${rs}`,
             `Stage: ${stageLabel}`,
