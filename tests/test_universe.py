@@ -364,16 +364,154 @@ def test_ac_sgr_021_sentinel_unified_no_hardcoded_defaults():
     assert "ETC_SECTOR" in src_ss and "ETC_SECTOR" in src_sm
 
 
-def test_ac_sgr_021_sentinel_behavioral_divergence_blocked():
-    """AC-SGR-021 (행동): 빈 산업명(대) 행이 두 경로에서 같은 센티널 키로 귀결.
+_UNCLASSIFIED_STOCK = "미분류종목"
+_CLASSIFIED_SECTOR = "전기전자"
+_SENTINEL_FIXTURE_DATE = "2024-01-12"
 
-    대조: 두 경로가 다른 기본값(Unknown vs 기타)을 쓰면 키가 갈라져 단언이 실패한다.
+_WEEKLY_FULL_COLS = (
+    "Name TEXT, Date TEXT, Close REAL, SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL, "
+    "CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, Volume REAL, VolumeSMA10 REAL, MAX52 REAL"
+)
+
+
+def _make_weekly_db_full(path: Path, names: list[str], d: str) -> None:
+    """stage_classifier + sector_metrics 양 경로가 요구하는 전체 컬럼 주봉 DB."""
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute(f"CREATE TABLE stock_prices ({_WEEKLY_FULL_COLS})")
+        conn.execute("CREATE TABLE relative_strength (Name TEXT, Date TEXT, RS_12M_Rating REAL)")
+        allnames = list(names) + ["KOSPI"]
+        conn.executemany(
+            "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            [(n, d, 100.0, 95.0, 90.0, 89.0, 0.02, 0.05, 0.10, 1_000_000.0, 800_000.0, 110.0)
+             for n in allnames],
+        )
+        conn.executemany(
+            "INSERT INTO relative_strength VALUES (?,?,?)",
+            [(n, d, 80.0) for n in allnames],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _sentinel_registry_df(unclassified_value) -> pd.DataFrame:
+    """산업명(대) 가 ``unclassified_value`` 인 1행 + 정상 5행 registry DataFrame."""
+    names = [_UNCLASSIFIED_STOCK] + [f"STOCK{i:03d}" for i in range(5)]
+    return pd.DataFrame({
+        "Code": [f"{i:06d}" for i in range(len(names))],
+        "Name": names,
+        "Market": ["KOSPI"] * len(names),
+        "산업명(대)": [unclassified_value] + [_CLASSIFIED_SECTOR] * 5,
+        "산업명(중)": ["반도체"] * len(names),
+        "주요제품": ["x"] * len(names),
+    })
+
+
+def _collect_sentinel_keys(db: str) -> tuple[str, str]:
+    """**실제 프로덕션 두 경로**를 호출해 미분류 종목의 섹터 키를 각각 수집한다.
+
+    반환: ``(stage 분포가 만든 키, 섹터 집계가 만든 키)``.
+
+    * Stage 분포: ``backend.services.stage_service.get_stage_overview``
+      (내부에서 ``sector_map[Name] = str(row.get("산업명(대)") or ETC_SECTOR)``).
+    * 섹터 집계: ``my_chart.analysis.sector_metrics.compute_sector_ranking``
+      (내부에서 ``sector = str(row.get("산업명(대)") or ETC_SECTOR)`` 로 그룹핑).
+
+    두 경로 모두 ``get_sector_registry()`` 를 읽으므로 registry 를 패치하면 실제
+    배선을 그대로 통과한다 — 테스트 안에서 식을 재작성하지 않는다.
     """
+    from backend.services.stage_service import get_stage_overview
+    from my_chart.analysis.sector_metrics import compute_sector_ranking
+
+    overview = get_stage_overview(db)
+    stage_key = {s.name: s.sector_major for s in overview.all_stocks}[_UNCLASSIFIED_STOCK]
+
+    ranks = compute_sector_ranking(db, _SENTINEL_FIXTURE_DATE)
+    # 미분류 종목은 유일하게 _CLASSIFIED_SECTOR 가 아닌 그룹의 단독 구성원이다.
+    other = [r.name for r in ranks if r.name != _CLASSIFIED_SECTOR]
+    assert len(other) == 1, f"섹터 집계 그룹이 예상과 다름: {[r.name for r in ranks]}"
+    metrics_key = other[0]
+    return stage_key, metrics_key
+
+
+def test_ac_sgr_021_sentinel_behavioral_divergence_blocked(tmp_path, monkeypatch):
+    """AC-SGR-021 (행동): 빈 산업명(대) 행이 **두 실제 경로**에서 같은 센티널 키로 귀결.
+
+    **v0.3.0 반증력 복구**: 이전 판은 테스트 파일 안에서
+    ``str(row.get("산업명(대)") or ETC_SECTOR)`` 를 **두 번 그대로 복사해** 비교했다.
+    두 식이 바이트 동일하므로 프로덕션 코드를 한 줄도 실행하지 않고 **무조건 통과**했다
+    — docstring 이 주장한 "두 경로가 다른 기본값을 쓰면 실패한다" 는 거짓이었다.
+
+    재작성판은 ``get_stage_overview`` 와 ``compute_sector_ranking`` 을 **실제로 호출**해
+    각 경로가 산출한 섹터 키를 비교한다. 두 모듈의 배선이 갈라지면 값이 갈라진다.
+    """
+    import my_chart.registry as reg
+
+    monkeypatch.setattr(reg, "_load_sectormap", lambda *a, **k: _sentinel_registry_df(""))
+    db = str(tmp_path / "sentinel.db")
+    _make_weekly_db_full(
+        Path(db), list(_sentinel_registry_df("")["Name"]), _SENTINEL_FIXTURE_DATE)
+
     from my_chart.analysis.universe import ETC_SECTOR
 
-    row = pd.Series({"산업명(대)": ""})
-    # stage_service:57 / sector_metrics:250 의 통일된 패턴: or ETC_SECTOR
-    stage_key = str(row.get("산업명(대)") or ETC_SECTOR)
-    metrics_key = str(row.get("산업명(대)") or ETC_SECTOR)
+    stage_key, metrics_key = _collect_sentinel_keys(db)
     assert stage_key == metrics_key == ETC_SECTOR, (
-        "두 경로가 같은 센티널 → 섹터 키 발산 차단(REQ-SGR-017)")
+        f"두 경로가 같은 센티널로 귀결해야 한다(REQ-SGR-017) — "
+        f"stage={stage_key!r} metrics={metrics_key!r} canonical={ETC_SECTOR!r}"
+    )
+
+
+def test_ac_sgr_021_sentinel_contrast_divergent_default_fails(tmp_path, monkeypatch):
+    """AC-SGR-021 (대조): 한 경로만 다른 기본값을 쓰도록 되돌리면 키가 **갈라진다**.
+
+    ``stage_service`` 는 ``from my_chart.analysis.universe import ETC_SECTOR`` 로
+    모듈 전역에 상수를 바인딩한다. 그 바인딩만 ``"Unknown"`` 으로 되돌리면
+    ``stage_service:52`` 가 읽는 값이 실제로 바뀌므로, 개정 전(Unknown vs 기타) 상태를
+    그대로 재현한다.
+
+    이 테스트가 통과한다는 것은 위 행동 단언이 **반증 가능**하다는 뜻이다 — 대조가
+    실패하면(키가 여전히 같으면) 행동 단언은 무엇도 검증하지 않는 것이다.
+    """
+    import backend.services.stage_service as stage_service
+    import my_chart.registry as reg
+
+    monkeypatch.setattr(reg, "_load_sectormap", lambda *a, **k: _sentinel_registry_df(""))
+    monkeypatch.setattr(stage_service, "ETC_SECTOR", "Unknown")
+    db = str(tmp_path / "sentinel_divergent.db")
+    _make_weekly_db_full(
+        Path(db), list(_sentinel_registry_df("")["Name"]), _SENTINEL_FIXTURE_DATE)
+
+    stage_key, metrics_key = _collect_sentinel_keys(db)
+    assert stage_key == "Unknown", f"대조 변형이 stage 경로에 반영되지 않음: {stage_key!r}"
+    assert stage_key != metrics_key, (
+        "대조 실패 — 기본값을 갈라놓아도 두 키가 같다면 행동 단언은 반증 불가하다 "
+        f"(stage={stage_key!r} metrics={metrics_key!r})"
+    )
+
+
+def test_ac_sgr_021_true_null_sector_paths_still_agree(tmp_path, monkeypatch):
+    """AC-SGR-021 (특성화): 진짜 NULL(NaN) 산업명(대) 에서도 두 경로가 **일치**한다.
+
+    **발견 사항 (M6 반증력 복구 중)**: pandas 가 NULL 을 ``NaN`` 으로 승격하면
+    ``NaN or ETC_SECTOR`` 는 **NaN 이 truthy 이므로** 센티널 분기를 타지 않고
+    ``str(NaN) == 'nan'`` 이 섹터 키가 된다. 즉 진짜 NULL 행은 canonical 센티널
+    (``기타``) 로 수렴하지 **않는다**.
+
+    본 테스트는 AC-SGR-021 의 게이팅 요건(두 경로 **일치**)만 단언한다 — 일치는
+    성립하므로 REQ-SGR-017 의 "발산 차단" 은 NULL 경로에서도 유지된다. 다만 키가
+    canonical 상수가 아니라는 사실은 progress.md §Gaps 에 미결로 기록한다
+    (라이브 ``stock_meta`` 의 NULL 행이 0건이라 현재 가시적 영향 없음).
+    """
+    import my_chart.registry as reg
+
+    monkeypatch.setattr(reg, "_load_sectormap", lambda *a, **k: _sentinel_registry_df(None))
+    db = str(tmp_path / "sentinel_null.db")
+    _make_weekly_db_full(
+        Path(db), list(_sentinel_registry_df(None)["Name"]), _SENTINEL_FIXTURE_DATE)
+
+    stage_key, metrics_key = _collect_sentinel_keys(db)
+    assert stage_key == metrics_key, (
+        f"NULL 산업명(대) 에서도 두 경로는 일치해야 한다 — "
+        f"stage={stage_key!r} metrics={metrics_key!r}"
+    )

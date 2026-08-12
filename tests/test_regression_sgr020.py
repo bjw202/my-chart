@@ -194,12 +194,34 @@ def test_r4_grid_fewer_than_raw_dates():
 
 
 # ---------------------------------------------------------------------------
-# R5 — 히스토리 x축 포인트 수 ≤ 원시 행 날짜 수 (assert 로 고정, docstring 아님)
+# R5 — history_grid(345) < grid(346) < 원시 고유 날짜(385) 프로즌 리터럴 3중 고정
 # ---------------------------------------------------------------------------
 
-def test_r5_history_points_le_raw_rows_assert():
-    """R5: 이것은 의도된 변화다. 히스토리 차트의 x축 포인트 수가 원시 행 날짜 수보다
-    적거나 같을 수 있다. docstring 지시만으로는 검사되지 않으므로 assert 로 고정한다.
+# 프로즌 스냅샷(weekly-2026-08-12) 실측 리터럴. 우변이 좌변과 같은 함수에서 나오지 않게
+# 리터럴로 못 박는다 — acceptance.md AC-SGR-020 R5(v0.3.0 재기술).
+_FROZEN_HISTORY_GRID = 345   # CG-2 가 진행 중인 주(W33)를 제외한 히스토리 뷰
+_FROZEN_GRID = 346           # CG-1 적용, 진행 중인 주 포함한 전체 격자
+_FROZEN_RAW_DISTINCT = 385   # 원시 고유 날짜(격자 규칙 미적용)
+
+
+def test_r5_history_grid_frozen_literals_and_strict_ordering():
+    """R5: 이것은 의도된 변화다. 히스토리 뷰가 진행 중인 주까지 제외해 격자보다 한 바
+    더 적다 — ``345 < 346 < 385`` 의 엄격한 3중 부등.
+
+    **v0.3.0 재기술 — 이전 판은 수학적 항진명제였다.** 이전 판은
+    ``len(history_grid) <= len(raw_row_dates)`` 였다. 격자 바는 원시 날짜에서 **선별**
+    되므로 이 부등식은 **어떤 구현에서도 참이다** — 격자 규칙을 한 줄도 구현하지 않고
+    원시 날짜를 그대로 돌려줘도 ``385 <= 385`` 로 통과했다.
+
+    재기술 R5 가 잡는 순진한 구현(전부 이전 판을 통과하던 것들):
+
+    ======================================== ============ ============
+    순진한 동작                                 이전 판 R5    재기술 R5
+    ======================================== ============ ============
+    원시 날짜를 그대로 히스토리로 반환 (385)        통과          실패
+    CG-1 만 적용, CG-2(진행 중인 주 제외) 누락 (346)  통과          실패
+    진행 중인 주를 두 번 제외 (344)                통과          실패
+    ======================================== ============ ============
 
     릴리스 노트: "RRG 궤적·Bump x축이 정규 격자 기준으로 재정렬되어 포인트 수가 약간
     줄어들 수 있으며, 궤적이 더 짧고 일관되게 표시됩니다."
@@ -208,12 +230,33 @@ def test_r5_history_points_le_raw_rows_assert():
 
     grid = compute_weekly_grid(str(FROZEN / "weekly.db"), as_of="2026-08-12")
     conn = sqlite3.connect(str(FROZEN / "weekly.db"))
-    raw_row_dates = conn.execute(
+    raw_distinct_dates = conn.execute(
         "SELECT COUNT(DISTINCT Date) FROM stock_prices"
     ).fetchone()[0]
     conn.close()
-    history_grid_points = len(grid.history)
-    # R5: assert 로 고정(docstring 지시만으로는 검사되지 않는다)
-    assert history_grid_points <= raw_row_dates, (
-        f"R5: history 포인트({history_grid_points}) <= 원시 날짜({raw_row_dates})"
+
+    history_grid = grid.history
+    # 3중 리터럴 고정 — 우변은 전부 리터럴(같은 함수 산출값이 아님)
+    assert len(history_grid) == _FROZEN_HISTORY_GRID, (
+        f"R5: history_grid = {len(history_grid)} (프로즌 기대 {_FROZEN_HISTORY_GRID})"
+    )
+    assert len(grid.dates) == _FROZEN_GRID, (
+        f"R5: grid = {len(grid.dates)} (프로즌 기대 {_FROZEN_GRID})"
+    )
+    assert raw_distinct_dates == _FROZEN_RAW_DISTINCT, (
+        f"R5: 원시 고유 날짜 = {raw_distinct_dates} (프로즌 기대 {_FROZEN_RAW_DISTINCT})"
+    )
+
+    # R4 와 같은 프로즌 스냅샷에서 엄격한 3중 부등 — 어느 한 값이 다른 값과 같아지는
+    # 순간 규칙 하나가 죽은 것이다(acceptance.md AC-SGR-020 R5 마지막 And).
+    assert len(history_grid) < len(grid.dates) < raw_distinct_dates, (
+        f"R5: 엄격 3중 부등 실패 — history_grid({len(history_grid)}) < "
+        f"grid({len(grid.dates)}) < raw({raw_distinct_dates})"
+    )
+
+    # 대조 단언: history_grid 대신 grid(진행 중인 주 포함)를 반환하도록 되돌리면
+    # 345 != 346 이므로 위 첫 단언이 실패한다 — CG-2 제외가 실제로 일어남을 값으로 증명.
+    assert len(grid.dates) != _FROZEN_HISTORY_GRID, (
+        "R5 대조: grid 를 history_grid 자리에 되돌리면 R5 가 실패해야 한다 "
+        f"(grid={len(grid.dates)} == {_FROZEN_HISTORY_GRID} 이면 CG-2 제외가 무의미)"
     )

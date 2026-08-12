@@ -58,6 +58,7 @@ markers = [
     "unit: 네트워크 없이 실행 가능한 순수 단위 테스트",
     "live: 라이브 HTTP 요청이 필요한 테스트",
     "slow: 실행 시간이 긴 테스트 (크롤링 포함)",
+    "nongating: 비게이팅 관측 기록 — 실패해도 CI 를 막지 않는다 (acceptance.md §4 비게이팅 절 분리 집계)",
 ]
 
 [tool.mypy]

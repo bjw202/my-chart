@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -183,6 +184,117 @@ def test_ac_sgr_003_partial_when_week_not_ended(tmp_path):
 # ---------------------------------------------------------------------------
 # AC-SGR-004 — 부분 데이터 날짜 배제 (CG-3)
 # ---------------------------------------------------------------------------
+
+def _fixture_partial_is_representative(tmp_path: Path) -> tuple[str, str, str]:
+    """AC-SGR-004 [HARD] 픽스처: 부분 데이터 날짜가 **자기 ISO 주의 대표 바**가 되는 구성.
+
+    구성(acceptance.md AC-SGR-004 `구성 예` = ``fixture_max_ne_canonical`` 과 동일 형태):
+      * ``W-금요일`` = 2024-01-12 (ISO wk2), 행 수 = 중앙값 수준(10)
+      * 그보다 **늦은** ``W+1-월요일`` = 2024-01-15 (ISO wk3), 행 수 1 (중앙값의 50% 미만)
+
+    ``2024-01-15`` 는 wk3 의 유일한 날짜이므로 **CG-1 이 그 날짜를 대표 바로 선택한 뒤**
+    CG-3 이 배제해야 하는 구성이다 — 즉 CG-3 가 실제로 발화한다.
+
+    반환: ``(db_path, partial_date, runner_up_date)``.
+    """
+    counts = {
+        "2023-12-15": 10, "2023-12-22": 10, "2024-01-05": 10,
+        "2024-01-12": 10,   # W-금요일 (중앙값 수준) — 차선 대표 바
+        "2024-01-15": 1,    # W+1-월요일 (50% 미만) — 자기 주의 MAX(Date)
+    }
+    date_names = {d: _week(c, prefix=d.replace("-", "")) for d, c in counts.items()}
+    db = _make_db(tmp_path, "partial_is_representative.db", date_names)
+    return db, "2024-01-15", "2024-01-12"
+
+
+def test_ac_sgr_004_partial_is_representative_excluded_and_replaced(tmp_path):
+    """AC-SGR-004: 부분 데이터 날짜가 대표 바일 때 배제되고 **차선 날짜로 대체**된다.
+
+    **v0.3.0 정정 — 이 AC 는 프로즌 스냅샷에서 아무것도 검증하지 않았다 [HARD]**.
+    프로즌 실측은 ``CG-3 배제된 대표 바 = 0건`` 이다: 픽스처의 부분 데이터 날짜 5건이
+    **어느 것도 자기 ISO 주의 대표 바가 아니어서** CG-1 이 먼저 배제하기 때문이다.
+    따라서 Then("해당 날짜는 격자에 포함되지 않는다")은 **CG-3 을 한 줄도 구현하지
+    않아도 참**이었다. 본 AC 를 합성 픽스처 게이팅으로 재분류하고, 부분 데이터 날짜가
+    반드시 대표 바가 되도록 픽스처 성질을 [HARD] 전제로 규정한다.
+    """
+    db, partial_date, runner_up = _fixture_partial_is_representative(tmp_path)
+
+    # --- [HARD] 전제 단언: 부분 데이터 날짜가 자기 ISO 주의 MAX(Date) 여야 한다 ---
+    week_of_partial = date.fromisoformat(partial_date).isocalendar()[:2]
+    conn = sqlite3.connect(db)
+    try:
+        all_dates = [r[0] for r in conn.execute("SELECT DISTINCT Date FROM stock_prices")]
+    finally:
+        conn.close()
+    dates_in_week_w = [
+        d for d in all_dates if date.fromisoformat(d).isocalendar()[:2] == week_of_partial
+    ]
+    assert partial_date == max(dates_in_week_w), (
+        "AC-SGR-004 전제 위반 — 부분 데이터 날짜가 대표 바가 아니면 CG-3 은 발화하지 "
+        "않으며 본 AC 는 무의미하다(CG-1 이 대신 배제한다)"
+    )
+
+    grid = compute_weekly_grid(db, as_of="2024-12-31")   # partial-week 개입 방지
+
+    # Then: 격자에서 배제 + **대표 바가 차선 날짜로 대체** (단순 미포함이 아니다)
+    assert partial_date not in grid.dates, "CG-3 이 부분 데이터 대표 바를 배제하지 않음"
+    assert grid.latest.date == runner_up, (
+        f"대표 바가 차선 날짜({runner_up})로 대체되지 않음 — 실측 {grid.latest.date}"
+    )
+    # And: grid_exclusions[] 에 {date, row_count} 기록 (단순 배제가 아니라 기록까지)
+    excl = {e.date: e.row_count for e in grid.exclusions}
+    assert excl == {partial_date: 1}, f"exclusions 기록 불일치: {excl}"
+
+
+def test_ac_sgr_004_contrast_without_cg3_partial_returns_as_representative(
+    tmp_path, monkeypatch
+):
+    """AC-SGR-004 **대조 단언 [HARD]**: CG-3 행 수 판정을 제거하면 부분 데이터 날짜가
+    **대표 바로 복귀해** 위 Then 이 실패한다.
+
+    ``weekly_grid`` 는 모듈 전역에 ``statistics`` 를 바인딩하고
+    ``threshold = statistics.median(...) * 0.5`` 로 배제 임계를 만든다. 그 바인딩만
+    중앙값 0 을 내도록 되돌리면 임계가 0 이 되어 **CG-3 이 아무것도 배제하지 않는다** —
+    행 수 판정 제거와 동치다. 이 대조가 없으면 AC 전체가 다시 공허해진다.
+    """
+    import my_chart.analysis.weekly_grid as wg
+
+    db, partial_date, runner_up = _fixture_partial_is_representative(tmp_path)
+
+    monkeypatch.setattr(wg, "statistics", SimpleNamespace(median=lambda values: 0))
+    wg._compute_cached.cache_clear()
+    try:
+        grid_no_cg3 = compute_weekly_grid(db, as_of="2024-12-31")
+    finally:
+        wg._compute_cached.cache_clear()
+
+    assert partial_date in grid_no_cg3.dates, (
+        "대조 실패 — CG-3 를 제거해도 부분 데이터 날짜가 격자에 복귀하지 않는다면 "
+        "위 Then 은 CG-3 이 아니라 다른 규칙이 만족시키고 있다는 뜻이다"
+    )
+    assert grid_no_cg3.latest.date == partial_date, (
+        f"대조 실패 — CG-3 제거 시 대표 바가 {partial_date} 로 복귀해야 한다 "
+        f"(실측 {grid_no_cg3.latest.date})"
+    )
+    assert grid_no_cg3.exclusions == [], "대조 실패 — CG-3 제거 시 배제 기록이 없어야 한다"
+    assert runner_up in grid_no_cg3.dates  # 차선 날짜는 자기 주의 대표로 그대로 남는다
+
+
+@pytest.mark.nongating
+def test_ac_sgr_004_frozen_exclusions_empty_is_expected_nongating():
+    """[비게이팅] 프로즌 스냅샷에서 ``grid_exclusions == []`` 는 **정상 기대값**이다.
+
+    프로즌의 부분 데이터 날짜 5건은 어느 것도 자기 ISO 주의 대표 바가 아니므로 CG-3 이
+    한 번도 발화하지 않는다(MANIFEST.md: ``CG-3 배제된 대표 바 = 0건``).
+    **프로즌에서의 통과를 CG-3 구현의 증거로 읽어서는 안 된다** — 게이팅 검증은 위의
+    합성 픽스처가 담당한다. 이 값이 0 이 아니게 되는 순간은 스냅샷 성질이 바뀐 시점이다.
+    """
+    grid = compute_weekly_grid(str(FROZEN), as_of="2026-08-12")
+    assert grid.exclusions == [], (
+        f"프로즌 스냅샷 성질 변화 감지 — CG-3 배제가 {len(grid.exclusions)}건 발생 "
+        f"(MANIFEST.md 기대 0건). 스냅샷 갱신 여부를 확인하라."
+    )
+
 
 def test_ac_sgr_004_partial_data_exclusion_and_boundary(tmp_path):
     """중앙값 50% 미만 대표 바 배제 + exclusions 기록; 정확히 50% 경계는 포함(>=)."""
