@@ -81,12 +81,13 @@ grep -rnE "MAX\(Date\)|max\(Date\)|DISTINCT Date|GROUP BY Date" \
   | grep -v "my_chart/analysis/weekly_grid\.py" \
   | grep -vE "chart_service\.py|routers/db\.py|sector_advanced\.py:.*COUNT\(DISTINCT|market_breadth\.py" \
   | grep -vE "meta_service\.py:.*MAX\(Date\) FROM stock_prices WHERE Name"
+  | grep -vE "universe\.py:.*MAX\(Date\) FROM stock_prices GROUP BY Name"
 ```
 
 - **Then** 출력이 **0행**이다 — 3종 관용구 전부에 대해 모든 **주봉** 기준일 조회가 공유 헬퍼를 경유한다.
 - **And** **`meta_service.py` 제외의 정밀도 단언 [HARD]**: 마지막 제외 패턴은 `FROM stock_prices`(일봉, `:135`)만 걸러내며 `FROM weekly.stock_prices`(`:196`)는 **걸러내지 않는다**. 검증: `:196`을 순진한 `MAX(Date)`로 되돌린 변형에서 이 스캔이 **1행 이상을 출력한다**. 파일 단위 제외(`grep -v meta_service\.py`)를 쓰면 이 대조가 실패하므로 금지한다 — 실제 소비자를 통째로 숨기게 된다.
-- **And** **allowlist 정당성 회귀**: 제외한 5개 경로가 §1.2.2의 사유(단일 종목 시계열 / 적재 상태 / `COUNT` / O-G6 보류 / **일봉 기준 종목 최신일(O-G7)**)를 여전히 만족함을 각 1건씩 단언한다. allowlist가 조용히 비대해지는 것을 막는다.
-- **And** **allowlist 상한 단언**: allowlist 항목 수가 **5개 이하**다(이전 판 4개 + `meta_service.py:135` 일봉 지점 1건 = 5). 신규 위반을 allowlist에 추가해 회피하는 경로를 봉쇄한다.
+- **And** **allowlist 정당성 회귀**: 제외한 6개 경로가 §1.2.2의 사유(단일 종목 시계열 / 적재 상태 / `COUNT` / O-G6 보류 / **일봉 기준 종목 최신일(O-G7)** / **일봉 종목별 stale 최신일(REQ-SGR-014, O-G7)**)를 여전히 만족함을 각 1건씩 단언한다. allowlist가 조용히 비대해지는 것을 막는다.
+- **And** **allowlist 상한 단언**: allowlist 항목 수가 **6개 이하**다(이전 판 4개 + 일봉 지점 2건: `meta_service.py:135` 일봉 기준종목 최신일 + `universe.py:106` 일봉 stale = 6). 두 일봉 지점은 모두 의도된 daily-stale/reference 조회(주봉 격자 소비자가 아니며 stale는 일봉 개념), 나머지 4개는 기존 비-격자 사이트. **신규 주봉 소비자 관용구를 allowlist에 추가해 회피하는 경로는 여전히 위반**이다 — 항목마다 사유가 명시되고, 일봉 범주 확장은 §7 O-G7 미결 사항과 별도로 정당화된다.
 - **And** §1.2.1의 **7개 모듈 전부**가 격자 모듈을 import한다: `sector_ranking_service.py`, `stage_service.py`, `market_service.py`, `meta_service.py`, **`sector_advanced_service.py`**, `sector_advanced.py`, `sector_metrics.py`.
 - **And** `sector_advanced_service.py`에 `def _get_latest_date` 정의가 **남아 있지 않다**(`grep -c` → 0). 함수를 남긴 채 호출부만 바꾸면 재도입 경로가 살아 있다.
 
@@ -150,6 +151,7 @@ grep -rnE "MAX\(Date\)|max\(Date\)|DISTINCT Date|GROUP BY Date" \
 
 - 처리: §1.2.2 정적 스캔 allowlist에 **사유와 함께** 등재한다(조용히 빠뜨리지 않는다). REQ-SGR-005의 금지 범위는 **주봉** `stock_prices`로 한정한다(D2).
 - 일봉 측 격자(있다면)를 요구하려면 별도 REQ와 **일봉 픽스처**(`fixture_daily_max_ne_canonical`: 기준 종목의 일봉 최신 날짜가 부분 데이터 날짜인 조건)가 필요하다. 본 SPEC은 이를 **수행하지 않으며**, §7 **O-G7**로 등록한다.
+- **동일 "일봉" 범주 — `my_chart/analysis/universe.py:106`** (0.2.2 보완): REQ-SGR-014/UN-5 stale 판정을 위해 **일봉** `stock_prices`에서 종목별 `MAX(Date)`를 구한다(`SELECT Name, MAX(Date) FROM stock_prices GROUP BY Name`, `daily_db_path` 커넥션). stale는 일봉 개념이므로 주봉 격자 계약(REQ-SGR-005 주봉 한정) 밖이며 `meta_service.py:135`과 동일 범주. M2(`universe.py`)에서 도입되어 allowlist 작성 시점(0.2.0)에 누락됐다 — AC-SGR-005 §1.2.2 allowlist + 위 grep 제외에 같이 등재한다.
 
 - **현재 상태**: 실패 (가드가 `compute_sector_history` 1곳에만 존재)
 
