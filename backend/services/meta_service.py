@@ -11,6 +11,7 @@ import logging
 import math
 import sqlite3
 
+from my_chart.analysis.weekly_grid import _get_latest_valid_date
 from my_chart.config import REFERENCE_STOCK
 from my_chart.registry import get_sector_registry
 from backend.deps import get_db_conn
@@ -192,10 +193,11 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
     # --- Attach weekly DB and load weekly snapshot ---
     conn.execute(f"ATTACH DATABASE '{weekly_db_path}' AS weekly")
 
-    weekly_date_row = conn.execute(
-        "SELECT MAX(Date) FROM weekly.stock_prices WHERE Name = ?", (REFERENCE_STOCK,)
-    ).fetchone()
-    latest_weekly_date: str | None = weekly_date_row[0] if weekly_date_row else None
+    # SPEC-SECTOR-GRID-001 REQ-SGR-005: 주봉 기준일은 정규 격자의 정규 대표 바로 해석
+    # (CG-1 ISO 주당 1바·CG-3 부분 데이터 배제). weekly.stock_prices 의 자체
+    # MAX(Date) WHERE Name=REFERENCE_STOCK 폐기 — 기준 종목 한정이 아니라 전 종목
+    # 정규 격자로 수렴한다.
+    latest_weekly_date = _get_latest_valid_date(weekly_db_path)
 
     weekly_by_name: dict[str, tuple] = {}
     rs_by_name: dict[str, float | None] = {}
