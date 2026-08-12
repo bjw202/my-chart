@@ -1,6 +1,22 @@
 ---
-
-## id: SPEC-SECTOR-MINOR-COLOR-001 version: 1.0.1 status: draft created: 2026-05-27 updated: 2026-05-27 author: jw priority: medium issue_number: 0
+id: SPEC-SECTOR-MINOR-COLOR-001
+title: "StockBubbleChart 산업명(중) 색상·범례 (Stage 색상 100% 대체)"
+version: "1.0.1"
+status: completed
+created: 2026-05-27
+updated: 2026-05-27
+author: jw
+priority: P2
+phase: "sector-ux v0"
+module: "frontend/src/components/SectorAnalysis, backend/services, my_chart/registry.py"
+lifecycle: spec-anchored
+tags: "sector, frontend, visualization, echarts, color-channel, legend"
+issue_number: 0
+merged_pr: [9]
+merged_commit: 4139ebc
+related_specs: [SPEC-SECTOR-UX-001]
+tier: S
+---
 
 # SPEC-SECTOR-MINOR-COLOR-001: StockBubbleChart 산업명(중) 색상·범례 (Stage 색상 100% 대체)
 
@@ -10,6 +26,16 @@
 | --- | --- | --- | --- |
 | 1.0.0 | 2026-05-27 | jw | 초기 SPEC 작성. research.md(2026-05-27) 기반. StockBubbleChart 드릴다운 뷰의 Weinstein Stage 색상 매핑을 sector_minor(산업명(중)) 기준으로 100% 대체하고, 동적 범례(클릭 토글 + hover emphasis, 모바일 fallback 정의)와 tooltip의 산업명(중) 라인을 추가한다. Stage 정보는 tooltip에 유지(사용자 결정). development_mode: tdd. issue_number: 0 (GitHub integration OFF). Lesson #1/#2/#7 반영 — hover 정책 + 모바일 fallback + prominence priority + 라이브 가설 + 성능 baseline + UI 매핑 표 명시. Lesson #4 N/A (no derived dataframe). |
 | 1.0.1 | 2026-05-27 | jw | plan-auditor review-1 PASS(0.93) 반영: D1 Tailwind 오인용 → project-grounded rationale로 정정, D2 useMediaQuery 인라인 구현 채택(외부 라이브러리 무도입), D3 AC-10 정적 스캔 binary 확정(Vitest source-string regex), D4 AC-9 component re-render 단언 추가(rerender × 2회 itemStyle.color 배열 비교), D5 @MX:ANCHOR fan_in=2 근거 명시, D6 라인 인용 L124→L125 정정(3 파일). D7 WCAG contrast는 non-blocking이라 본 amendment에서 미적용 (향후 별도 design 검토). |
+
+## Frontmatter 정정 (2026-08-12, 본문 변경 없음)
+
+YAML frontmatter가 **단일 `## id: ... version: ... status: ...` 제목 줄로 붕괴**되어 있었다(Lesson #6 재발). 그 결과:
+
+- 12개 canonical 필드 중 `title` / `phase` / `module` / `lifecycle` / `tags`가 **부재**했고, 나머지는 YAML로 파싱되지 않았다
+- `status: draft`로 남아 있었으나 본 SPEC은 **커밋 `4139ebc`(PR #9, 2026-05-27)로 이미 출하**되었다. `SPEC-SECTOR-UX-001` §1.2와 `01-data-contract.md §8.7`이 이 SPEC을 **보존 계약(변경 금지)**으로 인용하고 있어, `draft` 상태는 인용 근거와 모순된다
+- `priority: medium`은 canonical enum(`P0`~`P3` 또는 `High`/`Medium`/`Low`/`Critical`)에 없는 소문자 값이었다
+
+**정정 내용**: 12개 canonical 필드를 정상 YAML frontmatter로 복원하고, 출하 사실을 반영해 `status: completed`, `priority: P2`, `merged_pr: [9]`, `merged_commit: 4139ebc`를 기록했다. **버전은 1.0.1 그대로 두었다** — 본문·AC·구현에 어떤 변경도 없는 메타데이터 정정이므로 버전을 올릴 사유가 없다.
 
 ---
 
