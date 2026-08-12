@@ -14,6 +14,7 @@ from typing import Any
 
 from my_chart.analysis.stage_classifier import classify_stage, _compute_slope
 from my_chart.analysis.universe import ETC_SECTOR
+from my_chart.analysis.weekly_grid import anchor, compute_weekly_grid
 from my_chart.registry import get_sector_registry
 
 # Index names excluded from sector metrics
@@ -29,9 +30,6 @@ _COMPOSITE_W_3M = 0.3
 
 # RS top threshold per SPEC R7
 _RS_TOP_THRESHOLD = 80.0
-
-# Weeks to look back for rank_change comparison
-_RANK_CHANGE_WEEKS = 4
 
 
 @dataclass
@@ -227,15 +225,12 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
         snapshot = _load_weekly_snapshot(conn, date)
         kospi_returns = _load_kospi_returns(conn, date)
 
-        # Get previous date for rank_change (4 weeks ago)
-        prev_date_row = conn.execute(
-            """SELECT DISTINCT Date FROM stock_prices
-               WHERE Date < ? AND Name NOT IN ('KOSPI', 'KOSDAQ')
-               ORDER BY Date DESC
-               LIMIT 1 OFFSET ?""",
-            (date, _RANK_CHANGE_WEEKS - 1),
-        ).fetchone()
-        prev_date = prev_date_row[0] if prev_date_row else None
+        # rank_change 기준일: anchor(t, 28) — t−28일 이하 최근 정규 격자 바
+        # (SPEC-SECTOR-GRID-001 AC-SGR-006-B / AC-SGR-020 R2). 1M = 28d(REQ-SGR-006).
+        # 기존 LIMIT 1 OFFSET 3(raw 날짜 오프셋) → 정규 격자 기준으로 의미 변경.
+        grid = compute_weekly_grid(db_path)
+        prev_bar = anchor(grid, date, 28)
+        prev_date = prev_bar.date if prev_bar is not None else None
         prev_snapshot = _load_weekly_snapshot(conn, prev_date) if prev_date else {}
         prev_kospi = _load_kospi_returns(conn, prev_date) if prev_date else {
             "chg_1w": 0.0, "chg_1m": 0.0, "chg_3m": 0.0
