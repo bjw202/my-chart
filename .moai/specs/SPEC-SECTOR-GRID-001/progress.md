@@ -152,7 +152,7 @@ m1_to_mN_commit_strategy: per-milestone   # M1~M5 마일스톤별 commit, M6 본
 ```yaml
 sync_status: audit-ready
 sync_complete_at: 2026-08-12
-sync_commit_sha: pending-backfill   # 본 커밋 자기참조 불가(D3) — 후속 단일 커밋으로 백필
+sync_commit_sha: 95e0980            # M6 sync 커밋 SHA (D3 backfill — 자기참조 면제, 후속 커밋으로 완료)
 tier: M
 route: A                             # Hybrid Trunk main-direct
 changelog_entry_position: "[Unreleased] > Added (SPEC-SECTOR-GRID-001 v0.2.2, 2026-08-12)"
