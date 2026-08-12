@@ -71,7 +71,7 @@ Sector Analysis 화면에서 섹터 순위·버블차트·Sector Explorer가 서
 | 거래대금 | 기간 토글과 같은 창 합산 + **기간별 고정 눈금 사다리** (1W 100억/1,000억/1조 · 1M 500억/5,000억/5조 · 3M 1,000억/1조/10조) |
 | 오염 행 | 조회 정규화 + 적재 방지. **물리 삭제하지 않음** |
 | 종목 버블 색상 | **산업명(중)** — 출하된 `SPEC-SECTOR-MINOR-COLOR-001` + `StockBubbleChart.tsx:28` `@MX:ANCHOR`가 고정. Stage로 재배정 금지 |
-| 범위 밖 | 섹터 워치리스트, `sector_minor` 필터 (후속 SPEC) · 시장 개요 breadth(`market_breadth.py`, O-G6) — `market_breadth.py:472`가 `SELECT DISTINCT Date ... ORDER BY Date DESC LIMIT ?`로 조회해 `weeks=12`가 ①이 7개 소비자에서 고친 것과 같은 결함(약 36일치만 반환)을 그대로 지니고 있으나, 이 3-계층 로드맵 범위 밖이며 현재 출하 중인 상태로 남아 별도 SPEC이 필요하다 (`SPEC-SECTOR-GRID-001/progress.md` §Residual-risk 등재) |
+| 범위 밖 | 섹터 워치리스트, `sector_minor` 필터 (후속 SPEC) · 시장 개요 breadth — **`SPEC-MARKET-BREADTH-001`로 분리** (O-G6 승계, plan 완료 `0ee1cd1`). `market_breadth.py:472`가 격자를 타지 않아, 실호출 `weeks=52`가 52개 바를 돌려주면서도 실제로는 **21개 ISO주(139일)** 만 덮는다 — 개수는 맞고 기간이 틀리다(올바른 구현은 358일). 현재 출하 중 |
 
 ---
 
@@ -178,3 +178,5 @@ sqlite3 "file:Output/stock_data_weekly.db?mode=ro" "SELECT MAX(Date) FROM stock_
 ```
 
 ①은 완료(v0.3.0)됐으므로 착수 순서는 ② → ③이며, 각 마일스톤 종료 시 AC 통과 현황과 변한 수치를 보고한다.
+
+이 로드맵과 **별개 라인**으로 `SPEC-MARKET-BREADTH-001`(§4 범위 밖 참조)이 plan 완료 상태로 대기 중이다. ②→③ 의존 체인 밖이므로 ②/③과 순서 제약 없이 `/moai run SPEC-MARKET-BREADTH-001`로 언제든 착수할 수 있다. ①의 `canonical_weekly_grid`에만 의존하며 그 의존은 이미 충족됐다.
