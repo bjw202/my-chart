@@ -112,7 +112,7 @@ AC-SGR-002(anomalies 미기록) · 005(`meta_service` :196 되돌림 검출) · 
 ```yaml
 run_status: audit-ready
 run_complete_at: 2026-08-12
-run_commit_sha: pending-backfill   # 본 M6 커밋 SHA — 커밋 후 후속 커밋으로 backfill (D3 자기참조 면제)
+run_commit_sha: 1f62beb            # M6 커밋 SHA (D3 backfill — 자기참조 면제, 후속 커밋으로 완료)
 tier: M
 cycle_type: tdd
 route: A                            # Hybrid Trunk main-direct
@@ -123,7 +123,7 @@ ac_fail_count: 0
 ac_total: 21
 preserve_list_post_run_count: 0     # M6 는 구현 코드 미수정(test+docs only)
 l44_pre_commit_fetch: true          # git fetch origin main 사전 확인 — origin 정합
-l44_post_push_fetch: pending-backfill
+l44_post_push_fetch: true             # push 후 origin/main == HEAD 1f62beb 정합 확인
 new_warnings_or_lints_introduced: 0 # ruff 미설치(알려진 gap, 아래 §Gaps) — 신규 lint 0건(구현 코드 미수정)
 cross_platform_build:
   applicable: false                 # Python 프로젝트 — cross-platform build tag 해당 없음
