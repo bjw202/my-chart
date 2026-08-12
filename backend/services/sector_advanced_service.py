@@ -14,6 +14,7 @@ from my_chart.analysis.sector_advanced import (
     compute_stock_bubble,
     compute_treemap_data,
 )
+from my_chart.analysis.weekly_grid import _get_latest_valid_date
 from backend.schemas.sector_advanced import (
     RRGResponse,
     RRGSectorItem,
@@ -31,22 +32,6 @@ from backend.schemas.sector_advanced import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# 헬퍼: 최신 날짜 조회
-# ---------------------------------------------------------------------------
-
-def _get_latest_date(db_path: str) -> str | None:
-    """weekly DB에서 가장 최근 날짜를 반환한다."""
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    try:
-        row = conn.execute(
-            "SELECT MAX(Date) FROM stock_prices WHERE Name NOT IN ('KOSPI', 'KOSDAQ')"
-        ).fetchone()
-        return row[0] if row else None
-    finally:
-        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +53,7 @@ def get_sector_bubble(
     Returns:
         SectorBubbleResponse
     """
-    date = _get_latest_date(weekly_db_path) or ""
+    date = _get_latest_valid_date(weekly_db_path) or ""
     bubbles = compute_sector_bubble(weekly_db_path, period=period, market=market)
 
     items = [
@@ -109,7 +94,7 @@ def get_stock_bubble(
     Returns:
         StockBubbleResponse
     """
-    date = _get_latest_date(weekly_db_path) or ""
+    date = _get_latest_valid_date(weekly_db_path) or ""
     stocks = compute_stock_bubble(weekly_db_path, sector_name=sector_name, period=period)
 
     items = [
@@ -149,7 +134,7 @@ def get_rrg_data(weekly_db_path: str) -> RRGResponse:
     Returns:
         RRGResponse
     """
-    date = _get_latest_date(weekly_db_path) or ""
+    date = _get_latest_valid_date(weekly_db_path) or ""
     sectors = compute_rrg_data(weekly_db_path)
 
     items = [
@@ -258,7 +243,7 @@ def get_treemap_data(weekly_db_path: str, period: str = "1w") -> TreemapResponse
     Returns:
         TreemapResponse
     """
-    date = _get_latest_date(weekly_db_path) or ""
+    date = _get_latest_valid_date(weekly_db_path) or ""
     root = compute_treemap_data(weekly_db_path, period=period)
 
     sector_nodes: list[TreemapSectorNode] = []
