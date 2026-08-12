@@ -7,6 +7,7 @@ import sqlite3
 
 from my_chart.analysis.stage_classifier import classify_all, classify_stage, screen_stage2_entry
 from my_chart.analysis.universe import ETC_SECTOR
+from my_chart.analysis.weekly_grid import _get_latest_valid_date
 from my_chart.registry import get_sector_registry
 from backend.schemas.stage import (
     SectorStageBreakdown,
@@ -19,15 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 def _get_latest_date(db_path: str) -> str | None:
-    """Get the latest date in the weekly DB."""
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    try:
-        row = conn.execute(
-            "SELECT MAX(Date) FROM stock_prices WHERE Name NOT IN ('KOSPI', 'KOSDAQ')"
-        ).fetchone()
-        return row[0] if row else None
-    finally:
-        conn.close()
+    """정규 주간 격자 기반 최신 기준일 (SPEC-SECTOR-GRID-001 REQ-SGR-005 공유 헬퍼 경유)."""
+    return _get_latest_valid_date(db_path)
 
 
 def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
