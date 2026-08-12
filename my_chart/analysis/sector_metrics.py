@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from my_chart.analysis.stage_classifier import classify_stage, _compute_slope
+from my_chart.analysis.universe import ETC_SECTOR
 from my_chart.registry import get_sector_registry
 
 # Index names excluded from sector metrics
@@ -247,7 +248,7 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
     sector_to_stocks: dict[str, list[str]] = {}
     for _, row in df_sector.iterrows():
         name = str(row["Name"])
-        sector = str(row.get("산업명(대)") or "기타")
+        sector = str(row.get("산업명(대)") or ETC_SECTOR)
         if sector not in sector_to_stocks:
             sector_to_stocks[sector] = []
         sector_to_stocks[sector].append(name)

@@ -6,6 +6,7 @@ import logging
 import sqlite3
 
 from my_chart.analysis.stage_classifier import classify_all, classify_stage, screen_stage2_entry
+from my_chart.analysis.universe import ETC_SECTOR
 from my_chart.registry import get_sector_registry
 from backend.schemas.stage import (
     SectorStageBreakdown,
@@ -54,7 +55,7 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
     df_sector = get_sector_registry()
     sector_map: dict[str, str] = {}
     for _, row in df_sector.iterrows():
-        sector_map[str(row["Name"])] = str(row.get("산업명(대)") or "Unknown")
+        sector_map[str(row["Name"])] = str(row.get("산업명(대)") or ETC_SECTOR)
 
     # Stage distribution
     counts = {1: 0, 2: 0, 3: 0, 4: 0}
@@ -64,7 +65,7 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
         stage = result.stage
         counts[stage] = counts.get(stage, 0) + 1
 
-        sector = sector_map.get(result.name, "Unknown")
+        sector = sector_map.get(result.name, ETC_SECTOR)
         if sector not in sector_stages:
             sector_stages[sector] = {1: 0, 2: 0, 3: 0, 4: 0}
         sector_stages[sector][stage] = sector_stages[sector].get(stage, 0) + 1

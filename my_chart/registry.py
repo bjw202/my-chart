@@ -37,37 +37,72 @@ def _normalize_sector_column(series: pd.Series) -> pd.Series:
 # @MX:ANCHOR: [AUTO] sectormap loader — fan_in 8+ (registry/meta_service/sector_advanced/screen_service/stage_service)
 # @MX:REASON: 한 곳에서 sectormap-original.xlsx를 로드하여 단일 source 원칙 유지.
 #   header=8 + 컬럼 rename은 본 함수에서만 처리되어야 downstream 코드 변경 0.
-def _load_sectormap() -> pd.DataFrame:
-    """sectormap-original.xlsx 로드 → 영문 컬럼 6개 DataFrame 반환.
+def _load_raw_sectormap(path: str | None = None) -> pd.DataFrame:
+    """sectormap xlsx 원시 로드(rename/select/zfill/정규화). dedup 전 단계.
 
     파일 구조 (sectormap-original.xlsx):
     - row 0~7: 데이터 설명 주석 (header가 아님)
-    - row 8: 실제 header 행 ('종목\\n코드', '종목명', '시장', '산업명(대)', '산업명(중)', '주요제품', + 47개 재무/주가 컬럼)
-    - row 9+: 데이터 (2556 종목)
-
-    동작:
-    1. header=8로 실제 헤더 행 지정
-    2. 한글/개행 컬럼명 → 영문 (downstream 코드 변경 0 보장)
-    3. 사용 6 컬럼만 select (메모리 88% 절약, 47개 추가 컬럼 drop)
-    4. Code zfill(6) — 9, A0 같은 짧은/특수 코드도 6자리 정규화
-    5. 섹터 컬럼 정규화 (_normalize_sector_column)
+    - row 8: 실제 header 행 ('종목\\n코드', '종목명', '시장', '산업명(대)', ...)
+    - row 9+: 데이터
     """
-    # header=8: 앞 8개 row는 데이터 설명 주석 — 실제 컬럼명은 row 8
-    df = pd.read_excel(str(SECTORMAP_PATH), header=8)
-    # 한글/개행 컬럼명 → 영문 (downstream 호환)
+    df = pd.read_excel(path or str(SECTORMAP_PATH), header=8)
     df = df.rename(columns={
         "종목\n코드": "Code",
         "종목명": "Name",
         "시장": "Market",
     })
-    # 사용하는 6개 컬럼만 select (전체 53 컬럼 중) — 메모리 절약 + downstream 동일
     df = df[["Code", "Name", "Market", "산업명(대)", "산업명(중)", "주요제품"]].copy()
     df["Code"] = df["Code"].astype(str).str.zfill(6)
-    # 섹터 컬럼 정규화: 빈 값, nan, '-' 등을 '기타'로 처리
     for col in ["산업명(대)", "산업명(중)"]:
         if col in df.columns:
             df[col] = _normalize_sector_column(df[col])
     return df
+
+
+def _dedup_by_code(df: pd.DataFrame) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
+    """Code 기준 중복 제거 — 첫 행 유지, 나머지 drop + WARNING (UN-4 / REQ-SGR-013).
+
+    Returns:
+        (deduped_df, [(code, name), ...]) — drop 된 행들의 (Code, 종목명) 목록.
+        조용한 무시 금지: drop 마다 WARNING 로그에 Code+종목명을 남긴다.
+    """
+    dup_mask = df["Code"].duplicated(keep="first")
+    dups = [(str(r["Code"]), str(r["Name"])) for _, r in df[dup_mask].iterrows()]
+    for code, name in dups:
+        logger.warning(
+            "registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=%s 종목명=%s",
+            code, name,
+        )
+    return (df[~dup_mask].copy() if dups else df), dups
+
+
+def _load_sectormap(path: str | None = None) -> pd.DataFrame:
+    """sectormap 로드 → dedup 된 영문 컬럼 6개 DataFrame 반환.
+
+    기존 호출부(get_stock_registry/get_sector_registry)와의 호환을 위해 DataFrame 만
+    반환한다. dedup 된 행의 (Code, 종목명) 목록이 필요하면 load_sector_registry_with_diagnostics.
+    """
+    df, _ = _dedup_by_code(_load_raw_sectormap(path))
+    return df
+
+
+def load_sector_registry(path: str | None = None) -> pd.DataFrame:
+    """지정 경로(또는 기본 SECTORMAP_PATH) 섹터 registry 로드 + Code-dedup + WARNING.
+
+    universe.py 및 테스트가 경로를 지정해 로드하기 위해 사용한다.
+    get_sector_registry() 와 달리 global 캐시를 쓰지 않고 매 호출 시 로드한다.
+    """
+    return _load_sectormap(path)
+
+
+def load_sector_registry_with_diagnostics(
+    path: str | None = None,
+) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
+    """섹터 registry 로드 + dedup. (deduped_df, [(code, name), ...]) 반환.
+
+    universe.py 가 UniverseSnapshot.diagnostics 에 drop 된 중복 행을 기록할 때 사용.
+    """
+    return _dedup_by_code(_load_raw_sectormap(path))
 
 
 def get_stock_registry() -> pd.DataFrame:
