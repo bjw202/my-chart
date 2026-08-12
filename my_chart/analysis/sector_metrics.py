@@ -227,7 +227,7 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
 
         # rank_change 기준일: anchor(t, 28) — t−28일 이하 최근 정규 격자 바
         # (SPEC-SECTOR-GRID-001 AC-SGR-006-B / AC-SGR-020 R2). 1M = 28d(REQ-SGR-006).
-        # 기존 LIMIT 1 OFFSET 3(raw 날짜 오프셋) → 정규 격자 기준으로 의미 변경.
+        # 기존 raw 날짜 오프셋(3칸) 기준 → 정규 격자 기준으로 의미 변경.
         grid = compute_weekly_grid(db_path)
         prev_bar = anchor(grid, date, 28)
         prev_date = prev_bar.date if prev_bar is not None else None
@@ -319,48 +319,25 @@ def compute_sector_history(
 ) -> tuple[list[str], list[list[SectorRank]]]:
     """최근 N주 섹터 랭킹 히스토리를 계산한다.
 
-    부분 데이터 날짜(증분 업데이트 잔재 등으로 종목 수가 현저히 적은 날짜)는
-    자동 제외한다. 제외 기준: 조회 기간 내 중앙 종목 수의 50% 미만.
-    운영 DB(정상 2,548종목 vs 부분 1~4종목)와 테스트 DB(3~4종목) 모두
-    중앙값 기준으로 자동 적응한다.
+    날짜는 정규 주간 격자(SPEC-SECTOR-GRID-001 REQ-SGR-001 ``compute_weekly_grid``)의
+    ``history`` 에서 파생한다 — CG-1(ISO 주당 1바)·CG-3(부분 데이터 행 수 배제) 가 이미
+    적용됐으므로 자체 행수-중앙값×0.5 부분데이터 가드는 폐기한다(AC-SGR-006-B B-2).
+    ``(dates, rankings)`` 반환 계약과 last-N-weeks 의미는 유지한다(WIP 보존).
 
     Args:
         db_path: weekly SQLite DB 경로.
         weeks: 조회 주수.
 
     Returns:
-        (dates, rankings) 튜플. dates는 정제된 날짜(오름차순),
+        (dates, rankings) 튜플. dates는 정규 격자 history 의 최근 weeks 개(오름차순),
         rankings는 각 날짜의 섹터 랭킹 리스트. 둘은 같은 길이·같은 순서.
     """
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    try:
-        # 조회 기간 2배 확보: 부분 데이터 날짜가 끼어들어도 정상 날짜 weeks개 확보
-        date_counts = conn.execute(
-            """SELECT Date, COUNT(*) AS cnt
-               FROM stock_prices
-               WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
-               GROUP BY Date
-               ORDER BY Date DESC
-               LIMIT ?""",
-            (weeks * 2,),
-        ).fetchall()
-    finally:
-        conn.close()
+    grid = compute_weekly_grid(db_path)
+    all_history = [bar.date for bar in grid.history]
+    history_dates = all_history[-weeks:] if weeks > 0 else all_history
 
-    if not date_counts:
+    if not history_dates:
         return [], []
 
-    # 부분 데이터 날짜 감지: 중앙 종목 수의 50% 미만은 부분 데이터로 간주
-    counts = sorted(c for _, c in date_counts)
-    median_count = counts[len(counts) // 2]
-    stock_threshold = median_count * 0.5
-
-    valid_dates = sorted(d for d, c in date_counts if c >= stock_threshold)
-    # 최근 weeks개 선택 (오름차순 유지)
-    valid_dates = valid_dates[-weeks:]
-
-    if not valid_dates:
-        return [], []
-
-    rankings = [compute_sector_ranking(db_path, date) for date in valid_dates]
-    return valid_dates, rankings
+    rankings = [compute_sector_ranking(db_path, date) for date in history_dates]
+    return history_dates, rankings
