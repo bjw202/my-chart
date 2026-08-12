@@ -1,8 +1,8 @@
 # 섹터 분석 개편 — 개요와 실행 로드맵
 
-- 문서 상태: 설계·SPEC 확정, **구현 보류** (2026-08-12 사용자 결정)
+- 문서 상태: ① `SPEC-SECTOR-GRID-001` **완료** (v0.3.0, 2026-08-12) · ②③ **구현 보류** (2026-08-12 사용자 결정 유지)
 - 기준 측정일: 2026-08-11 (weekly DB 최신 bar)
-- 재개 명령: `/moai run SPEC-SECTOR-GRID-001`
+- 재개 명령: `/moai run SPEC-SECTOR-AGGREGATION-001`
 - 보고 주기: **마일스톤마다** (사용자 선택)
 
 ---
@@ -47,11 +47,11 @@ Sector Analysis 화면에서 섹터 순위·버블차트·Sector Explorer가 서
 
 계층 분할이며 의존이 **①→②→③ 단방향**이다. 앞 계층이 끝나야 뒤 계층을 검증할 수 있다.
 
-| SPEC | Tier | 범위 | 감사 점수 |
-|---|---|---|---|
-| `SPEC-SECTOR-GRID-001` | M | 정규 주간 격자, 적재 방지, 유니버스 단일화, 스냅샷 유효성 | 0.86 PASS |
-| `SPEC-SECTOR-AGGREGATION-001` | L | 시총가중 집계, 시장별 벤치마크, Stage 단일화, 응답 스키마 | 0.88 PASS |
-| `SPEC-SECTOR-UX-001` | L | 상태 모델, 화면 전환, 컨트롤 규약, 시각화 | 0.87 PASS |
+| SPEC | Tier | 범위 | 감사 점수 | 상태 |
+|---|---|---|---|---|
+| `SPEC-SECTOR-GRID-001` | M | 정규 주간 격자, 적재 방지, 유니버스 단일화, 스냅샷 유효성 | plan-audit 0.86 PASS | **완료 (v0.3.0)** — M1~M6 전부 구현, sync-auditor 사후 감사 PASS-WITH-DEBT 78.6/100(조화평균) → 반증력 복구 in-place amendment(AC-SGR-005/R5) 적용 후 v0.3.0 확정. 감사 기록: `.moai/reports/sync-audit-SPEC-SECTOR-GRID-001-20260812.md` |
+| `SPEC-SECTOR-AGGREGATION-001` | L | 시총가중 집계, 시장별 벤치마크, Stage 단일화, 응답 스키마 | plan-audit 0.88 PASS | 착수 전 |
+| `SPEC-SECTOR-UX-001` | L | 상태 모델, 화면 전환, 컨트롤 규약, 시각화 | plan-audit 0.87 PASS | 착수 전 |
 
 `plan-auditor` 적대적 감사 2회를 거쳤다. iter-1에서 **"격자를 안 써도, stale 필터를 안 만들어도 AC가 통과한다"** 는 사실이 라이브 데이터로 실증됐고, iter-2에서 합성 픽스처와 대조 단언으로 두 구멍이 모두 막혔음이 재실증됐다.
 
@@ -71,7 +71,7 @@ Sector Analysis 화면에서 섹터 순위·버블차트·Sector Explorer가 서
 | 거래대금 | 기간 토글과 같은 창 합산 + **기간별 고정 눈금 사다리** (1W 100억/1,000억/1조 · 1M 500억/5,000억/5조 · 3M 1,000억/1조/10조) |
 | 오염 행 | 조회 정규화 + 적재 방지. **물리 삭제하지 않음** |
 | 종목 버블 색상 | **산업명(중)** — 출하된 `SPEC-SECTOR-MINOR-COLOR-001` + `StockBubbleChart.tsx:28` `@MX:ANCHOR`가 고정. Stage로 재배정 금지 |
-| 범위 밖 | 섹터 워치리스트, `sector_minor` 필터 (후속 SPEC) |
+| 범위 밖 | 섹터 워치리스트, `sector_minor` 필터 (후속 SPEC) · 시장 개요 breadth(`market_breadth.py`, O-G6) — `market_breadth.py:472`가 `SELECT DISTINCT Date ... ORDER BY Date DESC LIMIT ?`로 조회해 `weeks=12`가 ①이 7개 소비자에서 고친 것과 같은 결함(약 36일치만 반환)을 그대로 지니고 있으나, 이 3-계층 로드맵 범위 밖이며 현재 출하 중인 상태로 남아 별도 SPEC이 필요하다 (`SPEC-SECTOR-GRID-001/progress.md` §Residual-risk 등재) |
 
 ---
 
@@ -79,16 +79,16 @@ Sector Analysis 화면에서 섹터 순위·버블차트·Sector Explorer가 서
 
 각 SPEC의 마일스톤은 **되돌리기 어려운 순**으로 배열됐다. 앞쪽일수록 데이터 모델·계약에 가깝고 뒤쪽일수록 기계적이다.
 
-### ① SPEC-SECTOR-GRID-001 (Tier M · 6 마일스톤)
+### ① SPEC-SECTOR-GRID-001 (Tier M · 6 마일스톤) — **완료 (v0.3.0)**
 
-- [ ] **M1 — 격자·유니버스 계약 정의** *(되돌리기 가장 어려움: 데이터 모델)*
-  - [ ] **M1.0 프로즌 스냅샷 픽스처 구축** `[HARD · 코드 변경 전]` — 이후 모든 회귀 AC의 기준
-  - [ ] M1.1 격자 계약 (ISO주별 `max(Date)` 대표행, 진행 중인 주 플래그)
-- [ ] **M2 — 유니버스 규약** *(되돌리기 어려움: 집계 모집단 정의)* — 단일 소스, Code 기준 dedup, stale 배제
-- [ ] **M3 — weekly INSERT column-name 마이그레이션** `[HARD · Lesson #8]`
-- [ ] **M4 — 적재 supersede** *(되돌리기 어려움: 물리 삭제)*
-- [ ] **M5 — 엔드포인트 배선 교체** *(기계적)* — 7개 소비자를 공유 헬퍼로
-- [ ] **M6 — 회귀 게이트 + 성능 측정**
+- [x] **M1 — 격자·유니버스 계약 정의** *(되돌리기 가장 어려움: 데이터 모델)*
+  - [x] **M1.0 프로즌 스냅샷 픽스처 구축** `[HARD · 코드 변경 전]` — 이후 모든 회귀 AC의 기준
+  - [x] M1.1 격자 계약 (ISO주별 `max(Date)` 대표행, 진행 중인 주 플래그)
+- [x] **M2 — 유니버스 규약** *(되돌리기 어려움: 집계 모집단 정의)* — 단일 소스, Code 기준 dedup, stale 배제
+- [x] **M3 — weekly INSERT column-name 마이그레이션** `[HARD · Lesson #8]`
+- [x] **M4 — 적재 supersede** *(되돌리기 어려움: 물리 삭제)*
+- [x] **M5 — 엔드포인트 배선 교체** *(기계적)* — 7개 소비자를 공유 헬퍼로
+- [x] **M6 — 회귀 게이트 + 성능 측정**
 
 ### ② SPEC-SECTOR-AGGREGATION-001 (Tier L · 7 마일스톤)
 
@@ -123,25 +123,25 @@ Sector Analysis 화면에서 섹터 순위·버블차트·Sector Explorer가 서
 | **O-A8** | ② M3 차단 | 진행 중인 주에 1W 수익률이 쓰는 날짜 쌍. 미결이면 BM-6(동일 날짜 창)이 **무증상으로** 깨진다 |
 | **O-A7** | ③ 착수 전 | 최소 구성수 5의 Bump 적용 여부. ③의 `AC-SUX-019`·`AC-SUX-056 R5`가 의존 |
 | **O-U9** | ③ 착수 전 | 저커버리지 시각 인코딩 |
-| **M1.0** | ①·② 각각 | 프로즌 픽스처 / 골든 baseline을 **코드 변경 전에** 캡처. 미캡처 시 다음 마일스톤 착수 금지 |
+| **M1.0** | ①(완료)·② | 프로즌 픽스처 / 골든 baseline을 **코드 변경 전에** 캡처. 미캡처 시 다음 마일스톤 착수 금지. ①은 프로즌 픽스처가 이미 커밋돼 있고 게이팅 AC가 라이브 DB 상태에 더 이상 의존하지 않는다 — ②의 골든 baseline은 아직 미캡처, M1 착수 시 최우선 |
 
 ### rollback 경계
 
-- ③ **M3 직전**이 전면 rollback 경계다. M3(NavIntent 교체) 이후로는 부분 rollback이 불가하므로 M3를 단일 커밋으로 유지한다.
-- ① **M4 이후**는 물리 삭제가 포함되어 되돌릴 수 없다. M4 진입 전 백업을 권한다.
+- ③ **M3 직전**이 전면 rollback 경계다. M3(NavIntent 교체) 이후로는 부분 rollback이 불가하므로 M3를 단일 커밋으로 유지한다. (아직 착수 전 — 유효한 경계)
+- ① **M4**는 물리 삭제가 포함되어 되돌리기 어려운 단계였다. M4는 완료됐고 회귀 게이트(M6)를 통과했으므로 더 이상 진입 전 경계가 아니라 완료된 이력이다.
 
 ---
 
 ## 7. 반드시 알아야 할 사실
 
-**1. `weekly.py`의 positional INSERT가 아직 살아 있다.**
-`my_chart/db/weekly.py:148`(stock_prices)과 `:295`(relative_strength)는 여전히 positional이다. `daily.py:276`은 [lessons #8](../../.claude/) 의 1.3M 행 부패 사고 후 이미 컬럼명 기반으로 마이그레이션됐다. ① M3가 이 두 지점을 옮기며, `AC-SGR-010`이 **legacy-ALTER 라운드트립 + positional 경로에서 시프트가 발생함을 대조 단언**한다. 감사가 "이 작업에서 가장 잘 된 부분"으로 꼽은 항목이므로 **수정하지 말 것.**
+**1. `weekly.py`의 positional INSERT는 ① M3에서 이미 column-name으로 마이그레이션됐다 (완료).**
+`my_chart/db/weekly.py:164`(stock_prices)과 `:186`(relative_strength)는 이제 `INSERT OR REPLACE INTO ... ({column_list}) VALUES ({placeholders})` 형태의 컬럼명 기반이다. `:156`과 `:180`에 남은 `VALUES (?` 문자열은 실행 코드가 아니라, positional을 **쓰지 않는 이유**를 설명하는 `@MX:REASON` 주석이다. `daily.py:276`은 [lessons #8](../../.claude/) 의 1.3M 행 부패 사고 후 이미 먼저 마이그레이션됐고, ① M3가 `weekly.py`의 나머지 두 지점을 같은 방식으로 옮겼다. `AC-SGR-010`이 **legacy-ALTER 라운드트립 + positional 경로에서 시프트가 발생함을 대조 단언**하는 회귀 테스트로 이 상태를 고정한다. 감사가 "이 작업에서 가장 잘 된 부분"으로 꼽은 항목이므로 **AC-SGR-010과 이 마이그레이션 자체는 수정하지 말 것.**
 
 **2. `SMA40`·`MAX52`·`CHG_*`는 DB 행이 아니라 수집 시점 원천 시계열에서 계산된다.**
 200종목 표본에서 저장 `SMA40`이 "DB 최근 40행 평균"과 일치한 것은 22건뿐이다. 따라서 주봉 중복 바 오염은 **Stage 분류에 영향이 적고**, 깨진 것은 DB 행을 세는 계산(히스토리·RRG·rank_change 기준일)뿐이다. 초기 감사의 "SMA40이 실제 22주라 Stage 전제가 붕괴했다"는 검증 결과 **사실이 아니다.**
 
 **3. frozen 픽스처 수치는 `as_of 2026-08-11` 기준이다.**
-라이브 DB가 갱신되면 `GRID acceptance.md §3` / `AGG acceptance.md §8`의 고정 수치를 재측정해야 한다. 이미 드리프트가 시작됐다. 재개 전 최신일을 먼저 확인할 것.
+라이브 DB가 갱신되면 `GRID acceptance.md §3` / `AGG acceptance.md §8`의 고정 수치를 재측정해야 한다. 이미 드리프트가 시작됐다. 재개 전 최신일을 먼저 확인할 것. — ①은 프로즌 픽스처가 커밋된 정적 자산이고 게이팅 AC가 더 이상 라이브 DB 상태에 의존하지 않으므로 이 드리프트 경고의 대상에서 제외된다. **②의 골든 baseline은 아직 미캡처**이므로 이 경고는 ② 착수 시 그대로 유효하다.
 
 ---
 
@@ -170,11 +170,11 @@ Sector Analysis 화면에서 섹터 순위·버블차트·Sector Explorer가 서
 # 1. 산출물 확인
 ls docs/sector-ux/ .moai/specs/SPEC-SECTOR-*
 
-# 2. frozen 수치 유효성 확인 (2026-08-11이 아니면 재측정 필요)
+# 2. frozen 수치 유효성 확인 (②의 골든 baseline 캡처 대상 — 2026-08-11이 아니면 재측정 필요)
 sqlite3 "file:Output/stock_data_weekly.db?mode=ro" "SELECT MAX(Date) FROM stock_prices"
 
-# 3. 착수
-/moai run SPEC-SECTOR-GRID-001
+# 3. 착수 — ①은 완료됐으므로 ②부터
+/moai run SPEC-SECTOR-AGGREGATION-001
 ```
 
-착수 순서는 ① → ② → ③이며, 각 마일스톤 종료 시 AC 통과 현황과 변한 수치를 보고한다.
+①은 완료(v0.3.0)됐으므로 착수 순서는 ② → ③이며, 각 마일스톤 종료 시 AC 통과 현황과 변한 수치를 보고한다.
