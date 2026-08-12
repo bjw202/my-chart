@@ -226,6 +226,49 @@ b12_self_test_c: "CHANGELOG 명시 파일 경로(weekly_grid.py/universe.py/week
 
 README.md는 수정하지 않았다 — 본 SPEC은 데이터/격자 내부 계약(REQ-SGR-*) 변경으로, README에 문서화된 사용자 대면 기능·설치·실행 절차가 변경되지 않았다(라이브 화면 재계산 결과는 CHANGELOG + release-notes.md로 안내).
 
+### Amendment Close (v0.3.0, in-place amendment)
+
+```yaml
+amendment_sync_status: audit-ready
+amendment_sync_complete_at: 2026-08-12
+amendment_sync_commit_sha: pending-backfill   # 본 커밋 SHA — 자기참조 면제(D3), 후속 커밋으로 backfill
+amendment_of: SPEC-SECTOR-GRID-001            # in-place (self-referential)
+prior_completed_sha: 95e0980                  # 최초 3-phase close (v0.2.2)
+prior_sync_commit_sha_backfill: fca134c       # 최초 close 의 §E.4 backfill 커밋
+amendment_body_commit_sha: 2140cd6            # manager-spec — spec.md + acceptance.md 개정
+amendment_test_commit_sha: a61c3c1            # manager-develop — 반증력 실질화(F1/F2/F3/F6/F7)
+amendment_test_backfill_sha: e07ae36          # manager-develop §E.3 run_commit_sha backfill
+tier: M
+route: A                                       # Hybrid Trunk main-direct
+changelog_entry_position: "[Unreleased] > Fixed (SPEC-SECTOR-GRID-001 v0.3.0 — in-place amendment, 2026-08-12)"
+frontmatter_status_transitions:
+  spec_md: "completed -> in-progress (amendment, 2140cd6) -> implemented -> completed (본 커밋)"
+  plan_md: "N/A (frontmatter 없음 — 본문 전용 문서)"
+  acceptance_md: "N/A (frontmatter 없음 — 본문 전용 문서)"
+audit_trigger:
+  auditor: sync-auditor
+  verdict: "PASS-WITH-DEBT 78.6/100"
+  dimensions: "Functionality 78 / Security 92 / Craft 72 / Consistency 75"
+  severity_counts: "BLOCKING 0 / SHOULD-FIX 6 / MINOR 6"
+defect_disposition:
+  fixed_in_amendment:
+    - "F1: AC-SGR-021 센티넬 발산 차단 — 테스트 내부 자기비교(무조건 통과) → 프로덕션 코드 실호출로 교체, 되돌린 변형에서 RED 관측"
+    - "F2: AC-SGR-006-A 6지점 개별 되돌림 — A-4/A-6 공유 헬퍼 재호출로 인한 실질 4-way → 6-way 전부 개별 대조 단언으로 복구"
+    - "F3: AC-SGR-020 R5 — 수학적 항진명제(len(history)<=len(raw)) → 프로즌 리터럴 345 기준 엄격 부등 재기술"
+    - "F6: AC-SGR-005.2 정적 스캔 규범 명령이 유효한 bash가 아니었음(줄바꿈 이음 누락) → 복구 + 잔류 집합 동등 비교로 전환"
+    - "F7: AC-SGR-004 프로즌 적용 주장이 사실과 불일치(실측 exclusions==[]) → 합성 픽스처 게이팅 대상으로 재분류"
+  open_not_fixed_this_amendment:
+    - "AC-SGR-021 NaN-truthiness: NULL 산업명(대) → pandas NaN 승격 → 'NaN or ETC_SECTOR' 가 NaN truthy 로 센티넬 미분기, 섹터 키가 'nan' (두 소비 경로는 일치하므로 AC 게이팅 요건 자체는 성립 — 정규화 여부는 REQ 개정 필요, manager-spec 소관, progress.md §E.2 §Gaps 참조)"
+    - "AC-SGR-004 문언-구현 불일치: '한 ISO 주 안에 두 날짜' 문자 그대로 구성 시 그 주 전체가 격자에서 탈락(대체 폴백 없음) — AC 명시 구성 예만 게이팅 채택, REQ/AC 개정 필요, manager-spec 소관"
+    - "O-G6: market_breadth.py:472 는 현재 출하 중인 TG-4 오계산(주봉 다중 날짜 주 오염으로 weeks=12 가 약 36일치만 반환) — 본 3-계층 SPEC 범위 밖, 별도 SPEC 필요(progress.md §E.3 §Residual-risk 에 이미 등재)"
+    - "sync-auditor 원 감사가 지목한 나머지 SHOULD-FIX/MINOR 세부 항목(총 6+6건) 중 F1/F2/F3/F6/F7 을 제외한 잔여 항목은 본 SPEC 저장소에 항목별로 영속화된 기록이 없어(원 감사 리포트 미보존) 이 close 시점에 개별 추적 불가 — 향후 SHOULD-FIX 잔여 재감사가 필요하면 새 sync-auditor 실행으로 재확인할 것"
+b12_self_test_a: "grep -c 'SECTOR-GRID' CHANGELOG.md (edit 전) = 2 — 기존 v0.2.2 항목 보존 확인, 신규 Fixed 섹션은 추가(append)"
+b12_self_test_b: "acceptance.md SSOT AC 유일 ID 21건(AC-SGR-001~021, grep -oE 'AC-SGR-[0-9]+[A-Za-z]*' | sort -u 재도출) == 원 close 시점 21 과 동일 — 개수 변화 없음(005/006 하위절 개정은 개수 미변경)"
+b12_self_test_c: "CHANGELOG Fixed 섹션 명시 커밋(2140cd6/a61c3c1) 및 파일 경로 my_chart/analysis/weekly_grid.py · my_chart/analysis/universe.py · tests/test_consumer_dates.py · tests/test_regression_sgr020.py · tests/test_universe.py · tests/test_weekly_grid.py · pyproject.toml ls 검증 완료"
+```
+
+README.md는 본 amendment 에서도 수정하지 않았다 — v0.3.0 은 SPEC 본문·테스트 반증력 수정이며 프로덕션 동작·사용자 대면 기능은 변경되지 않았다(구현 diff 빈 상태, `git diff --stat 2140cd6..HEAD -- my_chart/ backend/ frontend/` 확인).
+
 ## §F Phase 4 Mode Selection
 
 **Phase 1 (Plan Audit Gate)**: BYPASSED-with-recent-PASS — 금일 plan-phase PASS 0.86(iter-2, MUST-PASS 전항 통과) 인정, 산출물 미변경. 사용자 결정(Implementation Kickoff Approval 2026-08-12, 착수 게이트 = "최근 PASS 인정 후 M1.0 착수"). skip 자격(score≥0.90)은 아니나 동일 산물·동일 PASS로 재감사 무의미하여 사용자 판단으로 생략.

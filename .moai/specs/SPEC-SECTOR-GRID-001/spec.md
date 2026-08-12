@@ -2,7 +2,7 @@
 id: SPEC-SECTOR-GRID-001
 title: "섹터 분석 기반 계층 — 정규 주간 격자·유니버스·적재 보호"
 version: "0.3.0"
-status: in-progress
+status: completed
 created: 2026-08-12
 updated: 2026-08-12
 amendment_of: SPEC-SECTOR-GRID-001

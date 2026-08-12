@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 성능: 격자 캐시 적중 0.003~0.005ms(목표 <5ms 대비 ~1000× 여유), 캐시 미적중(콜드) 635~803ms(목표 P95<50ms 미달이나 spec §0.2 처방 완화(`(db_path, mtime)` 메모이즈)가 이미 M1에 구현되어 있어 프로세스당 1회 콜드 비용으로 완화됨)
   - **회귀처럼 보이지만 올바른 변화** (`.moai/specs/SPEC-SECTOR-GRID-001/release-notes.md` 참고): rank 순위 이동, 1주 초과수익률 양수 섹터 29→18, 52주 신고가 종목 99→56, 게임 섹터 구성종목 33→32(중복 제거) 등 — 전부 AC-SGR-020 R1~R5로 기대값 고정, 되돌림 금지
 
+### Fixed (SPEC-SECTOR-GRID-001 v0.3.0 — in-place amendment, 2026-08-12)
+
+- **반증력(falsifiability) 복구 — 위 v0.2.2 릴리스의 테스트/AC 문서 결함 수정. 프로덕션 동작은 변경 없음.**
+  - **배경**: 위 v0.2.2 종료 후 sync-auditor 독립 감사가 **PASS-WITH-DEBT 78.6/100**(Functionality 78 / Security 92 / Craft 72 / Consistency 75, BLOCKING 0 / SHOULD-FIX 6 / MINOR 6)을 반환했다. 핵심 소견: progress.md §E.2가 "대조 단언(falsification) 7종 전부 GREEN"이라 기록했으나, 실제로는 **진짜 4종 / 공허 3종**이었다 — 공허한 3종은 구현을 완전히 되돌려도 동일하게 GREEN이라 아무것도 반증하지 못했다. 사용자 승인 후 SPEC을 `completed → in-progress`로 되돌려 in-place amendment를 진행했다(`amendment_of: SPEC-SECTOR-GRID-001`, `prior_completed_sha: 95e0980`).
+  - **1단계 — SPEC 본문 개정** (commit `2140cd6`, manager-spec, spec.md + acceptance.md 192+/47−): AC-SGR-005 정적 스캔 규범 명령이 유효한 bash가 아니었던 결함(줄바꿈 이음 누락 → `bash -n` exit 2)을 복구하고 잔류 집합 검증 방식을 제외 정규식 연쇄에서 **집합 동등 비교**로 전환, allowlist 실행 쿼리 상한을 6→**5**로 축소(공허했던 `chart_service.py` 항목 제거, 실측 `grep -c` → 0), AC-SGR-020 R5를 수학적 항진명제(`len(history) <= len(raw)`, 격자가 원시에서 선별되므로 어떤 구현에서도 참)에서 프로즌 리터럴 `345` 기준 엄격 부등으로 재기술, AC-SGR-004를 프로즌 적용 대상에서 **합성 픽스처 게이팅** 대상으로 재분류(라이브 실측 `exclusions == []`로 CG-3가 프로즌 픽스처 위에서 한 번도 발화하지 않음을 확인), §1.2.1 행 번호 드리프트 정정 + 판정 키를 매칭 텍스트로 전환, O-G6(`market_breadth.py:472` TG-4 오계산) 심각도 상향.
+  - **2단계 — 테스트 반증력 실질화** (commit `a61c3c1` + backfill `e07ae36`, manager-develop, 4개 테스트 파일 + pyproject.toml + progress.md §E.2/§E.3, 689+/79−): F1(AC-SGR-021 센티넬 발산 차단 — 테스트 내부에서 동일 식 2회 비교하던 것을 프로덕션 코드 실호출로 교체), F2(AC-SGR-006-A 6지점 개별 되돌림 — A-4/A-6가 공유 헬퍼를 그대로 재호출해 실질 4-way였던 것을 6-way 전부로 복구), F3(AC-SGR-020 R5 항진명제 해소)을 되돌린 변형에서 실제 RED가 관측되도록 복구, F6(AC-SGR-005.2 규범 명령 실행), F7(AC-SGR-004 CG-3 재분류에 맞춘 게이팅 픽스처 전환)도 함께 실질화. **구현 코드는 한 줄도 수정하지 않았다** — `git diff --stat 2140cd6..HEAD -- my_chart/ backend/ frontend/`가 빈 diff(테스트/문서/설정 전용 변경).
+  - **검증**: 게이팅 6파일 M6 69 passed → **84 passed**(+15, 전부 M7 신규 단언). 전체 회귀 `pytest tests/` baseline 569 passed / 8 failed / 25 errors → **584 passed**(+15, 정확히 신규분과 일치) / 8 failed(동일 목록, 본 SPEC 범위 밖 기존 결함) / 25 errors(동일, `tests/fnguide/`) — **회귀 0건**. 커버리지(DoD §4 게이트, `>= 85%`): `my_chart/analysis/weekly_grid.py` **100%**(94/94), `my_chart/analysis/universe.py` **100%**(56/56).
+  - **미결로 남긴 것(REQ/AC 개정 소관, 본 커밋 범위 밖)**: (a) NULL `산업명(대)`가 pandas에서 `NaN`으로 승격되면 `NaN or ETC_SECTOR`가 NaN의 truthy 성질 때문에 센티넬 분기를 타지 않고 섹터 키가 `'nan'`이 된다(두 소비 경로 모두 동일값이라 AC-SGR-021의 "두 경로 일치" 게이팅 요건 자체는 성립 — 정규화 여부만 미결). (b) AC-SGR-004 본문의 "한 ISO 주 안에 두 날짜" 문구를 문자 그대로 구성하면 그 주가 통째로 격자에서 빠지는 경우가 있으며, AC 명시 `구성 예`만 게이팅 대상으로 채택함.
+
 ### Changed (SPEC-SECTOR-MINOR-COLOR-001 v1.0.1, 2026-05-27)
 
 - **StockBubbleChart 종목 버블 차트 색상·범례 인코딩 교체** (commits `bebd3f1`, `7c5be67`)
