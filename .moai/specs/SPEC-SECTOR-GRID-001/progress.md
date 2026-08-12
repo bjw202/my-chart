@@ -149,7 +149,23 @@ m1_to_mN_commit_strategy: per-milestone   # M1~M5 마일스톤별 commit, M6 본
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+```yaml
+sync_status: audit-ready
+sync_complete_at: 2026-08-12
+sync_commit_sha: pending-backfill   # 본 커밋 자기참조 불가(D3) — 후속 단일 커밋으로 백필
+tier: M
+route: A                             # Hybrid Trunk main-direct
+changelog_entry_position: "[Unreleased] > Added (SPEC-SECTOR-GRID-001 v0.2.2, 2026-08-12)"
+frontmatter_status_transitions:
+  spec_md: "in-progress -> completed"
+  plan_md: "N/A (frontmatter 없음 — 본문 전용 문서)"
+  acceptance_md: "N/A (frontmatter 없음 — 본문 전용 문서)"
+b12_self_test_a: "grep -c 'SECTOR-GRID' CHANGELOG.md (edit 전) = 0 — 중복 없음 확인"
+b12_self_test_b: "acceptance.md SSOT AC 21건(AC-SGR-001~021, 006은 A/B 하위절 포함 1건) == CHANGELOG/progress.md ac_count 21 일치"
+b12_self_test_c: "CHANGELOG 명시 파일 경로(weekly_grid.py/universe.py/weekly.py) ls 검증 완료"
+```
+
+README.md는 수정하지 않았다 — 본 SPEC은 데이터/격자 내부 계약(REQ-SGR-*) 변경으로, README에 문서화된 사용자 대면 기능·설치·실행 절차가 변경되지 않았다(라이브 화면 재계산 결과는 CHANGELOG + release-notes.md로 안내).
 
 ## §F Phase 4 Mode Selection
 

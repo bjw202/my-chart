@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-SECTOR-GRID-001 v0.2.2, 2026-08-12)
+
+- **섹터 분석 기반 계층 — 정규 주간 격자·유니버스·적재 보호** (M0~M6, `run_commit_sha` `1f62beb`)
+  - 신규 모듈 `my_chart/analysis/weekly_grid.py`: `compute_weekly_grid()` — 주봉 원시 날짜(다중 날짜 주·부분 데이터 포함)를 정규화해 ISO 주당 1바 격자 산출
+    - CG-1(ISO 주 그룹핑, 대표 = `MAX(Date)`), CG-2(진행 중인 주 `is_partial_week` 분리), CG-3(중앙값 50% 미만 배제 + `grid_exclusions[]`)
+    - `anchor(t, days)` 달력 앵커링(1W/1M/3M/6M/12M/52W), `history(weeks=N)`, `grid_version = "canonical-v1"` 상수
+    - 공유 헬퍼 `_get_latest_valid_date()` — 자체 기준일 조회 재도입 방지(REQ-SGR-005)
+  - 신규 모듈 `my_chart/analysis/universe.py`: `compute_universe()` — 유효 유니버스(4중 교집합: registry ∩ stock_meta ∩ 최신바가격 ∩ 비-stale) + 진단(`registry_only`, `duplicates`, `stale_names`)
+    - registry `Code` 기준 중복 제거(UN-4) + WARNING 로그, stale 판정(일봉 `MAX(Date)` 기준 14일 초과, `last_updated` 미사용, UN-5)
+    - 미분류 섹터 센티널 `ETC_SECTOR = "기타"` 단일화(REQ-SGR-017)
+  - `my_chart/db/weekly.py`: weekly INSERT를 positional → **column-name** 방식으로 전환(`stock_prices`, `relative_strength` 각 1건, Lesson #8 legacy-ALTER round-trip 게이트) + 주중 재적재 supersede(`--no-supersede` 안전장치 포함)
+  - 7개 기준일 소비자(`sector_ranking_service.py`, `stage_service.py`, `market_service.py`, `meta_service.py`, `sector_advanced_service.py`, `sector_advanced.py`, `sector_metrics.py`)를 공유 격자 헬퍼로 수렴(TG-5)
+  - **AC-SGR-001~021 전항 PASS (21/21)** — 프로즌 픽스처(`tests/fixtures/frozen/weekly-2026-08-12/`) 위에서 게이팅, 대조 단언(falsification) 7종 전부 GREEN
+  - 검증: SPEC 스코프 gating 69 passed (`test_weekly_grid.py` / `test_consumer_dates.py` / `test_weekly_insert.py` / `test_weekly_supersede.py` / `test_universe.py` / `test_regression_sgr020.py`), 전체 회귀 `pytest tests/ --ignore=tests/fnguide` 475 passed / 8 failed(SPEC 범위 밖 기존 결함 — `test_api`/`test_meta_service`/`test_rs_line`/`test_screen_service`)
+  - 성능: 격자 캐시 적중 0.003~0.005ms(목표 <5ms 대비 ~1000× 여유), 캐시 미적중(콜드) 635~803ms(목표 P95<50ms 미달이나 spec §0.2 처방 완화(`(db_path, mtime)` 메모이즈)가 이미 M1에 구현되어 있어 프로세스당 1회 콜드 비용으로 완화됨)
+  - **회귀처럼 보이지만 올바른 변화** (`.moai/specs/SPEC-SECTOR-GRID-001/release-notes.md` 참고): rank 순위 이동, 1주 초과수익률 양수 섹터 29→18, 52주 신고가 종목 99→56, 게임 섹터 구성종목 33→32(중복 제거) 등 — 전부 AC-SGR-020 R1~R5로 기대값 고정, 되돌림 금지
+
 ### Changed (SPEC-SECTOR-MINOR-COLOR-001 v1.0.1, 2026-05-27)
 
 - **StockBubbleChart 종목 버블 차트 색상·범례 인코딩 교체** (commits `bebd3f1`, `7c5be67`)
