@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from my_chart.analysis.stage_classifier import classify_stage, _compute_slope
+from my_chart.analysis.weekly_grid import compute_weekly_grid
 from my_chart.config import DEFAULT_DB_DAILY
 
 # ---------------------------------------------------------------------------
@@ -94,18 +95,19 @@ def _connect(db_path: str) -> sqlite3.Connection:
     return sqlite3.connect(db_path, check_same_thread=False)
 
 
-def _get_dates(conn: sqlite3.Connection, weeks: int) -> list[str]:
-    """최근 N주 날짜 목록을 오름차순으로 반환한다."""
-    rows = conn.execute(
-        """SELECT DISTINCT Date FROM stock_prices
-           WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
-           ORDER BY Date DESC
-           LIMIT ?""",
-        (weeks,),
-    ).fetchall()
-    if not rows:
+def _get_dates(db_path: str, weeks: int) -> list[str]:
+    """최근 N주 정규 격자 날짜(오름차순). SPEC-SECTOR-GRID-001 REQ-SGR-005.
+
+    ``compute_weekly_grid`` 의 정규 격자(CG-1 ISO 주당 1바·CG-3 부분 데이터 배제)에서
+    최근 ``weeks`` 개 바를 취한다. 자체 최신-날짜 직조회 SQL 관용구는 폐기했다.
+    """
+    grid = compute_weekly_grid(db_path)
+    dates = grid.dates  # 정규 격자 전체(미완성 latest 포함), 오름차순
+    if not dates:
         return []
-    return sorted(r[0] for r in rows)
+    if weeks <= 0:
+        return list(dates)
+    return dates[-weeks:]
 
 
 def _get_kospi_close_by_date(conn: sqlite3.Connection, dates: list[str]) -> dict[str, float]:
@@ -257,7 +259,7 @@ def compute_sector_price_index(
     """
     conn = _connect(db_path)
     try:
-        dates = _get_dates(conn, weeks)
+        dates = _get_dates(db_path, weeks)
         if not dates:
             return {}
 
@@ -500,7 +502,7 @@ def compute_sector_bubble(
     """
     conn = _connect(db_path)
     try:
-        dates = _get_dates(conn, 1)  # 최신 날짜만 필요
+        dates = _get_dates(db_path, 1)  # 최신 날짜만 필요
         if not dates:
             return []
         latest_date = dates[-1]
@@ -575,7 +577,7 @@ def compute_stock_bubble(
     """
     conn = _connect(db_path)
     try:
-        dates = _get_dates(conn, 1)
+        dates = _get_dates(db_path, 1)
         if not dates:
             return []
         latest_date = dates[-1]
@@ -663,7 +665,7 @@ def compute_treemap_data(
     """
     conn = _connect(db_path)
     try:
-        dates = _get_dates(conn, 1)
+        dates = _get_dates(db_path, 1)
         if not dates:
             return TreemapNode(name="root", market_cap=0.0, price_change=0.0)
         latest_date = dates[-1]
@@ -793,22 +795,13 @@ def detect_sector_transitions(db_path: str) -> SectorAlerts:
         SectorAlerts (강세/약세 전환 섹터 목록)
     """
     # 최근 5주 날짜를 가져온다 (현재 + 4주 전 비교)
-    conn = _connect(db_path)
-    try:
-        dates_rows = conn.execute(
-            """SELECT DISTINCT Date FROM stock_prices
-               WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
-               ORDER BY Date DESC
-               LIMIT 5""",
-        ).fetchall()
-    finally:
-        conn.close()
+    # SPEC-SECTOR-GRID-001 REQ-SGR-005: alerts 비교 날짜도 정규 격자에서 파생한다.
+    grid = compute_weekly_grid(db_path)
+    all_dates = grid.dates[-5:] if grid.dates else []
 
-    if len(dates_rows) < 2:
+    if len(all_dates) < 2:
         return SectorAlerts(emerging_leaders=[], weakening_sectors=[])
 
-    # 날짜 오름차순 정렬
-    all_dates = sorted(r[0] for r in dates_rows)
     current_date = all_dates[-1]
     prev_date = all_dates[0]  # 4주 전 (또는 가능한 가장 오래된 날짜)
 
