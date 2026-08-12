@@ -42,6 +42,13 @@ _STOCK_PRICES_COLS = (
     "RS_6M", "RS_9M", "RS_12M", "RS_Line",
 )
 
+# relative_strength 테이블 컬럼 순서 (CREATE TABLE DDL 순서와 동일).
+# column-name INSERT 매핑용 — rs_rows 값 튜플 순서와 반드시 일치해야 한다.
+_RELATIVE_STRENGTH_COLS = (
+    "Name", "Date",
+    "RS_12M_Rating", "RS_6M_Rating", "RS_3M_Rating", "RS_1M_Rating",
+)
+
 _PRICE_DF_COLS = (
     "Open", "High", "Low", "Close",
     "Volume", "Volume SMA10",
@@ -143,12 +150,41 @@ def _batch_insert(conn: sqlite3.Connection, rows: list[tuple]) -> None:
     """Batch insert rows using executemany with UPSERT."""
     if not rows:
         return
+    # @MX:ANCHOR: [AUTO] column-name 기반 INSERT — _STOCK_PRICES_COLS 순서가 라이브
+    #             stock_prices 물리 컬럼 순서와 달라도 이름으로 안전 매핑된다.
+    # @MX:REASON: positional `VALUES (?, ?, ...)` 패턴은 legacy ALTER ADD COLUMN이
+    #             컬럼을 테이블 끝에 append해 물리 순서가 튜플 순서와 어긋나면 모든
+    #             후속 컬럼이 시프트되어 무음 데이터 오염이 발생한다
+    #             (Lesson #8 / daily.py:267 선행 사례 — SPEC-SMA5-FILTER-001 v1.0.4
+    #             1.3M 행 부패 회귀, 2026-05-26).
+    column_list = ", ".join(_STOCK_PRICES_COLS)
     placeholders = ", ".join(["?"] * len(_STOCK_PRICES_COLS))
     conn.executemany(
-        f"INSERT OR REPLACE INTO stock_prices VALUES ({placeholders})",
+        f"INSERT OR REPLACE INTO stock_prices ({column_list}) VALUES ({placeholders})",
         rows,
     )
     conn.commit()
+
+
+def _batch_insert_rs(conn: sqlite3.Connection, rows: list[tuple]) -> None:
+    """Batch insert relative_strength rows via column-name UPSERT (no commit).
+
+    커밋은 호출처(generate_rs_db)의 기존 cadence(20 iteration 단위 + 최종)를
+    존중해 여기서 수행하지 않는다 — _batch_insert 와의 유일한 차이.
+    """
+    if not rows:
+        return
+    # @MX:ANCHOR: [AUTO] column-name 기반 INSERT — _RELATIVE_STRENGTH_COLS 순서가
+    #             라이브 relative_strength 물리 컬럼 순서와 달라도 안전 매핑된다.
+    # @MX:REASON: positional `VALUES (?, ?, ...)` 패턴은 legacy ALTER ADD COLUMN이
+    #             컬럼을 테이블 끝에 append하면 물리 순서가 어긋나 시프트 부패가
+    #             발생한다 (Lesson #8 / daily.py:267 선행 사례와 동일 인과).
+    column_list = ", ".join(_RELATIVE_STRENGTH_COLS)
+    placeholders = ", ".join(["?"] * len(_RELATIVE_STRENGTH_COLS))
+    conn.executemany(
+        f"INSERT OR REPLACE INTO relative_strength ({column_list}) VALUES ({placeholders})",
+        rows,
+    )
 
 
 def generate_price_db(
@@ -291,10 +327,7 @@ def generate_rs_db(
              float(row["RS_3M_Rating"]), float(row["RS_1M_Rating"]))
             for _, row in df.iterrows()
         ]
-        conn.executemany(
-            "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?, ?, ?, ?)",
-            rs_rows,
-        )
+        _batch_insert_rs(conn, rs_rows)
 
         if progress_callback is not None:
             progress_callback(i + 1, total_dates, str(date))
