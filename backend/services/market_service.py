@@ -13,6 +13,7 @@ from my_chart.analysis.market_breadth import (
     detect_choppy,
     determine_cycle,
 )
+from my_chart.analysis.weekly_grid import _get_latest_valid_date
 from backend.schemas.market import (
     BreadthData,
     BreadthHistoryItem,
@@ -30,15 +31,8 @@ _INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
 
 
 def _get_latest_date(db_path: str) -> str | None:
-    """Get the latest date in the weekly DB (excluding index stocks)."""
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    try:
-        row = conn.execute(
-            "SELECT MAX(Date) FROM stock_prices WHERE Name NOT IN ('KOSPI', 'KOSDAQ')"
-        ).fetchone()
-        return row[0] if row else None
-    finally:
-        conn.close()
+    """정규 주간 격자 기반 최신 기준일 (SPEC-SECTOR-GRID-001 REQ-SGR-005 공유 헬퍼 경유)."""
+    return _get_latest_valid_date(db_path)
 
 
 def _load_index_data(db_path: str, index_name: str, date: str) -> IndexData:
