@@ -156,7 +156,7 @@ $ python -m pytest -q                 # 전체 스위트
 ```yaml
 run_status: audit-ready
 run_complete_at: 2026-08-12
-run_commit_sha: pending-backfill-M7   # M7 커밋 SHA (D3 자기참조 면제 — 후속 커밋으로 backfill)
+run_commit_sha: a61c3c1               # M7 커밋 SHA (D3 자기참조 면제 — 본 후속 커밋으로 backfill 완료)
 prior_run_commit_sha: 1f62beb         # M6 커밋 SHA (1ccf918 로 backfill 완료)
 tier: M
 cycle_type: tdd
