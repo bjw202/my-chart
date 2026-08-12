@@ -60,36 +60,104 @@ GROUP BY iso_year, iso_week HAVING c > 1;
 - **And** `history_grid`의 마지막 날짜는 **그 화요일이 아니라 직전 완결 주의 대표 날짜**다.
 - **And** 최신 주에 금요일 바가 존재하는 픽스처에서는 `is_partial_week is False`이고 두 뷰의 마지막 날짜가 **동일**하다.
 
-### AC-SGR-004 — 부분 데이터 날짜 배제 (규칙 CG-3)
+### AC-SGR-004 — 부분 데이터 날짜 배제 (규칙 CG-3) [합성 픽스처 게이팅 — 프로즌 적용 대상 아님]
 
-- **Given** 조회 구간의 날짜별 행 수 중앙값이 2,548이고 특정 날짜의 행 수가 1인 픽스처에서 (실측 케이스: 2026-07-23=1행, 07-14=1행, 07-07=1행, 06-11=1행, 06-30=4행)
+> **v0.3.0 정정 — 이 AC는 프로즌 스냅샷에서 아무것도 검증하지 않았다 [HARD]**. 이전 판은 라이브 실측 날짜 5건(`2026-07-23=1행`, `07-14=1행`, `07-07=1행`, `06-11=1행`, `06-30=4행`)을 Given에 인용하고 §3 "적용 대상 AC"에 AC-004를 올렸다. 그러나 프로즌 스냅샷 `MANIFEST.md` 실측은 **`CG-3 배제된 대표 바 = 0건`**, 재현 검증은 **`CG-3 exclusions == []`** 이다.
+>
+> **원인**: 그 5개 날짜는 픽스처에 **존재하지만**(축소 기준에서 의도적으로 담았다), **어느 것도 자기 ISO 주의 대표 바(= 그 주의 `MAX(Date)`)가 아니다.** CG-3은 *대표 바 후보*에만 적용되므로 한 번도 발화하지 않는다 — 그 날짜들은 CG-3이 아니라 **CG-1(주당 1바 선별)이 대신 배제**한다. 즉 Then("해당 날짜는 격자에 포함되지 않는다")은 **CG-3을 한 줄도 구현하지 않아도 참**이며, 이 AC는 0.2.0에서 고쳤다고 기록한 바로 그 "통과해도 미구현" 양식이었다.
+>
+> **해소**: AC-004를 **합성 픽스처 게이팅**으로 재분류하고, 부분 데이터 날짜가 **반드시 ISO 주 대표 바가 되도록** 픽스처 성질을 규정한다. 라이브/프로즌 실행은 비게이팅 참고로 강등한다.
+
+- **Given** 합성 픽스처 `fixture_partial_is_representative`에서 — 다음 성질을 **[HARD] 전제 단언으로 먼저 검사**한다.
+  - 어떤 ISO 주 W 안에 두 날짜가 있고, **행 수가 부족한 날짜가 그 주의 `MAX(Date)`** 다. 즉 CG-1이 그 날짜를 대표 바로 **선택한 뒤** CG-3이 배제해야 하는 구성이다.
+  - 이 전제가 성립하지 않으면(부분 데이터 날짜가 대표 바가 아니면) CG-3은 발화하지 않으며 본 AC는 무의미하다 — 테스트는 `assert partial_date == max(dates_in_week_W)`를 **먼저** 단언한다.
+  - 구성 예: `W-금요일`(행 수 = 중앙값 수준) + 그보다 **늦은** `W+1-월요일`(행 수 = 중앙값의 50% 미만). `AC-SGR-006-A`의 `fixture_max_ne_canonical`이 이미 이 성질을 갖는 구성이므로 공유하거나 동일 팩토리로 만든다.
 - **When** 정규 격자를 산출하면
-- **Then** 해당 날짜는 격자에 포함되지 않는다.
-- **And** `grid_exclusions[]`에 `{date, row_count, median}` 항목이 기록된다.
-- **And** 행 수가 중앙값의 정확히 50%인 경계 날짜는 **포함**된다(`< 0.50` 배제, `>= 0.50` 포함 — 경계 방향 확정).
+- **Then** 그 부분 데이터 날짜는 격자에 포함되지 않고, **대표 바가 그 주의 차선 날짜(`W-금요일`)로 대체**된다 — 단순 미포함이 아니라 **대체까지** 단언한다.
+- **And** `grid_exclusions[]`에 `{date, row_count, median}` 항목이 기록된다(단순 배제가 아니라 기록까지).
+- **And** **대조 단언 [HARD]**: CG-3 행 수 판정을 제거한 변형에서 그 날짜가 **대표 바로 복귀해** 위 Then이 **실패**한다. 이 대조가 없으면 AC 전체가 다시 공허해진다.
+- **And** 행 수가 중앙값의 정확히 50%인 경계 날짜는 **포함**된다(`< 0.50` 배제, `>= 0.50` 포함 — 경계 방향 확정). 이 경계 종목도 **대표 바 위치에 놓아** 검사한다.
+- **And** **프로즌/라이브 실행은 비게이팅 참고**다: 프로즌 스냅샷에서는 `grid_exclusions == []`가 **정상 기대값**이며(대표 바 중 부분 데이터가 없음 — `MANIFEST.md`), 이 값이 0이 아니게 되는 순간은 스냅샷 성질이 바뀐 시점이므로 리포트로 남긴다. **프로즌에서의 통과를 CG-3 구현의 증거로 읽어서는 안 된다.**
 
 ### AC-SGR-005 — 자체 기준일 조회의 부재 (정적 스캔)
 
 > **이전 판의 결함**: 스캔이 `MAX(Date)` 리터럴만 찾았다. 그런데 **가장 중요한 두 지점** — `sector_metrics.py:231`(`LIMIT 1 OFFSET 3`, rank_change 기준일)과 `:346`(중앙값 가드) — 은 `ORDER BY Date DESC` / `GROUP BY Date` 관용구를 쓰므로 **한 번도 매칭되지 않았다.** 스캔이 통과해도 요구사항은 미구현일 수 있었다. 3종 관용구(§1.2.1 I1~I3)를 전부 덮도록 확장한다.
 
-- **When** 다음 명령을 실행하면
+> **v0.3.0 개정 — 규범 명령이 유효한 bash가 아니었다 [HARD]**. 0.2.2가 `universe.py` 제외 행을 추가하면서 **직전 줄의 줄바꿈 이음(`\`)을 빠뜨렸다.** 그 결과 마지막 `| grep -vE …` 행이 고아가 되어 `bash -n` 이 **exit 2 (`syntax error near unexpected token '|'`)** 로 거부한다 — **규범 명령을 있는 그대로 실행할 수 없었다.** 구현 측 테스트는 이를 신고하지 않고 침묵으로 우회했다: 자체 상수에 `--include="*.py"` 를 **문서화 없이 추가**하고, `universe.py` 제외를 파이프라인이 아니라 Python 쪽 리스트 컴프리헨션으로 옮겼다. "acceptance.md grep 과 동일"이라는 주석과 달리 둘은 동일하지 않았다.
+>
+> **`--include="*.py"` 는 결과 집합을 바꾸므로 규범에 명문화한다.** 실측: 없으면 `__pycache__/*.pyc` 바이너리 6행이 추가로 매칭된다. 결과를 바꾸는 옵션을 테스트에만 몰래 넣는 것은 금지한다.
+>
+> **제외 정규식 연쇄를 폐기하고 잔류 집합 동등으로 전환한다.** 이전 구조는 "제외 패턴을 계속 덧붙여 0행을 만든다"였고, 이는 **스캔을 점점 눈멀게 만드는 방향**이다 — 정규식이 넓어질수록 진짜 위반도 함께 숨는다(예: 어떤 주봉 서비스가 `MAX(Date) FROM stock_prices WHERE Name = …` 형태를 새로 쓰면 기존 `meta_service` 제외 패턴이 **그것까지 숨긴다**). 새 구조는 스캔을 넓게 유지하고 **잔류 전량을 §1.2.2 allowlist와 집합 동등 비교**한다. 이는 이전 구조보다 엄격하다 — 항목의 **추가와 삭제 양쪽**이 모두 검출된다.
+
+본 AC는 여섯 개의 독립 기계 검사로 구성된다. 각각 별도 테스트 함수를 갖는다.
+
+#### AC-SGR-005.1 — 주봉 소비자 순도 (핵심 게이트, 행 번호 비의존)
+
+- **Given** §1.2.1의 주봉 소비자 7개 파일
+  (`backend/services/sector_ranking_service.py`, `backend/services/stage_service.py`, `backend/services/market_service.py`, `backend/services/meta_service.py`, `backend/services/sector_advanced_service.py`, `my_chart/analysis/sector_advanced.py`, `my_chart/analysis/sector_metrics.py`)
+- **When** 각 파일에서 3종 관용구(`MAX(Date)` / `max(Date)` / `DISTINCT Date` / `GROUP BY Date`)를 매칭하면
+- **Then** 다음 **2건의 인파일 예외**를 제외하고 매칭이 **0행**이다.
+  | 예외 | 매칭 텍스트 | 사유 |
+  | --- | --- | --- |
+  | `meta_service.py` 일봉 | `MAX(Date) FROM stock_prices WHERE Name` | §1.2.2 L3 (일봉, O-G7) |
+  | `sector_advanced.py` 개수 | `COUNT(DISTINCT Date` | §1.2.2 L2 (개수) |
+- **And** 판정 키는 **매칭 텍스트**이며 행 번호가 아니다 — 무관한 편집으로 붉어지지 않고, 다른 줄을 조용히 가리키지도 않는다(§1.2.1 상단 [HARD]).
+
+#### AC-SGR-005.2 — 전수 스캔 잔류의 집합 동등 [HARD]
+
+- **When** 다음 규범 명령을 실행하면
 
 ```bash
-grep -rnE "MAX\(Date\)|max\(Date\)|DISTINCT Date|GROUP BY Date" \
+grep -rnE --include="*.py" \
+     "MAX\(Date\)|max\(Date\)|DISTINCT Date|GROUP BY Date" \
      backend/services/ backend/routers/ my_chart/analysis/ \
   | grep -v "_test\|tests/" \
-  | grep -v "my_chart/analysis/weekly_grid\.py" \
-  | grep -vE "chart_service\.py|routers/db\.py|sector_advanced\.py:.*COUNT\(DISTINCT|market_breadth\.py" \
-  | grep -vE "meta_service\.py:.*MAX\(Date\) FROM stock_prices WHERE Name"
-  | grep -vE "universe\.py:.*MAX\(Date\) FROM stock_prices GROUP BY Name"
+  | grep -v "my_chart/analysis/weekly_grid\.py"
 ```
 
-- **Then** 출력이 **0행**이다 — 3종 관용구 전부에 대해 모든 **주봉** 기준일 조회가 공유 헬퍼를 경유한다.
-- **And** **`meta_service.py` 제외의 정밀도 단언 [HARD]**: 마지막 제외 패턴은 `FROM stock_prices`(일봉, `:135`)만 걸러내며 `FROM weekly.stock_prices`(`:196`)는 **걸러내지 않는다**. 검증: `:196`을 순진한 `MAX(Date)`로 되돌린 변형에서 이 스캔이 **1행 이상을 출력한다**. 파일 단위 제외(`grep -v meta_service\.py`)를 쓰면 이 대조가 실패하므로 금지한다 — 실제 소비자를 통째로 숨기게 된다.
-- **And** **allowlist 정당성 회귀**: 제외한 6개 경로가 §1.2.2의 사유(단일 종목 시계열 / 적재 상태 / `COUNT` / O-G6 보류 / **일봉 기준 종목 최신일(O-G7)** / **일봉 종목별 stale 최신일(REQ-SGR-014, O-G7)**)를 여전히 만족함을 각 1건씩 단언한다. allowlist가 조용히 비대해지는 것을 막는다.
-- **And** **allowlist 상한 단언**: allowlist 항목 수가 **6개 이하**다(이전 판 4개 + 일봉 지점 2건: `meta_service.py:135` 일봉 기준종목 최신일 + `universe.py:106` 일봉 stale = 6). 두 일봉 지점은 모두 의도된 daily-stale/reference 조회(주봉 격자 소비자가 아니며 stale는 일봉 개념), 나머지 4개는 기존 비-격자 사이트. **신규 주봉 소비자 관용구를 allowlist에 추가해 회피하는 경로는 여전히 위반**이다 — 항목마다 사유가 명시되고, 일봉 범주 확장은 §7 O-G7 미결 사항과 별도로 정당화된다.
-- **And** §1.2.1의 **7개 모듈 전부**가 격자 모듈을 import한다: `sector_ranking_service.py`, `stage_service.py`, `market_service.py`, `meta_service.py`, **`sector_advanced_service.py`**, `sector_advanced.py`, `sector_metrics.py`.
-- **And** `sector_advanced_service.py`에 `def _get_latest_date` 정의가 **남아 있지 않다**(`grep -c` → 0). 함수를 남긴 채 호출부만 바꾸면 재도입 경로가 살아 있다.
+- **[HARD] 이 명령은 `bash -n` 을 **exit 0** 으로 통과해야 한다.** 테스트는 이 명령 문자열을 **문자 그대로** 사용하며, 자체 판단으로 옵션·제외를 추가하지 않는다. 추가가 필요하면 본 AC를 먼저 개정한다.
+- **Then** 출력 행을 `(경로, 매칭된 관용구 텍스트)`로 정규화한 집합이 **§1.2.2 allowlist와 정확히 동등**하다 — 초과(신규 위반)와 부족(허용 지점 소실) 양쪽 모두 실패다.
+- **기대 잔류 집합** (2026-08-12 실측, 총 10행 = 실행 쿼리 5 + `universe.py` 산문 5):
+  | # | 경로 | 매칭 텍스트 | 종류 |
+  | --- | --- | --- | --- |
+  | L1 | `backend/routers/db.py` | `SELECT MAX(Date) FROM stock_prices` | 실행 쿼리 |
+  | L2 | `my_chart/analysis/sector_advanced.py` | `SELECT COUNT(DISTINCT Date) FROM stock_prices …` | 실행 쿼리 |
+  | L3 | `backend/services/meta_service.py` | `SELECT MAX(Date) FROM stock_prices WHERE Name = ?` | 실행 쿼리 (일봉) |
+  | L4 | `my_chart/analysis/universe.py` | `SELECT Name, MAX(Date) FROM stock_prices GROUP BY Name` | 실행 쿼리 (일봉 stale) |
+  | L5 | `my_chart/analysis/market_breadth.py` | `SELECT DISTINCT Date FROM stock_prices` | 실행 쿼리 (O-G6 보류) |
+  | P1~P5 | `my_chart/analysis/universe.py` | 주석·docstring 내 `MAX(Date)` 언급 5행 | 비실행 산문 |
+- **And** **대조 단언**: 주봉 소비자 한 곳을 순진한 경로로 되돌린 변형에서 잔류 집합에 **새 원소가 나타나** 집합 동등이 **실패**한다.
+
+#### AC-SGR-005.3 — allowlist 상한 (기계 단언)
+
+- **Then** §1.2.2 allowlist의 **실행 쿼리 지점 수가 5개 이하**다 — `assert len(EXECUTABLE_ALLOWLIST) <= 5`.
+- **And** 상한은 v0.2.2의 6에서 **5로 축소**되었다(공허했던 `chart_service.py` 항목 제거 — 실측 `grep -c` → **0**, 3종 관용구를 하나도 갖지 않아 제외할 대상 자체가 없었다). 축소는 완화가 아니라 **강화**다.
+- **And** 비실행 산문 행(P1~P5)은 실행 쿼리 상한과 **별도로** 집계한다 — 산문 증가가 실행 지점 상한을 잠식하지 못하게 한다.
+- **And** **신규 주봉 소비자 관용구를 allowlist에 추가해 회피하는 경로는 여전히 위반**이다. 항목마다 §1.2.2에 사유가 명시되어야 하며, 사유 없는 신규 항목은 리뷰에서 거부한다.
+
+#### AC-SGR-005.4 — `meta_service` 지점 단위 제외의 정밀도 [HARD]
+
+- **Then** L3 예외는 일봉 지점(`FROM stock_prices`)만 허용하며 주봉 지점(`FROM weekly.stock_prices`)은 **허용하지 않는다**.
+- **And** **대조 단언**: 주봉 지점을 순진한 `MAX(Date)`로 되돌린 변형에서 AC-SGR-005.1이 **실패한다**(해당 행이 인파일 예외 텍스트와 매칭되지 않으므로 위반으로 잡힌다).
+- **And** 파일 단위 제외(`grep -v meta_service\.py` 또는 동등한 파일 전체 스킵)는 **금지**한다 — 실제 소비자를 통째로 숨겨 이 대조를 무력화한다.
+
+#### AC-SGR-005.5 — 7개 모듈 전부의 격자 모듈 import (7건 개별 단언)
+
+- **Then** 아래 **7개 파일 전부**가 `my_chart.analysis.weekly_grid`에서 격자 심볼을 import한다. **7건을 개별 단언**한다 — 일부만 검사하면 나머지가 미배선인 채 통과한다.
+  | # | 파일 | 기대 import 심볼 |
+  | --- | --- | --- |
+  | 1 | `backend/services/sector_ranking_service.py` | `_get_latest_valid_date` |
+  | 2 | `backend/services/stage_service.py` | `_get_latest_valid_date` |
+  | 3 | `backend/services/market_service.py` | `_get_latest_valid_date` |
+  | 4 | `backend/services/meta_service.py` | `_get_latest_valid_date` |
+  | 5 | `backend/services/sector_advanced_service.py` | `_get_latest_valid_date` |
+  | 6 | `my_chart/analysis/sector_advanced.py` | `compute_weekly_grid` |
+  | 7 | `my_chart/analysis/sector_metrics.py` | `anchor`, `compute_weekly_grid` |
+- **And** 단언은 파일별 루프가 아니라 위 표를 파라미터화해 **파일당 1개 테스트 케이스**로 보고한다 — 어느 모듈이 미배선인지 실패 메시지에서 즉시 식별된다.
+
+#### AC-SGR-005.6 — 재도입 경로 차단
+
+- **Then** `backend/services/sector_advanced_service.py`에 `def _get_latest_date` 정의가 **남아 있지 않다**(`grep -c` → 0). 함수를 남긴 채 호출부만 바꾸면 재도입 경로가 살아 있다.
 
 ### AC-SGR-006 — 전 엔드포인트 동일 격자 (불변식 **TG-5**)
 
@@ -124,7 +192,7 @@ grep -rnE "MAX\(Date\)|max\(Date\)|DISTINCT Date|GROUP BY Date" \
 - **Then** **6개 값이 모두 `W-금요일`과 동일**하다 — 서로 같을 뿐 아니라 **정규 격자 값과 같다**.
 - **And** **대조 단언**: 어느 한 지점을 순진한 `MAX(Date)`/`DISTINCT … DESC LIMIT 1` 경로로 되돌린 변형에서 이 AC가 **실패**한다. 지점별로 **6회** 반복해, 6개 교체가 전부 실제로 이루어졌음을 증명한다(1곳만 교체하고 나머지가 우연히 일치하는 상태를 검출).
 - **And** 같은 조건으로 각 지점이 사용하는 히스토리 날짜 집합이 동일하다(집합 동등 비교).
-- **And** **라이브 DB 비게이팅 스모크**: 라이브에서도 6개 값이 동일함을 확인하되, 이는 `xfail`이 아닌 **정보성 검사**로 표시한다 — 라이브에서 이 검사가 통과하는 것은 `naive_max == canonical`인 오늘의 우연이며 구현의 증거가 아님을 docstring에 명시한다.
+- **[비게이팅 · NON-GATING]** **라이브 DB 스모크**: 라이브에서도 6개 값이 동일함을 확인하되, 이는 **수용 기준이 아니라 관측 기록**이다. 라이브에서 이 검사가 통과하는 것은 `naive_max == canonical`인 오늘의 우연이며 **구현의 증거가 아니다**(그래서 게이팅할 수 없다). 구현 실행: `@pytest.mark.nongating` 로 표시하고 실패해도 CI를 막지 않으며 불일치를 리포트로 남긴다. **이 절은 §4 품질 게이트의 미충족 항목으로 집계하지 않는다.**
 
 #### AC-SGR-006-B — 격자·앵커 소비자 그룹 (2지점 / 1모듈)
 
@@ -256,7 +324,7 @@ grep -rn "INSERT OR REPLACE INTO [a-z_]* VALUES" my_chart/db/
 - **Then** 반환 집합이 `S-EDGE14`·`S-FRESH`를 **포함**하고 `S-STALE`·`S-EDGE15`를 **포함하지 않는다**(4종목 개별 단언).
 - **And** **대조 단언**: stale 필터를 제거한 변형에서 `S-STALE`과 `S-EDGE15`가 반환 집합에 **나타난다** — 즉 배제가 `∩ stock_meta`가 아니라 stale 규칙에서 왔음을 증명한다. 이 대조가 없으면 AC 전체가 무의미하다.
 - **And** 배제된 종목 수가 진단 필드 `stale_excluded_count`로 노출되며, 픽스처에서 정확히 `2`다.
-- **And** **라이브 비게이팅 진단**: 라이브에서 `stale ∩ stock_meta`의 크기를 측정해 로그로 남긴다. 현재 값 **0**이며, 이 값이 0인 동안은 stale 규칙이 라이브 화면에 **아무 변화도 만들지 않음**을 docstring에 명시한다 — 리뷰어가 가시적 변화를 기대해서는 안 된다. 개수는 하드코딩하지 않는다(§7 O-G3 미결).
+- **[비게이팅 · NON-GATING]** **라이브 진단**: 라이브에서 `stale ∩ stock_meta`의 크기를 측정해 로그로 남긴다. 현재 값 **0**이며, 이 값이 0인 동안은 stale 규칙이 라이브 화면에 **아무 변화도 만들지 않는다** — 리뷰어가 가시적 변화를 기대해서는 안 된다. 개수는 하드코딩하지 않는다(§7 O-G3 미결). 구현 실행: `@pytest.mark.nongating`, 실패해도 CI를 막지 않는다. **이 절은 §4 품질 게이트의 미충족 항목으로 집계하지 않는다** — 값이 0인 오늘 이 검사는 원리상 아무것도 반증하지 못하므로 게이팅 대상이 될 수 없다(게이팅 검증은 위의 `fixture_stale_in_meta` 합성 픽스처가 담당한다).
 
 ### AC-SGR-018 — `last_updated` 기반 판정 금지
 
@@ -287,7 +355,7 @@ grep -rn "INSERT OR REPLACE INTO [a-z_]* VALUES" my_chart/db/
 | R2 | rank_change 기준일이 `2026-07-31`(11일 전) → `t−28d` 이하 격자 바로 **이동한다** | `assert 28 <= (t - baseline).days <= 35` — **양쪽 경계 필수** |
 | R3 | 게임 섹터 구성종목이 33 → **32**로 줄어든다 | `assert game_member_count == 32` + Code/Name dedup 분기 픽스처 (아래) |
 | R4 | 정규 격자 바 개수가 원시 고유 날짜 수보다 **적다** | `assert len(grid) == 346 and len(raw_distinct_dates) == 385` (프로즌 스냅샷 기준) |
-| R5 | 히스토리 차트의 x축 포인트 수가 줄어들 수 있다 | `assert len(history_grid_points) <= len(raw_row_dates)` — **단언으로 고정**. docstring 지시만으로는 검사되지 않는다 |
+| R5 | 히스토리 뷰가 **진행 중인 주까지 제외**해 격자보다 한 바 더 적다 | `assert len(history_grid) == 345 and len(grid) == 346 and len(raw_distinct_dates) == 385` (프로즌 스냅샷 리터럴 3중 고정) |
 
 **R2 — 상한 경계가 없으면 규칙을 검증하지 못한다.** 이전 판은 `>= 28`만 단언했다. 그런데 `anchor(t, 364)`(=`t−364d` 이하 최근 바)도, 극단적으로 히스토리 첫 바도 `>= 28`을 만족한다 — **`anchor(t, 28)`을 `anchor(t, 364)`로 잘못 배선해도 통과한다.** 상한 `<= 35`가 "`t−28d` **이하**의 **가장 가까운** 격자 바"를 실제로 강제한다(정규 격자 간격 6–10일이므로 `t−28d` 직전 바는 최대 `t−35d` 근방이다).
 - **And** **대조 단언**: `anchor(t, 91)` / `anchor(t, 364)`를 대신 쓴 변형에서 R2가 **실패**한다.
@@ -305,7 +373,22 @@ R3의 단언은 두 층이다:
   같은 `Code`, 다른 `Name`이다. **Code 기준 dedup → 1행 유지(게임 +1), Name 기준 dedup → 2행 유지(게임 +2).** 두 규칙의 결과가 갈리므로 이 픽스처에서만 UN-4가 반증 가능해진다.
   - **Then** 이 픽스처에서 게임 구성종목 수가 **base+1**이다.
   - **And** **대조 단언**: dedup 키를 `Name`으로 되돌린 변형에서 **base+2**가 되어 실패한다.
-  - **And** 드롭된 행의 `Code`와 종목명이 WARNING 로그에 남는다(AC-SGR-016과 동일 경로).
+  - **And** **[게이팅 · 필수]** 드롭된 행의 `Code`와 종목명이 WARNING 로그에 남는다(AC-SGR-016과 동일 경로). **실행 형태 명시**(v0.3.0 — 이전 판은 문장만 있고 검사가 없었다): 위 `X00001` 분기 픽스처를 로드하면서 `caplog.at_level(logging.WARNING)`으로 캡처하고, 캡처된 WARNING 레코드 중 **`X00001`과 `가나전자우`를 모두 포함하는 레코드가 최소 1건** 존재함을 단언한다 — `assert any("X00001" in r.message and "가나전자우" in r.message for r in caplog.records)`. 개수만 세거나 로그 레벨만 확인하는 것은 금지한다(어느 행이 드롭됐는지 식별할 수 없으면 진단 가치가 없다).
+
+**R5 — 이전 판은 수학적 항진명제였다 [HARD, v0.3.0 개정].** 이전 판은 `assert len(history_grid_points) <= len(raw_row_dates)`였다. 격자 바는 원시 날짜에서 **선별**되므로 이 부등식은 **어떤 구현에서도 참이다** — 격자 규칙을 한 줄도 구현하지 않고 원시 날짜를 그대로 돌려줘도 `385 <= 385`로 통과한다. 0.2.0이 "docstring 지시를 `assert`로 전환"해 반증력을 얻었다고 기록했으나, 전환된 `assert`가 반증 불가능한 명제였다.
+
+**선택: 삭제가 아니라 재기술한다.** R5를 삭제하지 않는 이유는 R4가 대신하지 못하는 고유한 대상을 갖기 때문이다 — R4는 `grid`(346, **진행 중인 주 포함**)를 고정하고, R5는 `history_grid`(345, **CG-2가 진행 중인 주를 제외**한 결과)를 고정한다. R5를 삭제하면 **`history_grid`의 크기를 프로즌 리터럴로 못 박는 단언이 R-계열에 하나도 남지 않는다**(AC-SGR-003은 합성 픽스처에서 마지막 날짜의 성질만 보고 개수를 고정하지 않는다). 따라서 R4에 흡수(옵션 a)가 아니라 리터럴 재기술(옵션 b)이 정확한 처리다.
+
+**재기술된 R5가 잡는 순진한 구현** (전부 이전 판을 통과하던 것들):
+
+| 순진한 동작 | 이전 판 R5 | 재기술 R5 |
+| --- | --- | --- |
+| 원시 날짜를 그대로 히스토리로 반환 (385) | **통과** (`385 <= 385`) | **실패** (`385 != 345`) |
+| CG-1은 적용하되 CG-2(진행 중인 주 제외)를 누락 (346) | **통과** (`346 <= 385`) | **실패** (`346 != 345`) |
+| 진행 중인 주를 두 번 제외하거나 마지막 바를 추가로 잘라냄 (344) | **통과** (`344 <= 385`) | **실패** (`344 != 345`) |
+
+- **And** **대조 단언**: `history_grid` 대신 `grid`(진행 중인 주 포함)를 반환하도록 되돌린 변형에서 R5가 **실패**한다 — CG-2 제외가 실제로 일어남을 값으로 증명한다.
+- **And** R5는 R4와 **같은 프로즌 스냅샷에서 함께** 실행해 `345 < 346 < 385`의 엄격한 3중 부등이 성립함을 단언한다. 어느 한 값이 다른 값과 같아지는 순간 규칙 하나가 죽은 것이다.
 
 각 항목은 **테스트 함수의 docstring에 "이것은 의도된 변화다"를 명시**하고, 릴리스 노트 문구를 함께 기재한다. 단 docstring은 **보조 설명일 뿐 검사 수단이 아니다** — R1~R5 전부가 실행 가능한 `assert`를 갖는다.
 
@@ -352,16 +435,35 @@ R3의 단언은 두 층이다:
 4. **스냅샷 갱신은 명시적 행위다.** 갱신 시 커밋 메시지에 사유와 새 실측값을 남기고, 변경된 기대값을 AC 본문에도 반영한다. 조용한 재생성을 금지한다.
 5. `grid_version` 변경 시 스냅샷 기대값 재검토를 의무화한다.
 
-**적용 대상 AC**: AC-SGR-001, 002, 004, 015, 017, 020 (라이브 값이 기대값에 들어가는 전량). AC-SGR-003, 009, 010, 012, 013, 016, 021은 이미 순수 합성 픽스처이므로 해당 없음.
+**적용 대상 AC**: AC-SGR-001, 002, 015, 017, 020 (라이브 값이 기대값에 들어가는 전량).
+
+**적용 대상에서 제외 (v0.3.0 정정) — AC-SGR-004**: 이전 판은 AC-004를 적용 대상으로 올렸으나, 프로즌 스냅샷에서 **CG-3이 한 번도 발화하지 않는다** — `MANIFEST.md` 실측 `CG-3 배제된 대표 바 = 0건`, 재현 검증 `exclusions == []`. 부분 데이터 날짜 5건은 픽스처에 있지만 어느 것도 자기 ISO 주의 대표 바가 아니어서 CG-1이 먼저 배제하기 때문이다. 즉 AC-004는 프로즌 위에서 **아무것도 검증하지 않았다.** AC-004는 **합성 픽스처 게이팅**(`fixture_partial_is_representative`)으로 재분류하며, 프로즌 실행은 비게이팅 참고다(§AC-SGR-004 참조). 이 규약 표가 "프로즌이 AC-004를 보호한다"고 읽히면 안 된다.
+
+**해당 없음 (이미 순수 합성 픽스처)**: AC-SGR-003, 004, 009, 010, 012, 013, 016, 018, 021.
 
 ---
 
 ## 4. 품질 게이트 (Definition of Done)
 
-- [ ] AC-SGR-001 ~ AC-SGR-021 전부 PASS (**AC-SGR-006은 A/B 두 하위 절 모두** — 기준일 해석자 6지점 + 격자·앵커 소비자 2지점)
+- [ ] AC-SGR-001 ~ AC-SGR-021 전부 PASS (**AC-SGR-005는 .1~.6 여섯 하위 절 모두**, **AC-SGR-006은 A/B 두 하위 절 모두** — 기준일 해석자 6지점 + 격자·앵커 소비자 2지점)
+- [ ] **AC-SGR-005.2 규범 스캔 명령이 `bash -n` exit 0** — 명령을 스크립트로 추출해 문법 검사한다. 테스트 상수는 그 명령을 **문자 그대로** 사용하며(옵션·제외 임의 추가 금지), 상수와 acceptance.md 본문의 **바이트 동등**을 단언한다. v0.2.2에서 규범 명령이 `bash -n` exit 2였고 테스트가 조용히 다른 명령을 쓴 것이 본 개정의 직접 계기다.
 - [ ] **§3 프로즌 픽스처가 M1.0에서 구축됨** — 미구축 상태로 M1.1 착수 금지(§3.0 진입 게이트)
 - [ ] **§3 프로즌 픽스처가 리포에 존재하고 게이팅 AC가 그 위에서 실행됨** — 라이브 DB 갱신으로 CI가 붉어지지 않음을 `/api/db/update` 1회 실행 후 재실행으로 확인
-- [ ] **대조 단언 7종 PASS** — AC-SGR-002(anomalies 미기록), 005(`meta_service` 제외 정밀도 — `:196` 되돌림 시 스캔이 검출), **006-A(기준일 해석자 6지점 개별 되돌림 6회)**, **006-B(`LIMIT 1 OFFSET 3` 되돌림 · 자체 `GROUP BY Date` 되돌림)**, 010(positional INSERT), 017/018(stale 필터 제거 · `last_updated` 되돌림), 020 R2/R3(anchor 오배선 · Name dedup)
+- [ ] **대조 단언 10종 PASS — 각각이 "되돌리면 실패함"을 실제로 실행해 증명** (v0.3.0에서 3종 추가). **[HARD] 대조 단언은 "작성했다"가 아니라 "되돌린 변형에서 RED가 관측됐다"로만 PASS 처리한다** — 0.2.x의 실패 양식이 정확히 이 지점에서 재발했다(대조 단언 7종을 GREEN으로 보고했으나 3종은 구현을 전부 되돌려도 GREEN이었다).
+  | # | AC | 되돌릴 대상 | 기대 |
+  | --- | --- | --- | --- |
+  | 1 | AC-SGR-002 | `grid_anomalies` 기록 비활성화 | 핵심 게이트 실패 |
+  | 2 | **AC-SGR-004 (신규)** | CG-3 행 수 판정 제거 | 부분 데이터 날짜가 대표 바로 복귀해 실패 |
+  | 3 | AC-SGR-005.2 | 주봉 소비자 1곳 순진 경로 복귀 | 잔류 집합 동등 실패 |
+  | 4 | AC-SGR-005.4 | `meta_service` 주봉 지점 순진 `MAX(Date)` 복귀 | AC-005.1 위반 검출 |
+  | 5 | AC-SGR-006-A | 6지점 **개별** 되돌림 6회 | 매회 실패 |
+  | 6 | AC-SGR-006-B | `LIMIT 1 OFFSET 3` · 자체 `GROUP BY Date` 복귀 | B-1 / B-2 각각 실패 |
+  | 7 | AC-SGR-010 | positional INSERT | 시프트 발생 |
+  | 8 | AC-SGR-017 / 018 | stale 필터 제거 · `last_updated` 복귀 | `stale_excluded_count` 불일치 |
+  | 9 | AC-SGR-020 R2/R3 | anchor 오배선 · `Name` dedup | R2 / R3 각각 실패 |
+  | 10 | **AC-SGR-020 R5 (신규)** | `history_grid` → `grid`(진행 중인 주 포함) | `345 != 346` 실패 |
+- [ ] **항진명제 감사** — R1~R5 및 모든 `assert` 가 **구현을 전부 되돌린 상태에서 실패하는지** 1회 검사한다. 좌우변이 같은 함수에서 나오거나(`x == f(x)`), 선별 관계상 항상 참인 부등식(`len(선별집합) <= len(원본집합)`)이 남아 있지 않음을 확인한다.
+- [ ] **비게이팅 절의 분리 집계** — `[비게이팅 · NON-GATING]` 로 표시된 절(AC-SGR-006-A 라이브 스모크, AC-SGR-017 라이브 진단)은 **미충족 항목으로 집계하지 않는다.** 이들은 원리상 반증 불가능하므로 게이팅 대상이 될 수 없으며, 게이팅 검증은 각 AC의 합성 픽스처가 담당한다.
 - [ ] **AC-SGR-006-A `REFERENCE_STOCK` 픽스처 조건 확인** — `fixture_max_ne_canonical`의 부분 데이터 3행에 `REFERENCE_STOCK`이 포함되어 A-6(`meta_service.py:196`) 대조가 무음 통과하지 않음을 전제 단언으로 검증
 - [ ] **AC-SGR-010 (legacy-ALTER round-trip) PASS** — Lesson #8 [HARD] 게이트. 미통과 시 ship 금지
 - [ ] 신규 격자·유니버스 모듈 라인 커버리지 >= 85%

@@ -1,10 +1,11 @@
 ---
 id: SPEC-SECTOR-GRID-001
 title: "섹터 분석 기반 계층 — 정규 주간 격자·유니버스·적재 보호"
-version: "0.2.2"
-status: completed
+version: "0.3.0"
+status: in-progress
 created: 2026-08-12
 updated: 2026-08-12
+amendment_of: SPEC-SECTOR-GRID-001
 author: manager-spec
 priority: P0
 phase: "sector-ux v1"
@@ -26,6 +27,38 @@ tier: M
 | 0.2.0 | 2026-08-12 | manager-spec | plan-audit 0.81 PASS-WITH-DEBT 결함 델타 반영 (Completeness/Testability). **핵심 문제: AC가 통과해도 요구사항이 미구현일 수 있는 지점 4곳을 반증 가능하게 재작성.** (1) §1.2.1 신설 — 기준일 소비자를 6개→**7개**로 정정, 누락된 `backend/services/sector_advanced_service.py:40-45` `_get_latest_date()` 추가(5개 엔드포인트 지배). `sector_advanced.py:503`은 호출부이고 실제 쿼리는 `:100`·`:799`임을 정정. `sector_detail_service.py`는 기준일 쿼리 0건으로 대상 아님을 명시. §1.2.2 정적 스캔 allowlist 신설. (2) REQ-SGR-005 — 금지 대상을 `MAX(Date)` 리터럴에서 **3종 관용구**(I1 `MAX(Date)` / I2 `DISTINCT Date … ORDER BY Date DESC` / I3 `GROUP BY Date … DESC`)로 확장. (3) AC-SGR-002 — Then/And 자기모순 해소(판정 대상을 `grid_anomalies` 미기록 쌍으로 한정), 라이브 실측 예외 5건 픽스처 고정. (4) AC-SGR-005 — 스캔을 3종 관용구 통합 + allowlist 상한 4개로 확장. (5) AC-SGR-006 — 라이브에서 `naive MAX == canonical`이라 TG-5가 반증 불가였던 문제를 `fixture_max_ne_canonical` + 소비자별 되돌림 7회 대조 단언으로 해소. (6) AC-SGR-017/018 — `stale ∩ stock_meta = 0`이라 필터 미구현으로도 통과하던 문제를 `fixture_stale_in_meta`(14/15일 경계 포함) + `fixture_last_updated_divergent` + 대조 단언으로 해소. (7) AC-SGR-020 — R2 단측(`>=28`)을 양측(`28~35`)으로, R3 항진명제를 실측 리터럴 32 + Code/Name dedup 분기 픽스처로, R5를 docstring 지시에서 `assert`로 전환. (8) **§3 프로즌 픽스처 규약 신설** — 주 1회+ `/api/db/update`로 게이팅 AC가 코드 변경 없이 붉어지는 문제. (9) §7 O-G6 신설(`market_breadth.py:472` 격자 미적용). 설계 문서 `01 §3.5 TG-3` 동일 모순 함께 개정. |
 | 0.2.1 | 2026-08-12 | manager-spec | plan-audit iteration 2 **PASS 0.86**(M, thresh 0.80; MUST-PASS 전항 통과, 단조 개선) 이후 잔여 결함 정리. **(D3) 고정 예외 A1의 `gap_days` 오류 정정 (4 → 5)** — `2020-04-24 → 2020-04-29`는 5일이다(A2=4/A3=5/A4=5/A5=4는 정확). `AC-SGR-002`가 `{from, to, gap_days}` **집합 동등** 비교이므로 이 표로 작성된 테스트는 **올바른 구현에 대해 실패**하며, 그때의 자연스러운 반응(구현을 고치거나 개수 비교로 완화)은 AC가 명시적으로 금지한 두 가지다. `docs/sector-ux/01-data-contract.md:376` 동일 오류 함께 정정. **(D1) `AC-SGR-006`의 7-way 대조를 역할별로 분할** — 확장된 7개 소비자 중 둘이 "해석한 `as_of_date` == W-금요일"을 원리상 만족할 수 없었다: `sector_metrics.py:231`은 `t`보다 **구조적으로 이른** rank_change 기준일(`LIMIT 1 OFFSET 3`)을, `:346`은 날짜 **리스트**를 반환한다. `AC-SGR-006-A`(기준일 해석자 6지점 — 개별 되돌림 6회) / `AC-SGR-006-B`(격자·앵커 소비자 2지점 — `anchor(t,28)` 일치 + 공유 중앙값 가드 집합 동등)로 분리해 각자가 실제로 계산하는 것에 맞는 단언을 준다. **`meta_service.py:196`의 무음 통과 차단**: `WHERE Name = REFERENCE_STOCK` 때문에 `REFERENCE_STOCK`이 부분 데이터 3행에 없으면 순진한 경로로 되돌려도 `W-금요일`이 나와 대조가 통과한다 — 픽스처 조건을 [HARD]로 명문화. **(D2) `REQ-SGR-005`의 주봉/일봉 중의성 제거** — 두 DB 모두 `stock_prices`를 가지므로 한정어 없는 금지는 `meta_service.py:135`(일봉, `stock_meta` 재구축용)를 위반으로 잡는다. 금지 범위를 **주봉 전용**으로 한정(`REQ-SGR-014`의 "daily" 한정과 동형)하고, `:135`를 §1.2.2 allowlist에 사유와 함께 등재(상한 4 → 5). `meta_service` 제외는 **파일 단위가 아니라 지점 단위**이며, `:196` 되돌림 시 스캔이 검출함을 정밀도 대조로 단언한다. **§7 O-G7 신설**(일봉 기준일 격자 필요 여부 — 답을 발명하지 않는다). **(D4) 프로즌 픽스처를 M6 → M1.0으로 이동** — `plan.md`가 "다른 회귀 작업보다 먼저"라고 지시하면서 **최종 마일스톤**에 배치해 지시와 순서가 모순됐다. 그 픽스처가 보호하는 AC는 M1~M5를 게이팅한다. ②의 M1.0 `[HARD · 코드 변경 전]`과 동일 형태로 이동하고 **"미구축 상태로 M1.1 착수 금지"** 진입 게이트를 부여했다. |
 | 0.2.2 | 2026-08-12 | manager-spec | M5 run-phase 발견 보완 — AC-SGR-005 allowlist에 `my_chart/analysis/universe.py:106`(일봉 stale 판정, REQ-SGR-014/UN-5) 추가, 상한 5→6. `universe.py:106`은 M2에서 도입된 일봉 `stock_prices` 종목별 `MAX(Date)` 조회(`SELECT Name, MAX(Date) FROM stock_prices GROUP BY Name`)로 allowlist 작성 시점(0.2.0)에 누락됐다. `meta_service.py:135`과 동일 "일봉" 범주(주봉 격자 계약 REQ-SGR-005 주봉 한정 밖)이며 stale는 일봉 개념이므로 주봉 격자를 쓰지 않는다. **코드/요구사항 변경 없음(문서 보완 only)** — REQ-SGR-005/REQ-SGR-014 및 어떤 AC 의미도 변경하지 않는다. acceptance.md AC-SGR-005 grep 제외 + 상한 단언(5→6) 동기화. |
+| 0.3.0 | 2026-08-12 | manager-spec | **in-place amendment — 반증력 복구.** sync-auditor 독립 감사 PASS-WITH-DEBT 78.6/100 후속. 0.2.0~0.2.1이 **plan 단계**에서 잡아 고친 "통과해도 미구현일 수 있는 AC" 실패 양식이 **테스트 작성 단계**에서 재발했다 — progress.md §E.2는 "대조 단언 7종 전부 GREEN"이라 적었으나 실제로는 4종만 진짜고 3종은 구현을 전부 되돌려도 동일하게 통과한다. 본 개정은 그 3종의 발생지가 테스트가 아니라 **acceptance.md 본문**임을 확인하고 본문을 고친다. (1) **AC-SGR-005 스캔 명령이 유효한 bash가 아니었다** — 0.2.2에서 추가한 `universe.py` 제외 행 직전 줄에 줄바꿈 이음(`\`)이 빠져 `bash -n` 이 exit 2(syntax error)로 거부한다. 규범 명령이 실행 불가였고, 테스트는 이를 침묵으로 우회했다(`--include="*.py"` 무단 추가 + `universe.py` 를 파이프라인이 아닌 Python 쪽에서 필터). 명령을 복구하고 **결과 집합을 바꾸는 `--include="*.py"` 를 규범에 명문화**하며, 취약한 제외 정규식 연쇄를 **잔류 집합 동등 비교**로 전환한다(허용목록 증감이 자동 검출된다). (2) **§1.2.2 `chart_service.py` 항목이 공허했다** — 실측 `grep -c` → **0건**. 잡히지도 않는 경로가 상한 6개를 잠식했다. 제거하고 상한을 **실행 쿼리 지점 5개**로 재정의한다. (3) **AC-SGR-020 R5가 수학적 항진명제였다** — `len(grid.history) <= COUNT(DISTINCT Date)`는 격자 바가 원시 날짜에서 **선별**되므로 어떤 구현에서도(순진한 구현 포함) 참이다. R4가 이미 `grid` 를 프로즌 리터럴로 고정하지만 **`history_grid`(CG-2 진행 중인 주 배제)를 고정하는 단언은 R-계열에 하나도 없었다** — R5를 프로즌 리터럴 `345` 기준 엄격 부등으로 재기술해 그 공백을 메운다. (4) **AC-SGR-004의 프로즌 적용 주장이 사실과 달랐다** — `MANIFEST.md` 실측 `CG-3 배제된 대표 바 = 0건`, `exclusions == []`. 부분 데이터 날짜 5건은 픽스처에 있으나 어느 것도 ISO 주 대표 바가 아니어서 **CG-3이 한 번도 발화하지 않는다**(CG-1이 대신 배제). AC-004는 프로즌 적용 대상이 아니라 **합성 픽스처 게이팅**임을 명문화하고 필요한 픽스처 성질을 규정한다. (5) **§1.2.1/§1.2.2 행 번호 드리프트** — `stage_service.py:25`·`market_service.py:37`은 현재 빈 줄, `meta_service.py:135`→`:136`, `sector_advanced.py:386`→`:388`. 값을 갱신하되, 재발을 막기 위해 **행 번호를 정보성으로 강등**하고 기계적 키를 `(경로, 매칭 텍스트)`로 전환한다. (6) **§7 O-G6의 라이브 영향 명시** — `market_breadth.py:472`는 가정이 아니라 **현재 출하 중인 사용자 가시 오계산**이다. (7) 미검증 "And" 절 6건을 각각 **필수(테스트화)** 또는 **비게이팅(명시)** 으로 판정한다 — 조용히 버리지 않는다. **어떤 수용 기준도 완화하지 않는다 — 전부 강화 방향이다.** |
+
+---
+
+## Amendments
+
+### 0.3.0 — 반증력 복구 (in-place amendment)
+
+| 항목 | 값 |
+| --- | --- |
+| 직전 completed 버전 | `0.2.2` |
+| `prior_completed_sha` | `95e0980` (sync commit — `in-progress → implemented → completed` 전이 및 3-phase close 담당) |
+| 개정 성격 | **in-place amendment** (`amendment_of: SPEC-SECTOR-GRID-001` 자기참조). 후속 SPEC 분리가 아니다 — 결함의 발생지가 본 SPEC의 acceptance.md 본문이므로 본문을 고치는 것이 정확한 귀속이다 |
+| 상태 전이 | `completed → in-progress` (신규 enum 없음. `.claude/rules/moai/development/spec-frontmatter-schema.md` § Status Transition Ownership Matrix `completed → in-progress (amendment)` 행) |
+
+**개정 사유**: sync-auditor 독립 감사가 **PASS-WITH-DEBT 78.6/100** (Functionality 78 / Security 92 / Craft 72 / Consistency 75, BLOCKING 0 / SHOULD-FIX 6 / MINOR 6)을 반환했다. 중심 소견은 다음과 같다 — 본 SPEC의 HISTORY 0.2.0~0.2.1은 "AC가 통과해도 요구사항이 미구현일 수 있는 지점"을 **plan 단계에서** 네 곳 찾아 반증 가능하게 재작성한 기록이다. 그런데 **동일한 실패 양식이 한 계층 아래(테스트 작성 단계)에서 재발했다.** progress.md §E.2는 "대조 단언(falsification) 7종 — 전부 GREEN"이라고 기록했으나, 정확한 진술은 **진짜 4종 / 공허 3종**이다. 공허한 3종은 구현을 완전히 되돌려도 동일하게 통과한다.
+
+결정적으로, 그 3종 중 최소 2종은 **테스트의 결함이 아니라 acceptance.md 본문의 결함**이다: R5는 본문 자체가 항진명제이고, AC-005 스캔 명령은 본문 자체가 유효한 bash가 아니다(`bash -n` → exit 2). 테스트를 고치는 것만으로는 다음 작성자가 같은 본문을 읽고 같은 공허한 단언을 다시 만든다. 따라서 본문을 고치는 in-place amendment가 필요하다.
+
+**개정 범위 (영향받는 §B REQ / AC)**:
+
+| 대상 | 개정 내용 | 방향 |
+| --- | --- | --- |
+| `REQ-SGR-005` / `AC-SGR-005` | 스캔 명령 bash 문법 복구 + `--include="*.py"` 규범화 + 제외 정규식 연쇄 → 잔류 **집합 동등** 전환 + 허용목록 상한 기계 단언 + 7개 모듈 import 단언 명시 열거 | **강화** |
+| `REQ-SGR-018` / `AC-SGR-020 R5` | 항진명제 → 프로즌 리터럴(`history_grid == 345`) 기준 엄격 부등 | **강화** |
+| `REQ-SGR-003` / `AC-SGR-004` | 프로즌 적용 대상 → **합성 픽스처 게이팅**으로 정정 + 필요 픽스처 성질 규정 | **강화** (지금까지 아무것도 검증하지 않던 AC가 검증을 시작한다) |
+| `§1.2.1` 소비자 인벤토리 | 행 번호 갱신 + 정보성 강등, 기계적 키를 `(경로, 매칭 텍스트)`로 전환 | 정확도 복구 |
+| `§1.2.2` 정적 스캔 allowlist | 공허한 `chart_service.py` 항목 제거, 상한 6 → **실행 쿼리 지점 5** | **강화** (상한 축소) |
+| `§7 O-G6` | 가설이 아니라 **출하 중인 사용자 가시 오계산**임을 명시 | 정확도 복구 |
+| `AC-SGR-006-A` / `AC-SGR-017` 라이브 절 | **비게이팅**임을 명시적으로 표기(미충족 기준으로 읽히지 않게) | 명확화 |
+
+**요구사항 의미 변경 없음**: 어떤 REQ의 금지 범위·경계값·기대 동작도 완화하지 않는다. 본 개정은 전부 "통과하기 쉽게" 가 아니라 "되돌리면 실패하도록" 방향이다.
 
 ---
 
@@ -100,15 +133,19 @@ baseline은 run 단계 착수 시 **먼저 측정해 progress.md §E.2에 기록
 
 이전 판은 소비자를 6개로 셌고 `MAX(Date)` 리터럴만 추적했다. **재조사 결과 소비자는 7개 모듈이며, 기준일 조회 관용구는 3종이다.** 관용구가 3종이라는 사실이 AC-SGR-005의 정적 스캔 형태를 결정한다(단일 리터럴 스캔은 절반을 놓친다).
 
-| # | 경로 | 관용구 | 조치 |
-| --- | --- | --- | --- |
-| 1 | `backend/services/sector_ranking_service.py:24` | `SELECT MAX(Date)` | 공유 헬퍼 호출로 교체 |
-| 2 | `backend/services/stage_service.py:25` | `SELECT MAX(Date)` | 상동 |
-| 3 | `backend/services/market_service.py:37` | `SELECT MAX(Date)` | 상동 |
-| 4 | `backend/services/meta_service.py:196` | `SELECT MAX(Date) FROM weekly.stock_prices` (`WHERE Name = REFERENCE_STOCK`) | 상동. **같은 파일 `:135`는 일봉 조회이므로 대상이 아니다** — §1.2.2 allowlist + §7 O-G7 |
-| 5 | **`backend/services/sector_advanced_service.py:40-45`** `_get_latest_date()` | `SELECT MAX(Date)` | **신규 식별 — 이전 판 누락.** 공유 헬퍼 호출로 교체 |
-| 6 | `my_chart/analysis/sector_advanced.py:98-108` `_get_dates()`, `:799` | `SELECT DISTINCT Date … ORDER BY Date DESC LIMIT ?` | 상동. 이전 판은 이 파일을 `:503`으로 지목했으나 `:503`은 `_get_dates(conn, 1)` **호출부**이고 실제 쿼리는 `:100`과 `:799` 두 곳이다 |
-| 7 | `my_chart/analysis/sector_metrics.py:231`(`LIMIT 1 OFFSET 3`), `:346`(중앙값 가드) | `SELECT DISTINCT Date … ORDER BY Date DESC` / `GROUP BY Date … ORDER BY Date DESC` | `:231`은 `anchor(t,28)`로, `:346` 중앙값 가드는 공유 격자 함수로 승격 |
+> **[HARD] 행 번호는 정보성이며 기계적 식별자가 아니다 (v0.3.0)**. 이전 판은 아래 행 번호를 allowlist 정밀도의 **지점 단위 식별자**로 취급했다. 그러나 행 번호는 무관한 편집만으로도 어긋난다 — 2026-08-12 재실측 결과 `stage_service.py:25`·`market_service.py:37`은 이미 **빈 줄**이고, `meta_service.py:135`는 `:136`, `sector_advanced.py:386`은 `:388`로 밀렸다. 스캔이나 단언이 행 번호에 의존하면 **코드 변경 없이 붉어지거나(false positive), 조용히 다른 줄을 가리킨다(false negative)**. 따라서 본 개정 이후 **기계적 키는 `(경로, 매칭된 관용구 텍스트)`** 이며, 행 번호는 사람이 찾아가기 위한 참고값으로만 유지한다. AC-SGR-005의 잔류 집합 동등 비교도 이 키를 쓴다.
+>
+> **"개정 전 지점"과 "현행 지점"을 함께 적는다**: 아래 1~5번의 개정 전 쿼리는 M3/M5에서 **삭제**되었으므로(그것이 본 REQ의 목적이다) 그 행 번호는 현재 코드에 존재하지 않는다. 개정 전 값을 지우면 "무엇이 교체되었는가"의 근거가 사라지고, 현행 값만 적으면 "왜 이 파일이 인벤토리에 있는가"가 사라진다.
+
+| # | 경로 | 개정 전 지점 (교체 대상, 현재는 부재) | 관용구 | 현행 지점 (2026-08-12 실측) |
+| --- | --- | --- | --- | --- |
+| 1 | `backend/services/sector_ranking_service.py` | `:24` | `SELECT MAX(Date)` | `:8` import, `:21` `_get_latest_valid_date(db_path)` |
+| 2 | `backend/services/stage_service.py` | `:25` | `SELECT MAX(Date)` | `:10` import, `:24` 헬퍼 호출 |
+| 3 | `backend/services/market_service.py` | `:37` | `SELECT MAX(Date)` | `:16` import, `:35` 헬퍼 호출 |
+| 4 | `backend/services/meta_service.py` | `:196` | `SELECT MAX(Date) FROM weekly.stock_prices` (`WHERE Name = REFERENCE_STOCK`) | `:14` import, `:199` 헬퍼 호출. **같은 파일의 일봉 지점(개정 전 `:135` → 현행 `:136`)은 대상이 아니다** — §1.2.2 allowlist + §7 O-G7 |
+| 5 | **`backend/services/sector_advanced_service.py`** | `:40-45` `_get_latest_date()` | `SELECT MAX(Date)` | `:17` import, `:56`·`:97`·`:137`·`:246` 헬퍼 호출 4곳. `def _get_latest_date` 정의는 **제거됨**(재도입 경로 차단 — AC-SGR-005) |
+| 6 | `my_chart/analysis/sector_advanced.py` | `:98-108` `_get_dates()`, `:799` | `SELECT DISTINCT Date … ORDER BY Date DESC LIMIT ?` | `:14` import, `:104`·`:799` `compute_weekly_grid(db_path)`. 이전 판은 이 파일을 `:503`으로 지목했으나 `:503`은 `_get_dates(conn, 1)` **호출부**였고 실제 쿼리는 두 곳이었다 |
+| 7 | `my_chart/analysis/sector_metrics.py` | `:231`(`LIMIT 1 OFFSET 3`), `:346`(중앙값 가드) | `SELECT DISTINCT Date … ORDER BY Date DESC` / `GROUP BY Date … ORDER BY Date DESC` | `:17` import, `:231-232` `anchor(grid, date, 28)`, `:335` `compute_weekly_grid` (개정 전 `:346`에서 이동) |
 
 **소비자의 두 역할 (AC-SGR-006 단언 형태를 결정한다)**: 위 7개 모듈은 하는 일이 같지 않다. **기준일 해석자**(#1·#2·#3·#4·#5·#6 — 주봉에서 단일 기준일 값을 뽑는다)와 **격자·앵커 소비자**(#7 — `:231`은 `t`보다 구조적으로 이른 rank_change 기준일을, `:346`은 날짜별 행 수 가드를 계산한다)로 나뉜다. 후자에 "해석한 `as_of_date` == 정규 대표 바"를 요구하면 **올바른 구현이 실패한다** — `:231`은 정의상 `t`보다 이르고 `:346`은 단일 값이 아니라 리스트를 반환하기 때문이다. 두 역할은 `acceptance.md` AC-SGR-006-A / AC-SGR-006-B로 분리해 각자의 계약으로 단언한다. **교체 대상은 7개 전부**이며(REQ-SGR-005·M5), 분할되는 것은 **검증 형태**다.
 
@@ -128,17 +165,23 @@ baseline은 run 단계 착수 시 **먼저 측정해 progress.md §E.2에 기록
 
 #### 1.2.2 정적 스캔 allowlist (AC-SGR-005 근거)
 
-위 3종 관용구를 통합 스캔하면 **본 SPEC의 범위 밖 3건**이 함께 잡힌다. 이들은 기준일 격자와 무관하므로 allowlist로 명시 제외한다 — allowlist를 문서화하지 않으면 스캔이 항상 실패하거나, 반대로 스캔 범위를 좁히다 진짜 소비자를 놓친다.
+위 3종 관용구를 통합 스캔하면 본 SPEC의 **범위 밖 실행 쿼리 지점**이 함께 잡힌다. 이들은 기준일 격자와 무관하므로 allowlist로 명시 제외한다 — allowlist를 문서화하지 않으면 스캔이 항상 실패하거나, 반대로 스캔 범위를 좁히다 진짜 소비자를 놓친다.
 
-| 경로 | 왜 격자 소비자가 아닌가 |
-| --- | --- |
-| `backend/services/chart_service.py:39, 51, 143, 155` | `WHERE Name = ?` 단일 종목 OHLC 시계열 조회(`LIMIT 504`). 거래일 **집합**을 산출하지 않는다 |
-| `backend/routers/db.py:75` | `/api/db/status`의 적재 상태 표시용. 집계 기준일이 아니다 |
-| `my_chart/analysis/sector_advanced.py:386` | `COUNT(DISTINCT Date)` — 날짜가 아니라 **개수**를 센다 |
-| **`backend/services/meta_service.py:135`** | **일봉** `stock_prices`에서 기준 종목(`REFERENCE_STOCK`)의 최신 거래일을 해석한다 — `_rebuild`가 daily 커넥션에서 실행되며 주봉은 `:194`에서 `ATTACH`될 뿐이다. 본 SPEC의 정규 격자는 주봉 전용이므로 이 지점은 계약 밖이다(REQ-SGR-005 주봉 한정). **같은 파일의 `:196`은 주봉(`FROM weekly.stock_prices`)이므로 allowlist 대상이 아니라 교체 대상이다** — 파일 단위가 아니라 지점 단위로 제외한다. 일봉 격자 필요 여부는 §7 **O-G7** |
-| **`my_chart/analysis/universe.py:106`** | **일봉** `stock_prices`에서 종목별 `MAX(Date)`를 구해 REQ-SGR-014/UN-5 stale 판정에 사용(`daily_db_path` 커넥션). stale는 일봉 개념이며 주봉 격자(REQ-SGR-005 주봉 한정) 밖이다 — `meta_service.py:135`과 동일 "일봉" 범주. M2(`universe.py`)에서 도입되어 allowlist 작성 시점(0.2.0)에 누락됐고 0.2.2에서 보완한다. 일봉 격자 필요 여부는 §7 **O-G7** |
+> **[HARD] `chart_service.py` 항목 제거 (v0.3.0)**. 이전 판은 `backend/services/chart_service.py:39, 51, 143, 155`를 allowlist에 올렸다. 그러나 2026-08-12 실측 `grep -c "MAX(Date)\|DISTINCT Date\|GROUP BY Date" backend/services/chart_service.py` → **0**. 이 파일은 3종 관용구를 **하나도 갖고 있지 않으며**, 따라서 제외할 대상 자체가 없었다. 공허한 항목은 두 가지 해를 끼쳤다: (a) 상한 6개 중 1칸을 잠식해 **실질 상한을 부풀렸고**, (b) "allowlist에 있으니 검토됐다"는 인상을 주어 정당성 회귀 단언이 무엇을 검사하는지 흐렸다. 제거하고 상한을 **실행 쿼리 지점 5개**로 재정의한다 — 상한 축소는 완화가 아니라 **강화**다.
 
-**`my_chart/analysis/market_breadth.py:472`** (`SELECT DISTINCT Date … ORDER BY Date DESC`)는 **판단 보류 항목**이다. 격자 오염의 TG-4 왜곡을 동일하게 받지만 breadth는 섹터 화면이 아니며 본 SPEC의 3-계층 범위 밖이다. 이번 범위에서는 allowlist에 넣되 **§7 O-G6으로 등록**한다 — 조용히 빠뜨리지 않는다.
+**기계적 키는 `(경로, 매칭된 관용구 텍스트)`이며 행 번호가 아니다** (§1.2.1 상단 [HARD] 참조). 행 번호는 아래 표에서 참고값으로만 유지한다.
+
+| # | 경로 | 매칭 텍스트 (기계적 키) | 행(참고) | 왜 격자 소비자가 아닌가 |
+| --- | --- | --- | --- | --- |
+| L1 | `backend/routers/db.py` | `SELECT MAX(Date) FROM stock_prices` | `:75` | `/api/db/status`의 적재 상태 표시용. 집계 기준일이 아니다 |
+| L2 | `my_chart/analysis/sector_advanced.py` | `SELECT COUNT(DISTINCT Date) FROM stock_prices …` | `:388` | `COUNT(DISTINCT Date)` — 날짜가 아니라 **개수**를 센다 |
+| L3 | **`backend/services/meta_service.py`** | `SELECT MAX(Date) FROM stock_prices WHERE Name = ?` | `:136` | **일봉** `stock_prices`에서 기준 종목(`REFERENCE_STOCK`)의 최신 거래일을 해석한다 — `_rebuild`가 daily 커넥션에서 실행되며 주봉은 `ATTACH`될 뿐이다. 본 SPEC의 정규 격자는 주봉 전용이므로 이 지점은 계약 밖이다(REQ-SGR-005 주봉 한정). **같은 파일의 주봉 지점(`FROM weekly.stock_prices`)은 allowlist 대상이 아니라 교체 대상이다** — 파일 단위가 아니라 지점 단위로 제외한다. 일봉 격자 필요 여부는 §7 **O-G7** |
+| L4 | **`my_chart/analysis/universe.py`** | `SELECT Name, MAX(Date) FROM stock_prices GROUP BY Name` | `:106` | **일봉** `stock_prices`에서 종목별 `MAX(Date)`를 구해 REQ-SGR-014/UN-5 stale 판정에 사용(`daily_db_path` 커넥션). stale는 일봉 개념이며 주봉 격자(REQ-SGR-005 주봉 한정) 밖이다 — L3과 동일 "일봉" 범주. M2(`universe.py`)에서 도입되어 allowlist 작성 시점(0.2.0)에 누락됐고 0.2.2에서 보완했다. 일봉 격자 필요 여부는 §7 **O-G7** |
+| L5 | `my_chart/analysis/market_breadth.py` | `SELECT DISTINCT Date FROM stock_prices …` | `:472` | **판단 보류 항목** — §7 **O-G6**. 격자 오염의 TG-4 왜곡을 동일하게 받으며 **현재 출하 중인 오계산이다**(가설이 아니다). 다만 breadth는 섹터 화면이 아니라 시장 개요 소관이라 본 3-계층 SPEC 범위 밖이므로 이번 범위에서는 allowlist에 넣되 조용히 빠뜨리지 않는다 |
+
+**실행 쿼리 지점 상한 = 5** (L1~L5). 신규 **주봉** 소비자 관용구를 allowlist에 추가해 회피하는 경로는 여전히 위반이다 — 항목마다 사유가 명시되고, 일봉 범주(L3·L4) 확장은 §7 O-G7 미결과 별도로 정당화된다.
+
+**비실행 산문 행(주석·docstring)의 처리**: `universe.py`는 일봉 stale 규칙을 설명하는 주석·docstring에서 `MAX(Date)`를 **문자열로 언급**한다(2026-08-12 실측 `:14`, `:35`, `:55`, `:99`, `:111` — 총 5행). 이들은 SQL이 아니므로 격자 계약 위반이 아니지만, 스캔은 텍스트 매칭이므로 함께 잡힌다. 이전 판의 대응(제외 정규식을 계속 덧붙이기)은 **스캔을 조용히 눈멀게 만드는 방향**이었다 — 정규식이 넓어질수록 진짜 위반도 함께 숨는다. 본 개정은 반대로 간다: **스캔을 넓게 유지하고 잔류 전량을 집합 동등으로 비교한다**(AC-SGR-005). 산문 행도 명시적 allowlist 원소가 되며, 추가·삭제가 자동 검출된다.
 
 ### 1.3 실측 근거 (01-data-contract.md §3.1~§3.2, §4.1)
 
@@ -193,10 +236,10 @@ The 격자 모듈 **shall** provide two distinct views: `latest_snapshot` (미�
 
 The backend **shall** resolve `as_of_date` exclusively through a shared `_get_latest_valid_date()` helper backed by REQ-SGR-001. The following **7 modules shall not** resolve a trading-date set from the **weekly** `stock_prices` (`Output/stock_data_weekly.db`, including its `weekly.` ATTACH alias) on their own: `sector_ranking_service`, `stage_service`, `market_service`, `meta_service`, **`sector_advanced_service`**, `sector_advanced`, `sector_metrics` (규칙 CG-4, SN-1). 전량 인벤토리는 §1.2.1.
 
-**[HARD] 주봉/일봉 중의성 제거**: 두 DB **모두** `stock_prices` 테이블을 갖는다. 한정어 없이 "`stock_prices`에서 거래일 집합을 만들지 않는다"고 쓰면 일봉 측 조회까지 금지 대상으로 읽히고, `AC-SGR-005`의 grep이 `backend/services/meta_service.py:135`(일봉 기준 종목 최신일 — `stock_meta` 재구축용)를 위반으로 표시한다. 그 지점은 본 SPEC의 주간 격자 계약 밖이다.
+**[HARD] 주봉/일봉 중의성 제거**: 두 DB **모두** `stock_prices` 테이블을 갖는다. 한정어 없이 "`stock_prices`에서 거래일 집합을 만들지 않는다"고 쓰면 일봉 측 조회까지 금지 대상으로 읽히고, `AC-SGR-005`의 스캔이 `meta_service`의 일봉 기준 종목 최신일 조회(`stock_meta` 재구축용)를 위반으로 표시한다. 그 지점은 본 SPEC의 주간 격자 계약 밖이다.
 
 - 본 REQ의 금지 범위는 **주봉 전용**이다. `REQ-SGR-014`가 이미 stale 판정을 "**daily** `stock_prices`"로 한정한 것과 같은 한정 방식이다.
-- `meta_service.py`는 **두 지점을 갖는다**: `:135`(일봉, 범위 밖 — §1.2.2 allowlist) / `:196`(주봉 `weekly.stock_prices`, **범위 안** — 교체 대상). 모듈 단위가 아니라 **지점 단위**로 판정한다.
+- `meta_service.py`는 **두 지점을 갖는다**: 일봉 지점 `SELECT MAX(Date) FROM stock_prices WHERE Name = ?`(범위 **밖** — §1.2.2 L3) / 주봉 지점 `FROM weekly.stock_prices`(범위 **안** — 교체 대상). 모듈 단위가 아니라 **지점 단위**로 판정하며, 판정 키는 행 번호가 아니라 **매칭된 관용구 텍스트**다(§1.2.1 상단 [HARD]).
 - 일봉 측 기준일 정규화는 본 SPEC이 **요구하지 않는다** — 필요 여부는 §7 **O-G7** 미결이다. 답을 발명하지 않는다.
 
 The prohibition **shall** cover all three latest-date idioms in use, not the `MAX(Date)` literal alone:
@@ -389,6 +432,6 @@ SPEC-SECTOR-UX-001 (③)
 | **O-G2** | 미완성 주 바와 기간 계산의 정합 | 신규 (설계서 미규정) | `as_of_date`가 진행 중인 주(화요일)일 때, `CHG_1W`는 수집 시점 원천 시계열 기준이라 "화요일 대비 전주 화요일"이 아닐 수 있다. `latest_snapshot`(미완성 포함)과 `history_grid`(미완성 제외)가 **서로 다른 날짜를 가리키는 상태**에서 1W 수익률의 기준을 무엇으로 볼 것인가. 설계서 §3.3 CG-2는 "최신 스냅샷으로는 사용"만 규정하고 이 경계를 다루지 않는다. |
 | **O-G3** | stale 종목 수 불일치 | 실측 32 vs 팀 전달 34 | 01 §4.2 UN-5는 32개, 작업 지시는 "갱신 정지 34종목"이다. 측정 시점 차이인지 판정 기준 차이인지 확인이 필요하다. 본 SPEC은 **규칙(14일)** 을 고정하고 개수는 측정값으로 둔다(AC-SGR-017은 개수를 하드코딩하지 않는다). |
 | **O-G4** | supersede의 되돌림 불가능성 | 신규 | REQ-SGR-010은 이번 실행이 기록한 ISO 주 안에서 더 이른 날짜 행을 물리 삭제한다. "존재하는 행은 보존"이라는 고정 결정과의 경계(과거 이력 보존 / 당주 중복 정리)를 사용자가 승인해야 한다. `--no-supersede`가 안전장치다. |
-| **O-G6** | `market_breadth.py:472`의 격자 미적용 | 신규 (§1.2.1 재실측) | `my_chart/analysis/market_breadth.py:472`가 `SELECT DISTINCT Date … ORDER BY Date DESC`로 자체 날짜 집합을 만들며 TG-4 왜곡(“N주”≠N주)을 동일하게 받는다. 다만 breadth는 섹터 화면이 아니라 시장 개요 소관이라 본 3-계층 SPEC 범위 밖이다. (a) 본 SPEC 범위를 확장해 8번째 소비자로 교체할 것인가, (b) 별도 SPEC으로 분리할 것인가, (c) 감수할 것인가. **결정 전에는 AC-SGR-005 allowlist에 남는다.** |
+| **O-G6** | `market_breadth.py:472`의 격자 미적용 — **현재 출하 중인 사용자 가시 오계산** | 신규 (§1.2.1 재실측), v0.3.0에서 영향 등급 정정 | **[중요] 이것은 가설이 아니라 지금 라이브에서 잘못된 숫자를 내는 결함이다.** `compute_breadth_history(db_path, …)`는 **주봉 DB**를 받아(`:461` docstring "Path to weekly SQLite database file") `:472`에서 `SELECT DISTINCT Date FROM stock_prices … ORDER BY Date DESC LIMIT ?`로 **원시 날짜 행**을 가져온다. 따라서 `weeks=12`는 12개 원시 행 = 실측 기준 **약 36일**을 반환하며, 사용자가 "12주"라고 읽는 구간은 실제로 약 6주다. 이는 본 SPEC이 `REQ-SGR-007`(TG-4)로 **다른 곳에서는 이미 고친 바로 그 결함**이며, 시장 개요(breadth) 화면에는 **미수정 상태로 출하되어 있다**. §1.2.2 L5의 allowlist 등재는 "무해하다"는 판정이 아니라 **"이번 SPEC의 3-계층 범위 밖이므로 이번에 고치지 않는다"는 범위 판정**이다 — 두 가지를 혼동해서는 안 된다. 결정 필요: (a) 본 SPEC 범위를 확장해 8번째 소비자로 교체할 것인가, (b) 별도 SPEC으로 분리할 것인가, (c) 오계산을 알면서 감수할 것인가. **(c)를 선택하는 경우에도 "알려진 출하 결함"으로 명시 기록해야 하며, 조용한 잔류는 선택지가 아니다. 결정 전에는 AC-SGR-005 allowlist에 남는다.** |
 | **O-G7** | 일봉 기준일의 격자 정규화 필요 여부 | 신규 (AC-SGR-006 역할 분할) | `backend/services/meta_service.py:135`가 **일봉** `stock_prices`에서 기준 종목의 최신 거래일을 해석해 `stock_meta`를 재구축한다. 일봉에도 부분 데이터 날짜가 존재한다면 같은 종류의 오염을 받지만, 본 SPEC의 정규 격자는 **주봉 전용**이고 주봉 픽스처로는 반증할 수 없다. (a) 일봉 격자를 별도 REQ + `fixture_daily_max_ne_canonical`로 본 SPEC에 편입할 것인가, (b) 별도 SPEC으로 분리할 것인가, (c) 감수할 것인가. **결정 전에는 AC-SGR-005 allowlist에 남는다.** 선행 확인: 일봉 DB에 부분 데이터 날짜가 실제로 존재하는지 미측정 — 존재하지 않으면 (c)가 자명하다. |
 | **O-G5** | 미분류 섹터 센티넬 문자열의 값 | 신규 (REQ-SGR-017) | 두 경로가 `"Unknown"`과 `"기타"`로 갈려 있다. 기본안은 **`"기타"`** — 사용자에게 노출되는 한국어 문자열이고 종목 버블의 `ETC_LABEL = '기타'`(`StockBubbleChart.tsx:26`)와 이미 일치하므로 화면 어휘가 통일된다. 다만 `"기타"`는 registry에 실재하는 정상 섹터명일 가능성이 있어(현재 0건) "미분류 센티넬"과 "실제 기타 섹터"가 충돌할 여지가 있다. 별도 문자열(예: `"미분류"`)을 쓸 것인지 확인이 필요하다. |
