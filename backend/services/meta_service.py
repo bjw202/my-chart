@@ -194,9 +194,8 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
     conn.execute(f"ATTACH DATABASE '{weekly_db_path}' AS weekly")
 
     # SPEC-SECTOR-GRID-001 REQ-SGR-005: 주봉 기준일은 정규 격자의 정규 대표 바로 해석
-    # (CG-1 ISO 주당 1바·CG-3 부분 데이터 배제). weekly.stock_prices 의 자체
-    # MAX(Date) WHERE Name=REFERENCE_STOCK 폐기 — 기준 종목 한정이 아니라 전 종목
-    # 정규 격자로 수렴한다.
+    # (CG-1 ISO 주당 1바·CG-3 부분 데이터 배제). 주봉 self-ATTACH 의 기준종목 한정
+    # 순진 최신일 조회를 폐기하고 전 종목 정규 격자로 수렴한다.
     latest_weekly_date = _get_latest_valid_date(weekly_db_path)
 
     weekly_by_name: dict[str, tuple] = {}
