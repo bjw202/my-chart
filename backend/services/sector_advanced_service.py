@@ -195,7 +195,10 @@ def get_rrg_data(weekly_db_path: str) -> RRGResponse:
 def get_sector_history(weekly_db_path: str, weeks: int = 12) -> SectorHistoryResponse:
     """N주 섹터 랭킹 히스토리 API 응답을 반환한다.
 
-    compute_sector_ranking()을 각 주별로 호출하여 시계열을 구성한다.
+    compute_sector_history()가 부분 데이터 날짜를 제외한 정제된
+    (dates, rankings)를 반환하면, 이를 섹터별 시계열로 재구성한다.
+    날짜를 별도 재조회하지 않고 compute_sector_history가 반환한 dates를
+    그대로 사용하여 단일 진실 공급원(SSOT)을 보장한다.
 
     Args:
         weekly_db_path: weekly SQLite DB 경로
@@ -206,7 +209,8 @@ def get_sector_history(weekly_db_path: str, weeks: int = 12) -> SectorHistoryRes
     """
     from my_chart.analysis.sector_metrics import compute_sector_history
 
-    history_by_week = compute_sector_history(weekly_db_path, weeks=weeks)
+    # SSOT: 부분 데이터 날짜가 제외된 (dates, rankings) 튜플
+    dates, history_by_week = compute_sector_history(weekly_db_path, weeks=weeks)
 
     if not history_by_week:
         return SectorHistoryResponse(weeks=weeks, sectors=[])
@@ -214,32 +218,7 @@ def get_sector_history(weekly_db_path: str, weeks: int = 12) -> SectorHistoryRes
     # 섹터별 히스토리 데이터 수집
     sector_history: dict[str, list[SectorHistoryWeek]] = {}
 
-    for week_rankings in history_by_week:
-        if not week_rankings:
-            continue
-        # 해당 주의 날짜는 첫 번째 항목에서 추정 (sector_metrics에는 date가 없음)
-        # weekly DB에서 날짜를 별도로 조회
-        for rank_item in week_rankings:
-            name = rank_item.name
-            if name not in sector_history:
-                sector_history[name] = []
-
-    # 날짜를 DB에서 직접 조회
-    conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
-    try:
-        date_rows = conn.execute(
-            """SELECT DISTINCT Date FROM stock_prices
-               WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
-               ORDER BY Date DESC
-               LIMIT ?""",
-            (weeks,),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    dates = sorted(r[0] for r in date_rows)
-
-    # 날짜와 주별 랭킹을 매핑
+    # dates와 history_by_week는 같은 길이·같은 순서 (SSOT 보장)
     for date, week_rankings in zip(dates, history_by_week):
         if not week_rankings:
             continue

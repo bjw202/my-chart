@@ -320,30 +320,51 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
 def compute_sector_history(
     db_path: str,
     weeks: int = 12,
-) -> list[list[SectorRank]]:
-    """Compute sector ranking for each of the last N weeks.
+) -> tuple[list[str], list[list[SectorRank]]]:
+    """최근 N주 섹터 랭킹 히스토리를 계산한다.
+
+    부분 데이터 날짜(증분 업데이트 잔재 등으로 종목 수가 현저히 적은 날짜)는
+    자동 제외한다. 제외 기준: 조회 기간 내 중앙 종목 수의 50% 미만.
+    운영 DB(정상 2,548종목 vs 부분 1~4종목)와 테스트 DB(3~4종목) 모두
+    중앙값 기준으로 자동 적응한다.
 
     Args:
-        db_path: Path to weekly SQLite database file.
-        weeks: Number of weeks of history.
+        db_path: weekly SQLite DB 경로.
+        weeks: 조회 주수.
 
     Returns:
-        List of sector ranking lists, ordered chronologically.
+        (dates, rankings) 튜플. dates는 정제된 날짜(오름차순),
+        rankings는 각 날짜의 섹터 랭킹 리스트. 둘은 같은 길이·같은 순서.
     """
     conn = sqlite3.connect(db_path, check_same_thread=False)
     try:
-        date_rows = conn.execute(
-            """SELECT DISTINCT Date FROM stock_prices
+        # 조회 기간 2배 확보: 부분 데이터 날짜가 끼어들어도 정상 날짜 weeks개 확보
+        date_counts = conn.execute(
+            """SELECT Date, COUNT(*) AS cnt
+               FROM stock_prices
                WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
+               GROUP BY Date
                ORDER BY Date DESC
                LIMIT ?""",
-            (weeks,),
+            (weeks * 2,),
         ).fetchall()
     finally:
         conn.close()
 
-    if not date_rows:
-        return []
+    if not date_counts:
+        return [], []
 
-    dates = sorted(r[0] for r in date_rows)
-    return [compute_sector_ranking(db_path, date) for date in dates]
+    # 부분 데이터 날짜 감지: 중앙 종목 수의 50% 미만은 부분 데이터로 간주
+    counts = sorted(c for _, c in date_counts)
+    median_count = counts[len(counts) // 2]
+    stock_threshold = median_count * 0.5
+
+    valid_dates = sorted(d for d, c in date_counts if c >= stock_threshold)
+    # 최근 weeks개 선택 (오름차순 유지)
+    valid_dates = valid_dates[-weeks:]
+
+    if not valid_dates:
+        return [], []
+
+    rankings = [compute_sector_ranking(db_path, date) for date in valid_dates]
+    return valid_dates, rankings
