@@ -176,3 +176,24 @@ def history(grid: WeeklyGrid, weeks: int) -> HistorySlice:
     """최근 N 개의 history_grid 바(REQ-SGR-007). 가용 이력이 N 미만이면 가용한 만큼."""
     take = grid.history[-weeks:] if weeks > 0 else []
     return HistorySlice(take, weeks, len(take))
+
+
+# @MX:NOTE: [AUTO] 공유 최신 기준일 헬퍼(REQ-SGR-005). M5 7 소비자가 as_of_date 를
+#   이 함수로 수렴시킨다. fan_in >= 6 (sector_ranking/stage/market/meta/
+#   sector_advanced_service/sector_advanced). CG-1·CG-3 가 적용된 정규 대표 바.
+def _get_latest_valid_date(weekly_db_path: str, as_of: str | None = None) -> str | None:
+    """정규 주간 격자 기반 최신 기준일(REQ-SGR-005 공유 헬퍼).
+
+    ``compute_weekly_grid(...).latest.date`` 를 반환한다 — CG-1(ISO 주당 1바)·
+    CG-3(부분 데이터 행 수 배제) 가 이미 적용된 정규 대표 바로, 순진한 ``MAX(Date)``
+    와 달리 부분 데이터 날짜를 포함하지 않는다. 빈 DB 면 ``None``.
+
+    Args:
+        weekly_db_path: 주봉 SQLite DB 경로.
+        as_of: 진행 중인 주 판정 기준일(``None`` 이면 오늘).
+
+    Returns:
+        정규 최신 대표 날짜(ISO ``YYYY-MM-DD``). 빈 DB 면 ``None``.
+    """
+    grid = compute_weekly_grid(weekly_db_path, as_of)
+    return grid.latest.date if grid.latest is not None else None
