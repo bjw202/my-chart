@@ -231,7 +231,7 @@ README.md는 수정하지 않았다 — 본 SPEC은 데이터/격자 내부 계�
 ```yaml
 amendment_sync_status: audit-ready
 amendment_sync_complete_at: 2026-08-12
-amendment_sync_commit_sha: pending-backfill   # 본 커밋 SHA — 자기참조 면제(D3), 후속 커밋으로 backfill
+amendment_sync_commit_sha: 5931a14            # 본 커밋 SHA (D3 backfill 완료 — 자기참조 면제, 본 후속 커밋으로 완료)
 amendment_of: SPEC-SECTOR-GRID-001            # in-place (self-referential)
 prior_completed_sha: 95e0980                  # 최초 3-phase close (v0.2.2)
 prior_sync_commit_sha_backfill: fca134c       # 최초 close 의 §E.4 backfill 커밋
