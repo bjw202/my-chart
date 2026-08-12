@@ -15,6 +15,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
 
 import pandas as pd
 
@@ -187,11 +188,122 @@ def _batch_insert_rs(conn: sqlite3.Connection, rows: list[tuple]) -> None:
     )
 
 
+# DELETE 실행 시 SQLite 변수 상한(SQLITE_MAX_VARIABLE_NUMBER, 기본 999) 회피용
+# 이름 청크 크기. (names × dates) 가 상한을 넘지 않도록 names 를 분할한다.
+_SUPERSEDE_NAME_CHUNK = 500
+
+
+def _iso_year_week(date_str: str) -> tuple[int, int] | None:
+    """``YYYY-MM-DD`` → ``(iso_year, iso_week)``. 파싱 불가 시 None.
+
+    SQL ``strftime('%W')`` 는 ISO 주 규칙(연초 처리)과 달라 사용 금지이므로
+    Python ``date.isocalendar()`` 로 계산한다(plan §3.1).
+    """
+    try:
+        iy, iw, _ = date.fromisoformat(date_str).isocalendar()
+    except (ValueError, TypeError):
+        return None
+    return (iy, iw)
+
+
+# @MX:WARN: [AUTO] 물리 DELETE 경로 — 같은 (Name, ISO 주) 에서 이번 실행이 기록한
+#           바보다 이른 날짜의 행을 삭제한다(REQ-SGR-010 주중 재적재 supersede).
+# @MX:REASON: 삭제 범위는 “이번 실행이 기록한 ISO 주”로 한정되며 과거 주는 절대
+#             삭제하지 않는다. generate_price_db(supersede=False) / --no-supersede
+#             로 호출 자체가 차단된다. supersede 활성 실행 전 DB 백업 권장(advisory).
+def _supersede_same_iso_week_rows(
+    conn: sqlite3.Connection,
+    written_name_dates: list[tuple[str, str]],
+) -> int:
+    """이번 실행이 기록한 ``(Name, Date)`` 쌍을 받아 같은 ``(Name, ISO 주)`` 에서
+    **이번 실행이 기록한 바보다 이른 날짜**의 행을 DELETE 한다(REQ-SGR-010).
+
+    * 삭제 대상 ISO 주 = 이번 실행이 최소 1개 바를 기록한 주로 한정.
+      이번 실행이 기록하지 않은 과거 주의 행은 절대 삭제하지 않는다(과거 이력 보존).
+    * 각 ``(Name, ISO 주)`` 에서 이번 실행이 기록한 가장 큰 날짜(kept)는 남긴다.
+
+    Args:
+        conn: ``stock_prices`` 테이블을 가진 SQLite 연결.
+        written_name_dates: 이번 실행이 기록한 ``(Name, Date)`` 쌍 목록.
+
+    Returns:
+        삭제된 행 수.
+
+    Safety:
+        물리 DELETE(되돌림 불가). ``generate_price_db(supersede=False)`` 또는
+        ``--no-supersede`` 로 본 함수 호출을 차단한다 — 그 경로는 중복 행이 쌓이지만
+        DELETE 위험은 0이다. supersede 활성 실행 전에는 DB 백업을 권장한다(advisory).
+    """
+    if not written_name_dates:
+        return 0
+
+    # 1) (Name, ISO 주) → 이번 실행이 기록한 최대 날짜(kept)
+    max_written: dict[tuple[str, int, int], str] = {}
+    for name, date_str in written_name_dates:
+        iyw = _iso_year_week(date_str)
+        if iyw is None:
+            continue
+        key = (name, iyw[0], iyw[1])
+        prev = max_written.get(key)
+        if prev is None or date_str > prev:
+            max_written[key] = date_str
+    if not max_written:
+        return 0
+
+    # 2) DB 기존 날짜를 ISO 주로 그룹핑(SELECT DISTINCT Date — 수백 건으로 가벼움)
+    dates_by_week: dict[tuple[int, int], list[str]] = {}
+    for (d,) in conn.execute("SELECT DISTINCT Date FROM stock_prices"):
+        iyw = _iso_year_week(d)
+        if iyw is None:
+            continue
+        dates_by_week.setdefault(iyw, []).append(d)
+    if not dates_by_week:
+        return 0
+
+    # 3) 삭제 계획: (iso_year, iso_week, kept) → (earlier dates, names).
+    #    kept(이번 실행 최대 날짜)가 같으면 earlier 집합도 같으므로 한 번에 묶는다.
+    plan: dict[tuple[int, int, str], tuple[list[str], list[str]]] = {}
+    for (name, iy, iw), kept in max_written.items():
+        week_dates = dates_by_week.get((iy, iw))
+        if not week_dates:
+            continue
+        earlier = sorted(d for d in week_dates if d < kept)
+        if not earlier:
+            continue
+        plan.setdefault((iy, iw, kept), (earlier, []))[1].append(name)
+    if not plan:
+        return 0
+
+    # 4) DELETE 실행 + INFO 로그({iso_week, deleted_rows}). past 주는 범위 밖.
+    total = 0
+    for (iy, iw, kept), (earlier, names) in plan.items():
+        date_ph = ", ".join(["?"] * len(earlier))
+        for i in range(0, len(names), _SUPERSEDE_NAME_CHUNK):
+            chunk = names[i:i + _SUPERSEDE_NAME_CHUNK]
+            name_ph = ", ".join(["?"] * len(chunk))
+            cur = conn.execute(
+                f"DELETE FROM stock_prices "
+                f"WHERE Name IN ({name_ph}) AND Date IN ({date_ph})",
+                (*chunk, *earlier),
+            )
+            if cur.rowcount:
+                logger.info(
+                    "supersede: ISO %d-W%02d kept_date=%s deleted_rows=%d "
+                    "(earlier same-week rows removed; past ISO weeks untouched)",
+                    iy, iw, kept, cur.rowcount,
+                )
+                total += cur.rowcount
+    if total:
+        conn.commit()
+    return total
+
+
 def generate_price_db(
     db_name: str = DEFAULT_DB_WEEKLY,
     start: str = "20200101",
     max_workers: int = MAX_WORKERS,
     progress_callback: Callable[[int, int, str], None] | None = None,
+    supersede: bool = True,
 ) -> None:
     """Generate weekly price database for all stocks with parallel fetching.
 
@@ -199,6 +311,15 @@ def generate_price_db(
         db_name: Database file path (without .db extension).
         start: Start date in YYYYMMDD format.
         max_workers: Number of parallel API fetch threads.
+        progress_callback: Optional (done, total, current) progress callback.
+        supersede: REQ-SGR-010 — 같은 ``(Name, ISO 주)`` 에서 이번 실행이 기록한
+            바보다 이른 날짜의 행을 삭제한다(주중 재적재 supersede, 기본 True).
+            ``False``(``--no-supersede``)면 DELETE 를 수행하지 않는다(중복 허용,
+            DELETE 위험 0). 삭제 범위는 이번 실행이 기록한 ISO 주로 한정된다.
+
+    Note:
+        ``supersede=True`` 실행 전에는 DB 백업을 권장한다(물리 DELETE 는 되돌릴
+        수 없다 — 본 함수는 백업을 자동 생성하지 않는다, advisory).
     """
     st = time.time()
     db_path = f"{db_name}.db"
@@ -213,9 +334,13 @@ def generate_price_db(
     kospi = price_naver_rs("KOSPI", None, start, freq="week")
     kosdaq = price_naver_rs("KOSDAQ", None, start, freq="week")
 
+    # 이번 실행이 기록한 (Name, Date) 쌍 — REQ-SGR-010 supersede 범위 산출용
+    written_name_dates: list[tuple[str, str]] = []
+
     # Insert index data
     for label, idx_data in [("KOSPI", kospi), ("KOSDAQ", kosdaq)]:
         rows = _df_to_rows(label, idx_data)
+        written_name_dates.extend((r[0], r[1]) for r in rows)
         _batch_insert(conn, rows)
 
     # Parallel fetch individual stocks
@@ -240,13 +365,20 @@ def generate_price_db(
                 print(f"  [{done_count}/{total}] fetched, inserting batch...")
                 # Sort by (Name, Date) before insert for B-tree locality
                 all_rows.sort(key=lambda r: (r[0], r[1]))
+                written_name_dates.extend((r[0], r[1]) for r in all_rows)
                 _batch_insert(conn, all_rows)
                 all_rows = []
 
     # Final batch
     if all_rows:
         all_rows.sort(key=lambda r: (r[0], r[1]))
+        written_name_dates.extend((r[0], r[1]) for r in all_rows)
         _batch_insert(conn, all_rows)
+
+    # REQ-SGR-010: 같은 (Name, ISO 주) 의 이번 실행 이전 날짜 행을 supersede.
+    # supersede=False(--no-supersede)면 호출하지 않는다(DELETE 위험 0).
+    if supersede:
+        _supersede_same_iso_week_rows(conn, written_name_dates)
 
     conn.close()
     elapsed = time.time() - st

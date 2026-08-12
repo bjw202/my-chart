@@ -23,11 +23,16 @@ logger = logging.getLogger(__name__)
 _update_lock = threading.Lock()
 
 
-def start_update(daily_db_path: str, weekly_db_path: str) -> bool:
+def start_update(daily_db_path: str, weekly_db_path: str, supersede: bool = True) -> bool:
     """Launch DB update in a background daemon thread.
 
     Returns True if the update was started, False if one is already running.
     The caller should respond with HTTP 409 when False is returned.
+
+    Args:
+        supersede: REQ-SGR-010 주간 적재 supersede 활성 여부(기본 True).
+            ``False``(``--no-supersede``)면 weekly 적재의 같은-ISO-주 DELETE 를
+            무력화한다. ``db.py`` 라우터는 현재 기본값(True)으로 호출한다.
     """
     if not _update_lock.acquire(blocking=False):
         return False
@@ -36,7 +41,7 @@ def start_update(daily_db_path: str, weekly_db_path: str) -> bool:
     reset_progress()
     thread = threading.Thread(
         target=_run_update,
-        args=(daily_db_path, weekly_db_path),
+        args=(daily_db_path, weekly_db_path, supersede),
         daemon=True,
         name="db-update",
     )
@@ -56,7 +61,7 @@ def _make_progress_cb(
     return _cb
 
 
-def _run_update(daily_db_path: str, weekly_db_path: str) -> None:
+def _run_update(daily_db_path: str, weekly_db_path: str, supersede: bool = True) -> None:
     """Background thread: run all DB update phases sequentially."""
     try:
         # Phase 1: 주간 가격 데이터 (CHG_* 수익률, MA, RS_raw)
@@ -65,6 +70,7 @@ def _run_update(daily_db_path: str, weekly_db_path: str) -> None:
         generate_price_db(
             db_name=weekly_db_path.removesuffix(".db"),
             progress_callback=_make_progress_cb("weekly_prices", 0.0, 20.0),
+            supersede=supersede,
         )
 
         # Phase 2: 상대강도 순위
