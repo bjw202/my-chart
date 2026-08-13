@@ -187,7 +187,7 @@ allowlist 항목으로, O-G6 을 미결로 기술한다. `acceptance.md` amendme
 
 ```yaml
 run_complete_at: 2026-08-13
-run_commit_sha: pending-backfill-m6
+run_commit_sha: dbcbab2
 run_status: complete
 ac_pass_count: 10
 ac_fail_count: 0
