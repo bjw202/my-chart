@@ -43,7 +43,11 @@ logger = logging.getLogger(__name__)
 _INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
 
 # 52-week high/low proximity thresholds
-_NH_THRESHOLD = 0.02  # within 2% of MAX52
+_NH_THRESHOLD = 0.02  # within 2% of high_52w
+
+#: AC-SAG-024 — 52주 신고가 판정 창(일). 저장된 `MAX52`(Close 기반)를 쓰지 않고
+#: weekly `stock_prices.High` 를 이 창으로 직접 재계산한다(REQ-SAG-022, 규약 Y).
+HIGH_52W_WINDOW_DAYS = 364
 
 # Composite score weights per SPEC R8
 _COMPOSITE_W_1W = 0.3
@@ -312,14 +316,43 @@ def _anchor_returns(
     return by_name, anchor_dates
 
 
+# @MX:NOTE: [AUTO] AC-SAG-024 — 규약 Y: MAX52 가 NULL(52주 이력 부족)인 종목은
+#   신고가 판정의 분자·분모에서 모두 제외한다. NULL → 0.0 치환은 `Close >= 0` 을 항상
+#   참으로 만들어 결측 처리 차이를 실질 판정 차이로 오계상한다(실측 차이 20건).
+def _high52_map(
+    conn: sqlite3.Connection, t: str, window_days: int = HIGH_52W_WINDOW_DAYS
+) -> dict[str, float]:
+    """``MAX(High)`` over ``(t − window_days, t]`` — weekly ``stock_prices`` 단일 원천.
+
+    저장된 ``MAX52``(Close 기반, ``my_chart/price.py:148``)를 판정에 쓰지 않는다
+    (REQ-SAG-022). 창 내 ``High`` 행이 하나도 없는 종목은 결과 dict 에서 빠진다
+    (52주 최고가 산출 불가 — 분모에서 제외, AC-SAG-024 3번째 절).
+    """
+    from datetime import date as _date, timedelta as _timedelta
+
+    win_start = (_date.fromisoformat(t) - _timedelta(days=window_days)).isoformat()
+    try:
+        rows = conn.execute(
+            "SELECT Name, MAX(High) FROM stock_prices WHERE Date > ? AND Date <= ? "
+            "GROUP BY Name",
+            (win_start, t),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        # `High` 컬럼이 없는 최소 스키마 픽스처(단위 테스트 등) — 신고가 판정을
+        # 전부 산출 불가(분모 제외)로 접는다. 라이브/집계 픽스처는 항상 보유.
+        return {}
+    return {name: float(high) for name, high in rows if high is not None}
+
+
 def _build_member(
     name: str,
     row: dict[str, Any],
     caps: dict[str, float],
+    high52_map: dict[str, float],
     returns: dict[str, float | None] | None = None,
 ) -> _Member:
     close = row.get("Close")
-    max52 = row.get("MAX52")
+    max52 = high52_map.get(name)
     nh: bool | None = None
     if close is not None and max52 is not None and float(max52) > 0:
         nh = float(close) >= float(max52) * (1 - _NH_THRESHOLD)
@@ -696,6 +729,7 @@ def _compute_sector_aggregates_core(
     try:
         snapshot = _load_weekly_snapshot(conn, date)
         returns_by_name, anchor_dates = _anchor_returns(conn, grid, date)
+        high52_map = _high52_map(conn, date)
         caps = _load_market_caps(daily_db_path)
         sector_to_stocks, market_of = _load_registry_mapping(registry_path)
         universe = _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date)
@@ -712,7 +746,7 @@ def _compute_sector_aggregates_core(
         all_members: list[_Member] = []          # 규칙 BM-1 — 섹터 그룹핑 없는 벤치마크 유니버스
         for sector_name, stock_names in sector_to_stocks.items():
             members = [
-                _build_member(name, snapshot[name], caps, returns_by_name.get(name))
+                _build_member(name, snapshot[name], caps, high52_map, returns_by_name.get(name))
                 for name in stock_names
                 if name in snapshot
                 and name not in _INDEX_NAMES
@@ -821,6 +855,7 @@ def _compute_sector_metrics(
     kospi_returns: dict[str, float],
     caps: dict[str, float] | None = None,
     returns_by_name: dict[str, dict[str, float | None]] | None = None,
+    high52_map: dict[str, float] | None = None,
 ) -> SectorRank | None:
     """하위 호환 표면용 단일 섹터 지표(:class:`SectorRank`).
 
@@ -832,8 +867,9 @@ def _compute_sector_metrics(
     Returns None if no valid stocks found in sector.
     """
     rets = returns_by_name or {}
+    h52 = high52_map or {}
     members = [
-        _build_member(name, snapshot[name], caps or {}, rets.get(name))
+        _build_member(name, snapshot[name], caps or {}, h52, rets.get(name))
         for name in stock_names
         if name in snapshot and name not in _INDEX_NAMES
     ]
@@ -895,6 +931,8 @@ def compute_sector_ranking(
         kospi_returns = _load_kospi_returns(conn, date)
         # M2 — 기간 수익률은 `anchor(t, N)` 기준이며 저장된 CHG_* 컬럼이 아니다.
         returns_now, _anchors = _anchor_returns(conn, grid, date)
+        # M5 — AC-SAG-024 규약 Y: 신고가 판정은 weekly High 364일 창 재계산
+        high52_map = _high52_map(conn, date)
 
         # rank_change 기준일: anchor(t, 28) — t−28일 이하 최근 정규 격자 바
         # (SPEC-SECTOR-GRID-001 AC-SGR-006-B / AC-SGR-020 R2). 1M = 28d(REQ-SGR-006).
@@ -918,7 +956,7 @@ def compute_sector_ranking(
     current_results: list[SectorRank] = []
     for sector_name, stock_names in sector_to_stocks.items():
         metrics = _compute_sector_metrics(
-            sector_name, stock_names, snapshot, kospi_returns, caps, returns_now)
+            sector_name, stock_names, snapshot, kospi_returns, caps, returns_now, high52_map)
         if metrics:
             current_results.append(metrics)
 
