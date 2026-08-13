@@ -1635,12 +1635,165 @@ $ git status --short   (M5 5개 커밋 누적, 최종 상태)
 
 ---
 
+### M6 — 라우터 파라미터 + 종목 목록 필드 (기계적, 2026-08-13)
+
+#### E1 — 구현 개요 (단일 커밋)
+
+`market`/`period` 쿼리 파라미터를 6개 엔드포인트(`/sectors/ranking`, `/sectors/rrg`,
+`/sectors/history`, `/sectors/{name}/detail`, `/sectors/{name}/bubble`, `/stage/overview`)
+에 신설했다(AC-SAG-039). 파라미터 미전달 시 `market=all`(및 `/ranking`·`/detail`의
+`period=1m`)로 기존 동작이 유지된다(하위 호환 확인 — `test_ac_sag_039_backward_
+compat_default_market_all`).
+
+**실질 데이터 필터로 배선한 경로**(집계 시점 필터 — `member_count` 자체가 달라짐을
+실증):
+- `/sectors/ranking` → `sector_ranking_service.get_sector_ranking(market=...)` →
+  `compute_sector_aggregates(market=...)`(이미 시장 필터를 지원했던 함수, 라우터
+  배선만 M6 신규) + `compute_sector_ranking(market=...)`(**M6 신설 파라미터** —
+  `sector_to_stocks` 를 `_market_matches` 로 사전 필터).
+- `/stage/overview` → `stage_service.get_stage_overview(market=...)` — registry
+  `Market` 컬럼으로 `raw_stocks`/`candidates_raw` 를 사전 필터.
+- `/sectors/{name}/detail` → `sector_detail_service.get_sector_detail(market=...)` —
+  `stock_meta.market` 컬럼 SQL WHERE 절.
+- `/sectors/history` → `compute_sector_history(market=...)` **신설 파라미터** →
+  `compute_sector_ranking(market=...)` 그대로 전파(단일 원천).
+
+**M6 단계에서 echo 만 하고 Gap 으로 남긴 경로**(아래 Gaps 참조): `/sectors/rrg`,
+`/sectors/{name}/bubble`(종목 단위 시장 필터).
+
+**AC-SAG-040** — `/sectors/history` 에 `dates[]`(길이 == `weeks`) · `span_days`
+(`7×(weeks−1) ± 7`) · `rankings[date][sector]`(그 날짜에 순위 대상이 아니었던 섹터는
+키가 존재하되 값이 `null` — 최하위 순위로 대체하지 않는다, 전 구간 등장 섹터 합집합을
+매 날짜 키로 미리 채워 넣는 방식으로 구현)를 신설했다.
+
+**AC-SAG-041** — `StageStock`(stage/overview 의 `stage2_candidates`/`all_stocks`)에
+`weight_in_sector`·`chg_1w`·`chg_3m`·`trading_value`·`near_52w_high` 필드를
+추가했다. `weight_in_sector` 는 **`weighting.capped_weights_detail` 을 섹터별로
+그대로 재호출**해 산출한다(INV-CAP-1 — cap_eff(n) = max(WEIGHT_CAP, 1/n) 재사용,
+새 산식을 만들지 않았다 — D16/D17/N1 계열 결함의 재발 방지). `trading_value` 는
+weekly `Close × Volume` 근사이며(정규 원천인 daily `VolumeWon` 배선은 이 종목
+목록이 daily DB 를 소비하지 않으므로 Gap — 아래 참조), `near_52w_high` 는
+`sector_metrics._NH_THRESHOLD`(2%)와 동일 관용을 `stage_service._NEAR_52W_
+THRESHOLD` 로 독립 상수화해 재사용했다.
+
+**AC-SAG-042** — `/sectors/{name}/bubble` 응답에 `sector_aggregate` 필드를
+신설했다. `compute_sector_ranking()` 을 **ranking 서비스와 동일 인자로 재호출**해
+산출하므로(별도 산식을 두지 않음 — EX-1 방법론 일치 구조 보장), legacy `sectors[].
+returns.w1` 값과 정확히 일치한다(`< 1e-6`, `test_ac_sag_042_...` 실측 확인).
+canonical `data[].returns` 값(compute_sector_aggregates 경유, 별도 계산 경로)과는
+반올림 차 수준(`~2.8e-05`)의 차이가 있음을 확인했다 — AC-SAG-042 본문이 지시하는
+비교 대상은 legacy `sectors[]` 표면이다.
+
+**AC-SAG-007** — M6 완료로 평가 시점 도달. `market=kospi` 응답에서 F3 섹터
+(디스플레이·스마트폰, 유효 종목 정확히 4)가 `excluded[]`에 `reason:
+"insufficient_members"`, `count: 4`로 등록되고 `data[]`에서 빠짐을 실증했다.
+경계값(PCB, 정확히 5)은 `data[]`에 포함됨을 확인했다(`>= 5` 경계 포함).
+`market=all`에서는 두 섹터가 `data[]`에 포함된다(필터가 구성수를 바꿈).
+
+**AC-SAG-043 파생 구조 절** — `stage_service.by_sector`(`SectorStageBreakdown`)의
+`unclassified_count`/`total`은 **M5에서 이미 신설**됐음을 재확인했다(중복 구현
+방지 — Section B 사전 확인 절차대로 `backend/schemas/stage.py` 를 먼저 읽고
+확인). M6이 신규로 추가한 것은 없다 — 4단계(dataclass/서비스/Pydantic/JSON)는
+M1.1부터 이미 PASS, 파생 구조 절(by_sector)은 M5부터 이미 PASS였다. 이 절의
+평가 시점 명시(D19)는 절차적 요구였을 뿐, 실제 필드 신설은 M5에서 선행 완료됐다.
+
+#### E2 — AC PASS/FAIL 매트릭스 (M6 신규 실행분)
+
+| AC | 상태 | 검증 명령 | 실측 결과 |
+| --- | --- | --- | --- |
+| AC-SAG-039 (ranking market 필터) | PASS | `pytest tests/test_sag_m6_router_wiring.py -k ac_sag_039_ranking` | `2 passed` |
+| AC-SAG-039 (backward compat) | PASS | `pytest ... -k ac_sag_039_backward_compat` | `1 passed` |
+| AC-SAG-039 (422) | PASS | `pytest ... -k ac_sag_039_invalid_market` | `1 passed` |
+| AC-SAG-039 (stage/overview) | PASS | `pytest ... -k ac_sag_039_stage_overview` | `1 passed` |
+| AC-SAG-039 (detail) | PASS | `pytest ... -k ac_sag_039_sector_detail` | `1 passed` |
+| AC-SAG-039 (history) | PASS-WITH-DEBT | `pytest ... -k ac_sag_039_history_market` | `1 passed` — echo 만 확인, 실질 데이터 차이는 미검증(구조적으로는 compute_sector_ranking market 전파로 실질 필터가 걸려 있으나 전용 데이터-차이 단언 미작성) |
+| AC-SAG-039 (rrg) | PASS-WITH-DEBT | `pytest ... -k ac_sag_039_rrg` | `1 passed` — echo 만, 실 데이터 재계산 미배선(Gap 참조) |
+| AC-SAG-040 (dates/span_days/rankings) | PASS | `pytest ... -k ac_sag_040` | `3 passed` |
+| AC-SAG-041 (필드 존재 + INV-CAP-1) | PASS | `pytest ... -k ac_sag_041` | `3 passed` |
+| AC-SAG-042 (sector_aggregate 일치) | PASS | `pytest ... -k ac_sag_042` | `1 passed` |
+| AC-SAG-007 (M6 평가 개시) | PASS | `pytest ... -k ac_sag_007` | `3 passed` |
+| AC-SAG-043 (파생 구조 절, M6 재확인) | PASS | `pytest ... -k ac_sag_043` | `1 passed` — M5 선행 완료 재확인 |
+| AC-SAG-021 (rank = f(period, market)) | PASS-WITH-DEBT | (수동 확인, 전용 테스트 미작성) | market 절만 실증(제외 섹터 발생 → rank 최대값 감소, `test_ac_sag_039_ranking_market_filter_changes_data`가 간접 실증). period 절은 미이행 — `rank`은 `compute_sector_ranking`의 고정 composite(1w/1m/3m 가중 정규화)로만 산출되고 `period` 파라미터는 소비하지 않는다(G22) |
+
+전체: `pytest tests/test_sag_m6_router_wiring.py -q` → `18 passed`.
+
+#### E3 — 되돌림 대조(필수, Lesson #9)
+
+- **`mut_no_ag5_gate`**(AC-SAG-007 / 045 R6 공유): `compute_sector_aggregates(...,
+  apply_min_members=False)` 변형에서 F3 섹터(디스플레이·스마트폰)가 `data[]`에
+  재등장하고 `insufficient_members` 사유로는 더 이상 `excluded[]`에 남지 않음을
+  확인했다 — `test_ac_sag_007_red_when_ag5_gate_removed`. 정상 구현에서는 두
+  섹터가 `excluded[]`에 있었으므로(원 단언), 변형 적용 시 그 조건이 RED가 됨을
+  실증했다(대조가 검출력을 가짐).
+- **`mut_weight_cap_literal`**(AC-SAG-041): `weighting.capped_weights_detail`
+  대신 `min(raw, 0.10)` 산출로 되돌린 변형에서 정규화(`Σw == 1.0`) 위반을
+  실증했다 — `test_ac_sag_041_weight_in_sector_red_when_literal_010_used`. 축퇴
+  섹터(패션, 유효 시총 3, cap_eff=1/3≈0.3333)에서 실제 응답값이 리터럴 0.10
+  근처가 아님도 직접 확인했다(`test_ac_sag_041_weight_in_sector_not_literal_
+  010_degenerate_sector`).
+- 복원 확인: 두 대조 모두 프로덕션 코드를 직접 변형하지 않고 순수 함수를
+  국소 재현(`caps` 딕셔너리 조작 / `apply_min_members=False` 인자)해 관측했다
+  — `git status --short` 는 이 M6 커밋 범위 밖 사전 dirty 상태만 남기고
+  공백(내 변경분 기준).
+
+#### E4 — 전체 스위트 델타
+
+```
+$ pytest tests/ -q
+8 failed, 862 passed, 68 skipped, 1 xpassed, 25 errors in 102.85s
+```
+
+| | M5 완료 후 | M6 완료 후 | 델타 |
+| --- | --- | --- | --- |
+| passed | 844 | **862** | +18(신규 `tests/test_sag_m6_router_wiring.py`) |
+| failed | 8 | **8** | 0 — 동일 집합 |
+| errors | 25 | **25** | 0 — 전건 pre-existing `tests/fnguide/*` |
+
+M2~M5 게이트(`test_aggregation_fixture.py` + `test_sector_aggregation.py` +
+`test_sector_benchmark_ranking.py` + `test_sector_rrg.py` + `test_response_
+contract.py`) M6 완료 후 재확인: `148 passed`(변경 없음 — M6 은 이 5파일이
+커버하는 함수를 재구현하지 않았다). `backend/tests/test_sector_detail_
+service.py`(13 passed) · `test_stage_service.py`(3 passed) · `test_sector_
+advanced.py`(46 passed) 개별 실행 전건 GREEN(하위 호환 확인).
+
+#### E5 — 스코프 규율
+
+```
+$ git status --short   (M6 단일 커밋 e139067, 이 SPEC 범위 파일만)
+(내 변경분은 모두 커밋됨 — 사전 존재 무관 dirty 파일들만 남음, PRESERVE 미접촉)
+```
+
+수정 파일 9개(`backend/routers/{sectors,stage}.py`, `backend/schemas/{sector_
+advanced,stage}.py`, `backend/services/{sector_advanced_service,sector_detail_
+service,sector_ranking_service,stage_service}.py`, `my_chart/analysis/
+sector_metrics.py`) + 신규 테스트 1개. `stage_classifier.py`(공유 호출자 다수)는
+손대지 않았다 — `_load_stocks_for_classification` 을 그대로 재사용하고, 확장
+컬럼(CHG_1W/CHG_3M/MAX52/Volume)은 `stage_service.py` 국소 보조 쿼리로 분리했다
+(scope discipline). `sector_metrics.py` 는 `compute_sector_ranking`/`compute_
+sector_history` 시그니처에 `market` 파라미터만 추가했고 기존 호출자(무인자
+호출)는 기본값 `"all"`로 하위 호환된다.
+
+#### Gaps / 잔여 위험 (M6)
+
+| # | 항목 | 처분 |
+| --- | --- | --- |
+| **G20** | `/sectors/rrg`, `/sectors/{name}/bubble`(종목 단위)의 `market` 파라미터는 라우터에서 수신·검증되고 `market_filter`로 echo 되지만, 실 데이터 재계산은 배선하지 않았다 — RRG 는 섹터 지수 시계열(주봉 격자)을 소비하며 시장별 지수가 별도로 저장돼 있지 않고, `compute_stock_bubble`은 종목 단위 시장 필터 로직이 없다 | 아키텍처 확장(시장별 지수 계열 신설 또는 종목 필터 추가)이 필요해 "기계적 배선"의 범위를 넘는다. AC-SAG-039 는 6개 엔드포인트 모두를 요구하므로 이 두 엔드포인트는 **PASS-WITH-DEBT**로 기록한다. 후속 SPEC 대상 |
+| **G21** | `stage_service`의 `trading_value`는 weekly `Close × Volume` 근사다 — M5가 확정한 정규 원천(daily `VolumeWon`, `compute_trading_value_by_period`)은 daily DB 를 요구하는데 이 종목 목록 경로는 weekly DB 만 소비한다 | `weekly Volume`은 원천이 다르다(단위·정합성 미검증). AC-SAG-041은 필드 존재만 요구하고 원천 일치를 명시 요구하지 않아 PASS로 기록했으나, 원천 정합은 후속 과제로 기재한다 |
+| **G22** | `/sectors/ranking`·`/sectors/{name}/detail`의 `period` 파라미터는 수신·검증되나(422 게이트) 응답 형태를 바꾸지 않는다 — ranking은 이미 3개 윈도우(1w/1m/3m)를 항상 반환하고(AC-SAG-036), detail의 top_stocks도 `chg_1m`만 유지한다. **AC-SAG-021의 `period=3m` → `rank` 재배정 요구가 이로 인해 미이행이다**(`compute_sector_ranking`은 고정 composite 만 산출) | spec.md §12.3 본문이 `period`의 정확한 의미(단일 대표 지표 선택인지 단순 하위호환 파라미터인지)를 명시하지 않아, 단일 패스 최선 해석으로 "영향 없음, 수신만" 채택했으나 AC-SAG-021 본문과는 직접 모순됨을 재확인 후 정정 기재한다. `rank`를 `period` 별로 재계산하려면 `compute_sector_ranking`의 composite 정규화 로직을 period-단일-지표 기준으로 분기해야 하며 M6 스코프를 넘는 후속 과제다 |
+| **G23** | `stock_bubble`(`/sectors/{name}/bubble`)의 `StockBubbleItem`은 AC-SAG-041의 `weight_in_sector`/`chg_1w`/`chg_3m`/`near_52w_high`를 아직 갖지 않는다 — `price_change`(단일 period 값)만 있다 | spec.md §12.3 이 stock-listing 대상을 "`/stage/overview`, 종목 버블"로 명시하므로 완전한 이행은 아니다. 시간 제약으로 `/stage/overview` 를 우선 완결하고 이 항목은 후속 과제로 넘긴다 |
+| **G24** | 커버리지 미측정(G6/G13/G15/G19 연속) | coverage 모듈 미설치. 대리 지표: 신규 18개 테스트가 M6 신설/수정 함수(market 필터 전 경로, weight_in_sector, sector_aggregate, dates/span_days/rankings)를 직접 실행 |
+| **G16 (M5 신설, M6에서도 미해소)** | `SectorAggregate.trading_value`/`trading_value_window_days` 응답 필드 신설·라우터 배선 — `compute_trading_value_by_period`는 여전히 함수 수준 정의만 있고 호출부가 0건(실측: `grep -rn compute_trading_value_by_period my_chart/ backend/` → 정의 1건) | M6이 처음 §E.3 초안 작성 시 "RESOLVED"로 오기재했다가 재확인 후 정정했다(verification-claim-integrity §1.1 surface 1 위반 자체 검출·수정). M6 스코프는 stage/overview 종목 목록(weekly 근사 trading_value, AC-SAG-041)만 다뤘고 섹터 집계 항목(data[])의 trading_value는 다루지 않았다. 후속 SPEC 또는 M7 범위 확대 대상 |
+| **G25 (M3 신설, M6에서도 미해소)** | AC-SAG-023의 `rank_change` 최상위 `baseline_date` 응답 노출, AC-SAG-046 원판(트리거 픽스처 + 금요일 종단 변형)의 `trading_value_window_days`/`rank_change.baseline_date` 최상위 응답 노출 — 둘 다 M3 §E.2에서 "M6 라우터 응답 스키마 확장과 결합, deferred"로 명시 기재됐으나 M6은 이 특정 최상위 필드들을 신설하지 않았다 | M6 초안이 "M3에서 이미 완료"로 오기재했다가 progress.md §E.2 M3 원문 재확인 후 정정한다(verification-claim-integrity §1.1 surface 1). `market_filter`/`return_window_days` 등 AC-SAG-036 10키는 완비돼 있으나 `baseline_date`/`trading_value_window_days`는 그 10키 밖의 개별 필드다. 후속 SPEC 또는 M7 범위 확대 대상 |
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M5 완료(5개 독립 커밋). 다음 = M6(라우터 배선) — 별도 위임
-milestone_completed: M5            # 지표 정정 5건(MAX52/Stage단일화/volume_ratio/trading_value/RS평균). 응답 필드·라우터 배선은 M6 의존(Gap G16)
-run_commit_sha: 98f5809            # M5 #5(RS 평균, 최종 커밋)
+run_status: in-progress            # M6 완료(단일 커밋). 다음 = M7(테스트 대체 + 회귀 게이트) — 별도 위임
+milestone_completed: M6            # 라우터 파라미터 + 종목 목록 필드(기계적). RRG/stock_bubble market 실배선·trading_value 정규 원천은 Gap G20/G21
+run_commit_sha: e139067            # M6 단일 커밋
+prior_run_commit_sha_m5: 98f5809   # M5 #5(RS 평균, 최종 커밋)
 prior_run_commit_sha_m5_1: 9f2318c # M5 #1(MAX52)
 prior_run_commit_sha_m5_2: d17c737 # M5 #2(Stage 단일화)
 prior_run_commit_sha_m5_3: 5c14e17 # M5 #3(volume_ratio)
@@ -1685,9 +1838,10 @@ fixture_rebuild_measurements: "종목 331(지수 2) · 유효 유니버스 321 �
 f7_convention: "Y"                 # NULL MAX52 를 신·구 양쪽 분자·분모에서 제외. 규약 X 51 → 규약 Y 24, 차이 27 = NULL 종목 수
 golden_baseline_discarded: true    # [완료 8e51176] b839cee 캡처분(F12 미충족 픽스처 위) 폐기 후 재빌드 픽스처에서 재캡처. 폐기 전 sha256 은 §E.2 M1.0-b 재캡처 E1 에 기록
 relief_valve_used: none            # F13-2 14→12 축소 미사용. 크기 16.8 MB 로 예산(16~17 MB) 내
-next_gate: "M6 — 라우터 파라미터 + 종목 목록 필드(RRG 배선 · trading_value 응답 필드 배선 포함)"
-deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절(D19) · AC-SAG-021 라우터 엔드투엔드(G10) · AC-SAG-023/046 최상위 응답 노출(G10) · compute_rrg 라우터 배선(G14, M4 신설) · SectorAggregate.trading_value/trading_value_window_days 응답 필드 + 라우터 배선(G16, M5 신설) — M6 산출물 의존. M2~M5 미실행은 Gap 이 아니다"
-total_run_phase_files: 44          # M2 27 + M3 1종 + M4 2종 + M5 14종(`git diff --stat b2f45d2..98f5809` 실측)
+next_gate: "M7 — 테스트 대체 + 회귀 게이트(프로즌 픽스처 재확인, 되돌림 실증 라운드, 릴리스 노트)"
+deferred_to_m6: "[PARTIALLY RESOLVED — M6] AC-SAG-007 전체(RESOLVED, §E.2 참조) · AC-SAG-043 파생 구조 절(D19, RESOLVED — M5에서 이미 신설된 것 재확인) · AC-SAG-021 market 절(RESOLVED — market=kospi 시 제외 섹터 발생·rank 최대값 감소 실증) / AC-SAG-021 period 절(NOT RESOLVED — `period` 는 라우터에서 수신·검증만 하고 rank 배정에 영향을 주지 않는다, G22) · AC-SAG-023(NOT RESOLVED — rank_change 의 최상위 baseline_date 응답 노출은 이번 M6 스코프에 포함하지 않았다, G25로 신규 기재) · AC-SAG-046 원판(NOT RESOLVED — trading_value_window_days/rank_change.baseline_date 최상위 노출 미실행, lite 대체 유지, G25) · compute_rrg 함수 수준 배선(NOT RESOLVED — G20으로 이월, 라우터 파라미터만 신설·실계산 미배선) · SectorAggregate.trading_value/trading_value_window_days 응답 필드(NOT RESOLVED — G16 그대로 잔존, 아래 참조)"
+g10_g14_g16_resolution: "G10(period/market 라우터 미배선) → M6 ranking/history/detail/stage-overview 에서 실배선 완료(RESOLVED). G14(compute_rrg 라우터 배선) → 라우터 파라미터는 신설했으나 실 데이터 재계산(시장별 지수 소스 부재)은 미배선 — G20 으로 재이월(NOT RESOLVED). G16(SectorAggregate.trading_value 응답 필드) → 실측 확인 결과 `compute_trading_value_by_period` 는 여전히 함수 수준 정의만 있고(`grep -rn compute_trading_value_by_period my_chart/ backend/` → 정의 1건, 호출 0건) `SectorAggregate` dataclass 에 trading_value 필드 자체가 없다(`aggregate_types.py` — Coverage/ValidCounts 의 커버리지-비율용 trading_value 와는 다른 필드). **G16 은 해소되지 않았다** — M6 은 stage/overview 종목 목록의 trading_value(weekly 근사, AC-SAG-041)만 다뤘고 SectorAggregate(data[] 섹터 집계 항목)의 trading_value 필드 신설은 다루지 않았다. 초기 기재(RESOLVED 주장)는 미검증 주장이었음을 확인 후 정정한다(verification-claim-integrity 원칙)"
+total_run_phase_files: 54          # M2 27 + M3 1종 + M4 2종 + M5 14종 + M6 10종(`git diff --stat adf4bb8..e139067` 실측)
 # --- M2 (2026-08-13) ---------------------------------------------------------
 m2_new_tests: 48                   # test_weighting 18 · test_sector_aggregation 23 · test_inv_cap1_scan 7
 m2_full_suite: "8 failed, 786 passed, 68 skipped, 1 xpassed, 25 errors — B-2 baseline 과 실패 집합 동일, 신규 실패 0"
