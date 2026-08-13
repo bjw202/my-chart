@@ -1171,7 +1171,7 @@ A  tests/test_weighting.py
 ```yaml
 run_status: in-progress            # M2 완료 (비가역 경계 통과). 다음 = M3 (별도 위임)
 milestone_completed: M2            # 가중·집계 코어. 선행 M1.0-a 재빌드 → 048 → M1.0-b 재캡처 → 047 전건 충족 후 착수
-run_commit_sha: TBD-BACKFILL       # M2 커밋 — 커밋 직후 backfill
+run_commit_sha: 25f3fa9            # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
 prior_milestone_commits: "adb1f25 (M1.0-a 구) · b839cee (M1.0-a §E.3 구) · 6f00ba5 (M1.0-b/c 구) · 7b5fc45 (M1.0-b/c §E.3 구) · 7305e2e (M1.1) · a000add (M1.0-a 재빌드) · 8e51176 (M1.0-b 재캡처)"
 ac_gate: "AC-SAG-001~010 · 049 · 050 (M2 RED 목록 전건)"
