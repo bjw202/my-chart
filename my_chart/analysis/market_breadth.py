@@ -13,6 +13,8 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Any
 
+from my_chart.analysis.weekly_grid import compute_weekly_grid, history
+
 # Index names excluded from breadth calculations
 _INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
 
@@ -457,6 +459,10 @@ def compute_breadth_history(
 ) -> list[BreadthResult]:
     """Compute breadth indicators for the last N weeks.
 
+    대상 날짜는 ``my_chart.analysis.weekly_grid`` 의 정규 주간 격자 히스토리 뷰에서
+    유도한다(SPEC-MARKET-BREADTH-001 REQ-MBR-001). 원시 ``DISTINCT Date`` 조회는
+    다중 날짜 ISO 주를 중복 반환해 N개 행이 N주보다 짧은 구간을 덮으므로 쓰지 않는다.
+
     Args:
         db_path: Path to weekly SQLite database file.
         market: "KOSPI" or "KOSDAQ".
@@ -464,24 +470,17 @@ def compute_breadth_history(
 
     Returns:
         List of BreadthResult ordered by date ascending (oldest first).
+        서로 다른 N개 ISO 주의 대표 바이며, 진행 중인 주는 제외한다(CG-2).
     """
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    try:
-        # Get the last N distinct dates
-        date_rows = conn.execute(
-            """SELECT DISTINCT Date FROM stock_prices
-               WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
-               ORDER BY Date DESC
-               LIMIT ?""",
-            (weeks,),
-        ).fetchall()
-    finally:
-        conn.close()
+    # @MX:NOTE: [AUTO] 날짜 해석은 weekly_grid 가 단일 원천(SSOT)이다. grid.history 를
+    #   쓴다 — grid.dates 를 쓰면 진행 중인 주가 섞여 CG-2 가 죽는다.
+    grid = compute_weekly_grid(db_path)
+    hist = history(grid, weeks)
 
-    if not date_rows:
+    if not hist.bars:
         return []
 
-    dates = sorted(r[0] for r in date_rows)  # ascending order
+    dates = sorted(b.date for b in hist.bars)  # ascending order
 
     results = []
     for date in dates:
