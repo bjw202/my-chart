@@ -10,7 +10,7 @@ artifacts: [spec.md, plan.md, acceptance.md, progress.md]
 design_research_substitute:
   - docs/sector-ux/01-data-contract.md   # research (실측)
   - docs/sector-ux/02-screen-flow.md     # design (§12.3 서버 선행 조건)
-ac_count: 49          # 0.4.2: AC-SAG-049(상한 재배분 알고리즘 종료·불변식 계약 — 무작위 스윕, D17) 신설. 0.4.1: AC-SAG-048(M1.0-a 종료 게이트 — 집계 픽스처 F1~F12 충족, D14) 신설. 0.4.0: AC-SAG-047(M1 종료 게이트 — 골든 baseline 캡처 완결성, D4). 0.3.0: AC-SAG-046(창 일수 실측)
+ac_count: 50          # 0.5.0: AC-SAG-050(INV-CAP-1 작성 규약의 기계적 집행 — 정적 스캔 2종, N1 구조적 종결) 신설. 0.4.2: AC-SAG-049(상한 재배분 알고리즘 종료·불변식 계약 — 무작위 스윕, D17) 신설. 0.4.1: AC-SAG-048(M1.0-a 종료 게이트 — 집계 픽스처 F1~F12 충족, D14) 신설. 0.4.0: AC-SAG-047(M1 종료 게이트 — 골든 baseline 캡처 완결성, D4). 0.3.0: AC-SAG-046(창 일수 실측)
 invariants_owned: [EX-1, EX-2, RK-1, RK-2, RRG-1, RRG-2, RRG-3, RRG-4, BM-3, BM-6, SN-3, AG-6, "§8.6"]
 depends_on: [SPEC-SECTOR-GRID-001]
 open_questions: [O-A2, O-A5, O-A7]        # O-A5는 ① close로 착수 가능해졌으나 재측정이 run-phase M3 작업이라 미결 유지
@@ -21,13 +21,13 @@ resolved_open_questions:
   - "O-A6 (2026-08-12): 지표별 coverage.* + 최상위 최소값 병행"
   - "O-A8 (2026-08-13): 선택지 (a) 미완성 주 포함 — as_of = latest, 앵커 = anchor(t,N)(완성 바). 창이 라벨보다 길어짐(실측 프로즌 11/32/95일, 라이브 12/33/96일 — 요일 의존). 파생: REQ-SAG-043 + AC-SAG-046(return_window_days) 신설, REQ-SAG-012에 BM-6 보존 조건(동일 anchor 호출) 명시"
 blocking_before_run: []                   # 2026-08-13 v0.4.1: 착수 차단 항목 없음. ① status: completed(v0.3.0) + O-A8 결정 + plan-audit iteration 1 D1/D3/D5 + iteration 2 D10~D15 전부 SPEC 층에서 해소
-m1_forced_order: "[v0.4.2 재실행] M1.0-a **재빌드**(F12 포함) → AC-SAG-048 PASS(F1~F12 게이트, v0.4.1 D14 + v0.4.2 D16) → M1.0-b **재캡처**(구 baseline 폐기 — F12 미충족 픽스처 위에서 떠졌다) → M1.0-c(AC-SAG-047 종료 게이트) → M2. M1.1(응답 계약, 7305e2e)은 집계 로직 미변경이므로 되돌리지 않는다"
+m1_forced_order: "[v0.5.0 재실행] M1.0-a **재빌드**(F12 + **F13 재빌드 구성 계약** 포함, **F13-1 상위집합 필수**, **F7 규약 Y 적용 — 빌더 코드 변경 동반**) → AC-SAG-048 PASS(F1~F13 게이트) → M1.0-b **재캡처**(구 baseline 폐기 — F12 미충족 픽스처 위에서 떠졌다) → M1.0-c(AC-SAG-047 종료 게이트) → M2. M1.1(응답 계약, 7305e2e)은 집계 로직 미변경이므로 되돌리지 않는다"
 point_of_no_return: "M2"                  # [HARD] plan-audit iteration 2 판정. 비가역 경계는 M1.0-b가 아니라 M2다 — M1.0 구간에서는 구현 코드가 그대로이므로 잘못 뜬 baseline의 재캡처가 가능하다. M2가 구 구현을 교체하는 순간 캡처 창이 영구히 닫힌다. 이 여유가 D12/D14를 치명적이 아니라 회복 가능한 결함으로 만든 근거다. run-phase가 M1.0-c에서 AC-SAG-047 RED를 만나면 (1) 산출물 결함 vs 게이트 단언 결함을 구분하고 (2) 산출물 결함이면 M1.0-a로 되돌아가 재캡처, (3) 단언 결함이면 blocker report 반환(acceptance.md 편집 권한 없음). 상세: acceptance.md §8.5 / plan.md §0.2
 blocking_before_ux: [O-A7]                # ③의 AC-SUX-019 / AC-SUX-056 R5가 의존 (③의 O-U9)
 as_of_pinned: "2026-08-11"                # 사용자 결정 2026-08-13 (D3). 기존 날짜 축 픽스처 유지, AC-SAG-046 리터럴 4개(11/32/95, 앵커 07-31/07-10/05-08, baseline 07-10) 불변. 게이팅 테스트의 as_of 기본값(None → today) 사용 금지 — acceptance.md §8 규약 8
 fixtures:
   date_axis: "tests/fixtures/frozen/weekly-2026-08-12/"        # ① 소관, 읽기 전용. AC-SAG-046만 호스팅
-  aggregation: "tests/fixtures/frozen/aggregation-2026-08-11/" # ② 소관, M1.0-a 신규 빌드. 횡단면 게이팅 AC 호스팅. 요건 = acceptance.md §8.2 F1~F12. [v0.4.2] F12 신설로 재빌드 대상 — 섹터당 n >= 15 목표, 종목 145 → 240~255, 예상 9.0MB → 약 13MB
+  aggregation: "tests/fixtures/frozen/aggregation-2026-08-11/" # ② 소관, M1.0-a 신규 빌드. 횡단면 게이팅 AC 호스팅. 요건 = acceptance.md §8.2 F1~F13. [v0.5.0] F4·F8 폐지 + F13(재빌드 구성 계약) 신설. F13-1 상위집합(현행 145종목 전량 보존)이 F5-a/F5-b/F6/F7의 유일 충족 경로 — 신규 시총순 선정만으로는 각각 0/3/소멸/2로 미달(실측). 갱신 예산: 종목 약 360 / 26섹터 / 9.0MB → 약 16~17MB. F7은 규약 Y(NULL MAX52 분모 제외)로 재계수 — 빌더 변경 필요
 plan_audit_history:
   - "iteration 1 (2026-08-13): FAIL 0.78 (L thresh 0.85). MUST-PASS 전항 통과. Clarity 0.80 / Completeness 0.82 / Testability 0.55 / Traceability 0.95. BLOCKING D1·D2·D3·D5, SHOULD-FIX D4·D6·D7, MINOR D8·D9"
   - "iteration 2 (2026-08-13): PASS-WITH-DEBT 0.845 (조화평균, L thresh 0.85 미달 / 산술평균 0.855). Δ +0.065. MUST-PASS 7항 전항 통과. Clarity 0.85 / Completeness 0.88 / Testability 0.72(+0.17) / Traceability 0.97. D2·D3·D5·D6·D7·D8·D9 RESOLVED, D1·D4 PARTIALLY-RESOLVED. 신규 D10(CRITICAL)·D11(MAJOR)·D12(CRITICAL)·D13(MAJOR)·D14(MINOR)·D15(MINOR). M1 착수 SUSTAINED — blocking_before_run: [] 유지. 보고서: .moai/reports/plan-audit/SPEC-SECTOR-AGGREGATION-001-review-2.md"
@@ -53,7 +53,23 @@ plan_audit_resolution_v042:
   - "D17 (CRITICAL, M2 차단 — run-phase 실측 blocker) RESOLVED: plan.md §3.1 verbatim 알고리즘이 종료하지 않았다. 상한 종목을 cap_eff로 고정하지만 다음 반복에서 over 조건(> cap_eff + 1e-12)에 걸리지 않아 rest로 분류되어 재배분을 다시 받고, 진동하다 20회 상한에서 상한 초과 상태로 종료한다. 실측(manager-spec, seed 20260813, 4,000 케이스, n∈[2,40], 시총 10**U(0,4)×U(0,1)): 3,183건(79.6%) 상한 초과, 최악 n=6에서 cap_eff=0.166667 대비 max(w)=0.211925(+27.2%). 해소: §3.1을 동결형으로 교체 + 종료 증명 명시(매 회 frozen 진부분집합 엄격 증가 → <= min(n,20)회). 고정점 불변 실측 확인 — verbatim 2,000회와 최대 편차 6.696e-12, 닫힌 해와 3.053e-16. 반복 횟수 실측 최악 6회(4,000 케이스) / 7회(60,000 케이스, n<=60, seed 7) → AC-SAG-001과 spec.md §0.2의 '5회 이하' 임계 폐기. AC-SAG-001을 축퇴 케이스(A, [70,10,10,5,5] → 정확히 균등)와 비례 케이스(B, n=15 [1000,15,10×13] → w[1]/w[2] == 1.5)로 분리 — 이전 판의 w[1]/w[3] == 2.0은 n=5에서 원리적으로 성립 불가였다. AC-SAG-049 신설(무작위 스윕 + mut_plan31_verbatim). 파급: AC-SAG-003의 라이브 반도체 인용 + capped_weight 0.10 리터럴(픽스처 반도체 6종목 → cap_eff=0.1667이라 거짓)을 12종목 순수 합성 [600, 40×11]로 교체 + 6종목 축퇴 대조 추가"
   - "D18 (MAJOR, M1.1 관측) RESOLVED: AC-SAG-005의 cap_coverage_ratio 정의가 모호했다(run-phase 보고). '유효시총합 / 전체시총합'은 NULL 종목 시총을 합산할 수 없어 분자·분모가 항상 같아지는 항진명제(Lesson #9 F1)였고, 본 AC 시나리오에서는 두 해석이 모두 1.0을 내어 무증상이었다. Σ market_cap(유효 시총 ∧ 기간 수익률 non-null) / Σ market_cap(유효 시총 종목), 기간별 최솟값으로 확정(run-phase 구현과 동일). 유효 시총 종목 1개의 CHG_1M만 NULL로 바꾸는 판별 대조 절 추가 — 폐기된 해석은 그 변형에서도 1.0을 유지하므로 두 해석이 판별된다. spec.md REQ-SAG-004에도 정의 명시"
   - "D19 (MINOR) RESOLVED: M6 의존 절의 평가 시점 명시. AC-SAG-007 전체(market 파라미터 전제 — M6 신설, AC-SAG-039)와 AC-SAG-043의 파생 구조 절(by_sector · 상세 축약 리스트 — M6 신설, AC-SAG-041/042)은 M2~M5 구간에서 미실행이 Gap이 아니라 설계상 지연이다. AC 본문 + §8.4 규약 6 + §9 DoD에 명시하고 progress.md §E.2 deferred-to-M6 기재를 요구. AC-SAG-043은 4단계 절(M1.1부터)과 파생 구조 절(M6 이후)의 PASS/FAIL을 분리 기록하도록 요구 — 부분 PASS를 전체 PASS로 기록하는 것을 금지"
-plan_audit_cache: invalidated-2026-08-13-v0.4.2  # v0.4.2에서 plan 산출물 4종 전부 재변경 → plan-artifact hash 재변경. iteration 2 판정(PASS-WITH-DEBT 0.845)은 v0.4.1 시점 산출물에 대한 것이며 캐시로서 무효. /moai run Phase 1에서 plan-audit 재실행 필수(skip 4조건 중 artifact-hash 조건 불충족). iteration 3 예정
+plan_audit_cache: invalidated-2026-08-13-v0.5.0  # v0.5.0에서 plan 산출물 4종 전부 재변경 → plan-artifact hash 재변경. iteration 3 판정(FAIL 0.81 + STOP)은 v0.4.2 시점 산출물에 대한 것이며 캐시로서 무효. /moai run Phase 1에서 plan-audit 재실행 필수(skip 4조건 중 artifact-hash 조건 불충족)
+plan_audit_resolution_v050:
+  - "N1 (CRITICAL — cap_eff 축퇴 계열의 5번째 사례) RESOLVED-STRUCTURALLY: AC-SAG-041의 'weight_in_sector == 0.10'이 n < 10 섹터에서 거짓이었다(실측 n=5 → 0.200000, n=6 → 0.166667). 재빌드는 F3/F6 요건상 그런 섹터를 4개 의도 포함한다. 개별 정정에 그치지 않고 acceptance.md §0 INV-CAP-1(3개 명제 + 작성 규약)을 신설해 AC 11개 + F12-a를 전수 결속하고, AC-SAG-050(정적 스캔 2종 + 대조 변형 mut_reintroduce_cap_literal)으로 기계 집행했다. 이 스캔이 작성 중 AC-SAG-003의 'capped_weight: 0.10' 표기를 실제로 검출했다(값은 옳았으나 규약 위반)"
+  - "D22 (CRITICAL) RESOLVED: AC-SAG-010의 effective_n 24.3 ± 1.0 / 무상한 2.2는 라이브 반도체(n=163, 재현 실측 24.2606)의 값이었다. INV-CAP-1 명제 3(effective_n <= n)에 의해 밴드 [23.3,25.3]은 n >= 24를 요구하나 재빌드 목표는 n=15(실측 13.4214 topcap / 11.4189 random) — 성립 불가. 순수 합성 [3000,100×24]에서 22.8571428571(= 160/7) 유도 + 5/6종목 축퇴 대조(effective_n == n) + mut_effective_n_uncapped 신설"
+  - "D20 (MAJOR) RESOLVED: AC-SAG-045 R1의 '평균 절대 순위 이동 >= 2.5'가 6/6 구성에서 미달했다(composite↔composite 0.8235~2.3529, period=1m 1.1765~2.1176). 순위 이동 섹터 '집합'의 크기 >= 5로 교체 — 실측 집합 크기 15~23(26섹터 재빌드) / 9~14(17섹터), 여유 3.0배이며 mut_service_not_rewired에서 구조적으로 공집합이 된다. mut_equal_weight는 R1의 판별자가 아님을 재실측으로 확인(적용 후에도 집합 크기 12~20 유지)"
+  - "D23 (MAJOR) RESOLVED: AC-SAG-015의 '1W KOSPI/KOSDAQ 경고 없이 통과(실측 −0.10/−0.15%p)'는 부호부터 틀렸다. 재측정 라이브 +0.2695%p(n=827) / +0.5035%p(n=1705) — KOSDAQ는 이미 허용오차 0.5%p 초과. 픽스처 규모에서는 +1.0420/+1.9658%p(topcap). 2,546종목 지수를 부분집합이 재현할 수 없으므로 구조적 불가 → 정합성 대조를 비게이팅 스모크로 강등, 게이팅은 경고 발화 메커니즘(합성 픽스처 양방향)에만"
+  - "D24 (MAJOR) RESOLVED: AC-SAG-013의 부호 분산 0 < k < N을 비게이팅으로 강등. k를 규정하는 픽스처 요건이 없고 시장 상황에 종속된다(실측 k = 13~24/26, 17섹터 구성 7~15/17). 동시에 '모두 같은 부호는 불가' 선언과 '모두 같은 부호면 warnings[] 경고' 요구의 자기모순을 해소 — k ∈ {0,N}은 정상 가능 상태이고 그때 경고가 실리는 것이 계약이다. 경고 절은 합성 픽스처로 게이팅"
+  - "D21 (MINOR) RESOLVED: AC-SAG-045 R5-b(표준편차 증가)를 비게이팅으로 강등. 26섹터 구성에서는 6/6 상승(최소 여유 +1.06)이나 12섹터 구성에서 하락 관측 — 구성 의존. R5의 게이트는 R5-a(등간격, 실측 편차 0.00e+00) 단독"
+  - "N4 (MAJOR) RESOLVED: AC-SAG-012의 mock 호출 인자 비교가 항진명제였다 — plan.md §3.2가 '이 구조가 EX-1을 테스트가 아니라 타입 수준에서 보장한다'고 명시하므로 양변이 같은 호출 지점에서 나온다. 명명된 변형 2종(mut_benchmark_divergent_cap 신설 / mut_benchmark_own_anchor 공유) 대조를 주 단언으로 올리고 mock 절을 비게이팅 회귀 가드로 강등. 게이팅 열거로 승격"
+  - "N3 (MAJOR) RESOLVED: AC-SAG-016의 정적 스캔 grep -rnE '\\bis (not )?[0-9]' tests/ → 0행이 산문에 매치됐다 — 현행 트리에서 4건이 걸리며 전부 docstring/f-string의 자연어(test_registry.py:58, fnguide/test_dashboard.py:64/79/461)이고 실제 is-리터럴 비교는 0건이다. GREEN을 만들려면 무관한 docstring을 수정해야 했다. ast.Compare + ast.Is/IsNot + ast.Constant(수치, bool 제외) 스캔으로 교체 — 실측 0건"
+  - "N7 (MINOR) RESOLVED: AC-SAG-044의 grep -c hasattr에 수치 목표가 없어 카운트 절이 게이팅하지 않았다. 현행 15건이 전부 단일 함수 test_sector_rank_has_required_fields(:195-218)에 있음을 확인하고 기대값 0을 명시. 검출력은 되돌림 3케이스가 전담함을 분리 기재"
+  - "N2 (MAJOR) RESOLVED: F7 계수 규약이 빌더와 AC-024 본문에서 모순됐다. build_fixture.py:481의 (max52 or 0.0)는 NULL MAX52를 Close >= 0 = 항상 True로 처리해 divergent 35(MANIFEST 기록값), AC-024 본문 규약으로는 15 — 차이 20 = NULL MAX52 종목 수(실측 현행 픽스처). 규약 Y(NULL 종목을 신·구 양쪽 분모에서 제외)로 확정하고 AC-024 / 045 R3 / F7 / MANIFEST 의미 정렬. 빌더 코드 변경이 필요하므로 run-phase 작업 지시로 명기"
+  - "D25 (MAJOR) RESOLVED: F 요건 공허성 — F4·F8은 픽스처를 실행하는 소비 AC가 하나도 없어 빌드만 제약했다(F4는 현행 픽스처가 18/18 충족하면서 AC-SAG-002를 무게이팅으로 만든 당사자). 폐지. F5-a·F6은 AC-SAG-013의 null 섹터 집합 동등 절이, F10은 002/011/013의 market_cap 원천이 실제 소비 AC임을 확인해 재결속(이전 판의 소비 AC 표기 029/034가 틀렸을 뿐 요건은 vacuous가 아니다)"
+  - "R-C1~R-C8 (재빌드 구성) RESOLVED: F13(6개 기계 검사 조건)으로 통합. F13-1 상위집합이 핵심 — 신규 시총순 선정만으로는 F7 15→2, F5-b 10섹터→3, F5-a 7→0, F6 소멸로 네 요건이 동시에 깨진다(전부 시총 하위권 종목이 담당). F13-2(대형 섹터 >= 14) / F13-3(F12-b·c >= 9 빌드 목표 — R-C1의 6 vs 5 재발 방지) / F13-4(패션 5종목·유효 시총 3 보존) / F13-5(양 시장 비공백) / F13-6(합성 바 재현). R-C6은 AC-SAG-010의 순수 합성 전환으로 소멸. 예산 갱신: 약 360종목 / 16~17MB"
+  - "D29 (MINOR) RESOLVED: 합성 바 명문화 — 라이브 주봉에 2026-08-11 행이 존재하지 않으며(실측 최근 distinct 날짜 2026-08-12/08-10/08-07/07-31/07-24) 픽스처의 그 바는 라이브 2026-08-12를 재라벨링한 합성 바다. acceptance.md §8.1.1 신설 + MANIFEST synthetic_bar 4항목 요건화 + F13-6이 검사. 재빌드에서 재라벨링이 누락되면 AC-SAG-046의 리터럴 4개가 코드 변경 0줄에 전부 RED가 된다"
+  - "N5 / D26 (MINOR) RESOLVED: 고아 AC 결속 — AC-SAG-037을 plan.md M1.1(4단계 절) / M6(7-변형 행렬) RED 목록에, AC-SAG-049를 M2 RED 목록에 등재. AC-SAG-050도 M2(스캔 1) / M7(스캔 2 회귀) 결속"
+  - "스윕 미평가 항목 (8건) DISPOSED: acceptance.md §8.6 신설 — 각 항목에 미검증 유지가 안전한 근거 또는 검증 가능하게 만드는 요건을 기재했다. 025·031~035·046 금요일 변형은 안전(합성/정의적 성질 또는 ① 읽기 전용 픽스처), 037은 요건 추가, 012·014는 v0.5.0 검출력 보강, 007·043 파생 절은 deferred-to-M6 유지, AC-SAG-048의 F9/F10은 MANIFEST 실측 일치 절에 명시 포함, 골든 baseline 수치 정확성은 검증 대상 아님(구조 게이트가 의도)"
 ```
 
 Tier L이나 `design.md` / `research.md`를 신규 작성하지 않는다 — 그 역할은 이미 확정·교차검증된 `docs/sector-ux/01-data-contract.md`(연구·실측)와 `02-screen-flow.md`(설계)가 수행하며, 중복 작성은 SSOT 분기를 만든다.
@@ -543,6 +559,21 @@ M1.1(`7305e2e`)은 집계 로직을 건드리지 않았으므로 되돌리지 �
 `wip/SPEC-SECTOR-AGGREGATION-001-M2 @ 83cb847`은 **동결형 구현을 이미 담고 있으므로**
 (plan.md §3.1 v0.4.2와 동일 형태) M2 재개 시 참조하되, F12 픽스처 위에서 AC를 다시 판정한다.
 
+> **[v0.5.0 갱신 — 2026-08-13] 위 재개 순서는 F13 재빌드 구성 계약으로 대체된다.**
+> plan-audit iteration 3(FAIL 0.81 + STOP)에 이어 수행한 **49개 AC 전수 도달가능성 스윕**이
+> 신규 결함 N1~N7 + 재확인 D20~D26을 반환했고, v0.5.0이 이를 단일 배치로 정정했다.
+> **run-phase가 재개 전 반드시 반영할 두 가지**:
+> 1. **F13-1 상위집합 [HARD]** — 재빌드는 현행 픽스처 **145종목을 전량 보존**한다. 신규 시총순
+>    선정만으로 뽑으면 **F5-a(7→0) · F5-b(10섹터→3) · F6(패션 소멸) · F7(15→2)이 동시에 깨진다**
+>    (실측 2026-08-13, 독립 참조 구현). 갱신 예산: 약 360종목 / 26섹터 / 16~17 MB.
+> 2. **F7 규약 Y [빌더 코드 변경 동반]** — `build_fixture.py:481`의 `(max52 or 0.0)`을 **NULL 제외**로
+>    교체하고 MANIFEST `f7_*`를 재기록한다(현행 35 → 규약 Y 기준 15 계열).
+>
+> **갱신 재개 순서 (강제)**: `M1.0-a 재빌드(F12 + F13, 상위집합 + 규약 Y)` → `AC-SAG-048 PASS(F1~F13)` →
+> `M1.0-b 골든 baseline 재캡처` → `M1.0-c(AC-SAG-047 PASS)` → `M2`.
+> AC 총수 49 → **50**(AC-SAG-050 신설). M2 RED 목록에 **AC-SAG-049 · AC-SAG-050**이 추가됐고,
+> M1.1 / M6 RED 목록에 **AC-SAG-037**이 결속됐다(고아 AC 해소).
+
 ---
 
 ## §E.3 Run-phase Audit-Ready Signal
@@ -556,10 +587,10 @@ prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3) · 6f00ba5 
 ac_gate: AC-SAG-047
 ac_pass_count: 6                   # 048 + 047 + 036 + 038 + 043(부분) + 008
 ac_fail_count: 0                   # M2 는 착수 자체를 하지 않았다(FAIL 이 아니라 미실행)
-ac_blocked: "없음 — v0.4.2에서 해소 (D16: F12 신설 + AC-SAG-002 재작성 / D17: §3.1 동결형 교체 + AC-SAG-049 신설)"
+ac_blocked: "없음 — v0.4.2에서 해소 (D16: F12 신설 + AC-SAG-002 재작성 / D17: §3.1 동결형 교체 + AC-SAG-049 신설). [v0.5.0] 추가 정정 — N1(AC-SAG-041 cap_eff) · D22(AC-SAG-010) · D20(045 R1) · D23(AC-SAG-015) · D21(045 R5-b) · N4(AC-SAG-012) · N3(AC-SAG-016) · N7(AC-SAG-044) · D24(AC-SAG-013) · N2(F7 규약 Y) · D25(F4·F8 폐지) · R-C1~R-C8(F13 신설) · D29(합성 바) · N5/D26(고아 AC)"
 blocker_open: false               # [v0.4.2 2026-08-13] manager-spec 재위임 완료. SPEC 층 해소 — 다음 행동은 M1.0-a 재빌드
 blocker_owner: manager-develop    # 소유권 반환. acceptance.md 본문 수정 완료(v0.4.2)
-blocker_resolution_version: "0.4.2"
+blocker_resolution_version: "0.5.0"   # 0.4.2에서 M2 blocker 2건(D16·D17) 해소, 0.5.0에서 전수 스윕 결함 14건 일괄 해소
 spec_layer_deltas: "F12 신설(§8.2) · AC-SAG-002 절 2·3 집합 동등 재작성 · AC-SAG-045 R1 대조 mut_service_not_rewired 교체 · plan.md §3.1 동결형 + 종료 증명 · AC-SAG-001 A/B 분리 · AC-SAG-049 신설 · AC-SAG-003 순수 합성 교체 · AC-SAG-005 정의 확정 · AC-SAG-007/043 M6 의존 명시 · §8.4 규약 10 신설"
 wip_branch: "wip/SPEC-SECTOR-AGGREGATION-001-M2 @ 83cb847 (main 미머지)"
 capture_via_http_response: true    # TestClient 경유 response_model 직렬화. model_dump_json() 아님
@@ -579,9 +610,9 @@ live_db_mutated: false             # /api/db/update 미실행
 negative_verification: observed-red-1        # stage-overview.json 임시 이동 → 3 failed + 11 errors 관측. 복원 후 40 passed (E5)
 mutation_verification_m2: not-run  # mut_equal_weight 미실증 — 재빌드된 F12 픽스처 위에서 AC-SAG-002 가 검출력을 회복한 뒤 수행(Gap 유지)
 point_of_no_return_crossed: false  # **M2 미커밋 — 재캡처 경로 여전히 열려 있다**
-fixture_rebuild_required: true     # [v0.4.2 D16] 현 픽스처는 F12 미충족(AG-5 통과 18섹터 중 n>10 이 게임 1개). 재빌드 목표 = 섹터당 n >= 15, 12섹터 이상
+fixture_rebuild_required: true     # [v0.4.2 D16 · v0.5.0 F13 확장] 현 픽스처는 F12 미충족(AG-5 통과 18섹터 중 n>10 이 게임 1개). 재빌드 목표 = **현행 145종목 상위집합**(F13-1 [HARD]) + 유효 시총 n >= 15 섹터 14개 이상(F13-2) + F12-b·c >= 9 빌드 목표(F13-3) + 패션 5종목/유효 시총 3 보존(F13-4) + 양 시장 비공백(F13-5) + 합성 바 재라벨링 재현(F13-6). F7은 규약 Y로 재계수(빌더 변경)
 golden_baseline_discarded: true    # [v0.4.2 D16] b839cee 캡처분은 F12 미충족 픽스처 위에서 떠졌으므로 폐기 — M1.0-b 재수행
-next_gate: "M1.0-a 재빌드(F12 · n >= 15) → AC-SAG-048 PASS(F1~F12) → M1.0-b 재캡처 → M1.0-c(AC-SAG-047 PASS) → M2"
+next_gate: "M1.0-a 재빌드(F12 + F13 · 상위집합 + F7 규약 Y) → AC-SAG-048 PASS(F1~F13) → M1.0-b 재캡처 → M1.0-c(AC-SAG-047 PASS) → M2"
 deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절 — M6 산출물 의존(D19). M2~M5 미실행은 Gap 이 아니다"
 total_run_phase_files: 18          # 기존 11 + M1.1 7 (신설 3 · 수정 4)
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
