@@ -201,24 +201,205 @@ $ python -m pytest tests/test_aggregation_fixture.py -q
 증거 파일: `.moai/state/verify/sag001-m10a/e3-neg-f2-999.log`,
 `.moai/state/verify/sag001-m10a/e3-neg-manifest-tamper.log`.
 
+### M1.0-b — 골든 baseline 캡처 + M1.0-c AC-SAG-047 게이트 (2026-08-13)
+
+**구현 코드 0줄 변경.** 캡처는 구 구현의 현행 응답을 그대로 뜬 것이며, 비가역 경계인 M2 는
+아직 착수하지 않았다(plan.md §0.2 — M1.0-c 까지는 재캡처 가능).
+
+#### E1 — 캡처 경로 (직렬화 계약이 이 마일스톤의 최대 위험)
+
+AC-SAG-047 은 **직렬화 응답**의 형태를 단언한다. 서비스 반환값의 `model_dump_json()` 을 뜨면
+`response_model` 변환을 우회해 구조가 어긋나고, 게이트가 실결함과 무관하게 RED 가 된다.
+따라서 `fastapi.testclient.TestClient` 로 **실제 HTTP 요청**을 태워 캡처했다.
+
+```
+$ python tests/fixtures/golden/pre-sector-ux/capture_baseline.py
+httpx: HTTP Request: GET http://testserver/api/sectors/ranking "HTTP/1.1 200 OK"
+httpx: HTTP Request: GET http://testserver/api/stage/overview "HTTP/1.1 200 OK"
+captured: date=2026-08-11 sectors=18 total=135
+```
+
+DB 경로는 라우터 모듈 상수를 패치해 집계 프로즌 픽스처로 고정했다(라이브 DB 캡처 금지):
+
+| 패치 대상 | 값 |
+| --- | --- |
+| `backend.routers.sectors.WEEKLY_DB_PATH` | `tests/fixtures/frozen/aggregation-2026-08-11/weekly.db` |
+| `backend.routers.sectors.DAILY_DB_PATH` | `.../aggregation-2026-08-11/daily.db` |
+| `backend.routers.stage.WEEKLY_DB_PATH` | `.../aggregation-2026-08-11/weekly.db` |
+| `my_chart.registry.SECTORMAP_PATH` (+ lazy 캐시 2개) | `.../aggregation-2026-08-11/registry.xlsx` |
+
+**registry 고정은 캡처 중 발견한 추가 위험이다.** 구 구현의 `get_sector_registry()` 는 경로
+인자가 없고 라이브 `Input/sectormap-original.xlsx` 를 lazy-load 한다(`my_chart/registry.py:122`).
+고정하지 않으면 baseline 이 라이브 파일에 묶여 드리프트한다. 고정 전/후 캡처를 `diff` 로
+대조해 **양쪽이 바이트 동일**함을 확인했으므로(현재 라이브 registry == 픽스처 사본) 값 변화는
+없고, 재현성만 확보됐다.
+
+`as_of` 는 현행 무파라미터 엔드포인트에서 픽스처의 최신 정규 바로 결정되며, 캡처 스크립트가
+응답 `date == "2026-08-11"` 을 단언해 기준일이 실제로 고정값임을 확인한다(§8 규약 7).
+
+#### E2 — 산출물 인벤토리
+
+| 파일 | 크기 | 최상위 키 |
+| --- | --- | --- |
+| `ranking-current.json` | 7,804 B | `date`, `sectors` — `len(sectors) = 18`, `date = 2026-08-11` |
+| `stage-overview.json` | 54,024 B | `distribution`, `by_sector`, `stage2_candidates`, `all_stocks` |
+| `MANIFEST.md` | 2,988 B | 기계 판독 YAML 블록(`as_of` / `captured_at` / `git_sha` / `fixture` / `capture_command` / `periods`) |
+| `capture_baseline.py` | 8,453 B | 재캡처 스크립트(캡처 명령의 실체) |
+
+```
+sectors[0] keys: ['name','stock_count','returns','excess_returns','rs_avg',
+                  'rs_top_pct','nh_pct','stage2_pct','composite_score','rank','rank_change']
+distribution: {'stage1': 1, 'stage2': 42, 'stage3': 2, 'stage4': 90, 'total': 135}
+len(by_sector)=18  len(stage2_candidates)=6  len(all_stocks)=135
+```
+
+기간별 3파일은 캡처하지 않았다 — 현행 `/sectors/ranking` 은 무파라미터이므로 세 번 호출해도
+동일 응답 3부이며, 단일 응답이 이미 `returns.{w1,m1,m3}` / `excess_returns.{w1,m1,m3}` 로 세
+기간을 전부 싣는다(plan.md v0.4.0 정정 D4).
+
+#### E3 — AC-SAG-047 결과
+
+```
+$ python -m pytest tests/test_golden_baseline.py -q
+........................................                                 [100%]
+40 passed, 1 warning in 0.34s
+```
+
+#### E4 — D12 재도입 방지 (실측 문자열 카운트)
+
+| 파일 | `sector_excess_return` | `total_count` |
+| --- | --- | --- |
+| `ranking-current.json` | **0건** | **0건** |
+| `stage-overview.json` | **0건** | **0건** |
+
+`all sectors have excess_returns.{w1,m1,m3}: True` / `distribution.total present: True (=135)`.
+두 문자열은 각각 내부 dataclass 필드명(`SectorRank`)과 존재하지 않는 키이며, 검출되면 응답
+모델을 우회해 dataclass 를 덤프했다는 신호다. v0.4.0 결함이 되돌아오면 즉시 RED 가 된다.
+
+#### E5 — 음성 검증 (Lesson #9 — 작성이 아니라 **관측된 RED**)
+
+`stage-overview.json` 을 임시 이동한 상태에서 관측된 RED:
+
+```
+$ mv tests/fixtures/golden/pre-sector-ux/stage-overview.json /tmp/_neg_stage.json
+$ python -m pytest tests/test_golden_baseline.py -q
+FAILED tests/test_golden_baseline.py::test_baseline_file_exists[stage-overview.json]
+FAILED tests/test_golden_baseline.py::test_no_dataclass_field_names_leaked[sector_excess_return-stage-overview.json]
+FAILED tests/test_golden_baseline.py::test_no_dataclass_field_names_leaked[total_count-stage-overview.json]
+ERROR tests/test_golden_baseline.py::test_stage_top_level_container - Asserti...
+(… distribution 5건 / by_sector 5건 ERROR …)
+3 failed, 26 passed, 1 warning, 11 errors in 0.28s
+```
+
+복원 후:
+
+```
+$ mv /tmp/_neg_stage.json tests/fixtures/golden/pre-sector-ux/stage-overview.json
+$ ls tests/fixtures/golden/pre-sector-ux/
+MANIFEST.md  capture_baseline.py  ranking-current.json  stage-overview.json
+$ python -m pytest tests/test_golden_baseline.py -q
+40 passed
+```
+
+`git status --short` 는 이 시점에 `?? tests/fixtures/golden/pre-sector-ux/` 만 표시한다 —
+디렉터리 전체가 신규(untracked)이므로 개별 파일 diff 가 뜨지 않는 정상 상태이며, 복원 증명은
+위 `ls` + 재실행 GREEN 이 담당한다. 커밋 이후에는 `git status --short` 가 공백이 된다.
+
+#### E6 — baseline 비퇴화 (index row 존재 확인)
+
+`excess_returns` 가 `returns` 와 항등이면 벤치마크가 사실상 부재하다는 뜻이고, R4/R5 비교가
+무의미해진다. 사용자 승인 사항인 KOSPI/KOSDAQ 지수 행(각 59바) 포함 결정이 실제로 작동했는지
+직접 측정했다:
+
+| 지표 | 실측 |
+| --- | --- |
+| 한 기간이라도 다른 섹터 | **18 / 18** |
+| 다른 (섹터, 기간) 쌍 | **54 / 54** (항등 0건) |
+| `max abs(returns − excess_returns)` | **16.1662** |
+| 표본 (`화장품`) | `returns {w1:16.1499, m1:25.4084, m3:30.4431}` vs `excess {w1:11.0328, m1:28.95, m3:46.6092}` |
+
+#### E7 — 구현 코드 미변경
+
+```
+$ git status --porcelain my_chart/ backend/ frontend/
+ M frontend/src/components/SectorAnalysis/BumpChart.tsx      ← 본 SPEC 착수 이전부터 존재 (51+/36-)
+?? backend/reports/  frontend/coverage/  frontend/test-results/  frontend/2026-03-16-…txt
+```
+
+`BumpChart.tsx` 및 untracked 항목은 **본 마일스톤 착수 시점에 이미 워킹트리에 있던 무관 변경**이며
+커밋에 포함하지 않는다(경로 명시 `git add`). 프로즌 픽스처 2종도 미변경:
+`git status --porcelain tests/fixtures/frozen/` → 출력 없음.
+
+#### E8 — 전체 회귀 (M1.0-a baseline 대비)
+
+```
+$ python -m pytest -q
+8 failed, 688 passed, 68 skipped, 1 xpassed, 25 errors in 79.91s
+```
+
+| 항목 | M1.0-a 직후 | 현재 | 델타 |
+| --- | --- | --- | --- |
+| passed | 648 | **688** | **+40** (AC-SAG-047 신규) |
+| failed | 8 | **8** | 0 |
+| errors | 25 | **25** | 0 |
+| skipped / xpassed | 68 / 1 | 68 / 1 | 0 |
+
+실패 8건 집합이 baseline 과 **동일**하다: `test_screen_service` 3 · `test_meta_service` 2 ·
+`test_rs_line` 2 · `test_api::test_too_many_patterns_rejected` 1. errors 25 는 전건 `tests/fnguide/*`.
+**NEW 실패 0건.** 로그: `.moai/state/verify/m10bc/full-suite.log`.
+
+#### E9 — MANIFEST 기계 판독 블록 (verbatim)
+
+```yaml
+as_of: "2026-08-11"
+captured_at: "2026-08-13 13:45:27"
+git_sha: "b839cee"
+fixture: "tests/fixtures/frozen/aggregation-2026-08-11"
+capture_command: "python tests/fixtures/golden/pre-sector-ux/capture_baseline.py"
+periods: ["w1", "m1", "m3"]
+```
+
+#### Gaps / 잔여 위험
+
+- **Gap 1** — 캡처값의 **수치적 정확성**은 검증 대상이 아니다. AC-SAG-047 은 구조 게이트이며,
+  이 baseline 이 "구 구현의 응답"이라는 사실만 보증한다. 값의 옳고 그름은 M7 의 R1/R4/R5 가
+  구 대비 개선을 판정할 때 비로소 의미를 갖는다.
+- **Gap 2** — `all_stocks` (135개) 와 `stage2_candidates` (6개) 는 AC-SAG-047 이 단언하지 않는다.
+  R1/R4/R5 가 읽지 않는 필드이므로 게이트 범위 밖이나, 캡처에는 포함돼 있다.
+- **잔여 위험 1** — `git_sha: b839cee` 는 **캡처 시점** SHA 이며 본 마일스톤 커밋 이전이다.
+  이는 의도된 것이다 — baseline 은 "코드 변경 0줄 상태"에서 떠졌음을 기록해야 한다.
+- **잔여 위험 2** — 라이브 `Input/sectormap-original.xlsx` 가 향후 변경돼도 캡처는 픽스처
+  registry 를 읽으므로 재현된다(E1 에서 고정). 다만 **재캡처를 다른 커밋에서 수행하면**
+  구현이 그 사이 바뀌었을 수 있으므로, M2 이후 재캡처는 불가능하다(설계상 의도).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M1.0-a 완료. M1.0-b(골든 baseline 캡처)는 사용자 검토 게이트 뒤
-milestone_completed: M1.0-a
-run_commit_sha: adb1f25              # M1.0-a. 본 §E.3 backfill 은 후속 커밋
-ac_gate: AC-SAG-048
-ac_pass_count: 1                   # AC-SAG-048 (30 테스트 전건 GREEN)
+run_status: in-progress            # M1.0-c 완료. M2(비가역 경계) 는 사용자 검토 게이트 ② 뒤
+milestone_completed: M1.0-c
+run_commit_sha: pending-backfill-m10bc   # 본 §E.3 backfill 은 후속 커밋 (커밋은 자기 SHA 를 알 수 없다)
+prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3 backfill)"
+ac_gate: AC-SAG-047
+ac_pass_count: 2                   # AC-SAG-048 (30 테스트) + AC-SAG-047 (40 테스트)
 ac_fail_count: 0
-f_requirements_satisfied: 11       # F1~F11 전항
+capture_via_http_response: true    # TestClient 경유 response_model 직렬화. model_dump_json() 아님
+capture_as_of: "2026-08-11"        # 캡처 스크립트가 응답 date 와 동등성 단언
+capture_fixture: "tests/fixtures/frozen/aggregation-2026-08-11"
+capture_git_sha: b839cee           # 캡처 시점 (코드 변경 0줄 상태)
+baseline_files: 3                  # ranking-current.json · stage-overview.json · MANIFEST.md
+baseline_sector_count: 18          # >= 10 (AC-SAG-047)
+baseline_excess_returns_degenerate: false   # 54/54 (섹터,기간) 쌍이 returns 와 상이. max gap 16.1662
+d12_forbidden_string_count: 0      # sector_excess_return · total_count 양 파일 0건
 new_warnings_or_lints_introduced: 0
-full_suite_delta: "+30 passed / failed 8 (전건 pre-existing, baseline 동일 집합) / errors 25 (pre-existing)"
-date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경 (git status 공백)
-production_code_touched: false     # my_chart/ · backend/ · frontend/ 미변경 (M1.0-a 는 테스트 자산 마일스톤)
-live_db_mutated: false             # /api/db/update 미실행. Output/*.db 는 읽기 전용 접근
-negative_verification: observed-red-2         # (1) F2 임계 >= 999 상향 → RED, (2) MANIFEST 손조작(F6 섹터명 / F7 count) → RED. 두 건 모두 복원 후 git status --short 공백 확인 (E3)
-next_gate: "M1.0-b (골든 baseline 캡처) — 사용자 검토 게이트. AC-SAG-048 PASS 로 진입 조건 충족"
-total_run_phase_files: 6           # 픽스처 4 + build_fixture.py + 테스트 1
+full_suite_delta: "+40 passed (648 → 688) / failed 8 (전건 pre-existing, baseline 동일 집합) / errors 25 (pre-existing)"
+date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경
+aggregation_fixture_touched: false # tests/fixtures/frozen/aggregation-2026-08-11/ 미변경
+production_code_touched: false     # my_chart/ · backend/ · frontend/ 미변경 (BumpChart.tsx 는 착수 이전 무관 변경)
+live_db_mutated: false             # /api/db/update 미실행
+negative_verification: observed-red-1        # stage-overview.json 임시 이동 → 3 failed + 11 errors 관측. 복원 후 40 passed (E5)
+point_of_no_return_crossed: false  # M2 미착수 — 재캡처 여전히 가능
+next_gate: "M2 (구 집계 구현 교체) — 사용자 검토 게이트 ②. AC-SAG-048 + AC-SAG-047 양자 PASS 로 진입 전제 충족"
+total_run_phase_files: 11          # M1.0-a 6 + baseline 3 + capture_baseline.py 1 + test_golden_baseline.py 1
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
