@@ -153,6 +153,18 @@ def metric_model(m: MetricValue) -> MetricValueModel:
     return MetricValueModel(value=m.value, reason=m.reason)
 
 
+def _rounded_metric_model(m: MetricValue, ndigits: int) -> MetricValueModel:
+    """규칙 RK-2 — 반올림은 **직렬화 직전 1회만** 수행한다.
+
+    `sector_metrics._rank_sectors` (정렬 경로)는 원시(unrounded) 값으로 비교·정렬하고,
+    이 함수가 응답 모델 생성 시점에 딱 1번 반올림한다 — 정렬 경로 내부에는
+    ``round(`` 호출이 없다(AC-SAG-020 정적 스캔).
+    """
+    if m.value is None:
+        return MetricValueModel(value=None, reason=m.reason)
+    return MetricValueModel(value=round(m.value, ndigits), reason=None)
+
+
 def _metric_map(d: dict[str, MetricValue]) -> dict[str, MetricValueModel]:
     return {k: metric_model(v) for k, v in d.items()}
 
@@ -190,7 +202,7 @@ def aggregate_model(a: SectorAggregate) -> SectorAggregateModel:
         rs_top_pct=metric_model(a.rs_top_pct),
         nh_pct=metric_model(a.nh_pct),
         stage2_pct=metric_model(a.stage2_pct),
-        composite_score=metric_model(a.composite_score),
+        composite_score=_rounded_metric_model(a.composite_score, 2),
         rank=a.rank,
         rank_change=a.rank_change,
     )

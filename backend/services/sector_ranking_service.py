@@ -88,7 +88,9 @@ def get_sector_ranking(
         **envelope_fields(
             as_of_date=date,
             as_of_is_partial_week=partial,
+            return_window_days=agg.return_window_days,
             weight_cap=WEIGHT_CAP,
+            benchmark=agg.benchmark,
             data=agg.aggregates,
             excluded=agg.excluded,
             warnings=agg.warnings,

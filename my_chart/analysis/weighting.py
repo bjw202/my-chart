@@ -72,8 +72,10 @@ class WeightResult:
 
 
 # @MX:ANCHOR: [AUTO] AG-1 상한 재배분 가중치 계약 — 섹터·벤치마크 공용 진입점.
-#   fan_in = 3 (M2 실측: `capped_weights` 래퍼 + `sector_metrics._aggregate_members` 2곳).
-#   M3 에서 벤치마크 경로가 붙으면 증가한다 — 그때 이 수치를 갱신한다.
+#   fan_in = 3 (M2/M3 동일 실측: `capped_weights` 래퍼 + `sector_metrics._aggregate_members`
+#   2곳). M3 는 벤치마크를 `_aggregate_members` **재사용**(`_compute_benchmark`)으로
+#   구현했으므로 새 호출 지점이 생기지 않았다 — 호출 **빈도**는 늘지만 call-site 수는
+#   그대로다(EX-1 구조 보장이 정확히 "새 지점을 만들지 않는 것"이다).
 # @MX:REASON: EX-1(방법론 일치)·BM-2 를 "같은 함수 호출" 이라는 구조로 보장한다. 벤치마크가
 #   별도 구현을 두면 유니버스·상한·결측 처리가 조용히 갈리고, 그 어긋남은 응답에 두 값이
 #   모두 실려 겉보기 일치하는 형태로 **무증상 진행**한다(plan.md D1/D2, §3.2).

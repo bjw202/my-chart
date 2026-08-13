@@ -16,6 +16,7 @@ from typing import Any
 
 from my_chart.analysis.aggregate_types import (
     WEIGHT_CAP,
+    BenchmarkInfo,
     Coverage,
     ExcludedSector,
     MetricValue,
@@ -171,6 +172,51 @@ def _normalize_list(values: list[float]) -> list[float]:
     return [(v - min_v) / (max_v - min_v) * 100 for v in values]
 
 
+# --- SPEC-SECTOR-AGGREGATION-001 M3 순위·정규화 상수 (규칙 AG-8/AG-9/RK-1) --------
+#: composite_score 가중치(§2.9). ``norm(excess_1w)×0.30 + norm(excess_1m)×0.40 + norm(excess_3m)×0.30``.
+_COMPOSITE_WEIGHTS = {"1w": 0.30, "1m": 0.40, "3m": 0.30}
+
+#: 시장별 벤치마크 이름(규칙 BM-1).
+_MARKET_BENCHMARK_NAMES = {"all": "ALL_CAPPED", "kospi": "KOSPI_CAPPED", "kosdaq": "KOSDAQ_CAPPED"}
+
+#: AC-SAG-015 — 지수 행 정합성 경고 허용오차(%p). 단일 위치 정의 — O-A5 재측정 후
+#: 여기 한 곳만 바꾸면 된다.
+BENCHMARK_RECONCILIATION_TOLERANCE_PP = {"1w": 0.5, "1m": 3.0, "3m": 7.0}
+
+
+def norm(values: list[float]) -> list[float]:
+    """순위 백분위 정규화(규칙 AG-8, plan.md §3.3).
+
+    min-max 대신 **순위** 기반이라 극단값이 스케일을 지배하지 않는다(``[1,2,3,1000]``
+    이 ``[0,0.1,0.2,100]`` 대신 ``[0,33.33,66.67,100]`` 이 된다). 동점은 평균 순위로
+    묶인다(scipy ``rankdata(method="average")`` 와 동치 — 여기서는 순수 파이썬으로
+    재구현해 새 의존성을 추가하지 않는다).
+
+    Args:
+        values: 정규화할 값들(순서 보존).
+
+    Returns:
+        같은 길이의 0~100 스케일 리스트. ``N == 0`` → 빈 리스트. ``N == 1`` → ``[50.0]``.
+    """
+    n = len(values)
+    if n == 0:
+        return []
+    if n == 1:
+        return [50.0]
+    order = sorted(range(n), key=lambda i: values[i])
+    ranks = [0.0] * n
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        avg_rank = (i + j) / 2 + 1          # 1-indexed 평균 순위(동점 묶음)
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg_rank
+        i = j + 1
+    return [(r - 1) / (n - 1) * 100 for r in ranks]
+
+
 @dataclass(frozen=True)
 class _Member:
     """집계 입력 1종목. 결측은 ``None`` 이며 **어떤 대체값도 부여하지 않는다**(§9.1)."""
@@ -195,6 +241,12 @@ class SectorAggregationResult:
     aggregates: list[SectorAggregate]
     excluded: list[ExcludedSector]
     warnings: list[str]
+    # --- M3 신설 필드 (규칙 BM-1 ~ BM-6, AG-8/AG-9, REQ-SAG-043) -----------------
+    benchmark: BenchmarkInfo | None = None
+    return_window_days: dict[str, int | None] = field(
+        default_factory=lambda: {"1w": None, "1m": None, "3m": None})
+    as_of_is_partial_week: bool | None = None
+    baseline_date: str | None = None          # rank_change 기준일(anchor(t,28), AC-SAG-023)
 
 
 def _load_market_caps(daily_db_path: str | None) -> dict[str, float]:
@@ -427,6 +479,149 @@ def _aggregate_members(
     return aggregate, equal_fallback
 
 
+# @MX:NOTE: [AUTO] 벤치마크 = 섹터 그룹핑 없는 전체 유니버스 집계(규칙 BM-1,
+#   plan.md §3.2). `_aggregate_members` 를 섹터 집계와 **같은 함수**로 호출해
+#   EX-1(방법론 일치)·BM-2 를 테스트가 아니라 타입 수준에서 보장한다(D1/D2) —
+#   별도 벤치마크 구현을 두면 유니버스·상한·결측 처리가 조용히 갈릴 수 있다.
+def _compute_benchmark(
+    all_members: list[_Member],
+    cap: float,
+    market_key: str,
+    anchor_dates: dict[str, str | None],
+) -> BenchmarkInfo:
+    """규칙 BM-1 ~ BM-6 벤치마크 산출.
+
+    ``anchor_dates`` 는 섹터 집계와 **같은 `_anchor_returns` 호출**(같은 `t`)에서 나온
+    값을 그대로 받는다 — 벤치마크가 앵커를 독립적으로 다시 구하지 않는 것이 BM-6
+    보존의 유일 조건이다(plan.md 기술 노트).
+    """
+    name = _MARKET_BENCHMARK_NAMES.get(market_key, f"{market_key.upper()}_CAPPED")
+    if not all_members:
+        # 규칙 BM-4/BM-5 — 구성종목 0 이면 벤치마크 산출이 불가능하다.
+        return BenchmarkInfo(
+            name=name, status="unavailable", returns={},
+            anchor_date=anchor_dates.get("1w"), universe_size=0,
+            weight_cap=cap, error="벤치마크 유니버스가 비어 있다(구성종목 0) — 산출 불가")
+    aggregate, _fallback = _aggregate_members("__benchmark__", all_members, cap=cap)
+    return BenchmarkInfo(
+        name=name, status="ok", returns=dict(aggregate.returns),
+        anchor_date=anchor_dates.get("1w"), universe_size=len(all_members),
+        weight_cap=cap, error=None)
+
+
+def _excess_returns(
+    sector_returns: dict[str, MetricValue], benchmark_returns: dict[str, MetricValue]
+) -> dict[str, MetricValue]:
+    """규칙 EX-2 — 섹터 초과수익률 = 섹터 수익률 − 벤치마크 수익률(기간별).
+
+    두 값 모두 non-null 일 때만 산출한다(§9.1 상태 1 — 결측을 0 으로 접지 않는다).
+    """
+    out: dict[str, MetricValue] = {}
+    for label in _PERIODS:
+        s = sector_returns.get(label)
+        b = benchmark_returns.get(label)
+        if s is None or b is None or s.value is None or b.value is None:
+            out[label] = missing()
+        else:
+            out[label] = present(s.value - b.value)
+    return out
+
+
+def _benchmark_reconciliation_warnings(
+    conn: sqlite3.Connection,
+    date: str,
+    market_key: str,
+    uncapped_returns: dict[str, MetricValue],
+) -> list[str]:
+    """규칙 BM-3 — 지수 행(``Name='KOSPI'``/``'KOSDAQ'``) 대비 정합성 경고(AC-SAG-015).
+
+    ``market=all`` 은 단일 지수 행이 없으므로 대상에서 제외한다. 임계 초과 시에만
+    경고를 싣는다(§8.4 규약 3 — 부분집합 유니버스가 전체 지수를 재현하지 못하는 것은
+    결함이 아니라 산술이므로 항상 기록하지 않는다).
+    """
+    index_name = {"kospi": "KOSPI", "kosdaq": "KOSDAQ"}.get(market_key)
+    if index_name is None:
+        return []
+    row = conn.execute(
+        "SELECT CHG_1W, CHG_1M, CHG_3M FROM stock_prices WHERE Name = ? AND Date = ?",
+        (index_name, date),
+    ).fetchone()
+    if not row:
+        return []
+    index_pct = {"1w": row[0], "1m": row[1], "3m": row[2]}
+    out: list[str] = []
+    for label in _PERIODS:
+        idx_val = index_pct.get(label)
+        bench = uncapped_returns.get(label)
+        if idx_val is None or bench is None or bench.value is None:
+            continue
+        diff_pp = bench.value - float(idx_val) * 100
+        threshold = BENCHMARK_RECONCILIATION_TOLERANCE_PP[label]
+        if abs(diff_pp) > threshold:
+            out.append(
+                f"benchmark_reconciliation_warning: period={label} market={market_key} "
+                f"diff_pp={diff_pp:.6f}")
+    return out
+
+
+def _rank_sectors(aggregates: list[SectorAggregate]) -> list[ExcludedSector]:
+    """규칙 AG-9(composite_score) · RK-1(결정적 tie-break) · RK-2(반올림 미포함).
+
+    ``aggregates`` 를 in-place 로 갱신한다. **이 함수 내부에 ``round(`` 호출이 없다**
+    (AC-SAG-020 정적 스캔 — 반올림은 직렬화 직전 1회만 수행한다, `backend/schemas/envelope.py`).
+
+    Returns:
+        composite 산출이 불가능해 순위 대상에서 제외된 섹터 목록(``excluded[]`` 후보,
+        규칙 AG-9 — "excess_3m 이 null 인 섹터는 부분 점수 산출 금지").
+    """
+    candidates = [
+        a for a in aggregates
+        if a.excess_returns
+        and all(a.excess_returns.get(p) is not None and a.excess_returns[p].value is not None
+                for p in _PERIODS)
+    ]
+    newly_excluded: list[ExcludedSector] = []
+    for a in aggregates:
+        if a in candidates:
+            continue
+        a.composite_score = missing()
+        a.rank = None
+        if a.excess_returns:
+            newly_excluded.append(ExcludedSector(a.name, "excess_return_missing", a.member_count))
+
+    if not candidates:
+        return newly_excluded
+
+    norm_by_period = {
+        p: norm([a.excess_returns[p].value for a in candidates]) for p in _PERIODS
+    }
+    raw_scores = [
+        sum(_COMPOSITE_WEIGHTS[p] * norm_by_period[p][i] for p in _PERIODS)
+        for i in range(len(candidates))
+    ]
+    # RK-1 — 결정적 tie-break: composite 내림차순, 동점은 섹터명 사전순.
+    order = sorted(range(len(candidates)), key=lambda i: (-raw_scores[i], candidates[i].name))
+    for rank_i, idx in enumerate(order, start=1):
+        a = candidates[idx]
+        a.composite_score = present(raw_scores[idx])
+        a.rank = rank_i
+    return newly_excluded
+
+
+def compute_return_window_days(
+    anchor_dates: dict[str, str | None], t: str
+) -> dict[str, int | None]:
+    """REQ-SAG-043 — 실제 창 일수 ``(t − anchor_date).days``. 라벨 상수(7/28/91)가 아니다."""
+    from datetime import date as _date
+
+    t_d = _date.fromisoformat(t)
+    out: dict[str, int | None] = {}
+    for label in _PERIODS:
+        a = anchor_dates.get(label)
+        out[label] = (t_d - _date.fromisoformat(a)).days if a else None
+    return out
+
+
 def _market_matches(market: str | None, market_key: str) -> bool:
     if market_key in ("", "all"):
         return True
@@ -480,6 +675,96 @@ def _valid_universe(
     return set(snap.valid_names)
 
 
+def _compute_sector_aggregates_core(
+    weekly_db_path: str,
+    date: str,
+    daily_db_path: str | None,
+    registry_path: str | None,
+    market: str,
+    cap: float,
+    as_of: str | None,
+    apply_min_members: bool,
+) -> SectorAggregationResult:
+    """`compute_sector_aggregates` 의 rank_change 를 제외한 나머지 전체(벤치마크 ~ 순위).
+
+    별도 함수로 분리한 이유는 rank_change 산출이 ``anchor(t, 28)`` 기준일에서 **같은
+    집계를 재귀 없이 1회 더** 호출해야 하기 때문이다(M3) — 공개 함수가 이 core 를
+    두 번(현재·기준일) 호출한다.
+    """
+    grid = compute_weekly_grid(weekly_db_path, as_of or date)
+    conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
+    try:
+        snapshot = _load_weekly_snapshot(conn, date)
+        returns_by_name, anchor_dates = _anchor_returns(conn, grid, date)
+        caps = _load_market_caps(daily_db_path)
+        sector_to_stocks, market_of = _load_registry_mapping(registry_path)
+        universe = _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date)
+
+        warnings: list[str] = []
+        if not caps:
+            warnings.append(
+                "시총 원천(daily stock_meta)을 읽지 못해 시총가중 집계가 불가능하다 — "
+                "AG-4 에 따라 시총가중 필드가 null 로 보고된다")
+
+        market_key = (market or "all").lower()
+        aggregates: list[SectorAggregate] = []
+        excluded: list[ExcludedSector] = []
+        all_members: list[_Member] = []          # 규칙 BM-1 — 섹터 그룹핑 없는 벤치마크 유니버스
+        for sector_name, stock_names in sector_to_stocks.items():
+            members = [
+                _build_member(name, snapshot[name], caps, returns_by_name.get(name))
+                for name in stock_names
+                if name in snapshot
+                and name not in _INDEX_NAMES
+                and (universe is None or name in universe)
+                and _market_matches(market_of.get(name), market_key)
+            ]
+            all_members.extend(members)
+            if not members:
+                excluded.append(ExcludedSector(sector_name, "no_members", 0))
+                continue
+            if apply_min_members and len(members) < MIN_SECTOR_MEMBERS:
+                # 규칙 AG-5 — 구성종목 부족 섹터는 순위 대상에서 제외한다.
+                excluded.append(
+                    ExcludedSector(sector_name, "insufficient_members", len(members)))
+                continue
+            aggregate, _fallback = _aggregate_members(sector_name, members, cap=cap)
+            aggregates.append(aggregate)
+
+        # --- 규칙 BM-1 ~ BM-6 벤치마크(EX-1/EX-2 구조 보장 — 같은 `_aggregate_members`) --
+        benchmark = _compute_benchmark(all_members, cap, market_key, anchor_dates)
+        for a in aggregates:
+            a.excess_returns = _excess_returns(a.returns, benchmark.returns)
+        if benchmark.status == "ok":
+            uncapped = _compute_benchmark(all_members, 1.0, market_key, anchor_dates).returns
+            warnings.extend(
+                _benchmark_reconciliation_warnings(conn, date, market_key, uncapped))
+        else:
+            # 규칙 BM-4/BM-5 — 벤치마크 부재 시 전 섹터 초과수익률·순위를 null 로 만든다.
+            for a in aggregates:
+                a.excess_returns = {label: missing() for label in _PERIODS}
+
+        # --- 규칙 AG-8/AG-9/RK-1/RK-2 순위·정규화 -------------------------------
+        excluded.extend(_rank_sectors(aggregates))
+
+        # --- AC-SAG-013 부호 분산 정합성(합성 픽스처용, 비게이팅 보조) -----------
+        w1_excess = [a.excess_returns["1w"].value for a in aggregates
+                     if a.excess_returns.get("1w") is not None
+                     and a.excess_returns["1w"].value is not None]
+        if w1_excess and (all(v > 0 for v in w1_excess) or all(v < 0 for v in w1_excess)):
+            warnings.append("benchmark_reconciliation_warning: 1w excess distribution degenerate")
+
+        return_window_days = compute_return_window_days(anchor_dates, date)
+        partial = grid.latest.is_partial_week if grid.latest is not None else None
+    finally:
+        conn.close()
+
+    return SectorAggregationResult(
+        aggregates=aggregates, excluded=excluded, warnings=warnings,
+        benchmark=benchmark, return_window_days=return_window_days,
+        as_of_is_partial_week=partial)
+
+
 def compute_sector_aggregates(
     weekly_db_path: str,
     date: str,
@@ -489,8 +774,9 @@ def compute_sector_aggregates(
     cap: float = WEIGHT_CAP,
     as_of: str | None = None,
     apply_min_members: bool = True,
+    compute_rank_change: bool = True,
 ) -> SectorAggregationResult:
-    """섹터별 시총가중 집계(규칙 AG-1 ~ AG-7) — 응답 ``data[]`` 의 단일 산출 경로.
+    """섹터별 시총가중 집계(규칙 AG-1 ~ AG-9, BM-1 ~ BM-6) — 응답 ``data[]`` 의 단일 산출 경로.
 
     Args:
         weekly_db_path: 주봉 DB 경로.
@@ -504,50 +790,28 @@ def compute_sector_aggregates(
             (acceptance.md §8.4 규약 8 — 기본값 ``date.today()`` 의존 금지).
         apply_min_members: ``True`` 면 AG-5(최소 구성종목 5) 미달 섹터를 ``data[]`` 에서
             빼고 ``excluded[]`` 에 등록한다.
+        compute_rank_change: ``True`` 면 ``anchor(t, 28)`` 기준일 대비 ``rank_change`` 를
+            산출한다(AC-SAG-023). 기준일 재귀 호출은 이 인자를 ``False`` 로 넘겨
+            **1단만** 내려간다(무한 재귀 방지).
     """
-    grid = compute_weekly_grid(weekly_db_path, as_of or date)
-    conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
-    try:
-        snapshot = _load_weekly_snapshot(conn, date)
-        returns_by_name, _anchors = _anchor_returns(conn, grid, date)
-    finally:
-        conn.close()
+    result = _compute_sector_aggregates_core(
+        weekly_db_path, date, daily_db_path, registry_path, market, cap, as_of,
+        apply_min_members)
 
-    caps = _load_market_caps(daily_db_path)
-    sector_to_stocks, market_of = _load_registry_mapping(registry_path)
-    universe = _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date)
+    if compute_rank_change:
+        grid = compute_weekly_grid(weekly_db_path, as_of or date)
+        baseline_bar = anchor(grid, as_of or date, 28)
+        if baseline_bar is not None:
+            baseline = _compute_sector_aggregates_core(
+                weekly_db_path, baseline_bar.date, daily_db_path, registry_path, market, cap,
+                baseline_bar.date, apply_min_members)
+            prev_rank = {a.name: a.rank for a in baseline.aggregates}
+            for a in result.aggregates:
+                p = prev_rank.get(a.name)
+                a.rank_change = (p - a.rank) if (p is not None and a.rank is not None) else None
+            result.baseline_date = baseline_bar.date
 
-    warnings: list[str] = []
-    if not caps:
-        warnings.append(
-            "시총 원천(daily stock_meta)을 읽지 못해 시총가중 집계가 불가능하다 — "
-            "AG-4 에 따라 시총가중 필드가 null 로 보고된다")
-
-    market_key = (market or "all").lower()
-    aggregates: list[SectorAggregate] = []
-    excluded: list[ExcludedSector] = []
-    for sector_name, stock_names in sector_to_stocks.items():
-        members = [
-            _build_member(name, snapshot[name], caps, returns_by_name.get(name))
-            for name in stock_names
-            if name in snapshot
-            and name not in _INDEX_NAMES
-            and (universe is None or name in universe)
-            and _market_matches(market_of.get(name), market_key)
-        ]
-        if not members:
-            excluded.append(ExcludedSector(sector_name, "no_members", 0))
-            continue
-        if apply_min_members and len(members) < MIN_SECTOR_MEMBERS:
-            # 규칙 AG-5 — 구성종목 부족 섹터는 순위 대상에서 제외한다.
-            excluded.append(
-                ExcludedSector(sector_name, "insufficient_members", len(members)))
-            continue
-        aggregate, _fallback = _aggregate_members(sector_name, members, cap=cap)
-        aggregates.append(aggregate)
-
-    return SectorAggregationResult(
-        aggregates=aggregates, excluded=excluded, warnings=warnings)
+    return result
 
 
 def _compute_sector_metrics(

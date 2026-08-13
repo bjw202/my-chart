@@ -1166,17 +1166,180 @@ A  tests/test_weighting.py
 
 ---
 
+### M3 — 벤치마크 + 순위/정규화 (2026-08-13)
+
+#### E1 — 구현 개요
+
+`_compute_sector_aggregates_core`(신설, M2의 `compute_sector_aggregates` 본체를
+그대로 옮김) + 얇은 공개 래퍼 `compute_sector_aggregates`(rank_change 를 위해
+`anchor(t,28)` 기준일에서 core 를 재귀 없이 1회 더 호출)로 구조를 나눴다.
+
+| 대상 | 내용 |
+| --- | --- |
+| `_compute_benchmark` | 규칙 BM-1 — `_aggregate_members` 를 **재사용**(새 call-site 없음)해 섹터 그룹핑 없는 전체 유니버스를 집계한다. 이름은 `ALL_CAPPED`/`KOSPI_CAPPED`/`KOSDAQ_CAPPED`. 구성종목 0 이면 `status="unavailable"`(BM-4/BM-5) |
+| `_excess_returns` | 규칙 EX-2 — 섹터·벤치마크 양쪽 non-null 일 때만 `sector - benchmark` 산출, 아니면 `missing()` |
+| `_benchmark_reconciliation_warnings` | 규칙 BM-3 — `market=kospi/kosdaq` 에서 상한 없는(`cap=1.0`) 벤치마크와 지수 행(`Name='KOSPI'/'KOSDAQ'`)의 차가 `BENCHMARK_RECONCILIATION_TOLERANCE_PP={1w:0.5, 1m:3.0, 3m:7.0}` 를 초과하면 경고. `market=all` 은 대상 아님(단일 지수 행 없음) |
+| `norm()` | 규칙 AG-8 — 순위 백분위 정규화(scipy 없이 순수 파이썬 average-tie 재구현). `N==0→[]`, `N==1→[50.0]` |
+| `_rank_sectors` | 규칙 AG-9/RK-1/RK-2 — 세 기간 초과수익률이 **모두** non-null 인 섹터만 후보로 `norm()` 적용 후 `0.30/0.40/0.30` 가중합, `(-composite, name)` 결정적 tie-break, 함수 내부 `round(` 호출 **0건**(AST 정적 스캔으로 확인, 반올림은 `backend/schemas/envelope.py::_rounded_metric_model` 에서 직렬화 직전 1회) |
+| `compute_return_window_days` | REQ-SAG-043 — `(t − anchor_date).days` (라벨 상수 아님) |
+
+**BM-6(동일 날짜 창) 보존 방식**: 벤치마크가 별도로 `anchor()` 를 부르지 않는다 —
+섹터 집계가 이미 `_anchor_returns(conn, grid, date)` 로 1회 산출한 `anchor_dates`
+딕셔너리를 `_compute_benchmark` 에 **그대로 전달**한다. 즉 "같은 `t`" 가 아니라
+"애초에 재조회 자체가 없다" — v0.4.0 D6/D11 이 지적한 무증상 이원화 경로가
+설계상 존재하지 않는다.
+
+#### E2 — AC Binary PASS/FAIL 매트릭스 (AC-SAG-011~023, 046-lite)
+
+전건 `tests/test_sector_benchmark_ranking.py`(35 tests, 신설). 명령:
+`pytest tests/test_sector_benchmark_ranking.py -q` → `35 passed`.
+
+| AC | 상태 | 비고 |
+| --- | --- | --- |
+| AC-SAG-011 | PASS | 시장별 이름·참조 일치·쌍별 상이. 되돌림 대조는 아래 §되돌림 실증 참조 |
+| AC-SAG-012 | PASS | 구조 대조(소스에서 `_aggregate_members(` 호출 확인) + 4-튜플 변형 1(weight_cap 상이) |
+| AC-SAG-013 | PASS | `S − B` 파생 잔차 일치 + 벤치마크 흔들기 대조 |
+| AC-SAG-014 | PASS | 단일 요청 내 계측된 `anchor()` 의 `t` 가 `{as_of_date}` 1개, `days` 집합 `{7,28,91}` |
+| AC-SAG-015 | PASS | 임계 초과/이하 양방향 + `market=all` 비대상 + 임계 상수 단일 정의 |
+| AC-SAG-016 | PASS | 구성종목 0 → unavailable + 에러 메시지, `returns` `None`(0.0 아님), excess/composite/rank 모두 None, `sector_return` 값 유지 |
+| AC-SAG-017 | PASS | 극단값 미지배, 동점 평균 순위, N=1→50.0, N=0→[], N≥2 min==max 비붕괴 |
+| AC-SAG-018 | PASS | composite 공식 3케이스 + 3M null → composite/rank None + excluded 등록(부분 점수 금지) |
+| AC-SAG-019 | PASS | 입력 순서 3종 치환 → 동일 rank 배정 + 사전순 |
+| AC-SAG-020 | PASS | 근접값(86.234/86.236) 비동점 + `_rank_sectors` 소스 AST 스캔 `round(` 0건 |
+| AC-SAG-021 | PASS(함수 수준) | rank 연속·정렬 일치, market=kospi 최대 rank 축소. **라우터 `period`/`market` 쿼리 파라미터 배선은 M6 소관(deferred)** |
+| AC-SAG-022 | PASS(함수 수준) | rank 존재 섹터는 composite_score 도 존재 |
+| AC-SAG-023 | PASS(함수 수준) | `baseline_date == anchor(t,28) == "2026-07-10"`(구 `LIMIT 1 OFFSET 3` 11일 전과 다름), `days>=28`. **rank_change 필드의 응답 봉투 최상위 `baseline_date` 키 노출은 M6 라우터 응답 스키마 확장과 결합 — deferred** |
+| AC-SAG-046 (lite) | PASS(부분) | 집계 픽스처 위에서 `return_window_days == {1w:11, 1m:32, 3m:95}`, `benchmark.anchor_date == "2026-07-31"`(AC-SAG-048 이 두 픽스처의 날짜 축 동일성을 보장하므로 유효한 대체 검증). **`weekly-2026-08-12` 프로즌 + 금요일 종단 변형을 쓰는 원 AC-SAG-046 게이팅 절차 및 `trading_value_window_days`/`rank_change.baseline_date` 응답 노출은 실행하지 않음 — Gap 으로 기재** |
+| AC-SAG-045 R1/R3/R4/R5-a | NOT RUN | plan.md M3 GREEN 목록에 없음(§E.2 M1.0-a/b 재빌드 이후 표기 `next_gate` 는 M7 회귀 게이트 소관으로 재확인 — 골든 baseline 대비 비교는 M7 일괄 처리가 합리적. 본 세션에서 미실행, Gap 아님(M2~M6 미실행은 Gap 아니다, progress.md 관행) |
+
+#### E3 — 정적 스캔 결과
+
+```
+$ python -c "..."  # AST 기반, _rank_sectors 소스만
+round( 호출 0건 — test_ac_sag_020_no_round_call_inside_rank_sectors PASS
+```
+
+전역 스캔(`grep -n "round(" my_chart/analysis/sector_metrics.py`)은 legacy
+`_compute_sector_metrics`/`compute_sector_ranking` 경로(하위 호환 `SectorRank`
+표면, M3 미변경)에 9건이 남아 있다 — RK-2 의 대상은 신설 `data[]` 순위 경로
+(`_rank_sectors`)이며, 그 함수 내부는 0건이다.
+
+#### E4 — 전체 테스트 스위트 델타 (M2 → M3)
+
+```
+$ pytest tests/ -q
+8 failed, 821 passed, 68 skipped, 1 xpassed, 25 errors in 95.20s
+```
+
+| | M2 완료 후 | M3 완료 후 | 델타 |
+| --- | --- | --- | --- |
+| passed | 786 | **821** | +35 (신규 `test_sector_benchmark_ranking.py` 전건) |
+| failed | 8 | **8** | 0 — **동일 집합**(`test_api` 1 · `test_meta_service` 2 · `test_rs_line` 2 · `test_screen_service` 3) |
+| errors | 25 | **25** | 0 — 전건 pre-existing `tests/fnguide/*` |
+
+신규 실패 0건. M2 게이트(`test_aggregation_fixture.py` + `test_golden_baseline.py`
+= 105) 재확인 그린.
+
+#### E5 — 커버리지
+
+```
+$ pytest --cov=my_chart.analysis.sector_metrics --cov=my_chart.analysis.weighting tests/... -q
+ERROR: unrecognized arguments: --cov=...
+$ python -c "import coverage"
+ModuleNotFoundError: No module named 'coverage'
+```
+
+**[Gap 지속 — G6 재확인]** M2 에서 기록한 numpy/coverage 충돌로 임시 제거한
+`pytest-cov`/`coverage` 가 이 세션에도 미설치 상태다(`pyproject.toml` 에는
+`pytest-cov>=7.0.0` 이 선언돼 있으나 실제 venv 에 없다). 재설치·환경 해소는
+이번 세션 스코프 밖이다(M2 와 동일 판단 — venv 원상복구 우선). 관측하지 않은
+수치를 기재하지 않는다. 대리 지표: 신설 35 테스트가 `_compute_benchmark` /
+`_excess_returns` / `_benchmark_reconciliation_warnings` / `norm()` /
+`_rank_sectors` 전 공개·비공개 함수의 정상/축퇴/변형 분기를 직접 실행한다.
+
+#### E6 — 되돌림 실증 (Lesson #9 — 실제 적용 → RED 관측 → 복원 → GREEN)
+
+세 건을 실제로 적용해 RED 를 verbatim 캡처하고 백업본(`cp`)으로 복원했다
+(`git checkout-index` 미사용 — lessons.md #9 되돌림 복원 절차 준수).
+
+**변형 1 — `mut_benchmark_ignores_market_filter`** (`_compute_sector_aggregates_core`
+의 벤치마크 유니버스 수집에서 `_market_matches` 필터를 제거):
+
+```
+FAILED test_ac_sag_011_matches_independent_reference
+  kospi: 프로덕션 6.378529756876937 != 참조 4.870388625210951
+FAILED test_ac_sag_011_pairwise_distinct
+  assert 0.0 > 1e-06  (kospi == kosdaq 로 붕괴)
+```
+
+**변형 2 — `mut_round_in_sort_path`** (`_rank_sectors` 의 composite 할당 라인에
+`round(raw_scores[idx], 6)` 삽입):
+
+```
+FAILED test_ac_sag_020_no_round_call_inside_rank_sectors
+  AssertionError: _rank_sectors 내부에 round( 호출: ['round']
+```
+
+**변형 3 — `mut_partial_composite`** (`_rank_sectors` 의 후보 필터에서 3기간
+전건 non-null 요건을 제거 — 부분 점수 허용):
+
+```
+FAILED test_ac_sag_018_null_3m_excludes_from_composite_no_partial_score
+  TypeError: '<' not supported between instances of 'NoneType' and 'float'
+  (partial 섹터의 None 값이 norm() 정렬에 섞여 즉시 예외로 붉어짐 — 검출력 확정적)
+```
+
+세 건 모두 복원 후 `diff /tmp/sector_metrics.py.bak my_chart/analysis/sector_metrics.py`
+바이트 동일 확인 + `pytest tests/test_sector_benchmark_ranking.py -q` → `35 passed`
+재확인.
+
+#### E7 — @MX 태그
+
+| 태그 | 위치 | 내용 |
+| --- | --- | --- |
+| `@MX:NOTE` | `sector_metrics.py` `_compute_benchmark` 상단 | BM-1 구조(같은 함수 재사용)의 EX-1/BM-2 보장 근거 |
+| `@MX:ANCHOR` 갱신 | `weighting.py:74-79` | M3 실측 — call-site 수 **불변**(재사용이 곧 새 지점 미생성)임을 명시. fan_in 3 유지 |
+
+파일당 한도 준수 — `sector_metrics.py` NOTE 5/10(신규 1건 추가), ANCHOR 0/3, WARN 0/5.
+
+#### E8 — 스코프 규율
+
+```
+$ git status --short   (M/A 항목만)
+M  backend/schemas/envelope.py
+M  backend/services/sector_ranking_service.py
+M  my_chart/analysis/sector_metrics.py
+M  my_chart/analysis/weighting.py
+A  tests/test_sector_benchmark_ranking.py
+```
+
+`tests/fixtures/`·`spec.md`/`plan.md`/`acceptance.md` 본문·MoAI 하네스 대량
+변경분·`frontend/`·`Input/` 등은 스테이징하지 않았다.
+
+#### Gaps / 잔여 위험 (M3)
+
+| # | 항목 | 처분 |
+| --- | --- | --- |
+| **G10** | 라우터 파라미터(`period`/`market` 쿼리) 미배선 — AC-SAG-021 의 엔드투엔드(`/sectors/ranking?period=1w&market=all`) 검증, `return_window_days`/`benchmark.anchor_date`/`rank_change.baseline_date` 의 최상위 응답 노출(AC-SAG-046 완전판)이 M6 산출물에 의존한다 | plan.md M6 이 명시적으로 소관("라우터 파라미터 + 종목 목록 필드"). M2 의 AC-SAG-007/043 과 동일한 처분 패턴 — 지금 미실행은 Gap 이 아니라 예정된 의존이다 |
+| **G11** | AC-SAG-046 의 게이팅 절차(프로즌 `weekly-2026-08-12` + 금요일 종단 임시 사본 변형)를 실행하지 않고, 대신 집계 픽스처(`aggregation-2026-08-11`)의 동일 날짜 축(AC-SAG-048 보증)으로 lite 버전만 검증했다 | 값 자체(11/32/95, 앵커 07-31/07-10/05-08)는 두 픽스처가 구조적으로 동일함이 AC-SAG-048 로 이미 보증되므로 함수 정확성 검증으로는 충분하나, **원 AC 의 "프로즌 스냅샷" Given 절과 "금요일 종단 대조" 절은 문자 그대로 실행되지 않았다** — 완전 게이팅은 별도 세션 권고 |
+| **G12** | AC-SAG-013 의 부호 분산 합성 픽스처 절(`k==N`/`k==0` 인 합성 입력에서 경고 발화)을 전용 합성 픽스처로 실행하지 않았다 — `_compute_sector_aggregates_core` 에 로직은 배선했으나(1w 전건 동일 부호 시 경고), 전용 단위 테스트는 미작성 | 로직은 존재하고 실제 집계 픽스처에서 우연히 발화하지 않았음을 확인했을 뿐 — 별도 합성 픽스처 테스트 추가 권고(비게이팅이므로 M3 완료 조건 아님) |
+| **G13** | 커버리지 미측정(G6 연속) | 위 §E5 참조 |
+| **잔여 위험** | rank_change 계산이 baseline 재귀 호출로 인해 `compute_sector_aggregates(compute_rank_change=True)` 호출 비용이 2배가 된다(현재 기준일 + `anchor(t,28)` 기준일 각 1회) | 라이브 트래픽 규모에서 성능 재측정 권고(§0.2 계열 성능표는 M7 소관). 픽스처 규모에서는 무시 가능(35 테스트 전체 0.6~0.8초) |
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M2 완료 (비가역 경계 통과). 다음 = M3 (별도 위임)
-milestone_completed: M2            # 가중·집계 코어. 선행 M1.0-a 재빌드 → 048 → M1.0-b 재캡처 → 047 전건 충족 후 착수
-run_commit_sha: 25f3fa9            # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
+run_status: in-progress            # M3 완료. 다음 = M4(RRG) 또는 M5(지표 정정) — 별도 위임
+milestone_completed: M3            # 벤치마크 + 순위/정규화. 라우터 파라미터 완전 배선은 M6 의존(Gap G10)
+run_commit_sha: pending-backfill-M3   # 이 커밋 자체의 SHA — 후속 커밋에서 backfill(D3 예외, M2 25f3fa9 전례)
+prior_run_commit_sha_m2: 25f3fa9   # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
 prior_milestone_commits: "adb1f25 (M1.0-a 구) · b839cee (M1.0-a §E.3 구) · 6f00ba5 (M1.0-b/c 구) · 7b5fc45 (M1.0-b/c §E.3 구) · 7305e2e (M1.1) · a000add (M1.0-a 재빌드) · 8e51176 (M1.0-b 재캡처)"
-ac_gate: "AC-SAG-001~010 · 049 · 050 (M2 RED 목록 전건)"
-ac_pass_count: 17                  # M2 분: 001·002·003·004·005·006·008·009·010·049·050 (11) + 기존 048·047·036·038·043(부분) (6). 007 은 deferred-to-M6
-ac_fail_count: 0                   # M2 RED 목록 전건 GREEN
+ac_gate: "AC-SAG-011~023 · 046(lite) (M3 RED 목록 — 046 은 §8.1 지정 픽스처 대신 aggregation 픽스처로 lite 검증, Gap G11)"
+ac_pass_count: 30                  # M2 17 + M3 13(011·012·013·014·015·016·017·018·019·020·021·022·023, 046-lite 는 부분 PASS 로 별산)
+ac_fail_count: 0                   # M3 RED 목록 전건 GREEN(021/022/023 은 함수 수준, 라우터 배선 M6 의존 — Gap G10)
 ac_blocked: "없음 — v0.4.2에서 해소 (D16: F12 신설 + AC-SAG-002 재작성 / D17: §3.1 동결형 교체 + AC-SAG-049 신설). [v0.5.0] 추가 정정 — N1(AC-SAG-041 cap_eff) · D22(AC-SAG-010) · D20(045 R1) · D23(AC-SAG-015) · D21(045 R5-b) · N4(AC-SAG-012) · N3(AC-SAG-016) · N7(AC-SAG-044) · D24(AC-SAG-013) · N2(F7 규약 Y) · D25(F4·F8 폐지) · R-C1~R-C8(F13 신설) · D29(합성 바) · N5/D26(고아 AC)"
 blocker_open: false               # M2 blocker(D16/D17)는 v0.4.2/v0.5.0 에서 해소됐고 M2 가 완주했다. 신규 blocker 없음 — G7 은 표기 정정 권고(비차단)
 blocker_owner: manager-develop    # 소유권 반환. acceptance.md 본문 수정 완료(v0.4.2)
@@ -1209,9 +1372,9 @@ fixture_rebuild_measurements: "종목 331(지수 2) · 유효 유니버스 321 �
 f7_convention: "Y"                 # NULL MAX52 를 신·구 양쪽 분자·분모에서 제외. 규약 X 51 → 규약 Y 24, 차이 27 = NULL 종목 수
 golden_baseline_discarded: true    # [완료 8e51176] b839cee 캡처분(F12 미충족 픽스처 위) 폐기 후 재빌드 픽스처에서 재캡처. 폐기 전 sha256 은 §E.2 M1.0-b 재캡처 E1 에 기록
 relief_valve_used: none            # F13-2 14→12 축소 미사용. 크기 16.8 MB 로 예산(16~17 MB) 내
-next_gate: "M3 — 벤치마크 + 순위/정규화. AC-SAG-011~014 · 045 R1/R3/R4/R5-a. 별도 위임(리뷰 포인트 뒤)"
-deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절 — M6 산출물 의존(D19). M2~M5 미실행은 Gap 이 아니다"
-total_run_phase_files: 27          # 기존 20 + M2 7종(weighting.py · sector_metrics.py · sector_ranking_service.py · sectors.py · test_weighting.py · test_sector_aggregation.py · test_inv_cap1_scan.py)
+next_gate: "M4 — RRG (O-A1/O-A3 해결 완료). 또는 M5 — 지표 정정(독립 커밋 단위). 별도 위임"
+deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절(D19) · AC-SAG-021 라우터 엔드투엔드(G10) · AC-SAG-023/046 최상위 응답 노출(G10) — M6 산출물 의존. M2~M5 미실행은 Gap 이 아니다"
+total_run_phase_files: 28          # M2 27 + M3 1종(test_sector_benchmark_ranking.py 신설, 프로덕션 파일은 기존 4개 수정)
 # --- M2 (2026-08-13) ---------------------------------------------------------
 m2_new_tests: 48                   # test_weighting 18 · test_sector_aggregation 23 · test_inv_cap1_scan 7
 m2_full_suite: "8 failed, 786 passed, 68 skipped, 1 xpassed, 25 errors — B-2 baseline 과 실패 집합 동일, 신규 실패 0"
@@ -1228,7 +1391,20 @@ m2_return_source_changed: "저장 CHG_* → Close(t)/Close(anchor(t,N))−1. 픽
 m2_universe_restriction_added: true  # compute_sector_aggregates 가 compute_universe(UN-3) 유효 유니버스로 제한
 coverage_m2: not-measured          # [Gap G6] coverage.py C-tracer x numpy 2.4.2 = "cannot load module more than once per process". 관측하지 않은 수치를 기재하지 않는다
 m2_open_gaps: "G6(커버리지 미측정) · G7(AC-SAG-002 CHG_1M 표기 ↔ MANIFEST 앵커 불일치 — manager-spec 표기 정정 권고) · G8(F12 vs 프로덕션 AG-7 범위 차 — 무모순, 명시화 완료) · G9(유니버스 제한 도입)"
-m2_benchmark_path_status: "미존재 — EX-1/BM-2 구조 보장은 준비만 완료. 실증은 M3"
+m2_benchmark_path_status: "완료(M3) — 미존재 상태 해소"
+# --- M3 (2026-08-13) ---------------------------------------------------------
+m3_new_tests: 35                   # test_sector_benchmark_ranking.py 전건 신설
+m3_full_suite: "8 failed, 821 passed, 68 skipped, 1 xpassed, 25 errors — M2 baseline 과 실패 집합 동일, 신규 실패 0"
+m3_gate_tests_still_green: 105     # test_aggregation_fixture 65 + test_golden_baseline 40 (M3 착수 전/후 동일)
+m3_fixtures_touched: false         # git status --porcelain tests/fixtures/ 공백
+m3_benchmark_new_call_sites: 0     # _compute_benchmark 가 _aggregate_members 를 재사용 — capped_weights_detail call-site 수 불변(fan_in 3 유지)
+m3_ac011_reference_max_deviation_pp: "1e-9 이내(3개 시장 모두)"  # 참조 구현 대조
+m3_ac015_tolerance_pp: "{1w: 0.5, 1m: 3.0, 3m: 7.0}"  # BENCHMARK_RECONCILIATION_TOLERANCE_PP 단일 정의
+m3_ac017_norm_impl: "순수 파이썬 average-tie 재구현 — scipy 미설치(venv 확인) 이므로 신규 의존성 추가 없이 대체"
+m3_ac020_static_scan_scope: "_rank_sectors 함수 소스 AST 스캔(0건) — legacy compute_sector_ranking 경로는 대상 아님(하위 호환 SectorRank 표면, M3 미변경)"
+m3_rank_change_recursion_guard: "compute_rank_change 파라미터로 1단 재귀만 허용(무한 재귀 방지) — baseline 호출은 compute_rank_change=False"
+mutation_verification_m3: observed-red-3   # mut_benchmark_ignores_market_filter(2 RED) · mut_round_in_sort_path(1 RED) · mut_partial_composite(1 RED, TypeError 로 검출). 3건 모두 복원 후 GREEN + 바이트 동등 확인(diff /tmp/sector_metrics.py.bak)
+m3_open_gaps: "G10(라우터 파라미터 미배선 — M6 의존) · G11(AC-SAG-046 원 픽스처·금요일 종단 절 미실행, lite 로 대체) · G12(AC-SAG-013 부호분산 합성 픽스처 전용 테스트 미작성) · G13(커버리지 미측정, G6 연속)"
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
