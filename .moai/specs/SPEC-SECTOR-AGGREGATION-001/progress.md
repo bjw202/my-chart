@@ -494,7 +494,8 @@ AG-1~AG-7, 커버리지·`effective_n`·`capped_members`·`excluded` 산출) · 
 ```yaml
 run_status: blocked                # M1.1 완료. M2 는 AC-SAG-002 blocker 로 미착수
 milestone_completed: M1.1
-run_commit_sha: pending-backfill-m11   # 본 §E.3 갱신 커밋의 SHA 는 후속 커밋에서 backfill
+run_commit_sha: 7305e2e            # M1.1 구현 커밋 (§E.2 증거 커밋은 633d6b4)
+coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
 prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3) · 6f00ba5 (M1.0-b/c) · 7b5fc45 (M1.0-b/c §E.3) · 7305e2e (M1.1)"
 ac_gate: AC-SAG-047
 ac_pass_count: 6                   # 048 + 047 + 036 + 038 + 043(부분) + 008
