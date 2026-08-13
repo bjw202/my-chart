@@ -208,7 +208,31 @@ evidence_dir: .moai/state/verify/SPEC-MARKET-BREADTH-001/
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_&lt;pending sync-phase&gt;_
+```yaml
+sync_status: complete
+sync_complete_at: 2026-08-13
+sync_commit_sha: pending-backfill
+tier: S
+route: A
+changelog_entry_position: "CHANGELOG.md [Unreleased] 말미, ### Fixed (SPEC-MARKET-BREADTH-001 v0.1.1, 2026-08-13) — SPEC-SECTOR-GRID-001/SPEC-SECTOR-MINOR-COLOR-001 등 기존 항목 이후 추가(순수 삽입, 기존 항목 무변경)"
+frontmatter_transition: "spec.md status: in-progress → completed (version 0.1.1 유지, updated 2026-08-13 유지)"
+full_suite_post_sync: "618 passed / 8 failed / 68 skipped / 1 xpassed / 25 errors (run-phase §E.3 재확인, 변화 없음)"
+predecessor_gating_suite_post_sync: "84 passed (재확인, 변화 없음)"
+readme_decision: "수정 없음 — 아래 판단 근거 참조"
+```
+
+### README.md 판단 (수정하지 않음)
+
+README.md의 기능 목록·설치·실행 절차는 이번 변경으로 바뀌지 않는다(내부 데이터 계약 수정이며 신규 기능·신규 실행 경로가 아니다). 다만 선행 SPEC(SECTOR-GRID-001)의 sync 판단과 달리, 이번 변경은 **사용자 가시 차트 기간 라벨**(`12-week` → `Market Breadth (1-year)`)이 바뀐다 — 그러나 README.md는 이 차트의 라벨이나 기간을 문서화하고 있지 않으므로(기능 존재 여부만 서술, 세부 표기 미기재) 갱신 대상 문구가 없다. CHANGELOG의 릴리스 노트가 사용자 공지 채널 역할을 하며, README는 변경하지 않는다.
+
+### 이월 항목 [sync 단계에서 재확인 — 미해결]
+
+1. **선행 SPEC 자기모순 잔존.** M5가 `SPEC-SECTOR-GRID-001/acceptance.md`의 allowlist(L5 제거, 상한 5→4, 총 10→9행)를 동기화했지만, 그 SPEC 자신의 `spec.md` §1.2.2는 여전히 L5를 유효 allowlist 항목으로, §7은 O-G6을 미결로 기술한다. plan.md M5가 승인한 범위는 `acceptance.md`뿐이며, `completed` 상태인 선행 SPEC의 `spec.md` 본문 수정은 manager-docs의 소관 밖(SPEC 본문 수정 금지) — **manager-spec 후속 위임 필요**.
+2. **프로즌 리터럴의 벽시계 의존 — 시한부 결함.** `compute_breadth_history`에 `as_of` 인자가 없어 CG-2(진행 중인 주 배제) 판정이 `date.today()`에 의존한다. ISO 주 33이 실제로 종료되면 `2026-08-11`이 더 이상 미완성 주가 아니게 되어 **코드 변경 없이** AC-MBR-001/002/003/010의 프로즌 리터럴이 깨진다. run 단계는 테스트 전용 `frozen_clock` 픽스처(`date.today()`를 `2026-08-12`로 monkeypatch)로 봉쇄했으나, 프로덕션 시그니처는 변경하지 않았다(REQ-MBR-001의 `as_of=None` 계약 보존). manager-develop은 plan.md R4 노후화 리터럴 목록에 "⑦ frozen_clock 고정일"을 추가할 것을 권고했으나 plan.md는 편집하지 않았다 — **plan.md 갱신은 범위 밖이므로 사용자/manager-spec 결정 필요**.
+3. **O-M1 / O-M2 / O-M3 — 사용자 확인 대기 (미결 그대로).**
+   - O-M1: `compute_breadth`의 `market` 인자가 종목을 필터하지 않아 KOSPI/KOSDAQ이 동일 모집단 위에서 계산됨(잠재적, 사용자 비가시 — `breadth.kosdaq`는 스키마 선언만 있고 실사용·렌더 0건). 의도인지 미구현인지 미확인.
+   - O-M2: `detect_choppy` 판정 창 확대 — 프로즌 스냅샷에서 판정 자체(`False`)는 양쪽 다 변화 없었으나, 조건 2 입력(`pct_above_sma50` 최근 4주)은 `[42.42, 57.58, 57.58, 72.73]` → `[20.59, 18.18, 24.24, 57.58]`로 실질 이동했다 — 판정 불변이 임계값 안전을 증명하지 않는다. 임계값 재튜닝 여부는 요구사항 질문으로 남는다.
+   - O-M3: 차트 제목 `Market Breadth (1-year)` / docstring `1-year (52-week) history`는 run 단계에서 최소 변경 원칙으로 확정 후 바이트 동등 고정했다. 한글 병기 등 대안 문구는 사용자 결정 사안.
 
 ## §F Phase 4 Mode Selection
 

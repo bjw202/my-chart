@@ -290,6 +290,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 회귀: SPEC-001 30 테스트 모두 통과 (AC-017 byte-identical contract preserved)
 - 알려진 이슈: `test_sector_advanced.py` 5건 — 다른 테스트 파일의 SimpleNamespace 스텁이 my_chart.registry를 덮어쓸 때 발생, SPEC-002 코드와 무관
 
+### Fixed (SPEC-MARKET-BREADTH-001 v0.1.1, 2026-08-13)
+
+- **시장 개요 breadth 히스토리 — 정규 주간 격자 적용으로 구간 절단 결함 수정** (M1~M6, `run_commit_sha` `dbcbab2`)
+  - **결함**: `my_chart/analysis/market_breadth.py:472` `compute_breadth_history()`가 주봉 DB에서 최근 N개 **원시 distinct 날짜**를 직접 뽑아 썼다. 이 DB는 다중 날짜 ISO 주를 포함하므로, 실서비스 호출 `compute_breadth_history(weekly_db_path, "KOSPI", weeks=52)`(`backend/services/market_service.py:132`)가 반환한 52바는 실제로는 겨우 **21개 ISO 주(139일)**만 덮었다(기대: 52주/358일). 이제 `SPEC-SECTOR-GRID-001`의 정규 주간 격자(`compute_weekly_grid` → `history()`)를 단일 원천으로 소비한다.
+  - **중요 — 사용자 확인 필요**: **차트의 포인트 개수는 그대로 52개다.** "점이 줄어든 것 아니냐"는 신고가 있다면 이번 변경 때문이 아니다 — 바뀐 것은 포인트 **개수**가 아니라 차트가 덮는 **구간(span)**이다. 프로즌 실측: `span_days` 139일 → **358일**, 고유 ISO 주 21개 → **52개**, 마지막 점이 진행 중인 주(`2026-08-11`)에서 직전 완료 주(`2026-08-07`)로 이동. 차트 제목도 `12-week`(호출부 `weeks=52`와 불일치하던 표기)에서 `Market Breadth (1-year)`로 정정했다(`frontend/src/components/MarketOverview/BreadthChart.tsx:156`).
+  - 하류 소비자 `detect_choppy()`의 판정 입력 창도 함께 확대된다. 프로즌 스냅샷 기준으로는 판정 결과(`False`) 자체는 변하지 않았으나, 조건식 입력값(최근 4주 `pct_above_sma50`)은 `[42.42, 57.58, 57.58, 72.73]` → `[20.59, 18.18, 24.24, 57.58]`로 실질 이동했다 — 이 스냅샷에서 뒤집히지 않았다는 것이 임계값이 항상 안전하다는 뜻은 아니며, 임계값 자체는 재튜닝하지 않았다.
+  - 검증: `pytest tests/test_market_breadth_grid.py tests/test_market_breadth.py -q` 신규 34 passed + 기존 20 passed(무회귀), 전체 스위트 baseline 584 passed/8 failed/68 skipped/25 errors → **618 passed**(+34)/8 failed(무변화)/68 skipped/**1 xpassed**(AC-MBR-004, 비게이팅)/25 errors(무변화, `tests/fnguide/` 범위 밖). 선행 SPEC-SECTOR-GRID-001 게이팅 스위트 84 passed 유지(allowlist 5행 동기화 포함). 프론트엔드 `npx vitest run src/components/MarketOverview` 5 files/50 passed.
+  - AC-MBR-001~010 전항 PASS (AC-MBR-004는 XPASS·비게이팅으로 문서화된 한계).
+  - **미결(사용자 확인 대기)**: `compute_breadth`의 `market` 인자가 종목을 필터하지 않아 KOSPI/KOSDAQ이 동일 모집단 위에서 계산된다 — 다만 `breadth.kosdaq`는 스키마 선언만 있고 실사용·렌더 0건이라 사용자 비가시적 잠재 결함이다(의도/미구현 여부 확인 필요). `detect_choppy` 임계값 재튜닝 여부도 별도 확인 필요.
+
 ## [1.1.0] - 2026-03-08
 
 ### Added
