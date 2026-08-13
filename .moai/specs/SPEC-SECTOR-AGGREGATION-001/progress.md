@@ -1333,7 +1333,7 @@ A  tests/test_sector_benchmark_ranking.py
 ```yaml
 run_status: in-progress            # M3 완료. 다음 = M4(RRG) 또는 M5(지표 정정) — 별도 위임
 milestone_completed: M3            # 벤치마크 + 순위/정규화. 라우터 파라미터 완전 배선은 M6 의존(Gap G10)
-run_commit_sha: pending-backfill-M3   # 이 커밋 자체의 SHA — 후속 커밋에서 backfill(D3 예외, M2 25f3fa9 전례)
+run_commit_sha: 1815d30            # M3 커밋 (backfill — D3 예외, M2 25f3fa9 전례)
 prior_run_commit_sha_m2: 25f3fa9   # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
 prior_milestone_commits: "adb1f25 (M1.0-a 구) · b839cee (M1.0-a §E.3 구) · 6f00ba5 (M1.0-b/c 구) · 7b5fc45 (M1.0-b/c §E.3 구) · 7305e2e (M1.1) · a000add (M1.0-a 재빌드) · 8e51176 (M1.0-b 재캡처)"
