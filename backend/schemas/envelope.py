@@ -89,6 +89,8 @@ class SectorAggregateModel(BaseModel):
 
     # 지표
     returns: dict[str, MetricValueModel] = Field(default_factory=dict)
+    # M6-gap G16 — 기간별 섹터 거래대금(원, daily VolumeWon 원천 합산).
+    trading_value: dict[str, MetricValueModel] = Field(default_factory=dict)
     excess_returns: dict[str, MetricValueModel] = Field(default_factory=dict)
     rs_avg: MetricValueModel = Field(default_factory=MetricValueModel)
     rs_top_pct: MetricValueModel = Field(default_factory=MetricValueModel)
@@ -143,6 +145,11 @@ class EnvelopeMixin(BaseModel):
     data: list[SectorAggregateModel] = Field(default_factory=list)
     excluded: list[ExcludedSectorModel] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    # M6-gap G25 — AC-SAG-023 / AC-SAG-046: rank_change 기준일 및 거래대금 집계
+    # 창(O-A4 — return_window_days 와 동일 창 공유, anchor(t,N) 동일 호출).
+    baseline_date: str | None = None
+    trading_value_window_days: dict[str, int | None] = Field(
+        default_factory=_default_return_window_days)
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +204,7 @@ def aggregate_model(a: SectorAggregate) -> SectorAggregateModel:
         cap_weighted_available=a.cap_weighted_available,
         low_confidence=a.low_confidence,
         returns=_metric_map(a.returns),
+        trading_value=_metric_map(a.trading_value),
         excess_returns=_metric_map(a.excess_returns),
         rs_avg=metric_model(a.rs_avg),
         rs_top_pct=metric_model(a.rs_top_pct),
@@ -238,12 +246,21 @@ def envelope_fields(
     data: list[SectorAggregate] | None = None,
     excluded: list[ExcludedSector] | None = None,
     warnings: list[str] | None = None,
+    baseline_date: str | None = None,
+    trading_value_window_days: dict[str, int | None] | None = None,
 ) -> dict[str, Any]:
-    """봉투 10키를 응답 모델 생성자 kwargs 로 만든다."""
+    """봉투 12키를 응답 모델 생성자 kwargs 로 만든다.
+
+    ``baseline_date`` / ``trading_value_window_days`` 는 M6-gap G25 신설
+    (AC-SAG-023 / AC-SAG-046). ``trading_value_window_days`` 는 명시 전달이
+    없으면 ``return_window_days`` 와 **동일한 값**을 쓴다 — O-A4 결정에 따라
+    거래대금 집계 창이 수익률 창과 같은 ``anchor(t, N)`` 호출을 공유하기 때문이다.
+    """
+    resolved_return_window_days = return_window_days or _default_return_window_days()
     return {
         "as_of_date": as_of_date,
         "as_of_is_partial_week": as_of_is_partial_week,
-        "return_window_days": return_window_days or _default_return_window_days(),
+        "return_window_days": resolved_return_window_days,
         "market_filter": market_filter,
         "weight_cap": weight_cap,
         "grid_version": GRID_VERSION,
@@ -251,4 +268,9 @@ def envelope_fields(
         "data": [aggregate_model(a) for a in (data or [])],
         "excluded": excluded_models(excluded or []),
         "warnings": list(warnings or []),
+        "baseline_date": baseline_date,
+        "trading_value_window_days": (
+            trading_value_window_days
+            if trading_value_window_days is not None
+            else dict(resolved_return_window_days)),
     }

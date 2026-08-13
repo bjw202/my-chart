@@ -231,6 +231,8 @@ class _Member:
     rs: float | None
     nh: bool | None                       # 52주 신고가 판정(판정 불가면 None)
     stage2: bool | None                   # Stage 2 여부(분류 불가면 None)
+    # M6-gap G16 — 기간별 거래대금(원, daily VolumeWon 원천). 결측은 None.
+    trading_value: dict[str, float | None] = field(default_factory=dict)
 
     @property
     def cap_valid(self) -> bool:
@@ -386,6 +388,7 @@ def _build_member(
     caps: dict[str, float],
     high52_map: dict[str, float],
     returns: dict[str, float | None] | None = None,
+    trading_value: dict[str, float | None] | None = None,
 ) -> _Member:
     close = row.get("Close")
     max52 = high52_map.get(name)
@@ -405,6 +408,8 @@ def _build_member(
         rs=None if rs is None else float(rs),
         nh=nh,
         stage2=stage2,
+        trading_value=(
+            dict(trading_value) if trading_value else {label: None for label in _PERIODS}),
     )
 
 
@@ -514,6 +519,13 @@ def _aggregate_members(
             {m.name: m.returns[label] for m in valid_members}, sub_weights)  # type: ignore[misc]
         returns[label] = missing() if value is None else present(value)
 
+    # --- M6-gap G16 — 기간별 거래대금 합계(단순 합산, 가중치 없음 — AC-SAG-029) -----
+    trading_value: dict[str, MetricValue] = {}
+    for label in _PERIODS:
+        valid_tv = [m.trading_value.get(label) for m in members
+                    if m.trading_value.get(label) is not None]
+        trading_value[label] = present(sum(valid_tv)) if valid_tv else missing()
+
     rs_avg = _equal_mean(rs_values)                       # 결측 제외(§2.3)
     rs_top = (sum(1 for r in rs_values if r >= _RS_TOP_THRESHOLD) / len(rs_values) * 100
               if rs_values else None)
@@ -536,6 +548,7 @@ def _aggregate_members(
         cap_weighted_available=cap_weighted_available,
         low_confidence=low_confidence,
         returns=returns,
+        trading_value=trading_value,
         # 초과수익률·composite·rank 는 벤치마크가 붙는 M3 소관이다. 지수 행 기준
         # 초과수익률을 여기에 실으면 규칙 BM-1(지수 행 사용 금지)을 어기게 된다.
         excess_returns={label: missing() for label in _PERIODS},
@@ -633,11 +646,19 @@ def _benchmark_reconciliation_warnings(
     return out
 
 
-def _rank_sectors(aggregates: list[SectorAggregate]) -> list[ExcludedSector]:
+def _rank_sectors(
+    aggregates: list[SectorAggregate], period: str | None = None,
+) -> list[ExcludedSector]:
     """규칙 AG-9(composite_score) · RK-1(결정적 tie-break) · RK-2(반올림 미포함).
 
     ``aggregates`` 를 in-place 로 갱신한다. **이 함수 내부에 ``round(`` 호출이 없다**
     (AC-SAG-020 정적 스캔 — 반올림은 직렬화 직전 1회만 수행한다, `backend/schemas/envelope.py`).
+
+    Args:
+        period: ``None`` 이면 종전과 동일하게 3기간 가중 composite 로 순위를 매긴다.
+            ``"1w"``/``"1m"``/``"3m"`` 중 하나면 **그 기간의 초과수익률 단독**으로
+            순위를 매긴다(AC-SAG-021 — M6-gap G22). ``composite_score`` 필드는
+            어느 경우든 항상 3기간 가중 composite 값을 유지한다(AC-SAG-022).
 
     Returns:
         composite 산출이 불가능해 순위 대상에서 제외된 섹터 목록(``excluded[]`` 후보,
@@ -668,12 +689,21 @@ def _rank_sectors(aggregates: list[SectorAggregate]) -> list[ExcludedSector]:
         sum(_COMPOSITE_WEIGHTS[p] * norm_by_period[p][i] for p in _PERIODS)
         for i in range(len(candidates))
     ]
-    # RK-1 — 결정적 tie-break: composite 내림차순, 동점은 섹터명 사전순.
-    order = sorted(range(len(candidates)), key=lambda i: (-raw_scores[i], candidates[i].name))
+    for i, a in enumerate(candidates):
+        a.composite_score = present(raw_scores[i])
+
+    # M6-gap G22 — `period` 지정 시 그 기간의 (원시, 정규화 전) 초과수익률 단독을
+    # 순위 기준으로 쓴다(AC-SAG-021 "rank는 해당 (period, market)의 초과수익률
+    # 기준"). 미지정이면 종전과 동일하게 composite 로 순위를 매긴다.
+    if period in _PERIODS:
+        rank_key = [candidates[i].excess_returns[period].value for i in range(len(candidates))]
+    else:
+        rank_key = raw_scores
+
+    # RK-1 — 결정적 tie-break: 순위 기준 내림차순, 동점은 섹터명 사전순.
+    order = sorted(range(len(candidates)), key=lambda i: (-rank_key[i], candidates[i].name))
     for rank_i, idx in enumerate(order, start=1):
-        a = candidates[idx]
-        a.composite_score = present(raw_scores[idx])
-        a.rank = rank_i
+        candidates[idx].rank = rank_i
     return newly_excluded
 
 
@@ -753,6 +783,7 @@ def _compute_sector_aggregates_core(
     cap: float,
     as_of: str | None,
     apply_min_members: bool,
+    period: str | None = None,
 ) -> SectorAggregationResult:
     """`compute_sector_aggregates` 의 rank_change 를 제외한 나머지 전체(벤치마크 ~ 순위).
 
@@ -769,6 +800,10 @@ def _compute_sector_aggregates_core(
         caps = _load_market_caps(daily_db_path)
         sector_to_stocks, market_of = _load_registry_mapping(registry_path)
         universe = _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date)
+        # M6-gap G16 — 섹터 집계 거래대금(기간별 합산, O-A4 창 공유). anchor_dates 는
+        # 위 `_anchor_returns` 와 같은 호출에서 나온 값이므로 수익률과 창을 공유한다.
+        trading_value_by_period = compute_trading_value_by_period(
+            daily_db_path, anchor_dates, date)
 
         warnings: list[str] = []
         if not caps:
@@ -782,7 +817,11 @@ def _compute_sector_aggregates_core(
         all_members: list[_Member] = []          # 규칙 BM-1 — 섹터 그룹핑 없는 벤치마크 유니버스
         for sector_name, stock_names in sector_to_stocks.items():
             members = [
-                _build_member(name, snapshot[name], caps, high52_map, returns_by_name.get(name))
+                _build_member(
+                    name, snapshot[name], caps, high52_map, returns_by_name.get(name),
+                    trading_value={
+                        label: trading_value_by_period[label].get(name) for label in _PERIODS},
+                )
                 for name in stock_names
                 if name in snapshot
                 and name not in _INDEX_NAMES
@@ -815,7 +854,10 @@ def _compute_sector_aggregates_core(
                 a.excess_returns = {label: missing() for label in _PERIODS}
 
         # --- 규칙 AG-8/AG-9/RK-1/RK-2 순위·정규화 -------------------------------
-        excluded.extend(_rank_sectors(aggregates))
+        # M6-gap G22 — `period` 가 주어지면 그 기간의 초과수익률 단독으로 순위를
+        # 매긴다(AC-SAG-021). `composite_score` 는 항상 3기간 가중합으로 계산되며
+        # `period` 와 무관하다(AC-SAG-022 — composite_score 는 rank 와 함께 존재).
+        excluded.extend(_rank_sectors(aggregates, period=period))
 
         # --- AC-SAG-013 부호 분산 정합성(합성 픽스처용, 비게이팅 보조) -----------
         w1_excess = [a.excess_returns["1w"].value for a in aggregates
@@ -845,6 +887,7 @@ def compute_sector_aggregates(
     as_of: str | None = None,
     apply_min_members: bool = True,
     compute_rank_change: bool = True,
+    period: str | None = None,
 ) -> SectorAggregationResult:
     """섹터별 시총가중 집계(규칙 AG-1 ~ AG-9, BM-1 ~ BM-6) — 응답 ``data[]`` 의 단일 산출 경로.
 
@@ -863,10 +906,14 @@ def compute_sector_aggregates(
         compute_rank_change: ``True`` 면 ``anchor(t, 28)`` 기준일 대비 ``rank_change`` 를
             산출한다(AC-SAG-023). 기준일 재귀 호출은 이 인자를 ``False`` 로 넘겨
             **1단만** 내려간다(무한 재귀 방지).
+        period: ``None`` 이면 composite 순위(종전 동작). ``"1w"``/``"1m"``/``"3m"`` 면
+            그 기간의 초과수익률 단독으로 순위를 매긴다(AC-SAG-021 — M6-gap G22).
+            기준일 재귀 호출에도 **같은 period** 를 넘겨 ``rank_change`` 가 동일
+            기준(같은 period)의 순위 이동을 비교하도록 한다.
     """
     result = _compute_sector_aggregates_core(
         weekly_db_path, date, daily_db_path, registry_path, market, cap, as_of,
-        apply_min_members)
+        apply_min_members, period=period)
 
     if compute_rank_change:
         grid = compute_weekly_grid(weekly_db_path, as_of or date)
@@ -874,7 +921,7 @@ def compute_sector_aggregates(
         if baseline_bar is not None:
             baseline = _compute_sector_aggregates_core(
                 weekly_db_path, baseline_bar.date, daily_db_path, registry_path, market, cap,
-                baseline_bar.date, apply_min_members)
+                baseline_bar.date, apply_min_members, period=period)
             prev_rank = {a.name: a.rank for a in baseline.aggregates}
             for a in result.aggregates:
                 p = prev_rank.get(a.name)

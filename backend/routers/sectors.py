@@ -51,15 +51,16 @@ async def sector_ranking(
     Returns 503 if weekly DB is not available.
 
     ``market`` filters the aggregation universe (AC-SAG-039, M6). ``period``
-    is accepted for §12.3 parity with ``/sectors/{name}/detail`` but does not
-    change the response shape in M6 — the ranking response always carries all
-    three windows (1w/1m/3m) per AC-SAG-036.
+    changes which period's excess return the canonical ``data[]`` ``rank`` is
+    based on (AC-SAG-021, M6-gap G22 fix) — the legacy ``sectors[]`` surface
+    is unaffected and always carries all three windows (1w/1m/3m) per
+    AC-SAG-036.
     """
     from backend.services.sector_ranking_service import get_sector_ranking
 
     try:
         # 시총가중 집계(AG-1)의 시총 원천은 일봉 stock_meta 다 — 경로를 함께 넘긴다.
-        return get_sector_ranking(WEEKLY_DB_PATH, DAILY_DB_PATH, market=market)
+        return get_sector_ranking(WEEKLY_DB_PATH, DAILY_DB_PATH, market=market, period=period)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -97,11 +98,9 @@ async def sector_rrg(
     각 섹터의 RS-Ratio와 RS-Momentum을 JdK 방식으로 정규화한다.
     Returns 503 if weekly DB is not available.
 
-    ``market`` 은 §12.3 요건(AC-SAG-039)에 따라 파라미터로 신설됐다. RRG 는 섹터
-    지수 시계열(주봉 격자)을 소비하며 시장(코스피/코스닥)별 지수 계열이 별도로
-    저장되어 있지 않다 — M6 단계에서는 파라미터를 수신·검증하고
-    ``market_filter`` 로 echo 하되, 실제 데이터 재계산은 하지 않는다
-    (deferred — progress.md §E.2 M6 Gap 참조).
+    ``market`` 은 §12.3 요건(AC-SAG-039)에 따라 파라미터로 신설됐다. M6-gap G20
+    수정 — 별도 시장별 지수 저장소를 신설하지 않고, 섹터 지수 시계열을 구성하는
+    종목 유니버스를 시장으로 제한해 실제로 재계산한다.
     """
     from backend.services.sector_advanced_service import get_rrg_data
 
@@ -171,7 +170,8 @@ async def stock_bubble(
     Returns 503 if weekly DB is not available.
 
     ``sector_aggregate`` 는 ``/sectors/ranking`` 의 동일 섹터·동일 기간
-    ``sector_return`` 과 일치한다(AC-SAG-042).
+    ``sector_return`` 과 일치한다(AC-SAG-042). ``market`` 은 M6-gap G20 수정으로
+    종목 유니버스 필터에 실배선됐다.
     """
     from backend.services.sector_advanced_service import get_stock_bubble
 

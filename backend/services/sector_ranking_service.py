@@ -32,6 +32,7 @@ def get_sector_ranking(
     daily_db_path: str | None = None,
     as_of: str | None = None,
     market: str = "all",
+    period: str | None = None,
 ) -> SectorRankingResponse:
     """Compute sector rankings and return API response.
 
@@ -43,6 +44,11 @@ def get_sector_ranking(
             §8.4 규약 8 에 따라 **명시 인자**로 고정한다.
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039). 집계 시점
             필터이므로 ``member_count`` 자체가 달라진다.
+        period: ``1w``/``1m``/``3m`` — M6-gap G22(AC-SAG-021). ``data[]`` 의 ``rank``
+            가 이 기간의 초과수익률 단독 기준으로 재배정된다. ``None`` 이면 종전과
+            동일하게 composite 기준이다. 하위 호환 표면(``sectors[]``, legacy
+            ``compute_sector_ranking``)은 이 인자의 영향을 받지 않는다 —
+            AC-SAG-036 이 그 표면은 3기간 전부를 항상 반환하도록 요구한다.
 
     Returns:
         SectorRankingResponse with sectors ordered by rank.
@@ -55,7 +61,8 @@ def get_sector_ranking(
 
     rankings = compute_sector_ranking(weekly_db_path, date, daily_db_path, market)
     agg = compute_sector_aggregates(
-        weekly_db_path, date, daily_db_path=daily_db_path, market=market, as_of=as_of)
+        weekly_db_path, date, daily_db_path=daily_db_path, market=market, as_of=as_of,
+        period=period)
 
     # 기존 응답 키(하위 호환, plan.md §1 D4) — 프론트엔드가 읽던 형태 그대로 유지한다.
     sector_items = [
@@ -99,5 +106,6 @@ def get_sector_ranking(
             data=agg.aggregates,
             excluded=agg.excluded,
             warnings=agg.warnings,
+            baseline_date=agg.baseline_date,
         ),
     )

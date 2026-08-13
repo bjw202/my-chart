@@ -203,6 +203,11 @@ class SectorAggregate:
     # 지표 — 전부 결측 3상태 표현
     returns: dict[str, MetricValue] = field(default_factory=dict)
     excess_returns: dict[str, MetricValue] = field(default_factory=dict)
+    # M6-gap G16 — 섹터 집계 거래대금(기간별). 원천은 daily `VolumeWon`
+    # (`compute_trading_value_by_period`, AC-SAG-029/O-A4). `Coverage.trading_value` /
+    # `ValidCounts.trading_value` 는 의도적으로 계속 `None`이다(AG-7 최소값 오염 방지,
+    # 위 주석 참조) — 이 필드는 그 게이팅 로직과 무관한 별도 값 필드다.
+    trading_value: dict[str, MetricValue] = field(default_factory=dict)
     rs_avg: MetricValue = field(default_factory=missing)
     rs_top_pct: MetricValue = field(default_factory=missing)
     nh_pct: MetricValue = field(default_factory=missing)

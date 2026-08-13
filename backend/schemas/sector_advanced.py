@@ -56,6 +56,11 @@ class StockBubbleItem(BaseModel):
     volume_ratio: float | None  # 거래량 비율(NULL/0 VolumeSMA10 결측 시 None, AC-SAG-028)
     sector_minor: Optional[str] = None  # 산업명(중) (SPEC-SECTOR-MINOR-COLOR-001)
     product: Optional[str] = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
+    # M6-gap G23 — AC-SAG-041 종목 목록 필드 확장. 결측은 None(치환 금지).
+    weight_in_sector: float | None = None
+    chg_1w: float | None = None
+    chg_3m: float | None = None
+    near_52w_high: bool | None = None
 
 
 class StockBubbleResponse(EnvelopeMixin):

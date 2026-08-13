@@ -10,9 +10,15 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Any
 
+from my_chart.analysis.aggregate_types import WEIGHT_CAP
 from my_chart.analysis.stage_classifier import classify_stage, _compute_slope
 from my_chart.analysis.weekly_grid import compute_weekly_grid
+from my_chart.analysis.weighting import capped_weights_detail
 from my_chart.config import DEFAULT_DB_DAILY
+
+# M6-gap G23 — AC-SAG-041 근접 신고가 판정. `sector_metrics._NH_THRESHOLD` /
+# `stage_service._NEAR_52W_THRESHOLD` 와 동일 관용(2% 이내).
+_NEAR_52W_THRESHOLD = 0.02
 
 # ---------------------------------------------------------------------------
 # 상수 정의
@@ -25,6 +31,16 @@ _INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
 _RRG_LOOKBACK_WEEKS = 12  # z-score 계산을 위한 롤링 윈도우
 _RRG_SCALE = 7.0           # z-score 스케일 팩터 (축 범위 75~125에 맞춤)
 _RRG_CENTER = 100.0        # 정규화 중심값
+
+
+# @MX:NOTE: [AUTO] M6-gap G20 — RRG/종목버블 `market` 파라미터 실배선.
+#   라우터는 소문자 `all`/`kospi`/`kosdaq` 를 받지만 `stock_meta.market`(`시장구분`)
+#   원천은 대문자 `KOSPI`/`KOSDAQ` 로 저장된다(`_build_sector_stock_map` 관용과 동일).
+def _normalize_market_filter(market: str | None) -> str | None:
+    """``all``/``None``/``""`` → ``None``(무필터). 그 외 → 대문자(``KOSPI``/``KOSDAQ``)."""
+    if not market or market.strip().lower() == "all":
+        return None
+    return market.strip().upper()
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +86,12 @@ class StockBubble:
     volume_ratio: float | None
     sector_minor: str | None = None  # 산업명(중) (SPEC-SECTOR-MINOR-COLOR-001)
     product: str | None = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
+    # M6-gap G23 — AC-SAG-041 종목 목록 필드 확장(weight_in_sector/chg_1w/chg_3m/
+    # near_52w_high). 결측은 None(치환 금지).
+    weight_in_sector: float | None = None
+    chg_1w: float | None = None
+    chg_3m: float | None = None
+    near_52w_high: bool | None = None
 
 
 @dataclass
@@ -259,7 +281,7 @@ def _build_sector_stock_map(
 # ---------------------------------------------------------------------------
 
 def compute_sector_price_index(
-    db_path: str, weeks: int = 12
+    db_path: str, weeks: int = 12, market: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """섹터별 시가총액 가중 가격 지수를 계산한다.
 
@@ -268,6 +290,10 @@ def compute_sector_price_index(
     Args:
         db_path: weekly SQLite DB 경로
         weeks: 조회할 주수 (기본 12주)
+        market: 시장 필터 — ``None``/``"all"``=전체, ``"kospi"``/``"KOSPI"``/
+            ``"kosdaq"``/``"KOSDAQ"``(대소문자 무관, M6-gap G20). 필터는 섹터
+            지수를 구성하는 종목 유니버스에 적용된다 — RRG 가 시장별 지수를
+            실제로 재계산할 수 있는 유일한 경로다.
 
     Returns:
         {sector_name: [{date, index_value}, ...]} 딕셔너리
@@ -280,7 +306,8 @@ def compute_sector_price_index(
             return {}
 
         stock_meta = _get_stock_meta(db_path)
-        sector_map = _build_sector_stock_map(stock_meta)
+        sector_map = _build_sector_stock_map(
+            stock_meta, market_filter=_normalize_market_filter(market))
         kospi_closes = _get_kospi_close_by_date(conn, dates)
 
         # 섹터별 시계열 데이터 초기화
@@ -378,7 +405,7 @@ def _assign_quadrant(rs_ratio: float, rs_momentum: float) -> str:
         return "improving"
 
 
-def compute_rrg_data(db_path: str, weeks: int = 0) -> list[RRGSector]:
+def compute_rrg_data(db_path: str, weeks: int = 0, market: str | None = None) -> list[RRGSector]:
     """RRG(Relative Rotation Graph) 데이터를 계산한다.
 
     DB에 있는 전체 기간(또는 지정 주수)의 RS-Ratio/Momentum 시계열을 반환한다.
@@ -392,6 +419,12 @@ def compute_rrg_data(db_path: str, weeks: int = 0) -> list[RRGSector]:
     Args:
         db_path: weekly SQLite DB 경로
         weeks: 조회 주수 (0이면 전체 기간)
+        market: 시장 필터 — ``None``/``"all"``=전체, ``"kospi"``/``"kosdaq"``
+            (M6-gap G20). 섹터 지수 시계열을 구성하는 종목 유니버스를 시장으로
+            제한한다 — 별도 시장별 지수 저장소를 신설하지 않고, `compute_
+            sector_price_index` 의 종목 유니버스 필터를 재사용해 실제로
+            시장별 RRG 를 재계산한다(M2/M3 이 확립한 `_market_matches` 계열
+            유니버스 필터 관용을 이 모듈에서 재사용).
 
     Returns:
         RRGSector 리스트 (trail에 전체 시계열 포함)
@@ -409,7 +442,7 @@ def compute_rrg_data(db_path: str, weeks: int = 0) -> list[RRGSector]:
     finally:
         conn.close()
 
-    sector_index = compute_sector_price_index(db_path, weeks=total_weeks)
+    sector_index = compute_sector_price_index(db_path, weeks=total_weeks, market=market)
 
     if "KOSPI" not in sector_index or not sector_index["KOSPI"]:
         return []
@@ -576,10 +609,33 @@ def compute_sector_bubble(
 # compute_stock_bubble
 # ---------------------------------------------------------------------------
 
+def _load_raw_chg_max52(conn: sqlite3.Connection, date: str) -> dict[str, dict[str, Any]]:
+    """CHG_1W / CHG_3M / MAX52 — 결측을 0 으로 접지 않는 원시(raw) 조회.
+
+    `_get_price_on_date` 는 공유 함수라 다른 호출자와의 하위 호환을 위해 결측을
+    `0.0` 으로 접는다(scope discipline — 건드리지 않는다). AC-SAG-041 의
+    `chg_1w`/`chg_3m`/`near_52w_high` 는 결측을 `None` 으로 보존해야 하므로
+    (§9.1) 이 함수에서 별도 원시 조회를 한다(stage_service._load_extended_weekly_fields
+    와 동일 관용).
+    """
+    try:
+        rows = conn.execute(
+            "SELECT Name, CHG_1W, CHG_3M, Close, MAX52 FROM stock_prices WHERE Date = ?",
+            (date,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for name, chg_1w, chg_3m, close, max52 in rows:
+        out[str(name)] = {"chg_1w": chg_1w, "chg_3m": chg_3m, "close": close, "max52": max52}
+    return out
+
+
 def compute_stock_bubble(
     db_path: str,
     sector_name: str,
     period: str = "1w",
+    market: str | None = None,
 ) -> list[StockBubble]:
     """섹터 내 종목 버블 차트 데이터를 계산한다.
 
@@ -587,10 +643,15 @@ def compute_stock_bubble(
         db_path: weekly SQLite DB 경로
         sector_name: 조회할 섹터명
         period: 수익률 계산 기간 ("1w", "1m", "3m")
+        market: 시장 필터 — ``None``/``"all"``=전체, ``"kospi"``/``"kosdaq"``
+            (대소문자 무관, M6-gap G20). 섹터 내 종목을 시장으로 제한하며,
+            ``weight_in_sector``(AC-SAG-041)도 이 필터링 후 유니버스 기준으로
+            재계산된다(stage_service 의 시장 필터→가중치 재계산 관용과 동일).
 
     Returns:
         StockBubble 리스트
     """
+    market_filter = _normalize_market_filter(market)
     conn = _connect(db_path)
     try:
         dates = _get_dates(db_path, 1)
@@ -601,11 +662,13 @@ def compute_stock_bubble(
         stock_meta = _get_stock_meta(db_path)
         price_data = _get_price_on_date(conn, latest_date)
         rs_data = _get_rs_on_date(conn, latest_date)
+        raw_extended = _load_raw_chg_max52(conn, latest_date)
 
-        # 해당 섹터 종목 필터링
+        # 해당 섹터 종목 필터링 (+ M6-gap G20 — market 필터)
         sector_stocks = [
             name for name, meta in stock_meta.items()
             if meta["sector_major"] == sector_name
+            and (market_filter is None or meta["시장구분"] == market_filter)
         ]
 
     finally:
@@ -613,6 +676,18 @@ def compute_stock_bubble(
 
     if not sector_stocks:
         return []
+
+    # M6-gap G23 — AC-SAG-041 weight_in_sector: 이 섹터(위 market 필터 적용 후)
+    # 유니버스에 대해 시총 상한 재배분 가중치를 산출한다(INV-CAP-1, `weighting.
+    # capped_weights_detail` 재사용 — stage_service._weight_in_sector_map 과
+    # 동일 산식, 별도 재구현하지 않는다).
+    sector_caps = {
+        name: float(stock_meta[name]["market_cap"])
+        for name in sector_stocks
+        if stock_meta[name].get("market_cap") and float(stock_meta[name]["market_cap"]) > 0
+    }
+    weight_map: dict[str, float] = (
+        capped_weights_detail(sector_caps, cap=WEIGHT_CAP).weights if sector_caps else {})
 
     results: list[StockBubble] = []
     for name in sector_stocks:
@@ -628,6 +703,15 @@ def compute_stock_bubble(
         price_change = _get_chg_by_period(price_row, period)
         trading_value = close * volume
         cap = meta["market_cap"]
+
+        ext = raw_extended.get(name, {})
+        chg_1w = float(ext["chg_1w"]) * 100 if ext.get("chg_1w") is not None else None
+        chg_3m = float(ext["chg_3m"]) * 100 if ext.get("chg_3m") is not None else None
+        ext_close = ext.get("close")
+        ext_max52 = ext.get("max52")
+        near_52w_high: bool | None = None
+        if ext_close is not None and ext_max52 is not None and float(ext_max52) > 0:
+            near_52w_high = float(ext_close) >= float(ext_max52) * (1 - _NEAR_52W_THRESHOLD)
 
         # AC-SAG-028 — volume_ratio = Volume / VolumeSMA10(weekly). NULL/0 이면 None
         # (1.0 치환 금지, REQ-SAG-025). 가격 SMA10 을 거래량 기준선으로 쓰던 근사를 폐기.
@@ -663,6 +747,10 @@ def compute_stock_bubble(
             volume_ratio=round(volume_ratio, 4) if volume_ratio is not None else None,
             sector_minor=meta.get("sector_minor"),  # SPEC-SECTOR-MINOR-COLOR-001
             product=meta.get("product"),             # SPEC-STOCK-TOOLTIP-PRODUCT-001
+            weight_in_sector=weight_map.get(name),   # M6-gap G23 (AC-SAG-041)
+            chg_1w=round(chg_1w, 4) if chg_1w is not None else None,
+            chg_3m=round(chg_3m, 4) if chg_3m is not None else None,
+            near_52w_high=near_52w_high,
         ))
 
     return results

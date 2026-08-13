@@ -93,9 +93,8 @@ def get_stock_bubble(
         sector_name: 조회할 섹터명
         period: 수익률 기간 ("1w", "1m", "3m")
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039, §12.3).
-            ``compute_stock_bubble`` 은 종목 단위 지수 계산만 하므로, 이 M6
-            단계에서는 파라미터를 수신·검증하고 ``market_filter`` 로 echo
-            한다(개별 종목 시장 필터는 데이터에 이미 반영되지 않음 — deferred).
+            M6-gap G20 수정 — ``compute_stock_bubble`` 의 종목 유니버스 필터에
+            실배선된다(더 이상 echo 전용이 아니다).
         daily_db_path: 일봉 DB 경로(시총가중 원천) — ``sector_aggregate``
             (AC-SAG-042) 산출에 쓰인다.
 
@@ -103,7 +102,9 @@ def get_stock_bubble(
         StockBubbleResponse
     """
     date = _get_latest_valid_date(weekly_db_path) or ""
-    stocks = compute_stock_bubble(weekly_db_path, sector_name=sector_name, period=period)
+    # M6-gap G20 — market 을 실제로 종목 유니버스 필터에 배선한다(echo 미탈피).
+    stocks = compute_stock_bubble(
+        weekly_db_path, sector_name=sector_name, period=period, market=market)
 
     items = [
         StockBubbleItem(
@@ -117,6 +118,10 @@ def get_stock_bubble(
             volume_ratio=s.volume_ratio,
             sector_minor=s.sector_minor,  # SPEC-SECTOR-MINOR-COLOR-001
             product=s.product,            # SPEC-STOCK-TOOLTIP-PRODUCT-001
+            weight_in_sector=s.weight_in_sector,  # M6-gap G23 (AC-SAG-041)
+            chg_1w=s.chg_1w,
+            chg_3m=s.chg_3m,
+            near_52w_high=s.near_52w_high,
         )
         for s in stocks
     ]
@@ -154,15 +159,16 @@ def get_rrg_data(weekly_db_path: str, market: str = "all") -> RRGResponse:
     Args:
         weekly_db_path: weekly SQLite DB 경로
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039, §12.3).
-            RRG 는 섹터 지수 시계열을 소비하며 시장별 지수가 별도로 저장돼
-            있지 않으므로, 이 M6 단계에서는 파라미터를 수신·검증하고
-            ``market_filter`` 로 echo 만 한다(실제 재계산 미배선 — deferred).
+            M6-gap G20 수정 — 별도 시장별 지수 저장소를 신설하지 않고,
+            섹터 지수 시계열을 구성하는 종목 유니버스를 시장으로 제한해
+            실제로 재계산한다(``compute_sector_price_index`` 의
+            ``_build_sector_stock_map`` 필터 재사용).
 
     Returns:
         RRGResponse
     """
     date = _get_latest_valid_date(weekly_db_path) or ""
-    sectors = compute_rrg_data(weekly_db_path)
+    sectors = compute_rrg_data(weekly_db_path, market=market)
 
     items = [
         RRGSectorItem(

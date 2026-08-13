@@ -6,13 +6,14 @@ import logging
 import sqlite3
 
 from my_chart.analysis.aggregate_types import WEIGHT_CAP
+from my_chart.analysis.sector_metrics import compute_trading_value_by_period
 from my_chart.analysis.stage_classifier import (
     _load_stocks_for_classification,
     classify_stage_or_none,
     screen_stage2_entry,
 )
 from my_chart.analysis.universe import ETC_SECTOR
-from my_chart.analysis.weekly_grid import _get_latest_valid_date
+from my_chart.analysis.weekly_grid import _get_latest_valid_date, anchor, compute_weekly_grid
 from my_chart.analysis.weighting import capped_weights_detail
 from my_chart.registry import get_sector_registry
 from backend.schemas.stage import (
@@ -44,35 +45,47 @@ def _pct(decimal_value: float | None) -> float | None:
     return round(decimal_value * 100, 2) if decimal_value is not None else None
 
 
-def _load_extended_weekly_fields(weekly_db_path: str, date: str) -> dict[str, dict]:
+def _load_extended_weekly_fields(
+    weekly_db_path: str, date: str, daily_db_path: str | None = None,
+) -> dict[str, dict]:
     """CHG_1W / CHG_3M / MAX52 / trading_value 보조 필드 — AC-SAG-041 3열 확장.
 
     `_load_stocks_for_classification`(stage_classifier.py) 는 이 SPEC 범위 밖의
     다른 호출자와 공유하므로 건드리지 않고, 이 서비스에서 필요한 보조 컬럼만
     별도 쿼리로 읽는다(scope discipline).
+
+    M6-gap G21 — ``trading_value`` 는 M5 가 확정한 정규 원천(daily
+    ``VolumeWon``, ``compute_trading_value_by_period``, 1W 창)으로 계산한다.
+    ``daily_db_path`` 가 없으면(호출자가 넘기지 않음) 결측(``None``)으로
+    보존한다 — weekly ``Close×Volume`` 근사로 조용히 대체하지 않는다.
     """
     conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
     try:
         rows = conn.execute(
-            """SELECT Name, CHG_1W, CHG_3M, Close, MAX52, Volume
+            """SELECT Name, CHG_1W, CHG_3M, Close, MAX52
                FROM stock_prices WHERE Date = ?""",
             (date,),
         ).fetchall()
     finally:
         conn.close()
+
+    tv_by_name: dict[str, float] = {}
+    if daily_db_path:
+        grid = compute_weekly_grid(weekly_db_path, date)
+        anchor_bar = anchor(grid, date, 7)
+        anchor_date = anchor_bar.date if anchor_bar is not None else None
+        tv_by_period = compute_trading_value_by_period(
+            daily_db_path, {"1w": anchor_date}, date)
+        tv_by_name = tv_by_period.get("1w", {})
+
     out: dict[str, dict] = {}
-    for name, chg_1w, chg_3m, close, max52, volume in rows:
+    for name, chg_1w, chg_3m, close, max52 in rows:
         near_52w_high = None
         if close is not None and max52 is not None and float(max52) > 0:
             near_52w_high = float(close) >= float(max52) * (1 - _NEAR_52W_THRESHOLD)
         out[name] = {
             "chg_1w": chg_1w, "chg_3m": chg_3m,
-            # trading_value 원천은 daily VolumeWon(M5 REQ-SAG-XXX)이 정규 경로이나
-            # 이 종목 목록은 weekly DB 만 소비하므로 weekly Close*Volume 으로 근사한다
-            # — 정확한 daily VolumeWon 배선은 후속 과제(progress.md §E.2 Gap 기재).
-            "trading_value": (
-                float(close) * float(volume) if close is not None and volume is not None
-                else None),
+            "trading_value": tv_by_name.get(name),
             "near_52w_high": near_52w_high,
         }
     return out
@@ -162,7 +175,7 @@ def get_stage_overview(
             if _market_matches(registry_market_of.get(s["Name"]), market_key)
         ]
 
-    extended = _load_extended_weekly_fields(weekly_db_path, date)
+    extended = _load_extended_weekly_fields(weekly_db_path, date, daily_db_path)
     weight_map: dict[str, float] = {}
     if daily_db_path:
         names = {s["Name"] for s in raw_stocks}
