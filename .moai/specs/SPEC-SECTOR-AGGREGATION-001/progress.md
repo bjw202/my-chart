@@ -1328,18 +1328,155 @@ A  tests/test_sector_benchmark_ranking.py
 
 ---
 
+### M4 — RRG (2026-08-13)
+
+#### E1 — 구현 개요
+
+신설 모듈 `my_chart/analysis/rrg.py`(순수 함수, DB 미접근) — 라우터 배선은 M6 소관
+(plan.md M6 "라우터 파라미터 + 종목 목록 필드")이므로 M4 는 M2/M3 와 동일하게
+**함수 수준** 진입점(`compute_rrg`)까지만 제공한다. 기존 z-score 기반 RRG
+(`my_chart/analysis/sector_advanced.py`, SPEC-TOPDOWN-001A 소관)는 **건드리지 않았다**
+— 별도 SPEC 소관 파일이며 본 SPEC 의 PRESERVE 대상이다.
+
+| 대상 | 내용 |
+| --- | --- |
+| `chain_index` | RRG-3 — 수익률 연쇄 지수. `r(t) = Σ(w_i(t−1)×ret_i(t))/Σw_i(t−1)`, `I(t)=I(t−1)×(1+r(t))`, `I(t0)=100`. 분모는 양쪽 시점 종가가 모두 존재하는 종목의 직전 가중치 합으로 재정규화(`weighted_mean` 과 동일 관용) — 구성종목 변동에도 잔존 종목 수익률이 같으면 흔들리지 않는다 |
+| `implied_shares` / `historical_market_caps` | RRG-4 — 주식수 = 현재시총/현재주가(단일 지점 역산) → 시점별 시총 = 주식수×그 시점 Close. 현재 스냅샷 시총을 과거에 직접 적용하는 경로 없음(AST 정적 스캔으로 확인) |
+| `_rs_ratio_trail` | RRG-1/RRG-2 — `rs_ratio(t) = 100×섹터지수(t)/벤치마크지수(t)`. 모멘텀은 직전 유효 지점 대비 단순 차분(롤링 z-score 없음, O-A1). 처음 `lookback_weeks` 개 날짜는 `trail[]` 에서 제외(상수 패딩 없음) |
+| `compute_rrg` | 벤치마크(섹터 그룹핑 없는 전체 유니버스, `capped_weights` 재사용 — M3 의 BM-1 관용과 동일 구조) + 섹터별 궤적 + 산출 불가 섹터 `excluded[]` + 상수 주식수 가정 경고(O-A3, 매 응답 상설) |
+
+**해석이 필요했던 지점(단일 통과 최선 해석, blocker 아님)**: AC-SAG-032 의 "워밍업
+`lookback_weeks=12`" 이 정확히 무엇을 지연시키는지 acceptance.md 본문에 산식이
+없었다. **선택한 해석**: 처음 `lookback_weeks` 개 지수 지점을 `trail[]` 에서 제외하고,
+모멘텀은 단순 lag-1 차분(직전 지점 대비)으로 산출한다 — 롤링 정규화(O-A1 이 명시적으로
+금지)나 이동평균 스무딩을 도입하지 않는 가장 단순한 형태다. `trail` 길이가
+`history − lookback_weeks`(±1)로 정확히 맞아떨어지고, 모멘텀이 워밍업 구간 마지막
+지점을 기준으로 첫 지점부터 유효값을 갖는다(추가 1점 소비, AC-SAG-032 본문의 "모멘텀
+차분 1점 추가 제외" 표현과 부합). 대안(예: 모멘텀에 별도 스무딩 윈도우를 두는 해석)도
+가능했으나, Enforce Simplicity 원칙과 O-A1(롤링 정규화 없음) 결정에 가장 부합하는
+최소 형태를 택했다.
+
+#### E2 — AC Binary PASS/FAIL 매트릭스 (AC-SAG-031~035, AC-SAG-045 R7)
+
+전건 `tests/test_sector_rrg.py`(신설, 11 tests). 명령:
+`pytest tests/test_sector_rrg.py -q` → `11 passed`.
+
+| AC | 상태 | 실제 출력(검증 커맨드) | 비고 |
+| --- | --- | --- | --- |
+| AC-SAG-031 | PASS | `pytest tests/test_sector_rrg.py::test_ac_sag_031_identical_sector_and_benchmark_rs_ratio_100 tests/test_sector_rrg.py::test_ac_sag_031_all_sectors_above_100_when_all_leading -q` → `2 passed` | 동일 지수 → `rs_ratio==100±0.01` 전 구간, all-leading 픽스처 → 전 섹터 `rs_ratio>100`, `benchmark_name` 존재 |
+| AC-SAG-032 | PASS | `pytest tests/test_sector_rrg.py::test_ac_sag_032_warmup_non_emission -q` → `1 passed` | `trail` 길이 `30−12`(±1), `trail_start_date>dates[0]`, 상수 100 패딩 없음, 첫 4개 모멘텀 상이 |
+| AC-SAG-033 | PASS | `pytest tests/test_sector_rrg.py::test_ac_sag_033_index_chain_no_jump_on_membership_change tests/test_sector_rrg.py::test_weight_lag_uses_prev_period_weights_not_current -q` → `2 passed` | 구성종목 변동 시에도 인접 비율 `1.01±0.001` 유지 + **대조**: 날짜별 재계산(naive) 방식은 구성 변동 시점에서 `1.01` 대비 `0.005` 초과 이탈(점프) 실증 |
+| AC-SAG-034 | PASS | `pytest tests/test_sector_rrg.py::test_ac_sag_034_historical_market_cap_uses_implied_shares_not_current_snapshot tests/test_sector_rrg.py::test_ac_sag_034_static_scan_no_current_snapshot_leak_into_history -q` → `2 passed` | 과거 시총(`500.0`) ≠ 현재 시총(`1000.0`) 값 검증 + AST 스캔: `historical_market_caps` 함수 코드 내부에 `market_caps` 식별자 참조 0건 |
+| AC-SAG-035 | PASS | `pytest tests/test_sector_rrg.py::test_ac_sag_035_missing_sector_excluded_no_rs_ratio_100_substitute -q` → `1 passed` | 산출 불가 섹터는 `trail_by_sector` 에서 빠지고 `excluded[]` 에 사유(`no_data_in_trail_window`)와 함께 등록. `rs_ratio==100` 대체 없음 |
+| AC-SAG-045 R7 | PASS | `pytest tests/test_sector_rrg.py::test_ac_sag_045_r7a_all_leading_no_bias_warning tests/test_sector_rrg.py::test_ac_sag_045_r7a_cross_sectional_zscore_variant_diverges tests/test_sector_rrg.py::test_ac_sag_045_r7b_no_quadrant_balance_assertion_in_test_suite -q` → `3 passed` | (a) all-leading → 전 섹터 `rs_ratio>100`, 편중 경고 없음 + **대조**: 횡단면 z-score 되돌림 변형에서 절반 미만 실증. (b) `grep -rnE --include=*.py "quadrant.*(balanc|even|distribut)\|len\(leading\).*<" tests/` → 0행(자기 파일 제외) |
+
+#### E3 — 대조/되돌림 실증 (Lesson #9 — 실제 적용 → RED 관측 → 복원 → GREEN)
+
+세 건을 실제로 적용해 RED 를 verbatim 캡처하고 백업본(`cp`)으로 복원했다
+(`git checkout-index` 미사용).
+
+**변형 1 — `mut_current_weight`**(`chain_index` 에서 가중치를 `w(t-1)` 대신 `w(t)`
+로 즉시 갱신):
+
+```
+FAILED tests/test_sector_rrg.py::test_weight_lag_uses_prev_period_weights_not_current
+  AssertionError: {'d0': 100.0, 'd1': 108.0, 'd2': 116.64000000000001}
+  assert 8.0 < 1e-09
+   +  where 8.0 = abs((108.0 - 100.0))
+```
+
+**변형 2 — `mut_no_warmup`**(`_rs_ratio_trail` 에서 워밍업 구간을 건너뛰지 않고
+`range(0, len(ordered))` 로 전 구간 발행):
+
+```
+FAILED tests/test_sector_rrg.py::test_ac_sag_031_all_sectors_above_100_when_all_leading
+  AssertionError: ('SEC_A', (RRGPoint(date='d0', rs_ratio=100.0, ...), ...))
+  assert False
+FAILED tests/test_sector_rrg.py::test_ac_sag_032_warmup_non_emission
+  AssertionError: 30
+  assert 12 <= 1
+   +  where 12 = abs((30 - 18))
+```
+
+**변형 3 — `mut_rs_ratio_100_fallback`**(`compute_rrg` 에서 산출 불가 섹터를
+`excluded[]` 대신 `rs_ratio==100` 상수로 채워 `trail_by_sector` 에 포함):
+
+```
+FAILED tests/test_sector_rrg.py::test_ac_sag_035_missing_sector_excluded_no_rs_ratio_100_substitute
+  AssertionError: assert 'SEC_MISSING' not in {'SEC_MISSING': RRGSeries(trail=(RRGPoint(date='d11', rs_ratio=100.0, rs_momentum=0.0), ...)}
+```
+
+세 건 모두 복원 후 `diff /tmp/rrg.py.bak my_chart/analysis/rrg.py` 바이트 동일 확인
++ `pytest tests/test_sector_rrg.py -q` → `11 passed` 재확인.
+
+#### E4 — 전체 테스트 스위트 델타 (M3 → M4)
+
+```
+$ pytest tests/ -q
+8 failed, 832 passed, 68 skipped, 1 xpassed, 25 errors in 94.64s
+```
+
+| | M3 완료 후 | M4 완료 후 | 델타 |
+| --- | --- | --- | --- |
+| passed | 821 | **832** | +11 (신규 `test_sector_rrg.py` 전건) |
+| failed | 8 | **8** | 0 — **동일 집합**(`test_api` 1 · `test_meta_service` 2 · `test_rs_line` 2 · `test_screen_service` 3) |
+| errors | 25 | **25** | 0 — 전건 pre-existing `tests/fnguide/*` |
+
+신규 실패 0건. M2/M3 게이트(`test_aggregation_fixture.py` + `test_sector_aggregation.py`
++ `test_sector_benchmark_ranking.py` = 123) 재확인 그린.
+
+#### E5 — 커버리지
+
+`coverage` 모듈 미설치(M2/M3 와 동일 환경 — G6/G13 연속, 재설치는 세션 스코프 밖).
+대리 지표: 신설 11 테스트가 `chain_index` / `implied_shares` /
+`historical_market_caps` / `_rs_ratio_trail` / `compute_rrg` 전 공개·비공개 함수의
+정상/워밍업/결측/구성변동 분기를 직접 실행한다. `sector_advanced.py`(구 RRG, 본
+SPEC 미변경)는 커버리지 대상이 아니다.
+
+#### E6 — @MX 태그
+
+| 태그 | 위치 | 내용 |
+| --- | --- | --- |
+| `@MX:NOTE` | `rrg.py` `chain_index` 상단 | 가중치 지연(`w_i(t−1)`)이 plan.md §3.4 설계 결정임을 명시(우연한 구현 세부사항 아님) |
+
+신설 파일 — NOTE 1/10, ANCHOR 0/3, WARN 0/5. `compute_rrg` 는 M6 라우터 배선 이전
+이라 fan_in 0(아직 호출자 없음) — ANCHOR 대상 아님. M6 배선 이후 fan_in>=3 이 되면
+ANCHOR 승격 검토.
+
+#### E7 — 스코프 규율
+
+```
+$ git status --short   (신설 파일만)
+?? my_chart/analysis/rrg.py
+?? tests/test_sector_rrg.py
+```
+
+`my_chart/analysis/sector_advanced.py`(구 RRG, SPEC-TOPDOWN-001A 소관) ·
+`backend/routers/sectors.py`(M6 소관) · `tests/fixtures/` · `spec.md`/`plan.md`/
+`acceptance.md` 본문은 손대지 않았다.
+
+#### Gaps / 잔여 위험 (M4)
+
+| # | 항목 | 처분 |
+| --- | --- | --- |
+| **G14** | `compute_rrg` 는 함수 수준까지만 제공 — `/sectors/rrg` 라우터 배선, DB 조회(주봉 격자 history, daily 최신 시총/종가), 응답 스키마 노출은 M6 산출물에 의존 | plan.md M6 이 명시적으로 소관("라우터 파라미터 + 종목 목록 필드"). M2 의 AC-SAG-007/043, M3 의 G10 과 동일한 처분 패턴 — 지금 미실행은 Gap 이 아니라 예정된 의존이다 |
+| **G15** | 커버리지 미측정(G6/G13 연속) | 위 §E5 참조 |
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M3 완료. 다음 = M4(RRG) 또는 M5(지표 정정) — 별도 위임
-milestone_completed: M3            # 벤치마크 + 순위/정규화. 라우터 파라미터 완전 배선은 M6 의존(Gap G10)
-run_commit_sha: 1815d30            # M3 커밋 (backfill — D3 예외, M2 25f3fa9 전례)
+run_status: in-progress            # M4 완료. 다음 = M5(지표 정정) 또는 M6(라우터 배선) — 별도 위임
+milestone_completed: M4            # RRG(함수 수준). 라우터 배선(/sectors/rrg)은 M6 의존(Gap G14)
+run_commit_sha: pending-backfill-m4   # M4 커밋 (D3 예외 — 자기참조 해저드, 후속 커밋에서 backfill)
+prior_run_commit_sha_m3: 1815d30   # M3 커밋
 prior_run_commit_sha_m2: 25f3fa9   # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
 prior_milestone_commits: "adb1f25 (M1.0-a 구) · b839cee (M1.0-a §E.3 구) · 6f00ba5 (M1.0-b/c 구) · 7b5fc45 (M1.0-b/c §E.3 구) · 7305e2e (M1.1) · a000add (M1.0-a 재빌드) · 8e51176 (M1.0-b 재캡처)"
-ac_gate: "AC-SAG-011~023 · 046(lite) (M3 RED 목록 — 046 은 §8.1 지정 픽스처 대신 aggregation 픽스처로 lite 검증, Gap G11)"
-ac_pass_count: 30                  # M2 17 + M3 13(011·012·013·014·015·016·017·018·019·020·021·022·023, 046-lite 는 부분 PASS 로 별산)
-ac_fail_count: 0                   # M3 RED 목록 전건 GREEN(021/022/023 은 함수 수준, 라우터 배선 M6 의존 — Gap G10)
+ac_gate: "AC-SAG-011~023 · 046(lite) · 031~035 · 045(R7) (M2~M4 RED 목록 누적 — 046 은 §8.1 지정 픽스처 대신 aggregation 픽스처로 lite 검증, Gap G11)"
+ac_pass_count: 36                  # M2 17 + M3 13(011~023, 046-lite 는 부분 PASS 로 별산) + M4 6(031·032·033·034·035·045-R7)
+ac_fail_count: 0                   # M2~M4 RED 목록 전건 GREEN(021/022/023 은 함수 수준, compute_rrg 라우터 배선은 M6 의존 — Gap G10/G14)
 ac_blocked: "없음 — v0.4.2에서 해소 (D16: F12 신설 + AC-SAG-002 재작성 / D17: §3.1 동결형 교체 + AC-SAG-049 신설). [v0.5.0] 추가 정정 — N1(AC-SAG-041 cap_eff) · D22(AC-SAG-010) · D20(045 R1) · D23(AC-SAG-015) · D21(045 R5-b) · N4(AC-SAG-012) · N3(AC-SAG-016) · N7(AC-SAG-044) · D24(AC-SAG-013) · N2(F7 규약 Y) · D25(F4·F8 폐지) · R-C1~R-C8(F13 신설) · D29(합성 바) · N5/D26(고아 AC)"
 blocker_open: false               # M2 blocker(D16/D17)는 v0.4.2/v0.5.0 에서 해소됐고 M2 가 완주했다. 신규 blocker 없음 — G7 은 표기 정정 권고(비차단)
 blocker_owner: manager-develop    # 소유권 반환. acceptance.md 본문 수정 완료(v0.4.2)
@@ -1372,9 +1509,9 @@ fixture_rebuild_measurements: "종목 331(지수 2) · 유효 유니버스 321 �
 f7_convention: "Y"                 # NULL MAX52 를 신·구 양쪽 분자·분모에서 제외. 규약 X 51 → 규약 Y 24, 차이 27 = NULL 종목 수
 golden_baseline_discarded: true    # [완료 8e51176] b839cee 캡처분(F12 미충족 픽스처 위) 폐기 후 재빌드 픽스처에서 재캡처. 폐기 전 sha256 은 §E.2 M1.0-b 재캡처 E1 에 기록
 relief_valve_used: none            # F13-2 14→12 축소 미사용. 크기 16.8 MB 로 예산(16~17 MB) 내
-next_gate: "M4 — RRG (O-A1/O-A3 해결 완료). 또는 M5 — 지표 정정(독립 커밋 단위). 별도 위임"
-deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절(D19) · AC-SAG-021 라우터 엔드투엔드(G10) · AC-SAG-023/046 최상위 응답 노출(G10) — M6 산출물 의존. M2~M5 미실행은 Gap 이 아니다"
-total_run_phase_files: 28          # M2 27 + M3 1종(test_sector_benchmark_ranking.py 신설, 프로덕션 파일은 기존 4개 수정)
+next_gate: "M5 — 지표 정정(독립 커밋 단위). 또는 M6 — 라우터 파라미터 + 종목 목록 필드(RRG 배선 포함). 별도 위임"
+deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절(D19) · AC-SAG-021 라우터 엔드투엔드(G10) · AC-SAG-023/046 최상위 응답 노출(G10) · compute_rrg 라우터 배선(G14, M4 신설) — M6 산출물 의존. M2~M5 미실행은 Gap 이 아니다"
+total_run_phase_files: 30          # M2 27 + M3 1종 + M4 2종(rrg.py 신설 · test_sector_rrg.py 신설)
 # --- M2 (2026-08-13) ---------------------------------------------------------
 m2_new_tests: 48                   # test_weighting 18 · test_sector_aggregation 23 · test_inv_cap1_scan 7
 m2_full_suite: "8 failed, 786 passed, 68 skipped, 1 xpassed, 25 errors — B-2 baseline 과 실패 집합 동일, 신규 실패 0"
@@ -1405,6 +1542,17 @@ m3_ac020_static_scan_scope: "_rank_sectors 함수 소스 AST 스캔(0건) — le
 m3_rank_change_recursion_guard: "compute_rank_change 파라미터로 1단 재귀만 허용(무한 재귀 방지) — baseline 호출은 compute_rank_change=False"
 mutation_verification_m3: observed-red-3   # mut_benchmark_ignores_market_filter(2 RED) · mut_round_in_sort_path(1 RED) · mut_partial_composite(1 RED, TypeError 로 검출). 3건 모두 복원 후 GREEN + 바이트 동등 확인(diff /tmp/sector_metrics.py.bak)
 m3_open_gaps: "G10(라우터 파라미터 미배선 — M6 의존) · G11(AC-SAG-046 원 픽스처·금요일 종단 절 미실행, lite 로 대체) · G12(AC-SAG-013 부호분산 합성 픽스처 전용 테스트 미작성) · G13(커버리지 미측정, G6 연속)"
+# --- M4 (2026-08-13) ---------------------------------------------------------
+m4_new_tests: 11                   # test_sector_rrg.py 전건 신설
+m4_full_suite: "8 failed, 832 passed, 68 skipped, 1 xpassed, 25 errors — M3 baseline 과 실패 집합 동일, 신규 실패 0"
+m4_gate_tests_still_green: 123     # test_aggregation_fixture 65 + test_sector_aggregation 23 + test_sector_benchmark_ranking 35 (M4 착수 전/후 동일)
+m4_fixtures_touched: false         # git status --porcelain tests/fixtures/ 공백 — M4 는 순수 함수라 DB 픽스처 자체를 쓰지 않는다
+m4_new_module: "my_chart/analysis/rrg.py (신설, 순수 함수 — DB 미접근)"
+m4_legacy_rrg_untouched: true      # my_chart/analysis/sector_advanced.py(SPEC-TOPDOWN-001A 소관 z-score RRG) 미수정
+m4_interpretation_note: "AC-SAG-032 워밍업 산식 미명시 — lookback_weeks 만큼 trail 앞부분 절단 + 모멘텀 단순 lag-1 차분으로 단일 통과 해석(§E.2 M4 E1 상세)"
+mutation_verification_m4: observed-red-3   # mut_current_weight(1 RED) · mut_no_warmup(2 RED) · mut_rs_ratio_100_fallback(1 RED). 3건 모두 복원 후 GREEN + 바이트 동등 확인(diff /tmp/rrg.py.bak)
+m4_counter_naive_jump: "naive(날짜별 Σ(close×cap)/Σcap, 현재 가중치) 방식은 구성종목 변동 시점(d2→d3)에서 비율 1.000098 (기대 1.01 대비 0.0099 이탈, 임계 0.005 초과) — 체인 방식은 같은 구간에서 1.01±0.001 유지(test_ac_sag_033_index_chain_no_jump_on_membership_change)"
+m4_open_gaps: "G14(compute_rrg 라우터 배선 미실행 — M6 의존) · G15(커버리지 미측정, G6/G13 연속)"
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
