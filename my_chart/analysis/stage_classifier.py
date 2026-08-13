@@ -158,6 +158,23 @@ def classify_stage(stock_row: dict[str, Any]) -> StageResult:
     )
 
 
+# @MX:NOTE: [AUTO] SPEC-SECTOR-AGGREGATION-001 REQ-SAG-023/AC-SAG-026 — SMA40/SMA10
+#   결측 종목은 "분류 불가"로 분모에서 제외해야 한다. classify_stage() 자체는
+#   SPEC-TOPDOWN-001A 소관이라 그 시그니처(항상 int stage 반환)를 바꾸지 않고,
+#   결측 판정을 이 얇은 래퍼로 추가한다.
+def classify_stage_or_none(stock_row: dict[str, Any]) -> tuple[int | None, str | None]:
+    """``SMA10``/``SMA40`` 가 NULL 이면 ``(None, None)``, 아니면 :func:`classify_stage` 위임.
+
+    Returns:
+        ``(stage, detail)``. 분류 불가(결측)면 ``(None, None)`` — 호출부가
+        ``reason:"insufficient"`` 를 부여하고 분모에서 제외한다.
+    """
+    if stock_row.get("SMA10") is None or stock_row.get("SMA40") is None:
+        return None, None
+    result = classify_stage(stock_row)
+    return result.stage, result.detail
+
+
 def _load_stocks_for_classification(
     conn: sqlite3.Connection,
     date: str,

@@ -127,7 +127,7 @@ async def sector_detail(sector_name: str) -> SectorDetailResponse:
     Returns empty lists if sector is not found.
     """
     from backend.services.sector_detail_service import get_sector_detail
-    return get_sector_detail(DAILY_DB_PATH, sector_name)
+    return get_sector_detail(DAILY_DB_PATH, sector_name, weekly_db_path=WEEKLY_DB_PATH)
 
 
 # @MX:NOTE: [AUTO] /sectors/{sector_name}/bubble은 /sectors/bubble 다음에 선언

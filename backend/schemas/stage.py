@@ -14,6 +14,8 @@ class StageDistribution(BaseModel):
     stage2: int
     stage3: int
     stage4: int
+    # AC-SAG-027 — SMA40/SMA10 결측으로 분류 불가한 종목 수(REQ-SAG-024).
+    unclassified_count: int = 0
     total: int
 
 
@@ -25,6 +27,10 @@ class SectorStageBreakdown(BaseModel):
     stage2: int
     stage3: int
     stage4: int
+    # AC-SAG-027 — distribution 과 동일한 불변식(§8.6)이 by_sector 항목에도 성립해야
+    # 한다: stage1+stage2+stage3+stage4+unclassified_count == total.
+    unclassified_count: int = 0
+    total: int = 0
 
 
 class StageStock(BaseModel):
