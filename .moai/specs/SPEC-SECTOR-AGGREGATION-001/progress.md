@@ -576,14 +576,329 @@ M1.1(`7305e2e`)은 집계 로직을 건드리지 않았으므로 되돌리지 �
 
 ---
 
+### M1.0-a 재빌드 — 집계 픽스처 F1~F13 + AC-SAG-048 확장 (2026-08-13, `a000add`)
+
+**결론: AC-SAG-048 PASS (65 tests).** v0.4.2 D16 / v0.5.0 F13 요건에 따라 픽스처를 재빌드했다.
+구 빌드(`adb1f25`)는 F1~F11 을 전부 충족하고 AC-SAG-048 도 PASS 였으나, AG-5 통과 18섹터 중
+유효 시총 `n > 10` 이 게임 하나뿐이라 INV-CAP-1 축퇴(`cap_eff = max(0.10, 1/n)` — `n <= 10` 이면
+시총가중이 등가중과 비트 단위로 동일)로 AC-SAG-002 를 **완전한 무게이팅**으로 만들었다.
+
+#### 빌드 설계 (재빌드에서 바뀐 3점)
+
+1. **F13-1 상위집합 [HARD]** — `f13-1-superset-baseline.tsv` 신설. `git show adb1f25:…/weekly.db`
+   와 `…/registry.xlsx` 를 직접 추출해 145종목 + 섹터 배정을 기록했다(워킹트리 상태에 의존하지
+   않는다). 빌더는 이 집합을 **후보 풀 통과 여부와 무관하게 전량 시드**하며, 누락 시 빌드가
+   `SystemExit` 로 중단된다.
+2. **F13-2 대형 섹터 폭** — `SECTOR_PLAN` 확대. F3 3개 섹터(디스플레이·스마트폰·PCB)는
+   **KOSPI 구성수(4 / 4 / 5)를 고정한 채 KOSDAQ 으로만** 넓혔다. 이유: 이 셋을 `n <= 10` 으로
+   두면 시총가중 값이 등가중과 비트 동일해지는데도 **이웃 섹터의 교차만으로 F12-c 순위 이동
+   집합에 끼어든다**(1차 빌드에서 PCB·스마트폰이 실제로 들어왔다). AC-SAG-048 축퇴 방지 절이
+   그 상태를 참조 구현 결함으로 규정하므로, 축퇴 경계를 넘겨 구조적으로 제거했다.
+   패션은 5종목 / 유효 시총 3 을 유지한다(F6 · F13-4).
+3. **F7 규약 Y (N2)** — `build_fixture.py` 의 `(max52 or 0.0)` / `MAX52.fillna(0.0)`(규약 X)을
+   **NULL 제외**로 교체했다. 상세는 아래 E4.
+
+#### E1 — F1~F13 실측 표 (임계는 acceptance.md §8.2 / §8.2.1 리터럴)
+
+| 요건 | 요구 | 실측 | 여유 | 판정 | 측정 명령 |
+| --- | --- | --- | --- | --- | --- |
+| **F1** 날짜 축 상위집합 | 종목·날짜 집합 ⊇ | 누락 0 / 0 | — | PASS | `pytest -k f1_superset` |
+| **F2** AG-5 통과 섹터 | `>= 12` | **18** | 1.50x | PASS | `pytest -k f2_ag5` |
+| **F3-a** KOSPI 정확히 4 | `== 2` | **2** (디스플레이·스마트폰) | — | PASS | `pytest -k f3_kospi` |
+| **F3-b** KOSPI 정확히 5 | `>= 1` | **1** (PCB) | 1/1 | PASS | `pytest -k f3_kospi` |
+| ~~F4~~ | — | **폐지** (v0.5.0, 소비 AC 부재) | — | N/A | 검사 삭제 |
+| **F5-a** 시총 NULL/`<=0` 종목 | `>= 5` | **9** | 1.80x | PASS | `pytest -k f5a` |
+| **F5-b** RS 결측 보유 섹터 | `>= 3` | **10** | 3.33x | PASS | `pytest -k f5b` |
+| **F6** 유효 시총 정확히 3 섹터 | `>= 1` | **1** (패션) | 1/1 | PASS | `pytest -k f6_ag4` |
+| **F7** 신고가 판정 분기 (규약 Y) | `>= 5` | **24** | 4.80x | PASS | `pytest -k f7_nh` |
+| ~~F8~~ | — | **폐지** (v0.5.0, 소비 AC 부재) | — | N/A | 검사 삭제 |
+| **F9** 완성 바 / 3M 앵커 | `>= 53` / 존재 | **345** / True | 6.51x | PASS | `pytest -k f9_grid` |
+| **F10** meta·daily 결측 | `0` / `0` | **0** / **0** | — | PASS | `pytest -k f10_daily` |
+| **F11** MANIFEST 필수 키 + `synthetic_bar` | 비어 있지 않음 | 7키 + 4항목 | — | PASS | `pytest -k f11_manifest` |
+| **F12-a** `n >= 11` ∧ 최상위 원비중 `> 0.10` | `>= 12` | **17** | 1.42x | PASS | `pytest -k f12a` |
+| **F12-b** 1M 시총가중−등가중 `>= 0.5%p` | `>= 3` | **13** | 4.33x | PASS | `pytest -k f12b` |
+| **F12-c** 1M 시총가중 순위 ≠ 등가중 순위 | `>= 5` | **12** | 2.40x | PASS | `pytest -k f12c` |
+| **F12** 축퇴 방지 | f12a/b/c 집합에 `n<=10` 0개 | **0** | — | PASS | `pytest -k f12_no_degenerate` |
+| **F13-1** 상위집합 누락 / 섹터 드리프트 | `0` / `0` | **0** / **0** | — | PASS | `pytest -k f13_1_superset` |
+| **F13-2** 유효 시총 `n >= 15` 섹터 | `>= 14` | **17** | 1.21x | PASS | `pytest -k f13_2_large` |
+| **F13-3** F12-b / F12-c 빌드 목표 | `>= 9` / `>= 9` | **13** / **12** | 1.33x | PASS | `pytest -k f13_3_f12_headroom` |
+| **F13-4** 패션 구성 / 유효 시총 | `5` / `3` | **5** / **3** | — | PASS | `pytest -k f13_4_small` |
+| **F13-5** 양 시장 비공백 + AG-5 섹터 | `>= 1` / `>= 1` | kospi 15 · kosdaq 17 (유니버스 133 · 188) | — | PASS | `pytest -k f13_5_both_markets` |
+| **F13-6** 합성 바 재라벨링 | `2026-08-11 > 0` ∧ `2026-08-12 == 0` | **323** / **0** | — | PASS | `pytest -k f13_6_synthetic` |
+| **MANIFEST 실측 일치** | 기록 == 독립 재산출 | 카운트 19키 · 집합 8키 · 스칼라 8키 전건 일치 | — | PASS | `pytest -k manifest_` |
+
+> **여유가 얇았던 1차 빌드를 폐기하고 재구성했다** — 1차 구성(296종목)에서 F12-a 는 14(1.17x),
+> F13-2 는 14(**1.00x, 여유 0**)였고 F12-c 집합에 `n<=10` 섹터 2개(PCB·스마트폰)가 들어 있었다.
+> §8.4 규약 10(대조 단언의 검출력을 실측으로 확인한다)의 취지에 따라 임계에 붙은 구성을 버리고
+> F3 3개 섹터를 KOSDAQ 으로 넓힌 2차 구성(331종목)을 채택했다.
+
+#### E2 — 산출물 인벤토리
+
+| 파일 | 구 빌드(`adb1f25`) | 재빌드(`a000add`) |
+| --- | --- | --- |
+| `weekly.db` | 6.80 MB · 20,479행 · 145 이름 | **11.0 MB · 31,254행 · 331 이름**(지수 2 포함) |
+| `daily.db` | 2.56 MB · 9,050행 | **5.8 MB** |
+| `registry.xlsx` | 13 KB | **24 KB** |
+| `f13-1-superset-baseline.tsv` | — | **신설** (145종목 + 섹터 배정) |
+| `MANIFEST.md` | F2~F8 | **F2~F13 + `synthetic_bar` + F7 규약 대조** |
+| 합계 | 9.0 MB | **16.8 MB** |
+
+유효 유니버스 135 → **321**. 고유 날짜 385 · 정규 격자 346바 · `history_grid` 345바 ·
+CG-3 배제 0건 — **날짜 축은 불변**이다.
+
+#### E4 — F7 규약 Y 마이그레이션 (N2)
+
+`build_fixture.py` 변경 (선별 단계 · 실측 단계 양쪽):
+
+```python
+# 규약 X (폐기) — NULL MAX52 를 0.0 으로 채워 `Close >= 0` 을 항상 참으로 만든다
+verdict_stored = df["Close"] >= df["MAX52"].fillna(0.0) * (1 - NH_THRESHOLD)
+verdict_high   = df["Close"] >= df["max_high"].fillna(0.0) * (1 - NH_THRESHOLD)
+df["nh_divergent"] = verdict_stored != verdict_high
+
+# 규약 Y (확정) — NULL MAX52 종목을 신·구 양쪽 분자·분모에서 제외한다
+judgeable = df["MAX52"].notna() & df["max_high"].notna()
+verdict_stored = df["Close"] >= df["MAX52"] * (1 - NH_THRESHOLD)
+verdict_high   = df["Close"] >= df["max_high"] * (1 - NH_THRESHOLD)
+df["nh_divergent"] = judgeable & (verdict_stored != verdict_high)
+```
+
+| 계수 규약 | 구 픽스처(`adb1f25`) | 재빌드 픽스처 |
+| --- | --- | --- |
+| 규약 X (NULL → `0.0`, 폐기) | **35** (MANIFEST 기록값) | **51** |
+| **규약 Y (NULL 제외, 확정)** | 15 (재계산값) | **24** |
+| NULL `MAX52` 종목 수 | 20 | **27** |
+| 차이 == NULL 종목 수 | 35 − 15 = 20 ✔ | 51 − 24 = 27 ✔ |
+
+MANIFEST `f7_*` 3키를 규약 Y 기준으로 재기록했다(`f7_convention: "Y"` ·
+`f7_nh_verdict_divergent_stock_count: 24` · `f7_max52_null_stock_count: 27` ·
+`f7_convention_x_divergent_stock_count: 51`). AC-SAG-048 은 **두 규약의 계수가 다름**과
+**차이가 정확히 NULL 종목 수임**을 단언한다 — 두 값이 같으면 규약 선택이 무증상이라는 뜻이므로
+그 픽스처는 AC-SAG-024 의 규약 Y 절을 게이팅하지 못한다.
+
+> 프로덕션 `near_52w_high` 경로에도 같은 규약을 적용하는 것은 **M5 작업**이다(§2.5). 본
+> 마일스톤은 프로덕션 코드를 건드리지 않았다(E12).
+
+#### E5 — 날짜 축 정합 + AC-SAG-046 비회귀
+
+```
+$ git status --short tests/fixtures/frozen/weekly-2026-08-12/      → (공백)
+$ git diff --stat HEAD~2 HEAD -- tests/fixtures/frozen/weekly-2026-08-12/  → (공백)
+```
+
+날짜 축 픽스처는 ① SPEC-SECTOR-GRID-001 소관 읽기 전용이며 **본 마일스톤에서 단 1바이트도
+변경되지 않았다.** 집계 픽스처 위의 파생값도 AC-SAG-046 과 동일하다 — `latest=2026-08-11` ·
+`is_partial_week=True` · `return_window_days={1w:11, 1m:32, 3m:95}` · 격자 346바 · 배제 0건.
+소비 테스트 `tests/test_consumer_dates.py` 26 passed, `tests/test_response_contract.py` +
+`tests/test_weekly_grid.py` 27 passed.
+
+#### E6 — F13-1 상위집합 증명
+
+`adb1f25` 145종목 전량이 재빌드에 존재하고 섹터 배정도 보존됐다.
+
+```
+f13_1_missing        = []   (집합 차 sorted(set(baseline) - set(agg_names)))
+f13_1_sector_drift   = []   (baseline 섹터 != 재빌드 registry 섹터인 종목)
+f13_1_baseline_count = 145  (MANIFEST 기록 == 목록 실측)
+```
+
+#### E3 — 음성 검증 (Lesson #9 — 작성이 아니라 **관측된 RED**)
+
+**NEG-1 · F2 임계 `12 → 999`** (AC-SAG-048 본문 지정 변형)
+
+```
+E       AssertionError: F2 위반 — AG-5 통과 섹터 18개 < 999: ['Auto', 'PCB', '게임', '내수',
+        '디스플레이', '반도체', '방산', '비철금속', '스마트폰', '유통', '음식료', '인터넷',
+        '조선', '철강', '통신', '패션', '헬스케어', '화장품']
+E       assert 18 >= 999
+tests/test_aggregation_fixture.py:408: AssertionError
+FAILED tests/test_aggregation_fixture.py::test_ac_sag_048_f2_ag5_sector_count
+1 failed, 2 passed, 62 deselected
+```
+
+**NEG-2 · F12-a 임계 `12 → 999`** (v0.4.2 지정 변형)
+
+```
+E       AssertionError: F12-a 위반 — n >= 11 이고 최상위 원비중 > 0.1 인 섹터 17개 < 999: [...]
+E       assert 17 >= 999
+tests/test_aggregation_fixture.py:532: AssertionError
+FAILED tests/test_aggregation_fixture.py::test_ac_sag_048_f12a_observable_cap_redistribution_sectors
+1 failed, 2 passed, 62 deselected
+```
+
+두 변형 모두 복원 후 **sha256 바이트 동등**을 확인했다
+(`f794452e3fa911c53d36fce6755422da7bf0ef3a46b8d0c4f9e62bc7d8d7cb12`, before == after).
+
+**NEG-3 · F13-1 상위집합 OFF — 지정된 형태로 실증되지 않았다 (Gap, 아래 참조)**
+
+`load_superset_baseline()` 을 `{}` 로 눌러 tmpdir 에 재빌드한 결과 **네 요건이 모두 green 이었다**:
+
+```
+F5-a  market_cap NULL/<=0 종목       실측   7  임계 >=   5  -> green
+F5-b  RS 결측 보유 섹터              실측  10  임계 >=   3  -> green
+F6    유효 시총 정확히 3 섹터        실측   1  임계 >=   1  -> green
+F7    신고가 판정 분기(규약 Y)       실측  19  임계 >=   5  -> green
+```
+
+원인은 **빌더에 두 번째 충족 경로가 있다**는 것이다 — `select_names()` 는 `FORCED_CAP_MISSING_
+PER_SECTOR` 로 시총 결측 종목을 강제 포함하고, "(b) 플래그 종목 최대 2개" 단계에서
+`nh_divergent | sma_null | rs_missing` 종목을 우선 픽한다. 상위집합을 빼도 선별기가 라이브 풀에서
+동등한 종목을 다시 집어온다.
+
+SPEC §8.2.1 이 실측 근거로 든 **순수 시총순 선정**(상위집합 OFF **+** 플래그 인지 선별 OFF)을
+별도로 재현하면 **2/4 만 RED** 다:
+
+```
+F5-a  market_cap NULL/<=0 종목       실측   0  임계 >=   5  -> RED   (SPEC 예측 0 — 일치)
+F5-b  RS 결측 보유 섹터              실측   5  임계 >=   3  -> green (SPEC 예측 3 — 불일치)
+F6    유효 시총 정확히 3 섹터        실측   0  임계 >=   1  -> RED   (SPEC 예측 소멸 — 일치)
+F7    신고가 판정 분기(규약 Y)       실측  12  임계 >=   5  -> green (SPEC 예측 2 — 불일치)
+```
+
+두 실행 모두 **tmpdir 에만 빌드**했으며 리포의 픽스처는 건드리지 않았다.
+
+#### E10 — 전체 회귀 (B-13 baseline 대비)
+
+| 구분 | baseline (`a224593`) | 재빌드 후 | 신규 |
+| --- | --- | --- | --- |
+| passed | 702 | **737** (+35, 신규 AC-SAG-048 테스트) | — |
+| failed | 8 | **8** (동일 집합) | **0** |
+| errors | 25 (`tests/fnguide/*`) | **25** | **0** |
+| skipped / xpassed | 68 / 1 | 68 / 1 | — |
+
+기존 실패 8건은 전건 pre-existing 이다 — `test_screen_service.py`(3) · `test_meta_service.py`(2) ·
+`test_rs_line.py`(2) · `test_api.py::test_too_many_patterns_rejected`(1).
+로그: `.moai/state/verify/m10a/1-post-rebuild-suite.log`.
+
+---
+
+### M1.0-b 재캡처 — 골든 baseline 폐기 후 재수집 + M1.0-c AC-SAG-047 (2026-08-13, `8e51176`)
+
+**결론: AC-SAG-047 PASS (40 tests). `golden_baseline_discarded: true`.**
+
+#### E1 — 폐기 기록
+
+구 baseline(`b839cee`, 캡처 2026-08-13 13:45:27)은 F12 미충족 픽스처(`adb1f25`) 위에서 떠졌고,
+그 픽스처는 재빌드로 더 이상 리포에 존재하지 않는다. 그 위에서 R1/R4/R5 를 판정하면 v0.4.1 의
+결함을 그대로 상속하므로 폐기했다(§9 DoD). 폐기 전 sha256:
+
+```
+ranking-current.json  3dbf8341fa0448bd0be36c51f79ee08b767463ffd10d8f0c5945d8e1da169c1b
+stage-overview.json   6b02e9c47045f1626e2953ba53baa32e51f9995f2b75868633d91fc61cefd0f2
+MANIFEST.md           7631a4b8f77b2a541eebd746a9f65c6ff14d75db7a9febb3709918eca6dc250e
+```
+
+재캡처 후 sha256:
+
+```
+ranking-current.json  249940b97c05eeaeb0efc0c3880d2ee21202e6889f6413994bdb769943312595
+stage-overview.json   7bee482b9584f3c7ee4d10c61b3c0ad534d227c465bab7a5a616e7d30b41f664
+MANIFEST.md           5edd288e55f37a6ecbb0525c65503c98c96c35a4c2f6bd0e8a56d1a44779fea5
+```
+
+#### E7 — 캡처 provenance (직렬화 계약)
+
+캡처 경로는 불변이다 — `fastapi.testclient.TestClient` 로 실제 HTTP 요청을 태워
+`response_model` 직렬화를 통과한 바이트를 뜬다. ASGI 경유 증거(캡처 로그 verbatim):
+
+```
+[INFO] httpx: HTTP Request: GET http://testserver/api/sectors/ranking "HTTP/1.1 200 OK"
+[INFO] httpx: HTTP Request: GET http://testserver/api/stage/overview "HTTP/1.1 200 OK"
+captured: date=2026-08-11 sectors=18 total=321
+```
+
+레지스트리 고정도 불변이다 — `my_chart.registry.get_sector_registry()` 는 경로 인자 없이 라이브
+`Input/sectormap-original.xlsx` 를 lazy-load 하므로, 모듈 상수 `SECTORMAP_PATH` 와 lazy 캐시
+`_df_sector` / `_df_stock` 을 함께 눌러 픽스처 사본을 읽게 했다. DB 경로는
+`backend.routers.sectors.{WEEKLY,DAILY}_DB_PATH` 와 `backend.routers.stage.WEEKLY_DB_PATH` 를 패치했다.
+
+`as_of` 는 `2026-08-11` 로 고정되며, 캡처 스크립트가 응답 `date` 와의 동등성을 단언한다
+(§8.4 규약 8 — `as_of=None` 기본값 의존 0건). D12 재도입 가드: 캡처 JSON 전체에서
+`sector_excess_return` **0건** · `total_count` **0건**.
+
+MANIFEST 에 픽스처 계보를 추가로 기록했다 —
+`fixture_manifest_git_sha: a224593` · `fixture_superset_of: adb1f25` ·
+`golden_baseline_discarded: true` · `supersedes: "b839cee …"`.
+
+#### E8 — baseline 비축퇴
+
+| 지표 | 값 |
+| --- | --- |
+| `excess_returns != returns` 인 섹터 수 | **18 / 18** |
+| 세 기간 최대 절대 격차 `\|excess − returns\|` | **16.166200** |
+
+`capture_baseline.py` 에 **캡처 시 비축퇴 단언**을 신설했다 — 지수 행 부재나 벤치마크 산출
+실패로 초과수익률이 원수익률로 degenerate 하면 캡처 자체가 실패한다. 그 상태의 baseline 위에서는
+R1/R4/R5 비교가 무의미하다.
+
+#### E2 — 산출물 실측 (구 baseline 대비)
+
+| 지표 | 구 (`b839cee`) | 신 (`8e51176`) |
+| --- | --- | --- |
+| `ranking.date` | 2026-08-11 | **2026-08-11** (불변) |
+| `len(sectors)` | 18 | **18** (불변) |
+| `distribution.total` | 135 | **321** |
+| `distribution` 1/2/3/4 | 1 / 42 / 2 / 90 | **5 / 96 / 6 / 214** |
+| `len(by_sector)` | 18 | **18** (불변) |
+| `len(stage2_candidates)` | 6 | **11** |
+| `len(all_stocks)` | 135 | **321** |
+
+#### E3 — AC-SAG-047 음성 검증 (Lesson #9)
+
+`ranking-current.json` 을 스크래치패드로 임시 이동한 상태의 관측 RED:
+
+```
+E       AssertionError: 골든 baseline 누락: …/tests/fixtures/golden/pre-sector-ux/ranking-current.json
+        — M1.0-b 캡처가 수행되지 않았다. `python tests/fixtures/golden/pre-sector-ux/capture_baseline.py` 로 캡처한다.
+E       assert False
+tests/test_golden_baseline.py:62: AssertionError
+```
+
+복원 후 sha256 바이트 동등 확인(before == after), `pytest tests/test_golden_baseline.py` **40 passed**.
+
+#### E12 — 스코프 규율
+
+```
+$ git status --short my_chart/ backend/ frontend/
+ M frontend/src/components/SectorAnalysis/BumpChart.tsx     ← 본 마일스톤과 무관(마지막 커밋 4c89d79, 2026-03-15)
+?? backend/reports/ · frontend/coverage/ · frontend/test-results/   ← 기존 미추적
+```
+
+**프로덕션 코드 변경 0줄.** `my_chart/` · `backend/` · `frontend/` 는 스테이징하지 않았다.
+`git add -A` / `git add .` 미사용, 픽스처 DB 는 `git add -f`(`.gitignore:41 *.db`).
+
+| 커밋 | 스테이징된 파일 |
+| --- | --- |
+| `a000add` | `tests/test_aggregation_fixture.py` · 픽스처 5종(`build_fixture.py` · `MANIFEST.md` · `f13-1-superset-baseline.tsv` · `registry.xlsx` · `weekly.db` · `daily.db`) |
+| `8e51176` | `tests/fixtures/golden/pre-sector-ux/` 4종(`capture_baseline.py` · `MANIFEST.md` · `ranking-current.json` · `stage-overview.json`) |
+
+#### E10 — 전체 회귀 (재캡처 후)
+
+`8 failed, 737 passed, 68 skipped, 1 xpassed, 25 errors` — B-13 baseline 과 **동일 집합**, 신규 0.
+로그: `.moai/state/verify/m10a/2-post-recapture-suite.log`.
+
+#### Gaps / 잔여 위험 (M1.0 재실행)
+
+| # | 항목 | 처분 |
+| --- | --- | --- |
+| **G1** | **AC-SAG-048 v0.5.0 음성 검증(상위집합 OFF 시 F7/F5-a/F5-b/F6 **함께** RED)이 실증되지 않았다.** 상위집합만 끄면 4/4 green, SPEC 이 근거로 든 순수 시총순 선정에서도 **2/4**(F5-a·F6)만 RED 다. 원인 둘: (a) 빌더의 플래그 인지 선별이 **제2의 충족 경로**를 이룬다, (b) 재빌드 규모가 SPEC 실측(235종목)의 1.4배(331종목)라 F5-b·F7 이 자연 발생만으로 임계를 넘는다 | **Gaps 로 기재**(§9 DoD — "실증하지 못한 항목은 GREEN 이 아니라 Gaps"). **F13-1 자체는 게이트로 강제되고 GREEN 이다**(누락 0 · 섹터 드리프트 0). 영향 범위는 "상위집합이 네 요건의 **유일** 충족 경로"라는 §8.2.1 서술의 근거이며, 이는 이 빌더 구현에 대해 **F5-a·F6 에만 성립**한다. AC 본문 수정 없이는 실증 형태를 바꿀 수 없으므로 M2 착수 전 `manager-spec` 판단 대상 |
+| **G2** | F12-b/F12-c 참조 구현의 **AG-7 해석** — §8.3 은 "최상위 `coverage_ratio < 0.50`"이라 적었으나 F12 문맥의 coverage 정의가 명시돼 있지 않다. 본 구현은 "1M 수익률 산출 가능 종목 비율 `< 0.50` 이면 섹터 null" 로 해석했고, 재빌드 픽스처에서는 **어느 섹터도 이 분기에 걸리지 않아 무증상**이다 | 무증상이므로 F12 값에 영향 없음. M2 의 프로덕션 참조 대조(AC-SAG-002 / 011 / 013) 착수 시 재확인 |
+| **G3** | F12 참조 구현이 빌더(`build_fixture.py`)와 테스트(`test_aggregation_fixture.py`) **양쪽에 독립 재구현**돼 있다. MANIFEST 일치 절은 두 재구현의 대조이며, **둘이 같은 오해를 공유하면 무증상 통과**한다 | AC-SAG-048 이 규정한 구조 그대로다(MANIFEST 실측 일치). 프로덕션과의 진짜 대조는 M2~M3 의 AC-SAG-002 / 011 / 013 이 담당한다 |
+| **G4** | AC-SAG-046 의 **금요일 종단 변형**은 본 마일스톤에서 재실행하지 않았다 | §8.6 판정대로 **미재실행 유지 — 안전**. 날짜 축 픽스처가 무변경(E5)이고 F13-6 이 대리 감시자다 |
+| **G5** | `f13-1-superset-baseline.tsv` 는 `adb1f25` blob 에서 생성했으나 **파일 자체는 손으로 재생성 가능**하다 | 생성 명령을 파일 헤더 주석에 기록했다. AC-SAG-048 은 MANIFEST 기록 종목 수(145)와 목록 실측의 일치까지 단언한다 |
+| **잔여 위험** | 재빌드가 라이브 DB(`mtime 2026-08-12 23:09:34`)에 의존한다. `/api/db/update` 재실행 후 빌드를 다시 돌리면 선별 결과가 달라질 수 있다 | 픽스처는 커밋으로 동결됐고 게이팅은 커밋된 바이트 위에서만 돈다. MANIFEST 가 원본 mtime 을 기록한다 |
+| **잔여 위험** | F13-2 여유 1.21x · F12-a 1.42x 는 확보했으나, **F13-2 는 18섹터 중 17섹터가 이미 대형**이라 상한에 가깝다 | 추가 여유가 필요하면 새 섹터를 유니버스에 편입해야 한다(현 계약은 요구하지 않는다) |
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: blocked                # M1.1 완료. M2 는 AC-SAG-002 blocker 로 미착수
-milestone_completed: M1.1
-run_commit_sha: 7305e2e            # M1.1 구현 커밋 (§E.2 증거 커밋은 633d6b4)
+run_status: in-progress            # M1.0 재실행 완료(재빌드 + 재캡처). 다음 = M2
+milestone_completed: M1.0-c        # 재실행분 — M1.0-a 재빌드 → 048 PASS → M1.0-b 재캡처 → 047 PASS
+run_commit_sha: 8e51176            # M1.0-b 재캡처 커밋 (M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
-prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3) · 6f00ba5 (M1.0-b/c) · 7b5fc45 (M1.0-b/c §E.3) · 7305e2e (M1.1)"
+prior_milestone_commits: "adb1f25 (M1.0-a 구) · b839cee (M1.0-a §E.3 구) · 6f00ba5 (M1.0-b/c 구) · 7b5fc45 (M1.0-b/c §E.3 구) · 7305e2e (M1.1) · a000add (M1.0-a 재빌드) · 8e51176 (M1.0-b 재캡처)"
 ac_gate: AC-SAG-047
 ac_pass_count: 6                   # 048 + 047 + 036 + 038 + 043(부분) + 008
 ac_fail_count: 0                   # M2 는 착수 자체를 하지 않았다(FAIL 이 아니라 미실행)
@@ -596,25 +911,32 @@ wip_branch: "wip/SPEC-SECTOR-AGGREGATION-001-M2 @ 83cb847 (main 미머지)"
 capture_via_http_response: true    # TestClient 경유 response_model 직렬화. model_dump_json() 아님
 capture_as_of: "2026-08-11"        # 캡처 스크립트가 응답 date 와 동등성 단언
 capture_fixture: "tests/fixtures/frozen/aggregation-2026-08-11"
-capture_git_sha: b839cee           # 캡처 시점 (코드 변경 0줄 상태)
+capture_git_sha: a000add           # 재캡처 시점 (M1.0-a 재빌드 커밋 — 구현 코드 변경 0줄 상태)
+capture_fixture_manifest_git_sha: a224593   # 픽스처 MANIFEST 가 기록한 빌드 시점 SHA
+capture_fixture_superset_of: adb1f25        # F13-1 기준 빌드 식별자
 baseline_files: 3                  # ranking-current.json · stage-overview.json · MANIFEST.md
 baseline_sector_count: 18          # >= 10 (AC-SAG-047)
-baseline_excess_returns_degenerate: false   # 54/54 (섹터,기간) 쌍이 returns 와 상이. max gap 16.1662
+baseline_excess_returns_degenerate: false   # 18/18 섹터가 returns 와 상이. max gap 16.166200
+baseline_distribution_total: 321   # 구 baseline 135 → 재캡처 321 (유효 유니버스 확대의 귀결)
 d12_forbidden_string_count: 0      # sector_excess_return · total_count 양 파일 0건
 new_warnings_or_lints_introduced: 0
-full_suite_delta: "+14 passed (688 → 702, M1.1) / failed 8 (전건 pre-existing, 동일 집합) / errors 25 (pre-existing)"
-date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경
-aggregation_fixture_touched: false # tests/fixtures/frozen/aggregation-2026-08-11/ 미변경
-production_code_touched: true      # M1.1 — 응답 스키마 추가 전용 확장 + 서비스 봉투 배선. 집계 로직 미변경
+full_suite_delta: "+35 passed (702 → 737, AC-SAG-048 F12/F13 테스트 신설) / failed 8 (전건 pre-existing, 동일 집합) / errors 25 (pre-existing) / 신규 실패 0"
+date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경 (git status/diff 공백 확인)
+aggregation_fixture_touched: true  # [재실행] M1.0-a 재빌드 — 145 → 331 이름 / 9.0 → 16.8 MB
+production_code_touched: false     # [재실행] my_chart/ · backend/ · frontend/ 스테이징 0건. 프로덕션 near_52w_high 규약 Y 적용은 M5
 live_db_mutated: false             # /api/db/update 미실행
-negative_verification: observed-red-1        # stage-overview.json 임시 이동 → 3 failed + 11 errors 관측. 복원 후 40 passed (E5)
-mutation_verification_m2: not-run  # mut_equal_weight 미실증 — 재빌드된 F12 픽스처 위에서 AC-SAG-002 가 검출력을 회복한 뒤 수행(Gap 유지)
+negative_verification: observed-red-3        # NEG-1 F2→999 RED · NEG-2 F12-a→999 RED · NEG-4 golden 파일 이동 RED. 3건 모두 복원 후 sha256 바이트 동등 확인
+negative_verification_f13_1: not-reproduced  # [Gap G1] 상위집합 OFF 시 4/4 green, 순수 시총순에서도 2/4(F5-a·F6)만 RED. 빌더의 플래그 인지 선별이 제2 충족 경로
+mutation_verification_m2: not-run  # mut_equal_weight 미실증 — M2 착수 시 수행(Gap 유지). 픽스처는 이제 F12 를 충족하므로 검출력 전제는 확보됐다
 point_of_no_return_crossed: false  # **M2 미커밋 — 재캡처 경로 여전히 열려 있다**
-fixture_rebuild_required: true     # [v0.4.2 D16 · v0.5.0 F13 확장] 현 픽스처는 F12 미충족(AG-5 통과 18섹터 중 n>10 이 게임 1개). 재빌드 목표 = **현행 145종목 상위집합**(F13-1 [HARD]) + 유효 시총 n >= 15 섹터 14개 이상(F13-2) + F12-b·c >= 9 빌드 목표(F13-3) + 패션 5종목/유효 시총 3 보존(F13-4) + 양 시장 비공백(F13-5) + 합성 바 재라벨링 재현(F13-6). F7은 규약 Y로 재계수(빌더 변경)
-golden_baseline_discarded: true    # [v0.4.2 D16] b839cee 캡처분은 F12 미충족 픽스처 위에서 떠졌으므로 폐기 — M1.0-b 재수행
-next_gate: "M1.0-a 재빌드(F12 + F13 · 상위집합 + F7 규약 Y) → AC-SAG-048 PASS(F1~F13) → M1.0-b 재캡처 → M1.0-c(AC-SAG-047 PASS) → M2"
+fixture_rebuild_required: false    # [해소 a000add] F1~F13 전건 충족. F12-a 17(1.42x) · F12-b 13(4.33x) · F12-c 12(2.40x) · F13-2 17(1.21x) · F13-3 13/12(목표 9)
+fixture_rebuild_measurements: "종목 331(지수 2) · 유효 유니버스 321 · weekly 31,254행/385날짜 · 격자 346바 · 16.8 MB · F2 18 · F3 2·1 · F5-a 9 · F5-b 10 · F6 1 · F7(규약 Y) 24 · F9 345 · F10 0·0 · F13-1 누락 0 · F13-4 패션 5·3 · F13-6 323행/0행"
+f7_convention: "Y"                 # NULL MAX52 를 신·구 양쪽 분자·분모에서 제외. 규약 X 51 → 규약 Y 24, 차이 27 = NULL 종목 수
+golden_baseline_discarded: true    # [완료 8e51176] b839cee 캡처분(F12 미충족 픽스처 위) 폐기 후 재빌드 픽스처에서 재캡처. 폐기 전 sha256 은 §E.2 M1.0-b 재캡처 E1 에 기록
+relief_valve_used: none            # F13-2 14→12 축소 미사용. 크기 16.8 MB 로 예산(16~17 MB) 내
+next_gate: "M2 — 가중·집계 코어. 강제 순서상 선행 조건(M1.0-a 재빌드 → 048 PASS → M1.0-b 재캡처 → 047 PASS) 전건 충족. M2 는 별도 위임"
 deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절 — M6 산출물 의존(D19). M2~M5 미실행은 Gap 이 아니다"
-total_run_phase_files: 18          # 기존 11 + M1.1 7 (신설 3 · 수정 4)
+total_run_phase_files: 20          # 기존 18 + f13-1-superset-baseline.tsv(신설) + 재빌드 산출물(기존 파일 갱신)
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
