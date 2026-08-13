@@ -32,6 +32,23 @@ plan-audit iteration 1은 **FAIL 0.78**(Tier L 임계 0.85)이었다. MUST-PASS�
 
 > **plan-auditor 재실행 안내**: v0.4.0에서 plan 산출물 4종이 전부 변경됐으므로 **plan-artifact hash가 바뀌었고 캐시된 감사 판정(FAIL 0.78)은 무효**다. `/moai run` Phase 1에서 plan-audit이 재실행된다.
 
+### 0.2 v0.4.1 — plan-audit iteration 2 부채 해소 (2026-08-13)
+
+plan-audit iteration 2는 **PASS-WITH-DEBT 0.845**(L 임계 0.85, 조화평균 기준 미달)였다. MUST-PASS 7항 전항 통과, Testability **+0.17**로 단일 이터레이션 최대 상승. iteration 1의 D2/D3/D5/D6/D7/D8/D9는 RESOLVED, D1/D4는 PARTIALLY-RESOLVED. 사용자 결정에 따라 **신규 결함 D10~D15를 M1 착수 전 단일 배치로 해소**했다(집계 설계 재검토는 하지 않는다 — 두 계층 상한 재배분 구조는 그대로 두고 **수용 기준만 고친다**).
+
+| 결함 | 심각도 | 요지 | 해소 |
+| --- | --- | --- | --- |
+| **D10** | CRITICAL (M3 차단) | AC-SAG-013의 "가중평균 초과수익률 == 0" 파생 항등식이 **올바른 구현에서 거짓**. 상한 재배분은 그룹핑 계층을 넘어 합성되지 않으며, **F4가 상한 구속을 강제**하므로 요건상 반드시 실패했다. 실측 `+1.496127 %p` vs 허용 `±0.05` | 주 단언을 **참조 구현 대조**로 교체(섹터별 `S_s^ref − B^ref` + `ω_s^ref` 가중 잔차). `0` 리터럴 삭제. 무상한 완전분할 `0` 항등식은 **참조 자기검사(비게이팅)** 로만 잔존 |
+| **D11** | MAJOR (M3 차단) | AC-SAG-014의 `anchor()` 호출 `== 1` 단언이 **D1/D2 공용 함수 구조(`N+1`회)에서 스스로 RED** | 주 단언을 **인자 `t`의 유일성**으로 이전, 호출 횟수 제약 삭제. `mut_benchmark_own_anchor` 검출력 보존 |
+| **D12** | CRITICAL (M1.0-c 차단) | AC-SAG-047이 **존재하지 않는 응답 키**를 단언(`sector_excess_return_1w/1m/3m`, `total_count`) — 정상 캡처에서 게이트가 RED | 실측 직렬화 키로 전면 정정(`sectors[i].excess_returns.{w1,m1,m3}`, `distribution.total`). AC-SAG-027 / REQ-SAG-024 / M1.0-b 주석 파급분도 정정 |
+| **D13** | MAJOR (M2 차단) | 참조 구현 계약이 AG-3/AG-4/AG-7에 미규정 — F5/F6이 그 케이스를 주입하므로 참조 동작이 갈릴 수 있었다 | §8.3에 **제외·null 처리 계약** 신설(허용 동작 1개 + 대조 집합 제한 + null 섹터 집합 동등 단언) |
+| **D14** | MINOR (M1.0-b 차단) | F1~F11 검증이 **캡처 뒤**에 있어 degenerate 픽스처 위에서 baseline이 떠질 수 있었다 | **AC-SAG-048 신설** — M1.0-a **종료 조건**. MANIFEST 기록값과 검사 산출 실측값의 일치까지 요구 |
+| **D15** | MINOR (M3 차단) | AC-SAG-014 / 045 R5-a에 픽스처 지정·`as_of` 고정 누락(규약 1·8 위반) | 태그를 `[게이팅 — 집계 픽스처 · …]`로, Given에 `as_of="2026-08-11"` 명시 |
+
+> **[HARD] 비가역 경계는 M1.0-b가 아니라 M2다** (감사 판정 기록, acceptance.md §8.5). M1.0-a~M1.0-c 구간에서는 **구현 코드가 그대로**이므로 잘못 뜬 baseline은 **재캡처할 수 있다.** 구 구현이 교체되는 **M2에서 캡처 창이 영구히 닫힌다.** run-phase 에이전트가 **M1.0-c에서 AC-SAG-047 RED**를 만나면 (1) 산출물 결함인지 게이트 단언 결함인지 먼저 구분하고, (2) 산출물 결함이면 M1.0-a로 되돌아가 **재캡처**하고, (3) 단언 결함이면 acceptance.md 편집 권한이 없으므로 **blocker report를 반환**한다. **강제 순서: `M1.0-a` → `AC-SAG-048 PASS` → `M1.0-b` → `M1.0-c(AC-SAG-047 PASS)` → `M2`.**
+
+> **plan-auditor 캐시 무효화 (v0.4.1)**: spec.md / plan.md / acceptance.md / progress.md가 다시 변경됐으므로 plan-artifact hash가 바뀌었고 **iteration 2 판정(PASS-WITH-DEBT 0.845)도 캐시로서는 무효**다.
+
 ---
 
 ## 1. [HARD] 결정 사항
@@ -68,7 +85,9 @@ tests/fixtures/frozen/aggregation-2026-08-11/
 - **요건은 acceptance.md §8.2 F1~F11**이며 **값이 아니라 구조**다. 어느 섹터를 몇 개 넣을지는 빌드 재량이고, 충족 여부만 MANIFEST에 실측으로 기록한다.
 - **F1(상위집합)이 날짜 축 정합의 근거다** — 원래 41종목이 385날짜 전부에 행을 갖고 있으므로, 보강 종목이 최근 창에만 존재해도 격자·`as_of=2026-08-11`·`is_partial_week=True`가 그대로 재현된다. 신규 종목은 F9의 53 완성 바 창에만 행을 채우면 되므로 픽스처 크기가 폭증하지 않는다.
 - **날짜 축 픽스처(`weekly-2026-08-12/`)는 ① 소관이며 읽기 전용이다** — 수정하지 않는다. 집계 픽스처는 별도 디렉터리다.
-- 요건 충족 여부는 M1 종료 시 구조 검사로 확인한다(AC-SAG-047과 같은 형태).
+- **[v0.4.1 (D14)] 요건 충족 검사는 M1.0-a의 종료 조건이다 — `AC-SAG-048 PASS`.** v0.4.0은 이를 "M1 종료 시"로 적어 캡처(M1.0-b) **뒤**에 두었는데, 그 순서에서는 요건 미충족 픽스처 위에서 baseline이 떠진다(iteration 1 D1 실패 모드의 한 단계 이동). AC-SAG-048은 F1~F11을 각각 독립 단언하고, **MANIFEST에 기록된 값과 검사가 산출한 실측값의 정확한 일치**까지 요구한다(F3은 섹터명 집합까지) — AC-SAG-007 / 045 R6이 섹터명을 MANIFEST에서 읽으므로 MANIFEST가 틀리면 그 두 AC가 틀린 기대값 위에서 GREEN이 된다.
+- **AC-SAG-048이 RED인 상태로 M1.0-b(캡처) 착수를 금지한다.**
+- 음성 검증 1회: F2 임계를 `>= 12`에서 `>= 999`로 임시 상향한 상태에서 AC-SAG-048이 RED가 됨을 실증하고, 복원 후 `git status --short` 공백을 기록한다.
 
 #### M1.0-b — 골든 baseline 캡처 [HARD · 코드 변경 **전**에 수행]
 
@@ -81,14 +100,15 @@ tests/fixtures/golden/pre-sector-ux/
   MANIFEST.md              ← as_of: 2026-08-11 · 캡처 시각 · git SHA · 픽스처 식별자 · 캡처 명령 · 포함 기간 목록
 ```
 
-- **[v0.4.0 정정 (D4)] 기간별 3파일은 캡처할 수 없다.** `/sectors/ranking`은 현행 **무파라미터**(`backend/routers/sectors.py:44` — `async def sector_ranking()`)이므로 세 번 호출해도 동일 응답 3부다. `period` 파라미터는 M6 신설이다. 다만 현행 응답이 `sector_return_1w/1m/3m` + `sector_excess_return_1w/1m/3m`을 **모두** 싣고 있어(`sector_metrics.py:42-45, 194-197`) **단일 파일에 세 기간이 전부 담긴다** — 기능 손실 없이 파일만 1개로 줄인다.
+- **[v0.4.0 정정 (D4)] 기간별 3파일은 캡처할 수 없다.** `/sectors/ranking`은 현행 **무파라미터**(`backend/routers/sectors.py:44` — `async def sector_ranking()`)이므로 세 번 호출해도 동일 응답 3부다. `period` 파라미터는 M6 신설이다. 다만 현행 응답이 세 기간의 원수익률·초과수익률을 **모두** 싣고 있어 **단일 파일에 세 기간이 전부 담긴다** — 기능 손실 없이 파일만 1개로 줄인다. **[v0.4.1 정정 (D12)] 응답의 실제 키는 `sectors[i].returns.{w1,m1,m3}` / `sectors[i].excess_returns.{w1,m1,m3}`이다**(`backend/schemas/sector.py:24-37`, `sector_ranking_service.py:41-52`). v0.4.0이 인용한 `sector_return_1w` / `sector_excess_return_1w` 계열은 내부 dataclass `sector_metrics.SectorRank`의 필드명이며 **직렬화되지 않는다**(실측: 캡처 JSON에 해당 문자열 0건).
 - **M1.0-a의 집계 픽스처 위에서 `as_of="2026-08-11"`로 캡처한다**(acceptance.md §8 규약 2). 라이브 DB로 뜨면 baseline 자체가 드리프트해 비교가 무의미해진다.
 - `MANIFEST.md`는 필수다 — 나중에 "이 baseline이 무엇과 비교되는 값인가"를 판별할 수 없으면 R1/R4/R5가 다시 실행 불가능해진다.
 - **`as_of` 기준일은 결정 완료다 (2026-08-13, 사용자 결정): `2026-08-11`.** 기존 날짜 축 픽스처를 유지하며 재캡처하지 않는다 — AC-SAG-046의 리터럴 4개(11/32/95, 앵커 07-31 / 07-10 / 05-08, baseline 07-10)가 plan-auditor 독립 실행으로 검증됐고, 재캡처하면 요일이 바뀌어 네 리터럴 전부가 갱신 대상이 되며 그 갱신은 run-phase의 acceptance.md 편집(소유권 위반)을 요구한다. 상세: acceptance.md §8 규약 7.
 
 #### M1.0-c — M1 종료 게이트 [HARD · v0.4.0 신설 (D4)]
 
-- **AC-SAG-047 PASS가 M1 완료 조건이다.** baseline 3파일 존재 + MANIFEST 필수 키 비어 있지 않음 + `as_of == 2026-08-11` + JSON이 `rs_avg`·`composite_score`·`rank`·기간별 초과수익률 키를 담음 + 엔트리 수 `>= 10`을 **기계적으로** 검사한다.
+- **AC-SAG-047 PASS가 M1 완료 조건이다.** baseline 3파일 존재 + MANIFEST 필수 키 비어 있지 않음 + `as_of == 2026-08-11` + JSON이 `sectors[]` 컨테이너와 `rs_avg`·`composite_score`·`rank`·`excess_returns.{w1,m1,m3}`를 담음 + `sectors[]` 엔트리 수 `>= 10`을 **기계적으로** 검사한다. **[v0.4.1 (D12)] 키 이름은 실측 직렬화 결과로 정정됐다** — v0.4.0의 `sector_excess_return_1w/1m/3m`·`total_count`는 응답에 존재하지 않아 **정상 캡처에서 이 게이트가 RED가 되는 상태**였다.
+- **RED를 만났을 때**: 비가역 경계는 M1.0-b가 아니라 **M2**다(§0.2, acceptance.md §8.5). 여기서 RED가 나면 (1) 산출물 결함인지 게이트 단언 결함인지 구분하고, (2) 산출물 결함이면 **재캡처가 가능하다**(코드는 아직 그대로다) — M1.0-a로 되돌아간다. (3) 단언 결함이면 acceptance.md 편집 권한이 없으므로 **blocker report를 반환**한다.
 - **왜 필요한가**: 이전 판에서 "미캡처 상태로 M2 착수 금지"의 집행 수단은 산문과 DoD 체크박스뿐이었고, 유일한 기계적 검출기인 R1/R4/R5는 **M7에서야 발화**한다 — 캡처 창(M2가 구 구현을 교체하는 시점)이 닫히고 한참 뒤다. `tests/fixtures/golden/`은 현재 존재하지 않는다(실측 2026-08-13).
 - 음성 검증 1회: 세 파일 중 하나를 임시 이동한 상태에서 AC-SAG-047이 RED가 됨을 실증하고 복원 후 `git status --short` 공백을 기록한다.
 
@@ -103,7 +123,9 @@ tests/fixtures/golden/pre-sector-ux/
 - RED: AC-SAG-036, AC-SAG-038, AC-SAG-043, AC-SAG-008(지표별 커버리지)
 - GREEN: 스키마 정의 + 빈 값으로 채워 반환(값 로직은 M2 이후)
 
-### M2 — 가중·집계 코어 (지표 의미 변경)
+### M2 — 가중·집계 코어 (지표 의미 변경) [**비가역 경계 — 캡처 창이 여기서 닫힌다**]
+
+> **[HARD · v0.4.1] 이 마일스톤이 point of no return이다.** M2가 구 집계 구현을 교체하는 순간 골든 baseline의 재캡처가 불가능해진다. **진입 전제**: `AC-SAG-048 PASS`(집계 픽스처 F1~F11) **및** `AC-SAG-047 PASS`(골든 baseline 캡처 완결성). 둘 중 하나라도 RED면 M2에 진입하지 않는다 — M1.0 구간에서는 아직 되돌릴 수 있다.
 
 - RED: AC-SAG-001 ~ AC-SAG-010
 - GREEN: `my_chart/analysis/weighting.py` + `sector_metrics.py` 집계 교체
@@ -145,8 +167,8 @@ tests/fixtures/golden/pre-sector-ux/
 
 ### M7 — 테스트 대체 + 회귀 게이트
 
-- **프로즌 픽스처 확인** (acceptance.md §8): 게이팅 AC가 **각각 지정된** 픽스처 위에서 실행되는지 확인한다. v0.4.0 게이팅 열거 = **002 / 007 / 011 / 013 / 014 / 024 / 030 / 045(R1·R3·R4·R5·R6) / 046 / 047** (007은 D9로 순수 합성 열거에서 이동, 014는 D6으로 승격, 047은 D4로 신설). 픽스처 배정: **046만 날짜 축 픽스처**(`weekly-2026-08-12/`), 나머지 횡단면 AC는 **집계 픽스처**(`aggregation-2026-08-11/`). 이 열거는 acceptance.md §8 규약 6과 바이트 단위로 일치해야 한다. `/api/db/update` 1회 실행 후 재실행해 붉어지지 않음을 검증한다
-- **집계 픽스처 F1~F11 충족 확인** (acceptance.md §8.2) — MANIFEST 실측 기록과 실제 픽스처 내용의 일치를 구조 검사로 확인
+- **프로즌 픽스처 확인** (acceptance.md §8): 게이팅 AC가 **각각 지정된** 픽스처 위에서 실행되는지 확인한다. v0.4.1 게이팅 열거 = **002 / 007 / 011 / 013 / 014 / 024 / 030 / 045(R1·R3·R4·R5·R6) / 046 / 047 / 048** (007은 D9로 순수 합성 열거에서 이동, 014는 D6으로 승격 후 D15로 픽스처·`as_of` 지정, 047은 D4로 신설, **048은 v0.4.1 D14로 신설**). 픽스처 배정: **046만 날짜 축 픽스처**(`weekly-2026-08-12/`), 나머지 횡단면 AC는 **집계 픽스처**(`aggregation-2026-08-11/`). 이 열거는 acceptance.md §8 규약 6과 바이트 단위로 일치해야 한다. `/api/db/update` 1회 실행 후 재실행해 붉어지지 않음을 검증한다
+- **집계 픽스처 F1~F11 충족 재확인** (acceptance.md §8.2 · **AC-SAG-048**) — MANIFEST 실측 기록과 실제 픽스처 내용의 일치를 확인한다. 이 검사의 **최초 실행 지점은 M1.0-a 종료**이며(v0.4.1 D14), M7에서는 회귀 확인이다
 - **`as_of` 명시 고정 정적 스캔** (§8 규약 8): 게이팅 테스트에서 `as_of=None` 의존 0건. 스캔 명령은 `bash -n` 문법 검증 후 실행하고 명세 블록에서 런타임 추출해 바이트 동등을 단언한다(Lesson #9)
 - AC-SAG-044: `hasattr`-only 블록 대체 + 되돌림 검출 3케이스 증명
 - AC-SAG-045: R1·R3~R8 회귀 방지 테스트 (**R2는 삭제** — `10<=k<=24`는 29섹터의 34~83%로 아무것도 게이팅하지 않았고 AC-SAG-013과 중복이었다)

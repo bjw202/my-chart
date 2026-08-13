@@ -1,7 +1,7 @@
 ---
 id: SPEC-SECTOR-AGGREGATION-001
 title: "섹터 집계 계층 — 시총가중·벤치마크·순위·RRG 지수·응답 공통 스키마"
-version: "0.4.0"
+version: "0.4.1"
 status: draft
 created: 2026-08-12
 updated: 2026-08-13
@@ -27,6 +27,7 @@ tier: L
 | 0.2.1 | 2026-08-12 | manager-spec | plan-audit iteration 2 **PASS 0.88**(L, thresh 0.85; MUST-PASS 전항 통과, 단조 개선) 이후 잔여 결함 정리. **(D5) `AC-SAG-011`이 §8 프로즌 픽스처 규약 밖에 있었다** — 1W 벤치마크 실측값(KOSPI +1.03% / KOSDAQ +7.54% / All +1.88%, ±0.5%p)을 게이팅 기대값으로 못 박으면서 §8의 게이팅 표에도, §8.5 "순수 합성 · 해당 없음" 열거에도 없었다. `/api/db/update` 1회로 코드 변경 없이 붉어지는, §8이 막으려는 바로 그 형태다. **게이팅 표에 등재**하고 AC 본문에 프로즌 한정을 명시했다. `AC-SAG-044`(정적 스캔 + mutation 대조, 라이브 값 없음)도 어느 열거에도 없었으므로 **N/A로 명시 등재**했다 — 무해하지만 같은 누락 경로다. **§8.6 열거 완결성 규칙 신설**: `AC-SAG-001`~`045` 전부가 (게이팅 표) 또는 (순수 합성 열거) 중 정확히 한 곳에 나타나야 하며, 신규 AC는 반드시 한쪽에 등재한다 — 어느 쪽에도 없는 AC가 규약 밖에 방치되는 것이 011/044의 누락 경로였다. **(D6) 골든 baseline 캡처 문구의 잘못된 절 참조 정정** — `acceptance.md:416`이 프로즌 규약을 **§9**로 가리켰으나 §9는 품질 게이트이고 프로즌 규약은 **§8**이다(`plan.md:55`는 이미 §8로 정확했다). |
 | 0.3.0 | 2026-08-13 | manager-spec | **O-A8 해소 — 선택지 (a) 채택(미완성 주 포함)** + 그 귀결인 **창 일수 응답 계약 신설**. (1) `as_of` = `latest`(미완성 주 포함, `_get_latest_valid_date()` 현행 동작), 앵커 = `history_grid`(완성 바만). 근거: 사용자가 이 화면을 실시간으로 보므로 진행 중인 주의 움직임이 반영되어야 한다. (2) 그 결과 **창은 라벨보다 짧아지는 게 아니라 길어진다** — 실측 프로즌(as_of 2026-08-11 화) 1W=11일/1M=32일/3M=95일(+4), 라이브(as_of 2026-08-12 수) 12/33/96일(+5). 초과분은 요일 의존이며 세 기간에 **동일**하다(7·28·91이 모두 7의 배수). (3) **REQ-SAG-043 신설 + AC-SAG-046 신설** — `return_window_days: {1w,1m,3m}`를 응답에 실어 ③이 "1W (11일치)"로 표기할 수 있게 한다(O-A4의 `trading_value_window_days` 선례를 수익률에 확장). (4) REQ-SAG-012에 **BM-6 보존 조건 명시** — 섹터·벤치마크가 **같은 `anchor(t, N)` 호출**에서 앵커를 얻어야 하며, 창 길이 ≠ N은 오류가 아니라 기대되는 상태다. (5) REQ-SAG-021에 미완성 주 시 baseline 간격이 28일 초과임을 명시(AC-SAG-023의 `>= 28`이 이미 수용). AC 45 → 46. |
 | 0.4.0 | 2026-08-13 | manager-spec | **plan-audit iteration 1 FAIL 0.78**(L, thresh 0.85; MUST-PASS 전항 통과, Testability 0.55가 원인) 결함 D1~D9 해소. **(D1 BLOCKING) 프로즌 픽스처가 게이팅 기대값 8개 중 7개를 호스팅할 수 없었다** — `weekly-2026-08-12`는 ①이 **날짜 축** 재현용으로 만든 41종목 스냅샷이라 AG-5(최소 5종목)를 통과하는 섹터가 **게임 하나뿐**이고 헬스케어·방산·디스플레이는 아예 없다(실측: `stock_meta` 33행 = 게임 32 / 반도체 1, registry 41행 / 8섹터). 해소: **횡단면 집계용 제2 프로즌 픽스처를 신설 명세**(§8.2 F1~F11 — 값이 아니라 **구조** 요건)하고, 그 위의 게이팅 AC를 **리터럴이 아니라 파생 규칙**으로 재작성했다(§8.3). 파생 규칙은 픽스처 재빌드 시 acceptance.md 본문 수정이 불필요하므로 run-phase 소유권 위반(manager-develop의 acceptance.md 편집 금지)을 구조적으로 제거한다. **(D2 BLOCKING) 설계결정 3이 실증적으로 거짓이었다** — `as_of_is_partial_week == false ⇒ 창 == N`은 성립하지 않는다(실측 `as_of=2026-08-17` → partial `False`인데 창은 11/32/95). `as_of`는 날짜 축을 자르지 않기 때문이다. 참 조건은 **"최신 대표 바가 금요일(완성 주 대표 바)"**이며, 이에 맞춰 설계결정 3을 정정하고 AC-SAG-046의 마감 주 대조를 `as_of` override가 아닌 **금요일 종단 픽스처 변형**으로 재작성했다(실증: `Date <= '2026-08-07'` 절단본에서 partial `False` + 창 정확히 7/28/91). **(D3 BLOCKING) `as_of` 리터럴 미기재** — 사용자 결정으로 **`as_of = 2026-08-11` 고정**(기존 프로즌 유지, AC-SAG-046의 검증된 리터럴 4개 불변). 게이팅 테스트의 `as_of` 기본값(`None` → today) 사용을 금지하고 정적 스캔으로 강제한다(§8 규약 8). **(D5 BLOCKING) R1/R4/R5** — R1을 R4/R5와 동일하게 골든 baseline에 결속, R5의 `최상위>=95 / 최하위<=5`를 **등간격 파생 단언**(순위 백분위의 정의적 성질, min-max에서 불성립)으로 대체해 N 의존 우연을 제거. **(D4) AC-SAG-047 신설** — 골든 baseline 캡처 완결성의 **기계적 M1 종료 게이트**. 캡처 목록도 정정했다(`/sectors/ranking`은 무파라미터이나 응답이 1W/1M/3M을 **모두** 싣고 있으므로 기간별 3파일이 아니라 **단일 파일**로 캡처한다). **(D6) AC-SAG-014**를 출력 동등에서 **구조 단언**(공유 `anchor()` 호출 횟수·인자)으로 전환 — 실증으로 출력 동등의 검출력이 0임을 확인했다(`latest=2026-08-11`·`history 마지막=2026-08-07` 양쪽에서 `anchor(·,7/28/91)`이 **동일하게** 07-31/07-10/05-08). **(D7) 되돌림 변형 신설** — 002/011/013/014/045 R3·R4·R5·R6에 명명된 변형 추가 + **관측된 RED 증거를 요구하는 DoD 항목** 신설(Lesson #9: 작성 여부가 아니라 되돌림 RED 관측이 판정 기준). **(D8) GEARS 라벨 정정** REQ-SAG-029 → Unwanted Behavior, REQ-SAG-032 → Where. **(D9) AC-SAG-007** 라이브 구성수 인용을 픽스처 구조 요건(F3)으로 재기술하고 게이팅 표로 이동. AC 46 → **47**. |
+| 0.4.1 | 2026-08-13 | manager-spec | **plan-audit iteration 2 PASS-WITH-DEBT 0.845**(L, thresh 0.85; MUST-PASS 전항 통과, Testability +0.17). iteration 1 결함 D2/D3/D5/D6/D7/D8/D9 RESOLVED, D1/D4 PARTIALLY-RESOLVED. **신규 결함 D10~D15를 단일 배치로 해소한다.** **(D10 CRITICAL) AC-SAG-013의 파생 항등식이 올바른 구현에서 거짓이었다** — v0.4.0은 초과수익률의 시총가중 평균이 `0.0 ± 0.05%p`이며 *"정의상"* 성립한다고 적었으나, **상한 재배분은 그룹핑 계층을 넘어 합성되지 않는다**(섹터는 섹터 내부에, 벤치마크는 유니버스 전체에 상한을 적용한다). 실측(2026-08-13, plan.md §3.1을 두 계층에 그대로 구현): `cap=0.10`에서 가중평균 `+1.496127 %p`(허용오차의 30배) / 상한 없음에서 `-0.000000 %p`. 게다가 픽스처 요건 **F4가 상한 구속을 강제**하므로 이 단언은 **요건상 반드시 실패**했다. 추가 실측으로 **감사가 제시한 (a)"무상한 항등식" 대안도 채택 불가**임을 확인했다 — AG-5/AG-4 제외 섹터가 있으면 상한을 꺼도 0이 아니다(제외 2섹터에서 `+0.035526 %p`)이며 F3/F6이 그 제외를 강제한다. 해소: 주 단언을 **참조 구현 대조**(섹터별 `S_s^ref − B^ref` 일치 + `ω_s^ref` 가중 잔차 일치)로 교체하고 **`0` 리터럴을 삭제**했다. 상한을 끈 완전 분할에서의 `0` 항등식은 **참조 측 자기검사(비게이팅)** 로만 남겼다. `mut_benchmark_index_row`에서 편차 `0.957391 %p`(허용 `1e-9`)로 RED 검출 실측 확인. **(D12 CRITICAL) AC-SAG-047이 존재하지 않는 응답 키를 단언했다** — `sector_excess_return_1w/1m/3m`는 내부 dataclass `sector_metrics.SectorRank`의 필드명이며 **직렬화되지 않고**(실측: 캡처 JSON에 해당 문자열 0건), 실제 키는 `sectors[i].excess_returns.{w1,m1,m3}`이다(`backend/schemas/sector.py:24-37`). `total_count`도 존재하지 않으며 실제 키는 `distribution.total`이다(`backend/schemas/stage.py:8-15`). 정상 캡처에서 게이트가 RED가 되는 상태였다. 실측 직렬화 결과로 전 키를 정정하고 컨테이너명(`sectors`)을 명시했으며, **동일 결함 재도입 방지용 정적 확인**(`sector_excess_return` 문자열 0건)을 추가했다. 같은 결함이 파급된 **AC-SAG-027 · REQ-SAG-024 · plan.md M1.0-b 주석**도 함께 정정했다. **(D11 MAJOR) AC-SAG-014의 `anchor()` 호출 횟수 `== 1` 단언이 SPEC이 지시한 구조에서 스스로 RED가 됐다** — plan.md D1/D2의 공용 함수 구조에서는 섹터 N회 + 벤치마크 1회로 `N+1`회가 정상이며, 어느 REQ도 앵커 호이스팅을 요구하지 않는다. 주 단언을 **인자 `t`(앵커 기준일)의 유일성**으로 옮기고 호출 횟수 제약을 삭제했다 — `mut_benchmark_own_anchor`는 `t`를 `2026-08-07`로 바꾸므로 검출력이 보존된다. 반환 객체 아이덴티티는 두 `t`가 같은 `GridBar`를 반환하므로 **비게이팅 보조**로 강등했다. **(D13 MAJOR) 참조 구현 계약이 AG-3/AG-4/AG-7에 대해 미규정이었다** — 같은 픽스처가 F5/F6으로 그 케이스를 의도적으로 주입하므로 두 가지 defensible한 참조 동작이 갈릴 수 있었다. §8.3에 **제외·null 처리 계약**(AG-3/AG-4/AG-5/AG-7 + 대조 집합 제한 + null 섹터 집합 동등 단언)을 신설해 허용 동작을 하나로 못 박았다. **(D14 MINOR) F1~F11 검증이 캡처 뒤에 있었다** — **AC-SAG-048 신설**로 M1.0-a **종료 조건**으로 끌어올렸다(MANIFEST 기록값과 검사 산출 실측값의 일치까지 요구). **(D15 MINOR) AC-SAG-014·045 R5-a에 픽스처 지정과 `as_of` 고정 누락**(규약 1·8 위반) — 태그와 Given을 정정했다. **감사 판정 기록 — 비가역 경계는 M1.0-b가 아니라 M2다**(§8.5 신설): M1.0-c까지는 코드가 그대로이므로 재캡처 경로가 남아 있고, 이것이 D12/D14를 회복 가능한 결함으로 만든 근거다. 강제 순서 `M1.0-a → AC-SAG-048 → M1.0-b → M1.0-c(AC-SAG-047) → M2`. AC 47 → **48**. |
 
 ---
 
@@ -317,7 +318,9 @@ Stage classification **shall** use `my_chart/analysis/stage_classifier.py:classi
 
 #### REQ-SAG-024 (Ubiquitous) — Stage 합계 항등식
 
-`stage1_count + stage2_count + stage3_count + stage4_count + unclassified_count == total_count` **shall** hold for every stage distribution response, including the `by_sector` entries. 분류 불가를 Stage 1에 흡수시키는 것을 금지한다 (§8.6).
+`stage1 + stage2 + stage3 + stage4 + unclassified_count == total` **shall** hold for every stage distribution response, including the `by_sector` entries. 분류 불가를 Stage 1에 흡수시키는 것을 금지한다 (§8.6).
+
+> **[v0.4.1 정정 (D12 파급)] 키 이름을 실제 직렬화 형태에 맞췄다.** 이전 판은 `stage1_count + … == total_count`로 적었으나 현행 응답에 그런 키는 없다. 실측(2026-08-13, `StageOverviewResponse.model_dump_json()`): `distribution` = `{stage1, stage2, stage3, stage4, total}`, `by_sector[i]` = `{sector, stage1, stage2, stage3, stage4}`(합계 키 없음) — `backend/schemas/stage.py:8-15, 18-25`. 기존 키 `stage1`~`stage4`·`total`을 그대로 쓰고, 본 REQ가 **신설**하는 필드는 `unclassified_count`(`distribution`·`by_sector` 양쪽)와 `by_sector[i].total`이다.
 
 - 검증: AC-SAG-027 (불변식 **§8.6**)
 
@@ -450,7 +453,7 @@ Every field added by this SPEC **shall** be propagated end-to-end: 집계 datacl
 
 The regression suite **shall** assert the 8 behavior changes in `02-screen-flow.md` §12.2 as **expected**, not as defects.
 
-- 검증: AC-SAG-045
+- 검증: AC-SAG-045, AC-SAG-047(골든 baseline 캡처 완결성 — M1 종료 게이트), AC-SAG-048(집계 픽스처 F1~F11 충족 — **M1.0-a 종료 게이트**, v0.4.1 D14). 두 게이트는 R1/R4/R5의 비교 기반이 유효하게 성립하기 위한 선행 조건이다.
 
 #### REQ-SAG-043 (Ubiquitous) — 실제 창 일수의 응답 노출 [O-A8 귀결]
 
@@ -556,7 +559,7 @@ Every sector-related endpoint response **shall** include `return_window_days`, a
 | REQ-SAG-039 | AC-SAG-041, 042 | — |
 | REQ-SAG-040 | AC-SAG-043 | — |
 | REQ-SAG-041 | AC-SAG-044 | — |
-| REQ-SAG-042 | AC-SAG-045, 047 | — |
+| REQ-SAG-042 | AC-SAG-045, 047, 048 | — |
 | REQ-SAG-043 | AC-SAG-046 | **BM-6** (창 길이 노출) |
 
 **본 SPEC이 책임지는 01 부록 B 불변식: EX-1, EX-2, RK-1, RK-2, RRG-1, RRG-2, RRG-3, RRG-4, BM-3, BM-6, SN-3, AG-6, §8.6 (13개)**
