@@ -141,15 +141,72 @@ AC-SAG-046 의 네 리터럴(11/32/95, 앵커 07-31 / 07-10 / 05-08)이 위 E4 �
 
 #### E3 — 음성 검증 (Lesson #9 — 작성이 아니라 **관측된 RED**)
 
-_<M1 커밋 직후 실증하고 본 절에 verbatim 기록 — 복원 증명(`git status --short` 공백)을 위해
-추적 상태에서 수행한다>_
+M1 커밋(`adb1f25`) 직후, 추적 상태에서 두 건을 실증했다. 테스트를 작성했다는 사실은 증거가
+아니며, **되돌렸을 때 RED 를 관측했는지**만이 증거다.
+
+**(1) AC 본문이 요구한 음성 검증 — F2 임계 `>= 12` → `>= 999` 임시 상향**
+
+```
+$ sed -i '' 's/^F2_MIN_AG5_SECTORS = 12  /F2_MIN_AG5_SECTORS = 999/' tests/test_aggregation_fixture.py
+$ git diff --stat tests/test_aggregation_fixture.py
+ tests/test_aggregation_fixture.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ python -m pytest tests/test_aggregation_fixture.py -q
+.....F........................                                           [100%]
+=================================== FAILURES ===================================
+_____________________ test_ac_sag_048_f2_ag5_sector_count ______________________
+    def test_ac_sag_048_f2_ag5_sector_count(measured: dict) -> None:
+        """F2 — AG-5(>= 5종목)를 통과하는 섹터 수 >= 12."""
+        n = len(measured["f2_sectors"])
+>       assert n >= F2_MIN_AG5_SECTORS, (
+            f"F2 위반 — AG-5 통과 섹터 {n}개 < {F2_MIN_AG5_SECTORS}: {measured['f2_sectors']}")
+E       AssertionError: F2 위반 — AG-5 통과 섹터 18개 < 999: ['Auto', 'PCB', '게임', '내수', '디스플레이', '반도체', '방산', '비철금속', '스마트폰', '유통', '음식료', '인터넷', '조선', '철강', '통신', '패션', '헬스케어', '화장품']
+E       assert 18 >= 999
+=========================== short test summary info ============================
+FAILED tests/test_aggregation_fixture.py::test_ac_sag_048_f2_ag5_sector_count
+1 failed, 29 passed, 1 warning in 0.49s
+```
+
+**(2) 추가 음성 검증 — MANIFEST 손조작 (AC-SAG-048 의 "MANIFEST 실측 일치" 절)**
+
+이 절이 AC-SAG-048 의 핵심이므로(MANIFEST 가 틀리면 AC-SAG-007 / 045 R6 이 틀린 기대값 위에서
+GREEN 이 된다) 별도로 검출력을 실증했다. F6 섹터명을 `패션` → `헬스케어` 로, F7 count 를
+`35` → `34` 로 손으로 고친 변형:
+
+```
+$ python -m pytest tests/test_aggregation_fixture.py -q -k manifest
+E       AssertionError: MANIFEST 불일치 — f7_nh_verdict_divergent_stock_count: 기록 34 vs 실측 35 (...)
+E       assert 34 == 35
+E       AssertionError: MANIFEST 섹터명 집합 불일치 — f6_cap_valid_exactly3_sectors: 기록 ['헬스케어'] vs 실측 ['패션']
+E       assert {'헬스케어'} == {'패션'}
+FAILED tests/test_aggregation_fixture.py::test_ac_sag_048_manifest_counts_match_measured[f7_nh_verdict_divergent_stock_count-f7_stocks]
+FAILED tests/test_aggregation_fixture.py::test_ac_sag_048_manifest_sector_sets_match_measured[f6_cap_valid_exactly3_sectors-f6_sectors]
+2 failed, 12 passed, 16 deselected, 1 warning in 0.35s
+```
+
+**복원 증명 (두 건 모두)**
+
+```
+$ git checkout -- tests/test_aggregation_fixture.py
+$ git checkout -- tests/fixtures/frozen/aggregation-2026-08-11/MANIFEST.md
+$ git status --short tests/fixtures/ .moai/specs/SPEC-SECTOR-AGGREGATION-001/
+(출력 없음)
+$ python -m pytest tests/test_aggregation_fixture.py -q
+30 passed, 1 warning in 0.31s
+```
+
+**항진명제 회피 근거** — 단언의 양변이 서로 다른 원천에서 온다. 한 변은 픽스처 DB/xlsx 에서
+원시 컬럼을 직접 읽어 재산출한 실측값이고(`build_fixture.py` 를 import 하지 않는다), 다른
+한 변은 별도 산출물인 `MANIFEST.md` 의 기록값 또는 acceptance.md §8.2 본문 리터럴 임계다.
+증거 파일: `.moai/state/verify/sag001-m10a/e3-neg-f2-999.log`,
+`.moai/state/verify/sag001-m10a/e3-neg-manifest-tamper.log`.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
 run_status: in-progress            # M1.0-a 완료. M1.0-b(골든 baseline 캡처)는 사용자 검토 게이트 뒤
 milestone_completed: M1.0-a
-run_commit_sha: pending-backfill-m1
+run_commit_sha: adb1f25              # M1.0-a. 본 §E.3 backfill 은 후속 커밋
 ac_gate: AC-SAG-048
 ac_pass_count: 1                   # AC-SAG-048 (30 테스트 전건 GREEN)
 ac_fail_count: 0
@@ -159,7 +216,7 @@ full_suite_delta: "+30 passed / failed 8 (전건 pre-existing, baseline 동일 �
 date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경 (git status 공백)
 production_code_touched: false     # my_chart/ · backend/ · frontend/ 미변경 (M1.0-a 는 테스트 자산 마일스톤)
 live_db_mutated: false             # /api/db/update 미실행. Output/*.db 는 읽기 전용 접근
-negative_verification: pending-post-commit   # F2 임계 >= 999 상향 RED 실증 (E3)
+negative_verification: observed-red-2         # (1) F2 임계 >= 999 상향 → RED, (2) MANIFEST 손조작(F6 섹터명 / F7 count) → RED. 두 건 모두 복원 후 git status --short 공백 확인 (E3)
 next_gate: "M1.0-b (골든 baseline 캡처) — 사용자 검토 게이트. AC-SAG-048 PASS 로 진입 조건 충족"
 total_run_phase_files: 6           # 픽스처 4 + build_fixture.py + 테스트 1
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
