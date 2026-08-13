@@ -377,7 +377,7 @@ periods: ["w1", "m1", "m3"]
 ```yaml
 run_status: in-progress            # M1.0-c 완료. M2(비가역 경계) 는 사용자 검토 게이트 ② 뒤
 milestone_completed: M1.0-c
-run_commit_sha: pending-backfill-m10bc   # 본 §E.3 backfill 은 후속 커밋 (커밋은 자기 SHA 를 알 수 없다)
+run_commit_sha: 6f00ba5                 # 본 §E.3 backfill 은 후속 커밋 (커밋은 자기 SHA 를 알 수 없다)
 prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3 backfill)"
 ac_gate: AC-SAG-047
 ac_pass_count: 2                   # AC-SAG-048 (30 테스트) + AC-SAG-047 (40 테스트)
