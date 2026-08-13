@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from backend.schemas.envelope import EnvelopeMixin
+
 
 class StageDistribution(BaseModel):
     """Stage distribution counts."""
@@ -47,7 +49,7 @@ class StageStock(BaseModel):
 Stage2Candidate = StageStock
 
 
-class StageOverviewResponse(BaseModel):
+class StageOverviewResponse(EnvelopeMixin):
     """Response for GET /api/stage/overview."""
 
     distribution: StageDistribution

@@ -9,6 +9,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from backend.schemas.envelope import EnvelopeMixin
+
 
 # ---------------------------------------------------------------------------
 # 섹터 버블 스키마
@@ -24,7 +26,7 @@ class SectorBubbleItem(BaseModel):
     period_return: float    # 기간 수익률 (%)
 
 
-class SectorBubbleResponse(BaseModel):
+class SectorBubbleResponse(EnvelopeMixin):
     """GET /api/sectors/bubble 응답."""
 
     date: str
@@ -56,7 +58,7 @@ class StockBubbleItem(BaseModel):
     product: Optional[str] = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
 
 
-class StockBubbleResponse(BaseModel):
+class StockBubbleResponse(EnvelopeMixin):
     """GET /api/sectors/{sector_name}/bubble 응답."""
 
     date: str
@@ -94,7 +96,7 @@ class KospiPoint(BaseModel):
     close: float
 
 
-class RRGResponse(BaseModel):
+class RRGResponse(EnvelopeMixin):
     """GET /api/sectors/rrg 응답."""
 
     date: str
@@ -124,7 +126,7 @@ class SectorHistoryItem(BaseModel):
     history: list[SectorHistoryWeek]
 
 
-class SectorHistoryResponse(BaseModel):
+class SectorHistoryResponse(EnvelopeMixin):
     """GET /api/sectors/history 응답."""
 
     weeks: int

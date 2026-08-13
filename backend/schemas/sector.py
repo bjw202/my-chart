@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from backend.schemas.envelope import EnvelopeMixin
+
 
 class SectorReturns(BaseModel):
     """Sector returns by period."""
@@ -37,7 +39,7 @@ class SectorRankItem(BaseModel):
     rank_change: int
 
 
-class SectorRankingResponse(BaseModel):
+class SectorRankingResponse(EnvelopeMixin):
     """Response for GET /api/sectors/ranking."""
 
     date: str
@@ -72,7 +74,7 @@ class TopStockItem(BaseModel):
     stage_detail: str | None = None
 
 
-class SectorDetailResponse(BaseModel):
+class SectorDetailResponse(EnvelopeMixin):
     """Response for GET /api/sectors/{name}/detail."""
 
     sector_name: str
