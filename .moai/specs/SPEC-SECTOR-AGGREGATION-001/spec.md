@@ -1,10 +1,10 @@
 ---
 id: SPEC-SECTOR-AGGREGATION-001
 title: "섹터 집계 계층 — 시총가중·벤치마크·순위·RRG 지수·응답 공통 스키마"
-version: "0.2.1"
+version: "0.3.0"
 status: draft
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-13
 author: manager-spec
 priority: P0
 phase: "sector-ux v1"
@@ -25,6 +25,7 @@ tier: L
 | 0.1.0 | 2026-08-12 | manager-spec | 초기 SPEC. `docs/sector-ux/01-data-contract.md` §2(지표 사전)·§5(집계)·§6(벤치마크)·§8(화면별 계약)·§9(결측 정책)을 구현 계약으로 전환. `02-screen-flow.md` §12.3 서버 선행 조건 전부 포함. Lesson #3/#4/#5/#7 반영. |
 | 0.2.0 | 2026-08-12 | manager-spec | plan-audit 0.83 FAIL(L, thresh 0.85) 결함 델타 반영. **사용자 결정 4건 수용**: O-A1(RS-Ratio **롤링 정규화 미적용** — 100이 문자 그대로 벤치마크. 표준 JdK RRG와의 발산 및 강세장 사분면 편중이 정상임을 명시), O-A3(상수 주식수 가정 한계를 `warnings[]`에 명시 + **"현재주가" = daily 최신 `Close`**. 이벤트 감지는 과설계로 미구현), O-A4(**거래대금 창 = 기간 토글 연동** `[anchor(t,N), t]` + `trading_value_window_days` 동반), O-A6(**지표별 `coverage.*` + 최상위 최소값** 병행 — AG-7 임계는 최소값에 적용). **AC 반증 가능성 복구**: AC-SAG-037(라이브 `naive MAX == canonical`이라 SN-3 반증 불가 → `fixture_max_ne_canonical` + 엔드포인트별 되돌림 7회), AC-SAG-025(동일성 단독 단언은 양쪽이 모두 구 분류기여도 통과 → 주봉 Weinstein 기대 stage 리터럴 3케이스 + `_classify_stage_simple` 대조 + rename 내성 행동 단언), AC-SAG-016(`is not 0.0` float 아이덴티티 비교 삭제 — 결함 미검출 + `SyntaxWarning`), AC-SAG-045(R2 `10<=k<=24`는 29섹터의 34~83%로 무게이팅 + AC-SAG-013 중복 → **삭제**; R4/R5는 비교 대상 미보존으로 실행 불가였으므로 **골든 baseline 캡처를 plan.md M1.0 선행 작업으로 신설**; R7 "그런 테스트가 없음을 확인"을 행동 단언 + grep 2종으로 재작성). **§8 프로즌 픽스처 규약 신설** — 주 1회+ `/api/db/update`로 게이팅 AC가 코드 변경 없이 붉어지는 문제. **O-A8 신설** — ①의 O-G2(미완성 주 바와 기간 계산의 정합)를 인수, M3 차단 항목. **O-A7에 ③ 의존 교차 링크** 추가. |
 | 0.2.1 | 2026-08-12 | manager-spec | plan-audit iteration 2 **PASS 0.88**(L, thresh 0.85; MUST-PASS 전항 통과, 단조 개선) 이후 잔여 결함 정리. **(D5) `AC-SAG-011`이 §8 프로즌 픽스처 규약 밖에 있었다** — 1W 벤치마크 실측값(KOSPI +1.03% / KOSDAQ +7.54% / All +1.88%, ±0.5%p)을 게이팅 기대값으로 못 박으면서 §8의 게이팅 표에도, §8.5 "순수 합성 · 해당 없음" 열거에도 없었다. `/api/db/update` 1회로 코드 변경 없이 붉어지는, §8이 막으려는 바로 그 형태다. **게이팅 표에 등재**하고 AC 본문에 프로즌 한정을 명시했다. `AC-SAG-044`(정적 스캔 + mutation 대조, 라이브 값 없음)도 어느 열거에도 없었으므로 **N/A로 명시 등재**했다 — 무해하지만 같은 누락 경로다. **§8.6 열거 완결성 규칙 신설**: `AC-SAG-001`~`045` 전부가 (게이팅 표) 또는 (순수 합성 열거) 중 정확히 한 곳에 나타나야 하며, 신규 AC는 반드시 한쪽에 등재한다 — 어느 쪽에도 없는 AC가 규약 밖에 방치되는 것이 011/044의 누락 경로였다. **(D6) 골든 baseline 캡처 문구의 잘못된 절 참조 정정** — `acceptance.md:416`이 프로즌 규약을 **§9**로 가리켰으나 §9는 품질 게이트이고 프로즌 규약은 **§8**이다(`plan.md:55`는 이미 §8로 정확했다). |
+| 0.3.0 | 2026-08-13 | manager-spec | **O-A8 해소 — 선택지 (a) 채택(미완성 주 포함)** + 그 귀결인 **창 일수 응답 계약 신설**. (1) `as_of` = `latest`(미완성 주 포함, `_get_latest_valid_date()` 현행 동작), 앵커 = `history_grid`(완성 바만). 근거: 사용자가 이 화면을 실시간으로 보므로 진행 중인 주의 움직임이 반영되어야 한다. (2) 그 결과 **창은 라벨보다 짧아지는 게 아니라 길어진다** — 실측 프로즌(as_of 2026-08-11 화) 1W=11일/1M=32일/3M=95일(+4), 라이브(as_of 2026-08-12 수) 12/33/96일(+5). 초과분은 요일 의존이며 세 기간에 **동일**하다(7·28·91이 모두 7의 배수). (3) **REQ-SAG-043 신설 + AC-SAG-046 신설** — `return_window_days: {1w,1m,3m}`를 응답에 실어 ③이 "1W (11일치)"로 표기할 수 있게 한다(O-A4의 `trading_value_window_days` 선례를 수익률에 확장). (4) REQ-SAG-012에 **BM-6 보존 조건 명시** — 섹터·벤치마크가 **같은 `anchor(t, N)` 호출**에서 앵커를 얻어야 하며, 창 길이 ≠ N은 오류가 아니라 기대되는 상태다. (5) REQ-SAG-021에 미완성 주 시 baseline 간격이 28일 초과임을 명시(AC-SAG-023의 `>= 28`이 이미 수용). AC 45 → 46. |
 
 ---
 
@@ -235,7 +236,9 @@ The benchmark **shall** be computed with the same effective universe, the same 1
 
 Sector return and benchmark return **shall** use the same as-of date and the same past anchor date, and both dates **shall** appear in the response (불변식 BM-6).
 
-- 검증: AC-SAG-014 (불변식 **BM-6**)
+**O-A8 결정 (2026-08-13) 반영 — BM-6 보존 조건의 명시**: `as_of`가 미완성 주 바이므로 창 길이가 라벨 N과 다를 수 있다(§7 O-A8). 이 상태에서 BM-6을 지키는 조건은 하나다 — **섹터 쪽과 벤치마크 쪽이 같은 `anchor(t, N)` 호출에서 앵커를 얻어야 한다.** 양쪽이 동일 앵커를 공유하는 한 창이 몇 일이든 초과수익률(`sector − benchmark`) 비교는 정합적이며, **창 길이 ≠ N은 오류가 아니라 기대되는 상태**다. 반대로 한쪽이 `history_grid` 마지막 바를, 다른 쪽이 `latest`를 기준으로 각자 앵커를 구하면 두 날짜가 어긋나고 BM-6이 **무증상으로** 깨진다. 구현은 D1/D2(공용 함수 재사용)로 이 동일성을 **구조로** 보장한다. `anchor()`는 정의상 `history_grid`(완성 바)만 반환하므로 앵커 쪽에는 미완성 바가 절대 섞이지 않는다.
+
+- 검증: AC-SAG-014 (불변식 **BM-6**) — 두 앵커 날짜의 **문자열 동등** 단언은 창 길이가 가변이 된 뒤에도 그대로 유효하며, 오히려 더 결정적이 된다.
 
 #### REQ-SAG-013 (When) — 지수 행 정합성 검증
 
@@ -291,7 +294,9 @@ The ranking response **shall** additionally return `composite_score` and `compos
 
 `rank_change = rank(baseline_date) − rank(as_of_date)` where `baseline_date = anchor(as_of_date, 28)` from SPEC-SECTOR-GRID-001. The response **shall** include `baseline_date`. 비교 기준일이 없거나 당시 순위 대상이 아니었으면 `rank_change = null`(0 아님) (§2.10).
 
-- 검증: AC-SAG-023
+**O-A8 결정 (2026-08-13) 반영 — 실제 간격은 28일보다 길다**: `as_of`가 미완성 주 바일 때 `anchor(t, 28)`은 28일 전이 아니라 그보다 이른 완성 바를 가리킨다(실측: 프로즌 `as_of=2026-08-11` → `baseline_date=2026-07-10`, 간격 **32일**). 요구사항 문구는 그대로 유효하다 — 정의가 "28일"이 아니라 `anchor(t, 28)`이기 때문이다. **별도 필드를 신설하지 않는다**: `anchor(t, 28)`은 1M 수익률 앵커와 **동일한 호출**이므로, 소비자는 `baseline_date`(날짜)와 REQ-SAG-043의 `return_window_days["1m"]`(일수)만으로 기준 구간을 완전히 복원할 수 있다. `rank_change_baseline_window_days` 같은 네 번째 필드는 같은 값의 중복이므로 만들지 않는다.
+
+- 검증: AC-SAG-023 — 기존 단언 `(as_of_date − baseline_date).days >= 28`은 이 결정을 **이미 수용**한다(`== 28` 이 아니라 `>= 28`). 32일도, 주가 마감된 금요일의 28일도 모두 통과하며, `현행 LIMIT 1 OFFSET 3`(11일 전)과 다름을 요구하는 절이 검출력을 유지한다.
 
 ### 3.4 지표 정정
 
@@ -384,9 +389,11 @@ Where RS-Ratio or RS-Momentum cannot be computed, the response **shall** omit th
 
 #### REQ-SAG-033 (Ubiquitous) — 응답 공통 스키마
 
-Every sector-related endpoint response **shall** include: `as_of_date`, `as_of_is_partial_week`, `market_filter`, `weight_cap`, `grid_version`, `benchmark{name, return_*, status, reconciliation_diff_pp}`, `data[]`, `excluded[]`, `warnings[]` (§9.3).
+Every sector-related endpoint response **shall** include: `as_of_date`, `as_of_is_partial_week`, `return_window_days`, `market_filter`, `weight_cap`, `grid_version`, `benchmark{name, return_*, status, reconciliation_diff_pp}`, `data[]`, `excluded[]`, `warnings[]` (§9.3).
 
-- 검증: AC-SAG-036
+`return_window_days`는 REQ-SAG-043이 정의한다(O-A8 결정의 귀결).
+
+- 검증: AC-SAG-036, AC-SAG-046
 
 #### REQ-SAG-034 (Ubiquitous) — 전 엔드포인트 as_of_date 일치
 
@@ -441,6 +448,22 @@ Every field added by this SPEC **shall** be propagated end-to-end: 집계 datacl
 The regression suite **shall** assert the 8 behavior changes in `02-screen-flow.md` §12.2 as **expected**, not as defects.
 
 - 검증: AC-SAG-045
+
+#### REQ-SAG-043 (Ubiquitous) — 실제 창 일수의 응답 노출 [O-A8 귀결]
+
+Every sector-related endpoint response **shall** include `return_window_days`, an object carrying **all three** period keys — `{"1w": int, "1m": int, "3m": int}` — where each value is the **실측** day count `(as_of_date − anchor(as_of_date, N)).days`, N = 1W→7 / 1M→28 / 3M→91. The values **shall not** be the nominal N when the two differ.
+
+**동기**: O-A8 결정 (a)에 따라 `as_of`가 미완성 주 바이므로 실제 창이 라벨보다 길다 — 실측으로 프로즌 `as_of=2026-08-11`(화)에서 1W가 **11일**, 라이브 `as_of=2026-08-12`(수)에서 **12일**이다. 라벨만 `1W`로 표기하면 HTS·네이버와 값이 어긋나는데 화면에 그 이유가 없다. ③은 이 필드로 `1W (11일치)`를 렌더링한다(`00-overview.md` §4 "진행 중 (N일치)" 배지의 값 출처).
+
+**설계 결정 3건**:
+
+1. **세 키를 항상 전부 싣는다** — `period` 파라미터가 있는 엔드포인트(`/sectors/ranking`, `/sectors/{name}/detail`)에서도 활성 기간만 싣지 않는다. 필드 모양을 엔드포인트마다 다르게 하면 ③이 분기해야 하고, `rank_change`의 `anchor(t,28)` 기준 구간(= `1m` 키)이 `period=1w` 조회에서 사라진다.
+2. **`trading_value_window_days`(O-A4)와의 관계**: O-A4의 거래대금 창은 `[anchor(t, N), t]`로 수익률 창과 **같은 구간**이므로, 활성 기간 P에 대해 `trading_value_window_days == return_window_days[P]`가 성립해야 한다. 두 필드는 같은 `anchor()` 호출에서 파생한다.
+3. **`as_of_is_partial_week == false`이면 초과분은 0이다** — 주가 마감된 금요일 기준으로는 `return_window_days == {7, 28, 91}`이 된다. 즉 이 필드는 미완성 주에서만 라벨과 갈라진다.
+
+**초과분의 성질 (실측)**: 초과분은 `as_of` 요일에만 의존하며 **세 기간에 동일**하다 — 7·28·91이 모두 7의 배수라 `t − N`의 요일이 `t`와 같고, 앵커는 그 요일 직전의 금요일(완성 바)로 밀리기 때문이다. 실측 2회: 화요일 `as_of` → +4(11/32/95), 수요일 `as_of` → +5(12/33/96). 파생 예상치는 월 +3 / 목 +6 / 금 0.
+
+- 검증: AC-SAG-046
 
 ---
 
@@ -507,7 +530,7 @@ The regression suite **shall** assert the 8 behavior changes in `02-screen-flow.
 | REQ-SAG-030 | AC-SAG-033 | **RRG-3** |
 | REQ-SAG-031 | AC-SAG-034 | **RRG-4** |
 | REQ-SAG-032 | AC-SAG-035 | — |
-| REQ-SAG-033 | AC-SAG-036 | — |
+| REQ-SAG-033 | AC-SAG-036, 046 | — |
 | REQ-SAG-034 | AC-SAG-037 | **SN-3** |
 | REQ-SAG-035 | AC-SAG-038 | — |
 | REQ-SAG-036 | AC-SAG-039 | — |
@@ -517,6 +540,7 @@ The regression suite **shall** assert the 8 behavior changes in `02-screen-flow.
 | REQ-SAG-040 | AC-SAG-043 | — |
 | REQ-SAG-041 | AC-SAG-044 | — |
 | REQ-SAG-042 | AC-SAG-045 | — |
+| REQ-SAG-043 | AC-SAG-046 | **BM-6** (창 길이 노출) |
 
 **본 SPEC이 책임지는 01 부록 B 불변식: EX-1, EX-2, RK-1, RK-2, RRG-1, RRG-2, RRG-3, RRG-4, BM-3, BM-6, SN-3, AG-6, §8.6 (13개)**
 
@@ -537,7 +561,7 @@ The regression suite **shall** assert the 8 behavior changes in `02-screen-flow.
 | **O-A2** | 산업명(중) 161개의 중분류 단위 집계 제공 여부 | 01 §10 O-6 = 02 §13 O-7 | 중분류 단위 순위·RRG를 제공할 것인가. 161개 중 상당수가 §5.4 최소 구성수 5에 걸릴 가능성이 크다. 제공 시 서브탭이 늘어 "현행 IA 유지" 제약과 충돌한다. |
 | ~~**O-A3**~~ **해결됨** | RRG 시점별 시총 역산의 한계 | 신규 (고정 결정의 미규정 부분) | **결정 (2026-08-12): (a) `warnings[]` 명시 채택. (b) 이벤트 감지는 구현하지 않는다 — 과설계.** 상장주식수 상수 가정의 한계(유·무상증자·액면분할·자사주 소각)를 RRG 응답 `warnings[]`에 상설 기재한다. **"현재주가" 출처 = daily DB 최신 `Close`** — `market_cap`이 `stock_meta`(daily)에서 오므로 주식수 역산의 분모·분자가 같은 원천이어야 정합적이다. 검증: AC-SAG-034. |
 | ~~**O-A4**~~ **해결됨** | 거래대금의 기간 정의 | 신규 (설계서 미규정) | **결정 (2026-08-12): 기간 토글과 동일한 창을 합산한다.** `trading_value(period) = Σ VolumeWon over [anchor(t, N), t]`, N = 1W→7일 / 1M→28일 / 3M→91일 (①의 `anchor()` 사용). 근거: 버블의 X축(기간 수익률)과 크기 채널(거래대금)이 **같은 창을 서술**해야 두 채널을 함께 읽을 수 있다. 검증: AC-SAG-029. `01 §2.7` · `§10 O-10` 개정 반영. |
-| **O-A8** | 미완성 주 바와 기간 계산의 정합 (①에서 이관) | ①의 §7 O-G2 | **①이 등록했으나 "집계 의미는 ② 소관"으로 제외한 항목이며, ②가 인수한다.** `as_of_date`가 진행 중인 주(화요일)일 때 `latest_snapshot`(미완성 포함)과 `history_grid`(미완성 제외)가 **서로 다른 날짜**를 가리킨다. 이때 1W 수익률의 날짜 쌍을 무엇으로 잡을 것인가: (a) `as_of = latest_snapshot`, `anchor = history_grid`에서 `t−7d` 이하 → 창이 7일이 아닐 수 있다, (b) 수익률은 전부 `history_grid`만 사용하고 `latest_snapshot`은 표기 전용으로 둔다, (c) 두 값을 병기한다. **REQ-SAG-012(동일 날짜 창)와 REQ-SAG-021(`anchor(t,28)`)이 이 결정에 직접 의존한다** — 미결이면 BM-6이 무증상으로 깨질 수 있다(양쪽이 각자 다른 뷰를 쓰면서 응답에는 둘 다 실려 겉보기 일치). **M3 착수 전 결정 필수.** 검증: AC-SAG-014. |
-| **O-A5** | 3M 벤치마크 정합성 이탈 (KOSDAQ 6.27%p) | 01 §10 O-5 | 격자 정규화(① ship) 후 재측정해 원인이 격자 오염인지 구성종목 변동인지 판별한다. 허용오차 **7%p는 잠정치**이며 재측정 후 조정이 필요하다. AC-SAG-015는 임계값을 상수로 분리해 조정 가능하게 둔다. |
+| ~~**O-A8**~~ **해결됨** | 미완성 주 바와 기간 계산의 정합 (①에서 이관) | ①의 §7 O-G2 | **결정 (2026-08-13): 선택지 (a) — 미완성 주를 포함한다.** `as_of = latest`(진행 중인 주 포함), 앵커 = `anchor(t, N)`(정의상 `history_grid` = 완성 바만). **근거(사용자)**: 이 화면을 실시간으로 보므로 진행 중인 주의 움직임이 반영되어야 한다. 그로 인한 부정확은 수용 가능하다고 판단했다. (b)안(수익률은 완성 바만 사용)은 화면이 최대 4~6일 낡아 보이므로, (c)안(병기)은 같은 지표에 두 값을 실어 ③이 어느 쪽을 순위에 쓸지 다시 미결이 되므로 각각 기각. **귀결 — 창은 짧아지는 게 아니라 길어진다**: 실측 프로즌(`as_of=2026-08-11` 화) 1W **11일** / 1M **32일** / 3M **95일**(라벨 대비 +4), 라이브(`as_of=2026-08-12` 수) 12 / 33 / 96일(+5). 초과분은 `as_of` 요일 의존이며 세 기간에 동일하다(7·28·91이 모두 7의 배수). **현행 구현이 이미 이 동작이다** — `_get_latest_valid_date()`(`weekly_grid.py:184`)가 `grid.latest.date`를 반환하고 ①의 M5가 7개 소비자를 이 헬퍼로 수렴시켰으므로, `as_of` 쪽은 새로 만들 것이 없다. **BM-6은 깨지지 않는다** — 섹터·벤치마크가 같은 `anchor(t, N)` 호출을 공유하는 한(REQ-SAG-012 개정 참조) 창 길이가 몇 일이든 초과수익률 비교는 정합적이다. **파생 요구사항**: 라벨과 실제 창의 괴리를 화면이 설명할 수 있도록 **REQ-SAG-043**(`return_window_days`)을 신설했다. 검증: AC-SAG-014(BM-6 보존), **AC-SAG-046**(창 일수 실측값). |
+| **O-A5** | 3M 벤치마크 정합성 이탈 (KOSDAQ 6.27%p) | 01 §10 O-5 | **미결이나 2026-08-13부로 착수 가능해졌다** — 선결 조건이던 ① `SPEC-SECTOR-GRID-001`이 `status: completed`(v0.3.0)에 도달했다. 다만 해소에는 재측정이 필요하고 재측정은 run-phase **M3**의 작업이므로, 여기서 답을 적지 않는다. 격자 정규화(① ship) 후 재측정해 원인이 격자 오염인지 구성종목 변동인지 판별한다. 허용오차 **7%p는 잠정치**이며 재측정 후 조정이 필요하다. AC-SAG-015는 임계값을 상수로 분리해 조정 가능하게 둔다. |
 | ~~**O-A6**~~ **해결됨** | `coverage_ratio`의 입도 | 신규 (설계서 미규정) | **결정 (2026-08-12): 지표별 + 최상위 최소값 병행.** `coverage: {rs, nh, stage, chg, trading_value}` 객체를 싣고, **동시에** 최상위 `coverage_ratio = min(그 값들)`을 유지해 기존 단일 필드 소비자(§8.1 저신뢰 판정, AG-7 임계, ③의 `⚠` 배지)를 깨지 않는다. AG-7의 0.80/0.50 임계는 **최상위 최소값**에 적용한다. 검증: AC-SAG-008. `01 §10 O-11` 개정 반영. |
 | **O-A7** | 최소 구성수 5 규칙의 Bump 적용 여부 | 신규 | 01 §5.4 AG-5는 "순위·버블·RRG 대상에서 제외"라 하고 Bump를 언급하지 않는다. Bump는 순위의 시계열이므로 자동 적용되는 것으로 보이나, 특정 주에만 5 미만이 되는 섹터의 선 처리(끊김)와의 관계가 명시되지 않았다. **③의 AC-SUX-019(제외 섹터 가시성)와 AC-SUX-056 R5(KOSPI 필터 시 제외 영역 등장)가 이 항목에 의존한다** — ③은 "AG-5가 Bump에도 적용된다"를 전제로 작성되어 있으나 그것이 바로 여기서 미결이다. 결정 시 ③의 두 AC에 반영해야 한다. **③ 착수 전 해소 필요.** |

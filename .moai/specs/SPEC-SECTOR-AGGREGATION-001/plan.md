@@ -8,15 +8,17 @@
 
 | ID | 사항 | 상태 | 차단 대상 |
 | --- | --- | --- | --- |
-| **O-A8** | 미완성 주 바와 기간 계산의 정합 (①의 O-G2 인수) | **미결 — 차단 중** | **M3 (벤치마크·순위)** — REQ-SAG-012(동일 날짜 창)·REQ-SAG-021(`anchor(t,28)`)이 직접 의존. 미결이면 BM-6이 무증상으로 깨진다 |
+| ~~**O-A8**~~ | 미완성 주 바와 기간 계산의 정합 (①의 O-G2 인수) | **해결 (2026-08-13)** — 미완성 주 **포함**(`as_of = latest`), 앵커는 `anchor(t,N)` = 완성 바. 창이 라벨보다 길어짐(+4~+5일, 요일 의존) | **M3 차단 해제.** 파생: REQ-SAG-043 / AC-SAG-046 신설 |
 | **O-A7** | 최소 구성수 5 규칙의 Bump 적용 | **미결** | M6의 `/sectors/history`, 그리고 **③의 AC-SUX-019 / AC-SUX-056 R5** |
 | ~~O-A1~~ | RS-Ratio 롤링 정규화 | **해결 (2026-08-12)** — 정규화 미적용 | M4 차단 해제 |
 | ~~O-A3~~ | 주식수 상수 가정 + "현재주가" 출처 | **해결** — `warnings[]` 명시 + daily 최신 `Close` | M4 차단 해제 |
 | ~~O-A4~~ | 거래대금의 기간 정의 | **해결** — 기간 토글과 동일 창 | M5 차단 해제 |
 | ~~O-A6~~ | `coverage_ratio` 입도 | **해결** — 지표별 + 최상위 최소값 | M1 차단 해제 |
-| ①의 close | `SPEC-SECTOR-GRID-001` `status: completed` | 선행 | 전 마일스톤 |
+| ~~①의 close~~ | `SPEC-SECTOR-GRID-001` `status: completed` | **충족 (v0.3.0 `completed`)** | 전 마일스톤 차단 해제 |
 
-M1·M2·M4·M5·M6은 진행 가능하다. **M3은 O-A8 결정 후에만 착수한다.** O-A7은 M6 착수 전 그리고 ③ 착수 전에 해소한다.
+**2026-08-13 기준 — run 착수 차단 항목이 전부 해소됐다.** ① close + O-A8 결정 두 조건이 모두 충족되어 **M1~M6 전부 착수 가능**하다. O-A7만 남으며 이는 M6 착수 전 그리고 ③ 착수 전에 해소한다.
+
+> **plan-auditor 재실행 안내**: 이 문서를 포함한 plan 산출물이 변경됐으므로 **plan-artifact hash가 바뀌었고 캐시된 감사 판정은 무효**다. 직전 판정은 `PASS 0.88`로 어차피 skip 임계 `0.90` 미만이었으므로, `/moai run` Phase 1에서 plan-audit이 정상 재실행된다.
 
 ---
 
@@ -55,6 +57,7 @@ tests/fixtures/golden/pre-sector-ux/
 - **프로즌 DB 스냅샷 위에서 캡처한다**(acceptance.md §8). 라이브 DB로 뜨면 baseline 자체가 드리프트해 비교가 무의미해진다.
 - `MANIFEST.md`는 필수다 — 나중에 "이 baseline이 무엇과 비교되는 값인가"를 판별할 수 없으면 R4/R5가 다시 실행 불가능해진다.
 - **M1 완료 조건에 포함한다. baseline 미캡처 상태로 M2 착수를 금지한다.**
+- **[HARD · 2026-08-13 추가] 캡처 전에 `as_of` 기준일을 먼저 결정하고 `MANIFEST.md`에 적는다.** 드리프트가 이미 시작됐다 — 프로즌 스냅샷의 정규 최신 바는 `2026-08-11`(화)인데 라이브 주봉 DB는 `2026-08-12`(수)까지 갱신됐다(실측). 기존 프로즌(08-11)을 그대로 쓸지 새 스냅샷을 뜰지의 선택이며, **새로 뜨면 AC-SAG-046의 리터럴 4개가 전부 바뀐다**(O-A8 결정으로 `as_of`가 미완성 주 바에 놓여 초과 일수가 요일 종속이 됐다). 결정 없이 캡처하면 나중에 "이 baseline이 어느 기준일의 값인가"를 되짚을 수 없다. 상세: acceptance.md §8 규약 7.
 
 #### M1.1 — 응답 계약 + 결측 표현
 
@@ -62,6 +65,7 @@ tests/fixtures/golden/pre-sector-ux/
 
 - D6 결측 표현 형태 확정 → 전 지표 필드에 적용
 - **O-A6 반영**: `coverage: {rs, nh, stage, chg, trading_value}` + 최상위 `coverage_ratio = min(...)`, `valid_counts` 동형. AG-7 임계는 최상위 최소값에 적용
+- **O-A8 반영**: 봉투에 `return_window_days: {"1w", "1m", "3m"}` 키를 신설한다(REQ-SAG-043). 키 존재·모양은 M1.1 소관(AC-SAG-036), **값의 실측 일치는 앵커가 붙는 M3 소관**(AC-SAG-046)
 - `SectorAggregate` / `BenchmarkInfo` / `ResponseEnvelope` dataclass + Pydantic 모델 정의
 - RED: AC-SAG-036, AC-SAG-038, AC-SAG-043, AC-SAG-008(지표별 커버리지)
 - GREEN: 스키마 정의 + 빈 값으로 채워 반환(값 로직은 M2 이후)
@@ -73,10 +77,11 @@ tests/fixtures/golden/pre-sector-ux/
 - `sector_metrics.py:42-44` 거짓 주석 정정
 - 커버리지·`effective_n`·`capped_members` 산출
 
-### M3 — 벤치마크 + 순위/정규화 (지표 의미 변경) [**O-A8 선결**]
+### M3 — 벤치마크 + 순위/정규화 (지표 의미 변경) [O-A8 해결 완료 — 착수 가능]
 
-- **선결**: O-A8 (미완성 주 바일 때 1W 수익률의 날짜 쌍). REQ-SAG-012·REQ-SAG-021이 직접 의존하며, 미결 상태로 진행하면 BM-6이 **무증상으로** 깨진다 — 섹터와 벤치마크가 각자 다른 뷰(`latest_snapshot` vs `history_grid`)를 쓰면서 응답에는 두 날짜가 모두 실려 겉보기로는 일치한다
-- RED: AC-SAG-011 ~ AC-SAG-023
+- **O-A8 결정 (2026-08-13) 반영**: `as_of = latest`(미완성 주 포함), 앵커 = `anchor(t, N)`(완성 바). **BM-6 보존의 유일 조건은 섹터·벤치마크가 같은 `anchor(t, N)` 호출을 쓰는 것**이며, D1/D2(공용 함수)로 구조적으로 보장한다. 각자 다른 뷰(`latest` vs `history_grid`)에서 앵커를 구하면 응답에는 두 날짜가 모두 실려 겉보기 일치하면서 BM-6이 **무증상으로** 깨진다 — 이것이 원래의 위험이었고, 동일 호출 강제가 그 방어다
+- **창 길이는 라벨과 다르다** — 실측 11 / 32 / 95일(프로즌, `as_of=2026-08-11`). 이것은 오류가 아니며, `return_window_days`로 응답에 노출한다(REQ-SAG-043). `rank_change`의 `anchor(t,28)`도 같은 이유로 실제 32일이다(AC-SAG-023의 `>= 28`이 이미 수용)
+- RED: AC-SAG-011 ~ AC-SAG-023, **AC-SAG-046**
 - GREEN: 벤치마크를 M2 집계 함수 재사용으로 구현(D2), 조용한 0.0 제거, 순위 백분위 정규화, tie-break, 반올림 1회화, `rank = f(period, market)`, `rank_change` 기준일(①의 `anchor(t,28)`)
 - 정적 스캔: 정렬 경로 내 `round(` 0건
 
@@ -105,7 +110,7 @@ tests/fixtures/golden/pre-sector-ux/
 
 ### M7 — 테스트 대체 + 회귀 게이트
 
-- **프로즌 픽스처 확인** (acceptance.md §8): 게이팅 AC(002 / 013 / 024 / 030 / 045 R3·R4·R5)가 `tests/fixtures/frozen/weekly-2026-08-12/` 위에서 실행되는지 확인. `/api/db/update` 1회 실행 후 재실행해 붉어지지 않음을 검증한다
+- **프로즌 픽스처 확인** (acceptance.md §8): 게이팅 AC(002 / **011** / 013 / 024 / 030 / 045 R3·R4·R5 / **046**)가 `tests/fixtures/frozen/weekly-2026-08-12/` 위에서 실행되는지 확인 — 이 열거는 acceptance.md §8 게이팅 표와 일치해야 한다(011은 0.2.1에서, 046은 0.3.0에서 등재됐다). `/api/db/update` 1회 실행 후 재실행해 붉어지지 않음을 검증한다
 - AC-SAG-044: `hasattr`-only 블록 대체 + 되돌림 검출 3케이스 증명
 - AC-SAG-045: R1·R3~R8 회귀 방지 테스트 (**R2는 삭제** — `10<=k<=24`는 29섹터의 34~83%로 아무것도 게이팅하지 않았고 AC-SAG-013의 `18±3`과 중복이었다)
 - R4/R5는 M1.0에서 캡처한 골든 baseline과 비교한다
