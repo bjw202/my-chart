@@ -372,16 +372,137 @@ periods: ["w1", "m1", "m3"]
   registry 를 읽으므로 재현된다(E1 에서 고정). 다만 **재캡처를 다른 커밋에서 수행하면**
   구현이 그 사이 바뀌었을 수 있으므로, M2 이후 재캡처는 불가능하다(설계상 의도).
 
+### M1.1 — 응답 계약 + 결측 3상태 표현 (2026-08-13)
+
+#### E1 AC PASS/FAIL 매트릭스
+
+| AC | 상태 | 검증 명령 | 실측 |
+| --- | --- | --- | --- |
+| AC-SAG-036 (응답 공통 10키) | **PASS** | `pytest tests/test_response_contract.py -q` | 7 엔드포인트 × 10키 누락 0건. `excluded` 키 상존, `return_window_days` 3키 |
+| AC-SAG-038 (결측 3상태) | **PASS** | 동상 | 3상태 직렬화 형태 3종 상이. 전 응답 스캔에서 결측 자리 `0`/`0.0`/`50.0` 0건 |
+| AC-SAG-043 (4단계 전파) | **PASS (부분 — Gap 1건)** | 동상 | dataclass / 서비스 변환 / `model_fields` / JSON 4단계 전건 통과. **파생 구조(`by_sector`·상세 축약 리스트) 절은 M6 이관** |
+| AC-SAG-008 (커버리지 4필드) | **PASS** | 동상 | `data[]` 18항목 전건 4필드 보유. `coverage`/`valid_counts` 5버킷 동형 |
+
+전체: `14 passed` (tests/test_response_contract.py). 회귀: `702 passed / 8 failed / 25 errors`
+— failed·errors 는 M1.0-c 이전과 **동일 집합**(신규 0건), 증거
+`.moai/state/verify/m11/1-full-m11.log`.
+
+#### E2 D6 결측 표현 형태 결정 기록
+
+**채택: `{value, reason}` 객체 형태.** 형제 `*_reason` 필드 형태를 기각한다.
+
+1. AC-SAG-038 본문이 세 상태를 `{value: null, reason: "missing"}` / `{value: 0.0}` /
+   `{value: null, reason: "insufficient"}` 로 **직접 명시**한다. 형제 필드 형태는
+   `{"x": null, "x_reason": "missing"}` 으로 직렬화돼 AC 본문과 형태가 갈린다.
+2. 형제 필드는 지표당 키가 2개로 늘고 **한쪽만 등록에서 빠뜨릴 수 있다** — Lesson #4
+   (파생 구조가 원본 갱신을 자동 반영하지 않아 누락된 선례)의 실패 형태 그대로이며,
+   AC-SAG-043 의 4단계 전파 검사 대상도 두 배가 된다.
+3. §9.1 3상태 보존은 **생성자 검증**으로 구조 보장한다 — `MetricValue.__post_init__` 이
+   `reason` 과 `value` 의 동시 지정을 `ValueError` 로 거부하므로, 결측 자리에 `0`/`0.0`/
+   `50.0` 이 들어가려면 `present(0.0)` 를 **의도적으로 써야** 하고 누락으로는 발생할 수
+   없다. 구 구현의 `float(s.get("CHG_1W") or 0.0)` 및 `_normalize_list` 의 `50.0` 붕괴가
+   재도입되면 타입 수준에서 막힌다.
+
+#### E9 `sector_metrics.py` 거짓 주석 — M2 로 이월
+
+plan.md 가 지시한 `:42-44` 는 현재 파일에서 `:41-43`(`sector_return_1w/1m/3m` 의
+`# market-cap weighted avg ... return (%)`)이다. 정정은 실제 구현을 시총가중으로 바꾸는
+M2 와 같은 커밋에 있어야 의미가 있으므로 M1.1 에서 수행하지 않았다(주석만 먼저 고치면
+"등가중인데 등가중이라고 적힌" 상태가 되어 정보량이 같다). 정정문은 WIP 브랜치
+`83cb847` 에 포함돼 있다.
+
+---
+
+### M2 — 가중·집계 코어 : **미착수 (BLOCKER)** (2026-08-13)
+
+**M2 를 커밋하지 않았다.** 착수 직전 검증에서 **AC-SAG-002(게이팅 AC)의 절 2건이 지정
+집계 픽스처 위에서 산술적으로 성립 불가**임을 실측했다. M2 는 비가역 경계(§8.5)이며,
+해소에 집계 픽스처 재빌드(M1.0-a) → 골든 baseline 재캡처(M1.0-b) 가 필요할 수 있어
+**지금 커밋하면 그 경로가 영구히 닫힌다**. 구현물은 WIP 브랜치에 보존했다
+(`wip/SPEC-SECTOR-AGGREGATION-001-M2`, `83cb847`, main 미머지).
+
+#### 근본 원인 — `cap_eff = max(cap, 1/n)` 의 귀결
+
+`cap = 0.10` 에서 `n <= 10` 이면 `cap_eff = 1/n` 이므로 `n × cap_eff = 1` 이 된다. 즉
+"최대 가중치 <= cap_eff 이고 Σw = 1" 을 만족하는 해가 **등가중 하나뿐**이다. 따라서
+**구성종목 10개 이하 섹터에서 시총가중은 등가중과 항상 완전히 동일**하며, 상한 재배분이
+관측 가능한 구간은 `n >= 11` 이다.
+
+집계 픽스처의 AG-5 통과 18섹터 중 `n > 10` 은 **게임(32) 하나뿐**이다(나머지 17개는
+n=5~8). 픽스처 요건 **F4("최상위 종목 원비중 > 10% 인 섹터 >= 3")는 이 조건을 함의하지
+않는다** — F4 자체는 충족돼 있고 AC-SAG-048 도 PASS 다.
+
+#### 실측 (독립 참조 구현 — 프로덕션 모듈 미import, §8.3)
+
+```
+AG-5 통과 16섹터 중 |시총가중 − 등가중| >= 0.5%p 인 섹터 = 1개 (게임, Δ 2.2763%p)
+                                       AC-SAG-002 요구: >= 3개          → FAIL
+평균 절대 순위 이동 (시총가중 순위 vs 등가중 순위) = 0.3750
+                                       AC-SAG-002 요구: >= 1.0          → FAIL
+n=6 섹터 표본: 비철금속 24.2060 vs 24.2060 / 통신 15.0261 vs 15.0261 / 화장품 25.4084 vs 25.4084
+              (Δ = 0.0000%p — 완전 동일, 부동소수 오차조차 없음)
+```
+
+AC-SAG-002 는 이 두 절에 대해 *"두 방식이 우연히 일치하는 픽스처에서는 이 AC 가
+무게이팅이 되므로 F4 는 필수 요건이다"* 라고 적고 있다 — **AC 자신의 항진명제 방지
+장치가 발화한 것**이며, 형식 위반이 아니라 검출력 상실이다. 같은 벽에 **AC-SAG-045 R1**
+(골든 baseline 대비 순위 이동, M7 게이팅)도 부딪힌다.
+
+#### 파생 발견 — plan.md §3.1 알고리즘의 20회 상한 부족
+
+§3.1 verbatim 형태는 상한에 걸린 종목을 다음 반복에서 나머지 집합에 **다시 포함**하므로
+진동하며, 20회 안전 상한에서 **가중치가 상한을 초과한 채 종료**한다.
+
+```
+n=9,  cap_eff=0.111111 → §3.1 verbatim 20회 종료 시 max weight = 0.122775  (+10.5% 초과)
+n=12, cap_eff=0.100000 → §3.1 verbatim 20회 종료 시 max weight = 0.1000000000063
+```
+
+AC-SAG-001 의 "최대값 <= cap_eff" 와 "5회 이하 수렴" 을 동시에 위반한다. WIP 구현은
+상한 종목을 **동결**하는 형태를 쓰며 같은 고정점을 갖는다(§3.1 을 200회까지 돌린 값과
+최대 편차 `4.8e-12`, 무작위 305 케이스에서 반복 최대 **5회**, 상한 위반 0건).
+등가성 대조는 `tests/test_weighting.py::test_ac_sag_001_matches_plan_31_verbatim_fixed_point`
+가 §3.1 을 독립 재구현해 단언한다.
+
+#### 파생 발견 2 — AC-SAG-001 지정 픽스처의 비율 단언 불가
+
+AC-SAG-001 의 `w[1]/w[2] == 1.0`, `w[1]/w[3] == 2.0` 는 지정 픽스처 `[70,10,10,5,5]`
+(`n=5`, `cap_eff=0.20`)에서 **어떤 인덱싱 규약으로도 성립 불가**하다 — 위 귀결에 의해
+해가 균등 `0.2 × 5` 하나뿐이므로 모든 비율이 `1.0` 이다. "비례 배분(균등 아님)" 이라는
+**성질**은 `n >= 11` 픽스처에서 단언했다(`test_ac_sag_001_redistribution_is_proportional_not_equal`,
+원 시총 3:2:1 비율 보존 확인).
+
+#### E3 Lesson #9 되돌림 실증 — **미실행 (Gap)**
+
+`mut_equal_weight`(AC-SAG-002 / 045 R1) 변형 실증은 **수행하지 않았다.** 대조 대상인
+AC-SAG-002 의 값 단언 자체가 현 픽스처에서 검출력을 갖지 못하므로, 변형을 적용해 RED 를
+받아도 그 RED 는 "AC 가 유효하다" 는 증거가 되지 못한다. §9 DoD 에 따라 **GREEN 이 아니라
+Gap 으로 기재**한다. 픽스처 요건 정정 후 실증한다.
+
+#### 보존된 WIP 내용 (`83cb847`, main 미머지)
+
+`my_chart/analysis/weighting.py` 신설(`capped_weights` — `@MX:ANCHOR` AG-1 계약,
+`effective_n`, `weighted_mean`) · `sector_metrics.py` 집계 교체(`compute_sector_aggregates`,
+AG-1~AG-7, 커버리지·`effective_n`·`capped_members`·`excluded` 산출) · `:41-43` 거짓 주석
+정정 · `tests/test_weighting.py` 11 tests. 회귀 `713 passed`, 신규 실패 0건
+(`.moai/state/verify/m2/1-full-m2.log`).
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M1.0-c 완료. M2(비가역 경계) 는 사용자 검토 게이트 ② 뒤
-milestone_completed: M1.0-c
-run_commit_sha: 6f00ba5                 # 본 §E.3 backfill 은 후속 커밋 (커밋은 자기 SHA 를 알 수 없다)
-prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3 backfill)"
+run_status: blocked                # M1.1 완료. M2 는 AC-SAG-002 blocker 로 미착수
+milestone_completed: M1.1
+run_commit_sha: pending-backfill-m11   # 본 §E.3 갱신 커밋의 SHA 는 후속 커밋에서 backfill
+prior_milestone_commits: "adb1f25 (M1.0-a) · b839cee (M1.0-a §E.3) · 6f00ba5 (M1.0-b/c) · 7b5fc45 (M1.0-b/c §E.3) · 7305e2e (M1.1)"
 ac_gate: AC-SAG-047
-ac_pass_count: 2                   # AC-SAG-048 (30 테스트) + AC-SAG-047 (40 테스트)
-ac_fail_count: 0
+ac_pass_count: 6                   # 048 + 047 + 036 + 038 + 043(부분) + 008
+ac_fail_count: 0                   # M2 는 착수 자체를 하지 않았다(FAIL 이 아니라 미실행)
+ac_blocked: "AC-SAG-002 (게이팅) — 픽스처 요건 F4 불충분으로 절 2건 산술적 성립 불가"
+blocker_open: true
+blocker_owner: manager-spec        # acceptance.md 본문 수정 필요 — run-phase 권한 밖(§8.5 3)
+wip_branch: "wip/SPEC-SECTOR-AGGREGATION-001-M2 @ 83cb847 (main 미머지)"
 capture_via_http_response: true    # TestClient 경유 response_model 직렬화. model_dump_json() 아님
 capture_as_of: "2026-08-11"        # 캡처 스크립트가 응답 date 와 동등성 단언
 capture_fixture: "tests/fixtures/frozen/aggregation-2026-08-11"
@@ -391,15 +512,16 @@ baseline_sector_count: 18          # >= 10 (AC-SAG-047)
 baseline_excess_returns_degenerate: false   # 54/54 (섹터,기간) 쌍이 returns 와 상이. max gap 16.1662
 d12_forbidden_string_count: 0      # sector_excess_return · total_count 양 파일 0건
 new_warnings_or_lints_introduced: 0
-full_suite_delta: "+40 passed (648 → 688) / failed 8 (전건 pre-existing, baseline 동일 집합) / errors 25 (pre-existing)"
+full_suite_delta: "+14 passed (688 → 702, M1.1) / failed 8 (전건 pre-existing, 동일 집합) / errors 25 (pre-existing)"
 date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경
 aggregation_fixture_touched: false # tests/fixtures/frozen/aggregation-2026-08-11/ 미변경
-production_code_touched: false     # my_chart/ · backend/ · frontend/ 미변경 (BumpChart.tsx 는 착수 이전 무관 변경)
+production_code_touched: true      # M1.1 — 응답 스키마 추가 전용 확장 + 서비스 봉투 배선. 집계 로직 미변경
 live_db_mutated: false             # /api/db/update 미실행
 negative_verification: observed-red-1        # stage-overview.json 임시 이동 → 3 failed + 11 errors 관측. 복원 후 40 passed (E5)
-point_of_no_return_crossed: false  # M2 미착수 — 재캡처 여전히 가능
-next_gate: "M2 (구 집계 구현 교체) — 사용자 검토 게이트 ②. AC-SAG-048 + AC-SAG-047 양자 PASS 로 진입 전제 충족"
-total_run_phase_files: 11          # M1.0-a 6 + baseline 3 + capture_baseline.py 1 + test_golden_baseline.py 1
+mutation_verification_m2: not-run  # mut_equal_weight 미실증 — 대조 대상 AC-SAG-002 가 현 픽스처에서 무검출력(Gap)
+point_of_no_return_crossed: false  # **M2 미커밋 — 재캡처 경로 여전히 열려 있다**
+next_gate: "AC-SAG-002 / 픽스처 요건 F4 정정 (manager-spec 재위임) → 필요 시 M1.0-a 픽스처 재빌드 + M1.0-b 재캡처 → M2"
+total_run_phase_files: 18          # 기존 11 + M1.1 7 (신설 3 · 수정 4)
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
