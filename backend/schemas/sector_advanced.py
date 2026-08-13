@@ -53,7 +53,7 @@ class StockBubbleItem(BaseModel):
     stage: int | None        # 스테이지 (1~4)
     stage_detail: str | None # 스테이지 상세
     market_cap: float        # 시가총액
-    volume_ratio: float      # 거래량 비율
+    volume_ratio: float | None  # 거래량 비율(NULL/0 VolumeSMA10 결측 시 None, AC-SAG-028)
     sector_minor: Optional[str] = None  # 산업명(중) (SPEC-SECTOR-MINOR-COLOR-001)
     product: Optional[str] = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
 

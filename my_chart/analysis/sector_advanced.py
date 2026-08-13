@@ -66,7 +66,8 @@ class StockBubble:
     stage: int | None        # 스테이지 (1~4)
     stage_detail: str | None # 스테이지 상세
     market_cap: float        # 시가총액
-    volume_ratio: float      # 거래량 비율 (Volume / VolumeSMA10)
+    # AC-SAG-028 — weekly VolumeSMA10 기준. NULL/0 이면 None(1.0 치환 금지, REQ-SAG-025).
+    volume_ratio: float | None
     sector_minor: str | None = None  # 산업명(중) (SPEC-SECTOR-MINOR-COLOR-001)
     product: str | None = None       # 주요제품 (SPEC-STOCK-TOOLTIP-PRODUCT-001)
 
@@ -172,13 +173,26 @@ def _get_price_on_date(
     conn: sqlite3.Connection, date: str
 ) -> dict[str, dict[str, Any]]:
     """특정 날짜의 종가 및 거래량 데이터를 로드한다."""
-    rows = conn.execute(
-        """SELECT Name, Close, Volume, SMA10, SMA40, SMA40_Trend_4M,
-                  CHG_1W, CHG_1M, CHG_3M, MAX52
-           FROM stock_prices
-           WHERE Date = ?""",
-        (date,),
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            """SELECT Name, Close, Volume, SMA10, SMA40, SMA40_Trend_4M,
+                      CHG_1W, CHG_1M, CHG_3M, MAX52, VolumeSMA10
+               FROM stock_prices
+               WHERE Date = ?""",
+            (date,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        # `VolumeSMA10` 컬럼이 없는 최소 스키마 픽스처(단위 테스트) — volume_ratio 는
+        # 전부 결측(None)으로 접힌다(AC-SAG-028). 라이브/집계 픽스처는 항상 보유.
+        rows = [
+            (*r, None) for r in conn.execute(
+                """SELECT Name, Close, Volume, SMA10, SMA40, SMA40_Trend_4M,
+                          CHG_1W, CHG_1M, CHG_3M, MAX52
+                   FROM stock_prices
+                   WHERE Date = ?""",
+                (date,),
+            ).fetchall()
+        ]
     result: dict[str, dict[str, Any]] = {}
     for r in rows:
         name = r[0]
@@ -195,6 +209,8 @@ def _get_price_on_date(
             "CHG_1M": float(r[7] or 0.0),
             "CHG_3M": float(r[8] or 0.0),
             "MAX52": float(r[9] or 0.0),
+            # AC-SAG-028 — 원시(raw) VolumeSMA10. None/0 은 volume_ratio 결측 판정에 쓴다.
+            "VolumeSMA10": r[10],
         }
     return result
 
@@ -607,11 +623,20 @@ def compute_stock_bubble(
         close = price_row["Close"]
         volume = price_row["Volume"]
         sma10 = price_row["SMA10"]
-        volume_sma10 = sma10  # SMA10을 볼륨 SMA 근사값으로 사용 (DB에 VolumeSMA10 없을 수 있음)
+        raw_volume_sma10 = price_row.get("VolumeSMA10")
         rs = rs_data.get(name, 0.0)
         price_change = _get_chg_by_period(price_row, period)
         trading_value = close * volume
         cap = meta["market_cap"]
+
+        # AC-SAG-028 — volume_ratio = Volume / VolumeSMA10(weekly). NULL/0 이면 None
+        # (1.0 치환 금지, REQ-SAG-025). 가격 SMA10 을 거래량 기준선으로 쓰던 근사를 폐기.
+        if raw_volume_sma10 is None or float(raw_volume_sma10) == 0:
+            volume_ratio: float | None = None
+            stage_volume_sma10 = 1.0  # stage 분류 입력(classify_stage)만의 안전값
+        else:
+            volume_ratio = volume / float(raw_volume_sma10)
+            stage_volume_sma10 = float(raw_volume_sma10)
 
         # 스테이지 분류
         stock_row = {
@@ -623,7 +648,7 @@ def compute_stock_bubble(
             "RS_12M_Rating": rs,
             "CHG_1M": price_row["CHG_1M"],
             "Volume": volume,
-            "VolumeSMA10": max(volume_sma10, 1.0),
+            "VolumeSMA10": stage_volume_sma10,
         }
         stage_result = classify_stage(stock_row)
 
@@ -635,7 +660,7 @@ def compute_stock_bubble(
             stage=stage_result.stage,
             stage_detail=stage_result.detail,
             market_cap=round(cap, 0),
-            volume_ratio=round(stage_result.volume_ratio, 4),
+            volume_ratio=round(volume_ratio, 4) if volume_ratio is not None else None,
             sector_minor=meta.get("sector_minor"),  # SPEC-SECTOR-MINOR-COLOR-001
             product=meta.get("product"),             # SPEC-STOCK-TOOLTIP-PRODUCT-001
         ))

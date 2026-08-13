@@ -1106,3 +1106,72 @@ def test_compute_stock_bubble_product_null_fallback() -> None:
             break
     else:
         pytest.fail("LG화학이 결과에 없음 — 테스트 데이터 문제")
+
+
+# ---------------------------------------------------------------------------
+# AC-SAG-028 — volume_ratio: weekly VolumeSMA10 기준 (SPEC-SECTOR-AGGREGATION-001 M5)
+# ---------------------------------------------------------------------------
+
+def _make_volume_ratio_db(volume_sma10: float | None) -> str:
+    """VolumeSMA10 컬럼을 갖는 weekly DB 1종목 픽스처."""
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    conn = sqlite3.connect(tmp.name)
+    conn.executescript("""
+        CREATE TABLE stock_prices (
+            Name TEXT, Date TEXT, Close REAL, Volume REAL,
+            SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL,
+            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL, VolumeSMA10 REAL
+        );
+        CREATE TABLE stock_meta (
+            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
+            market TEXT, market_cap REAL, product TEXT
+        );
+        CREATE TABLE relative_strength (
+            Name TEXT, Date TEXT, RS_12M_Rating REAL
+        );
+    """)
+    conn.execute(
+        "INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)",
+        ("테스트종목", "000001", "IT", "소그룹", "KOSPI", 1_000_000.0, None),
+    )
+    # Given: Volume=200, VolumeSMA10=100, 가격 SMA10=50000 — REQ-SAG-025 literal example.
+    conn.execute(
+        "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("테스트종목", "2026-08-07", 50000.0, 200.0,
+         50000.0, 48000.0, 47000.0, 0.01, 0.02, 0.03, 55000.0, volume_sma10),
+    )
+    conn.commit()
+    conn.close()
+    return tmp.name
+
+
+def test_ac_sag_028_volume_ratio_uses_weekly_volume_sma10_not_price_sma10() -> None:
+    """Volume=200, VolumeSMA10=100 → volume_ratio==2.0 (현행 로직이면 200/50000==0.004)."""
+    from my_chart.analysis.sector_advanced import compute_stock_bubble
+
+    db_path = _make_volume_ratio_db(volume_sma10=100.0)
+    result = compute_stock_bubble(db_path, sector_name="IT", period="1w")
+    assert len(result) == 1
+    item = result[0]
+    assert item.volume_ratio == pytest.approx(2.0), (
+        f"volume_ratio={item.volume_ratio!r} — 가격 SMA10 근사(0.004) 로 되돌아갔다")
+
+
+@pytest.mark.parametrize("volume_sma10", [None, 0.0])
+def test_ac_sag_028_volume_ratio_none_when_volume_sma10_missing(volume_sma10) -> None:
+    """VolumeSMA10 이 NULL 또는 0 이면 volume_ratio 는 None(1.0 치환 금지)."""
+    from my_chart.analysis.sector_advanced import compute_stock_bubble
+
+    db_path = _make_volume_ratio_db(volume_sma10=volume_sma10)
+    result = compute_stock_bubble(db_path, sector_name="IT", period="1w")
+    assert len(result) == 1
+    assert result[0].volume_ratio is None
+
+
+def test_ac_sag_028_static_scan_no_price_sma10_volume_approximation() -> None:
+    """정적 스캔 — `volume_sma10 = sma10` 근사 표현이 소스에 남아있지 않다."""
+    from pathlib import Path
+
+    src = Path("my_chart/analysis/sector_advanced.py").read_text(encoding="utf-8")
+    assert "volume_sma10 = sma10" not in src
