@@ -1896,6 +1896,109 @@ m5_open_gaps: "G16(trading_value 응답 필드·라우터 배선 미실행 — M
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
+### M6 Gap Closure — G16/G20/G21/G22/G23/G25 (2026-08-14)
+
+M6 §E.2 에 남은 6건의 Gap을 M7(회귀 게이트) 착수 전에 해소한다. `cycle_type=tdd`
+위임 세션 — 각 gap마다 되돌림(수정 전 상태) RED를 실측 후 수정 GREEN을 확인했다
+(§E.2 관행 — 대조 단언 판정 기준은 lessons.md #9).
+
+#### 상태 매트릭스
+
+| Gap | 상태 | 근거 |
+| --- | --- | --- |
+| **G16** | **RESOLVED** | `compute_trading_value_by_period`(M5 신설)를 `SectorAggregate.trading_value`(기간별 dict, `returns`와 동형)에 배선. `_compute_sector_aggregates_core`가 `anchor_dates`(수익률과 동일 호출) 기준으로 1회 계산해 `_Member.trading_value`에 실은 뒤 `_aggregate_members`에서 결측 제외 합산. `envelope.py` `SectorAggregateModel.trading_value` + `aggregate_model()` 배선. `Coverage.trading_value`/`ValidCounts.trading_value`는 의도적으로 `None` 유지(AG-7 최소값 오염 방지, aggregate_types.py 기존 주석과 동일 근거) — 이 필드는 그 게이팅과 무관한 별도 값 필드다. |
+| **G20** | **RESOLVED** | RRG: `compute_sector_price_index`/`compute_rrg_data`에 `market` 전달 → `_build_sector_stock_map`의 기존 `market_filter` 재사용(별도 시장별 지수 저장소 신설 없음). 종목 버블: `compute_stock_bubble`에 `market` 추가 — `sector_stocks` 필터링에 `stock_meta[name]["시장구분"]` 비교 적용. 실측(§ 하단 E2): market=kospi에서 18개 섹터 전부 rs_ratio가 market=all과 달라짐(더 이상 echo 전용 아님); 종목 버블 kospi 9종목 vs all 17종목(축소 확인). |
+| **G21** | **RESOLVED** | `stage_service._load_extended_weekly_fields`가 weekly `Close×Volume` 근사 대신 M5 정규 원천(`compute_trading_value_by_period`, daily `VolumeWon`, 1W 창)을 소비하도록 교체. `daily_db_path` 미전달 시(호출자 없음) 결측(`None`) 유지 — 조용한 근사 대체 금지. |
+| **G22** | **RESOLVED** | `_rank_sectors(aggregates, period=...)` 신설 — `period` 지정 시 그 기간의 (정규화 전) 초과수익률 단독을 rank 정렬 키로 사용(AC-SAG-021 "해당 (period, market)의 초과수익률 기준"). `composite_score`는 항상 3기간 가중합 유지(AC-SAG-022 비회귀). `compute_sector_aggregates`/`_compute_sector_aggregates_core`에 `period` 관통 배선, baseline(rank_change) 재귀 호출에도 동일 period 전달(같은 기준 비교 유지). 라우터 `/sectors/ranking`이 `period`를 `get_sector_ranking`에 전달. 레거시 `sectors[]`(`compute_sector_ranking`)는 영향 없음(AC-SAG-036 3윈도우 상설 요구 유지). |
+| **G23** | **RESOLVED** | `StockBubble`/`StockBubbleItem`에 `weight_in_sector`/`chg_1w`/`chg_3m`/`near_52w_high` 4필드 신설. `weight_in_sector`는 `weighting.capped_weights_detail`(stage_service와 동일 산식 재사용, INV-CAP-1)로 market 필터 후 유니버스 기준 산출. `chg_1w`/`chg_3m`/`near_52w_high`는 별도 원시 쿼리(`_load_raw_chg_max52`)로 결측을 `None` 보존(§9.1) — 기존 `_get_price_on_date`(공유 함수, 결측 0 치환)는 건드리지 않음(scope discipline). |
+| **G25** | **RESOLVED** | `EnvelopeMixin`에 `baseline_date`/`trading_value_window_days` 신설(봉투 10키 → 12키). `envelope_fields()`가 `trading_value_window_days` 미지정 시 `return_window_days`와 **동일 dict**를 채운다(O-A4 — 같은 anchor 창 공유이므로 항등이 자명하게 성립). `get_sector_ranking`이 `agg.baseline_date`를 `envelope_fields(baseline_date=...)`로 전달. |
+
+#### 되돌림(RED) 실측 — `git stash push` 로 프로덕션 파일만 pre-fix로 되돌린 뒤 신규 회귀
+테스트(`tests/test_m6_gap_closure.py`) 실행, 이후 `git stash pop`으로 복원.
+
+```
+$ git stash push -m "m6-gap-closure-verify-red" -- \
+    my_chart/analysis/aggregate_types.py my_chart/analysis/sector_metrics.py \
+    backend/schemas/envelope.py backend/services/sector_ranking_service.py \
+    backend/routers/sectors.py my_chart/analysis/sector_advanced.py \
+    backend/schemas/sector_advanced.py backend/services/sector_advanced_service.py \
+    backend/services/stage_service.py
+$ pytest tests/test_m6_gap_closure.py -q
+10 failed, 1 passed, 1 warning in 5.94s
+  FAILED test_g16_compute_trading_value_by_period_has_call_site
+  FAILED test_g16_data_trading_value_field_present_and_populated
+  FAILED test_g20_rrg_market_filter_recomputes_rs_ratio
+  FAILED test_g20_stock_bubble_market_filter_reduces_universe
+  FAILED test_g21_stage_overview_trading_value_matches_canonical_source
+  FAILED test_g22_period_changes_data_rank
+  FAILED test_g23_stock_bubble_item_has_ac_sag_041_fields
+  FAILED test_g23_weight_in_sector_sums_close_to_one
+  FAILED test_g25_baseline_date_exposed_at_top_level
+  FAILED test_g25_trading_value_window_days_matches_return_window_days_per_period
+$ git stash pop   # 프로덕션 수정 복원
+$ pytest tests/test_m6_gap_closure.py -q
+11 passed, 1 warning in 7.12s
+```
+
+10/11 되돌림 RED(9개 defect-proving 테스트 + G22 대비 테스트 1건 — `test_g16_
+compute_trading_value_by_period_has_call_site`도 포함해 총 10건). 나머지 1건
+(`test_g22_composite_score_still_present_alongside_rank`)은 비회귀 확인용(defect
+판별자가 아니므로 pre-fix에서도 PASS가 정상 — AC-SAG-022는 M6 이전부터 유지).
+
+#### AC 재검증 (수정 후, 픽스처 고정)
+
+```
+$ pytest tests/ -k "ac_sag_021 or ac_sag_023 or ac_sag_029 or ac_sag_041 or ac_sag_046" -v
+14 passed
+  AC-SAG-021: test_ac_sag_021_ranks_are_contiguous_and_sorted PASSED
+  AC-SAG-021: test_ac_sag_021_market_filter_reduces_max_rank PASSED
+  AC-SAG-023: test_ac_sag_023_baseline_date_is_anchor_t_minus_28 PASSED
+  AC-SAG-023: test_ac_sag_023_rank_change_none_for_sector_absent_at_baseline PASSED
+  AC-SAG-029: test_ac_sag_029_given_then_trading_value_from_volume_won_not_close_times_volume PASSED
+  AC-SAG-029: test_ac_sag_029_compute_trading_value_by_period_sums_volume_won_over_anchor_window PASSED
+  AC-SAG-029: test_ac_sag_029_static_scan_no_close_times_volume_recomputation PASSED
+  AC-SAG-041: test_ac_sag_041_stage_stock_has_required_fields PASSED
+  AC-SAG-041: test_ac_sag_041_weight_in_sector_not_literal_010_degenerate_sector PASSED
+  AC-SAG-041: test_ac_sag_041_weight_in_sector_red_when_literal_010_used PASSED
+  AC-SAG-041(G23): test_g23_stock_bubble_item_has_ac_sag_041_fields PASSED (tests/test_m6_gap_closure.py)
+  AC-SAG-046: test_ac_sag_046_lite_return_window_days_literal PASSED
+  AC-SAG-046: test_ac_sag_046_lite_mut_label_constant_window_is_detectable PASSED
+  AC-SAG-046: test_ac_sag_046_lite_benchmark_anchor_date_matches_1w PASSED
+```
+
+#### 전체 스위트 델타
+
+```
+$ pytest tests/ -q
+8 failed, 873 passed, 68 skipped, 1 xpassed, 25 errors in 110.42s
+```
+
+M6 완료 시점 baseline(862 passed / 8 failed / 25 errors, 실패·에러 집합 동일)
+대비 **+11 passed**(`tests/test_m6_gap_closure.py` 신규 11건), 실패 8건·에러
+25건은 전건 baseline과 동일 집합(사전 존재, SPEC 범위 밖 — 신규 실패 0건).
+
+#### 미해소 / 이관 항목 (없음)
+
+이번 세션에서 6건 전부 RESOLVED로 종결했다. DEFERRED-WITH-RATIONALE 또는
+MISDIAGNOSED로 분류된 항목은 없다.
+
+#### 해석이 필요했던 지점 (단일 패스 최선 해석)
+
+1. **G16 `trading_value` 필드 모양** — spec.md/plan.md/G16 원문은 "응답 필드
+   신설"만 명시하고 스칼라 vs 기간별 dict 여부를 특정하지 않았다. `trading_
+   value_window_days`가 `return_window_days`(3키 dict)와 동일 모양으로 요구된
+   점(AC-SAG-046)에 근거해 `SectorAggregate.trading_value`도 `returns`/
+   `excess_returns`와 동형인 `dict[str, MetricValue]`(3기간)로 해석했다.
+2. **G22 `rank_change`의 period 결속** — AC-SAG-021은 `data[].rank`가 period에
+   결속돼야 함을 요구하지만 `rank_change`(baseline 대비 순위 이동)의 period
+   결속 여부는 명시하지 않는다. baseline 재귀 호출에도 동일 period를 전달해
+   "같은 기준(같은 period)의 순위 이동"으로 해석했다 — 이질적 기준(현재
+   period-rank vs baseline composite-rank) 비교를 피하기 위함이다.
+3. **G23 필드 적용 범위** — spec.md §12.3은 종목 목록 대상을 "`/stage/overview`,
+   종목 버블"로 명시한다. G23 원문은 `/sectors/{name}/bubble`의 `StockBubbleItem`
+   미비를 지적했으므로 그 표면만 확장했다(`/sectors/bubble`의 `SectorBubbleItem`
+   — 섹터 단위 버블 — 은 대상 밖으로 해석, 종목 단위 필드 요구가 아니므로).
+
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase>_
