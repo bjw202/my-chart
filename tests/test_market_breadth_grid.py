@@ -1,0 +1,321 @@
+# coding: utf-8
+"""SPEC-MARKET-BREADTH-001 — breadth 히스토리 정규 주간 격자 전환 수용 기준.
+
+`tests/fixtures/frozen/weekly-2026-08-12/weekly.db` (프로즌 스냅샷) 위에서만 실행한다.
+게이팅 AC: AC-MBR-001 / 002 / 003 / 008 / 010.
+
+§3.0 반증력 규약 [HARD]
+  본 파일의 모든 주 단언 우변은 **프로즌 리터럴**(문자열/정수)이다. 구현이 호출하는
+  헬퍼(`history(compute_weekly_grid(db), 52)`)를 테스트가 다시 호출해 자기 자신과
+  비교하는 형태(F2)를 주 단언으로 쓰지 않는다.
+
+§1.4 개수는 판별자가 아니다 [설계상 핵심]
+  현행 출하 구현(V0) / 올바른 구현(V★) / CG-2 누락(V1) 모두 52개를 반환한다.
+  따라서 `len(...) == 52` 단독 단언은 아무것도 잡지 못한다(F4). 판별자는
+  날짜 집합 — 첫 날짜 / 마지막 날짜 / span / 고유 ISO 주 수 — 이다.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+FROZEN_DB = str(
+    Path(__file__).parent / "fixtures" / "frozen" / "weekly-2026-08-12" / "weekly.db"
+)
+
+# ---------------------------------------------------------------------------
+# 프로즌 리터럴 — 갱신 지점 단일화 (plan.md R4)
+#
+# 스냅샷을 갱신하면 아래 블록 **전체**를 재도출해야 한다. 개별 테스트에 리터럴을
+# 흩뿌리지 않는 이유가 이것이다.
+# ---------------------------------------------------------------------------
+
+# 진행 중인 주 판정 기준일. 프로즌 스냅샷 MANIFEST.md 의 `as_of` 와 동일해야 한다.
+FROZEN_AS_OF = date(2026, 8, 12)
+
+# AC-MBR-001 — 히스토리 날짜 경계 (V★ = 올바른 구현)
+EXPECTED_FIRST_DATE = "2025-08-14"
+EXPECTED_LAST_DATE = "2026-08-07"
+EXPECTED_SPAN_DAYS = 358
+
+# AC-MBR-002 — 진행 중인 주 (CG-2 배제 대상)
+PARTIAL_WEEK_DATE = "2026-08-11"
+PARTIAL_WEEK_ISO = (2026, 33)
+
+# AC-MBR-003 — ISO 주 고유성
+EXPECTED_WEEKS = 52
+
+# AC-MBR-008 — PRESERVE baseline (M1 에서 **코드 변경 전에** 캡처했다)
+BASELINE_DATE = "2026-07-31"
+BASELINE_FIELDS = {
+    "date": "2026-07-31",
+    "market": "KOSPI",
+    "pct_above_sma50": 24.242424242424242,
+    "pct_above_sma200": 15.151515151515152,
+    "nh_nl_ratio": 0.2,
+    "nh_nl_diff": -3,
+    "ad_ratio": 1.5,
+    "total_stocks": 33,
+}
+BASELINE_COMPOSITE = 33.598484848484844
+
+# AC-MBR-010 — 하류 소비자 창(`history[-8:]`) 양끝 앵커 + span 경계
+# span 하한 47 은 V★ 52바 계열의 8바 창 45개 전수 실측 분포(48–50)의 바닥 48에서
+# 1일 여유를 뺀 값이다. 46 이하로 내리면 V1(46)이 통과하므로 채택하지 않는다.
+WINDOW_SIZE = 8
+EXPECTED_WINDOW_FIRST = "2026-06-19"
+EXPECTED_WINDOW_LAST = "2026-08-07"
+WINDOW_SPAN_MIN = 47
+WINDOW_SPAN_MAX = 56
+
+# §3.0 변형표 — 각 변형의 (n, 첫 날짜, 마지막 날짜, span)
+VARIANT_LITERALS = {
+    "V*": (52, "2025-08-14", "2026-08-07", 358),
+    "V0": (52, "2026-03-25", "2026-08-11", 139),
+    "V1": (52, "2025-08-22", "2026-08-11", 354),
+    "V2": (51, "2025-08-14", "2026-07-31", 351),
+    "V3": (51, "2025-08-22", "2026-08-07", 350),
+}
+
+
+# ---------------------------------------------------------------------------
+# 픽스처
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`compute_weekly_grid(db, as_of=None)` 의 벽시계를 프로즌 as_of 로 고정한다.
+
+    `compute_breadth_history` 는 as_of 인자를 갖지 않으며 REQ-MBR-001 이 그 계약을
+    `compute_weekly_grid(weekly_db_path, as_of=None)` 으로 못박는다. 따라서 CG-2
+    (진행 중인 주 배제) 판정이 **벽시계에 의존**한다 — W33 이 실제로 종료되는 날부터는
+    `2026-08-11` 이 더 이상 미완성 주가 아니게 되어 프로즌 리터럴이 코드 변경 없이
+    깨진다. 프로덕션 시그니처를 바꾸지 않고 결정성을 얻기 위해 테스트에서만
+    `date.today()` 를 고정한다.
+    """
+    from my_chart.analysis import weekly_grid
+
+    class _FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return FROZEN_AS_OF
+
+    monkeypatch.setattr(weekly_grid, "date", _FrozenDate)
+
+
+@pytest.fixture
+def frozen_history_dates(frozen_clock: None) -> list[str]:
+    """구현이 반환한 히스토리 날짜 리스트(게이팅 AC 의 좌변)."""
+    from my_chart.analysis.market_breadth import compute_breadth_history
+
+    results = compute_breadth_history(FROZEN_DB, "KOSPI", weeks=EXPECTED_WEEKS)
+    return [r.date for r in results]
+
+
+# ---------------------------------------------------------------------------
+# 단언 술어 — 실제 구현과 변형 하네스가 **동일한** 술어를 공유한다.
+#
+# 이것이 하네스의 핵심이다: 아래 술어들이 각 변형에 대해 실제로 실패하는지를
+# 먼저 실행으로 증명해야 "이 AC 가 무엇을 잡는가"라는 주장이 근거를 갖는다.
+# (plan-audit iter-1 D1 — SPEC v0.1.0 의 "잡는 잘못된 구현" 열은 거짓 주장을
+#  담고 있었고, 열을 *읽는* 리뷰는 그 거짓을 통과시켰다.)
+# ---------------------------------------------------------------------------
+
+
+def _span_days(dates: list[str]) -> int:
+    return (date.fromisoformat(dates[-1]) - date.fromisoformat(dates[0])).days
+
+
+def _iso_weeks(dates: list[str]) -> set[tuple[int, int]]:
+    return {date.fromisoformat(d).isocalendar()[:2] for d in dates}
+
+
+def assert_ac_mbr_001(dates: list[str]) -> None:
+    """히스토리 날짜 경계 — 프로즌 리터럴 3중 고정."""
+    assert dates[0] == EXPECTED_FIRST_DATE, f"first={dates[0]}"
+    assert dates[-1] == EXPECTED_LAST_DATE, f"last={dates[-1]}"
+    assert _span_days(dates) == EXPECTED_SPAN_DAYS, f"span={_span_days(dates)}"
+
+
+def assert_ac_mbr_002(dates: list[str]) -> None:
+    """진행 중인 주(CG-2) 배제."""
+    assert PARTIAL_WEEK_DATE not in dates, f"진행 중인 주 {PARTIAL_WEEK_DATE} 포함"
+    last_iso = date.fromisoformat(dates[-1]).isocalendar()[:2]
+    assert last_iso != PARTIAL_WEEK_ISO, f"마지막 바가 진행 중인 주 {last_iso}"
+
+
+def assert_ac_mbr_003(dates: list[str]) -> None:
+    """ISO 주 고유성 — 날짜 하나당 ISO 주 하나(1:1)."""
+    weeks = _iso_weeks(dates)
+    assert len(weeks) == EXPECTED_WEEKS, f"고유 ISO 주={len(weeks)}"
+    assert len(dates) == EXPECTED_WEEKS, f"바 개수={len(dates)}"
+
+
+def assert_ac_mbr_010(window: list[str]) -> None:
+    """하류 소비자 창 — 양끝 앵커 리터럴 + span 경계.
+
+    입력은 `history[-8:]` **창 자체**다. 판별자는 "며칠인가"가 아니라
+    "어느 8개인가"이므로 (1) 양끝 앵커가 주 판별자이고 (2) span 은 보조다.
+    """
+    assert window[0] == EXPECTED_WINDOW_FIRST, f"창 시작={window[0]}"
+    assert window[-1] == EXPECTED_WINDOW_LAST, f"창 끝={window[-1]}"
+    span = _span_days(window)
+    assert WINDOW_SPAN_MIN <= span <= WINDOW_SPAN_MAX, f"창 span={span}"
+
+
+# ---------------------------------------------------------------------------
+# 변형 구성 — 구현(`compute_breadth_history`)을 호출하지 않고 직접 만든다.
+# ---------------------------------------------------------------------------
+
+
+def _build_variants() -> dict[str, list[str]]:
+    """§3.0 변형표의 날짜 집합을 각 변형의 **정의대로** 구성한다."""
+    from my_chart.analysis.weekly_grid import compute_weekly_grid, history
+
+    grid = compute_weekly_grid(FROZEN_DB, as_of=FROZEN_AS_OF.isoformat())
+    v_star = [b.date for b in history(grid, 52).bars]
+
+    # V0: 현행 출하 구현 — 원시 `DISTINCT Date ... ORDER BY Date DESC LIMIT 52`
+    conn = sqlite3.connect(FROZEN_DB)
+    try:
+        rows = conn.execute(
+            """SELECT DISTINCT Date FROM stock_prices
+               WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
+               ORDER BY Date DESC
+               LIMIT ?""",
+            (52,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return {
+        "V*": v_star,
+        "V0": sorted(r[0] for r in rows),
+        "V1": grid.dates[-52:],                            # CG-2 누락
+        "V2": v_star[:-1],                                 # off-by-one
+        "V3": [b.date for b in history(grid, 51).bars],    # 오배선
+    }
+
+
+# ---------------------------------------------------------------------------
+# AC-MBR-008 — PRESERVE: 단일 날짜 breadth 불변
+# ---------------------------------------------------------------------------
+
+
+def test_ac_mbr_008_single_date_breadth_preserved() -> None:
+    """AC-MBR-008: `compute_breadth`(:85) 의 모든 수치 필드가 baseline 과 동등하다.
+
+    우변은 M1 이 **코드 변경 전에** 캡처한 리터럴이다. 히스토리 날짜 집합이 바뀌어도
+    개별 날짜의 breadth 값은 바뀌면 안 된다(범위 이탈 탐지).
+    """
+    from my_chart.analysis.market_breadth import compute_breadth, compute_breadth_composite
+
+    result = compute_breadth(FROZEN_DB, "KOSPI", BASELINE_DATE)
+
+    for field_name, expected in BASELINE_FIELDS.items():
+        assert getattr(result, field_name) == expected, field_name
+    assert compute_breadth_composite(result) == BASELINE_COMPOSITE
+
+
+# ---------------------------------------------------------------------------
+# 게이팅 AC — 프로즌 스냅샷 위 실제 구현
+# ---------------------------------------------------------------------------
+
+
+def test_ac_mbr_001_history_date_boundaries(frozen_history_dates: list[str]) -> None:
+    """AC-MBR-001: 첫 날짜 / 마지막 날짜 / span 3중 프로즌 리터럴 고정.
+
+    잡는 잘못된 구현: V0 / V1 / V2 / V3 (네 변형 전부 — 하네스가 실행으로 증명).
+    """
+    assert_ac_mbr_001(frozen_history_dates)
+
+
+def test_ac_mbr_002_partial_week_excluded(frozen_history_dates: list[str]) -> None:
+    """AC-MBR-002: 진행 중인 주(W33 = 2026-08-11) 를 반환 집합에서 제외한다.
+
+    `2026-08-11` 은 프로즌 DB 에 33행을 갖고 **실재**하므로, 격자 규칙을 적용하지
+    않으면 반드시 반환 집합에 들어온다 — 존재하지 않는 날짜의 부재를 단언하는 것이
+    아니다. AC-MBR-003 이 잡지 못하는 V1 의 사각을 이 단언이 메운다.
+    """
+    assert_ac_mbr_002(frozen_history_dates)
+
+
+def test_ac_mbr_003_iso_week_uniqueness(frozen_history_dates: list[str]) -> None:
+    """AC-MBR-003: 날짜 하나당 ISO 주 하나(1:1) — 다중 날짜 주 중복 소멸.
+
+    잡는 잘못된 구현: V0 전용(52 날짜 / 21 ISO 주). 개수 단언만으로는 V0 을 잡지
+    못하므로(§1.4, F4) 고유 주 수가 실제 판별자다.
+    """
+    assert_ac_mbr_003(frozen_history_dates)
+
+
+# ---------------------------------------------------------------------------
+# 변형 하네스 — "AC 가 실제로 잡는지"를 구현 전에 증명한다 (M1 진입 게이트)
+# ---------------------------------------------------------------------------
+
+
+def test_variant_literals_match_spec_table() -> None:
+    """변형 하네스 자체를 프로즌 리터럴에 고정한다.
+
+    하네스가 잘못 구성되면(예: V1 을 `grid.history[-52:]` 로 잘못 만들면) 아래
+    catch 행렬이 무의미해진다. 이 테스트가 하네스의 무결성을 지킨다.
+    """
+    variants = _build_variants()
+    actual = {
+        name: (len(d), d[0], d[-1], _span_days(d)) for name, d in variants.items()
+    }
+    assert actual == VARIANT_LITERALS
+
+
+# (AC 이름, 술어, 창 입력 여부) — 술어는 게이팅 테스트와 **같은 함수**다.
+_PREDICATES = {
+    "AC-MBR-001": assert_ac_mbr_001,
+    "AC-MBR-002": assert_ac_mbr_002,
+    "AC-MBR-003": assert_ac_mbr_003,
+}
+
+# 실측한 catch 행렬. True = 이 AC 가 이 변형을 **잡는다**(AssertionError).
+# 이 표는 SPEC 의 "잡는 잘못된 구현" 열을 옮겨 적은 것이 **아니라**, M1 에서 각
+# 술어에 각 변형을 실제로 투입해 관측한 결과다(plan-audit iter-1 D1 이월 사항).
+_CATCH_MATRIX = [
+    ("AC-MBR-001", "V*", False),
+    ("AC-MBR-001", "V0", True),
+    ("AC-MBR-001", "V1", True),
+    ("AC-MBR-001", "V2", True),
+    ("AC-MBR-001", "V3", True),
+    ("AC-MBR-002", "V*", False),
+    ("AC-MBR-002", "V0", True),
+    ("AC-MBR-002", "V1", True),
+    ("AC-MBR-002", "V2", False),   # AC-MBR-001 이 전담
+    ("AC-MBR-002", "V3", False),   # AC-MBR-001 이 전담
+    ("AC-MBR-003", "V*", False),
+    ("AC-MBR-003", "V0", True),
+    ("AC-MBR-003", "V1", False),   # V1 은 CG-1 을 올바로 적용 → AC-MBR-002 가 전담
+    ("AC-MBR-003", "V2", True),
+    ("AC-MBR-003", "V3", True),
+]
+
+
+@pytest.mark.parametrize(("ac_name", "variant_name", "should_catch"), _CATCH_MATRIX)
+def test_variant_harness_catch_matrix(
+    ac_name: str, variant_name: str, should_catch: bool
+) -> None:
+    """각 AC 술어가 각 변형을 잡는지/놓치는지를 **실행으로** 확인한다.
+
+    `should_catch=False` 행도 함께 고정한다 — "이 AC 는 이 변형을 잡지 못한다"는
+    한계를 명문화해, 다른 AC 가 그 사각을 메우고 있음을 회귀로 보호한다.
+    """
+    variants = _build_variants()
+    predicate = _PREDICATES[ac_name]
+    dates = variants[variant_name]
+
+    if should_catch:
+        with pytest.raises(AssertionError):
+            predicate(dates)
+    else:
+        predicate(dates)

@@ -2,7 +2,7 @@
 id: SPEC-MARKET-BREADTH-001
 title: "시장 개요 breadth 히스토리 — 정규 주간 격자 적용 및 기간 표기 일치"
 version: "0.1.1"
-status: draft
+status: in-progress
 created: 2026-08-13
 updated: 2026-08-13
 author: manager-spec
