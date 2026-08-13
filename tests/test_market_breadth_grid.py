@@ -341,6 +341,54 @@ def test_ac_mbr_005_sufficient_history_is_silent(
 
 
 # ---------------------------------------------------------------------------
+# AC-MBR-007 — 기간 표기 3중 일치 (REQ-MBR-005)
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# O-M3 확정 문구 — 각 표면과 **바이트 동등**으로 고정한다.
+# 기존 차트 제목이 영문 + 범례 설명이 한글인 현 스타일을 유지하는 최소 변경이다.
+CHART_TITLE_LITERAL = "Market Breadth (1-year)"
+ROUTER_DOC_LITERAL = "1-year (52-week) history"
+
+STALE_PERIOD_LITERAL = "12-week"
+
+
+def test_ac_mbr_007_period_label_consistency() -> None:
+    """AC-MBR-007: 기간 문구를 실제 호출부의 `weeks` 인자와 일치시킨다.
+
+    셋째 조건이 나머지 둘과 **반대 방향**이라는 점이 이 AC 의 핵심이다 — 라벨을
+    맞추는 가장 쉬운 방법(호출부를 12로 내리기)을 셋째 조건이 명시적으로 차단한다.
+
+    잡는 잘못된 구현: (a) 백엔드 docstring 만 고치고 사용자가 실제로 보는 차트
+    제목(P2)을 방치, (b) 반대로 프론트만 고침, (c) 라벨 대신 호출부를 12로 낮춰
+    이미 출하된 정보량을 축소(§1.6 판정 위반).
+    """
+    router = (_REPO_ROOT / "backend" / "routers" / "market.py").read_text(encoding="utf-8")
+    chart = (
+        _REPO_ROOT / "frontend" / "src" / "components" / "MarketOverview" / "BreadthChart.tsx"
+    ).read_text(encoding="utf-8")
+    service = (
+        _REPO_ROOT / "backend" / "services" / "market_service.py"
+    ).read_text(encoding="utf-8")
+
+    # P1 — 백엔드 docstring
+    assert STALE_PERIOD_LITERAL not in router
+    assert ROUTER_DOC_LITERAL in router
+
+    # P2 — 사용자가 실제로 보는 차트 제목
+    assert STALE_PERIOD_LITERAL not in chart
+    assert CHART_TITLE_LITERAL in chart
+
+    # P3 — 정본. 라벨을 맞추려고 호출부를 12로 낮추는 경로를 차단한다.
+    calls = [
+        line for line in service.splitlines() if "compute_breadth_history(" in line
+    ]
+    assert len(calls) == 1, calls
+    assert "weeks=52" in calls[0], calls[0]
+
+
+# ---------------------------------------------------------------------------
 # 변형 하네스 — "AC 가 실제로 잡는지"를 구현 전에 증명한다 (M1 진입 게이트)
 # ---------------------------------------------------------------------------
 

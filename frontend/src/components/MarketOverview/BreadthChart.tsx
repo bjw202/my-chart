@@ -153,7 +153,7 @@ export function BreadthChart({ history }: BreadthChartProps): ReactElement {
 
   return (
     <div className="breadth-chart">
-      <div className="breadth-chart-title">Market Breadth (12-week)</div>
+      <div className="breadth-chart-title">Market Breadth (1-year)</div>
 
       {/* Legend panel with current values and descriptions */}
       <div className="breadth-legend" data-testid="breadth-legend">

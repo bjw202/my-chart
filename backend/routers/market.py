@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get("/market/overview", response_model=MarketOverviewResponse)
 async def market_overview() -> MarketOverviewResponse:
-    """Return full market overview including breadth, cycle phase, and 12-week history.
+    """Return full market overview including breadth, cycle phase, and 1-year (52-week) history.
 
     Returns 503 if weekly DB is not available.
     """
