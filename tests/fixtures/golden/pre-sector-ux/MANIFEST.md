@@ -12,11 +12,15 @@
 
 ```yaml
 as_of: "2026-08-11"
-captured_at: "2026-08-13 13:45:27"
-git_sha: "b839cee"
+captured_at: "2026-08-13 17:39:57"
+git_sha: "a000add"
 fixture: "tests/fixtures/frozen/aggregation-2026-08-11"
+fixture_manifest_git_sha: "a224593"
+fixture_superset_of: "adb1f25"
 capture_command: "python tests/fixtures/golden/pre-sector-ux/capture_baseline.py"
 periods: ["w1", "m1", "m3"]
+golden_baseline_discarded: true
+supersedes: "b839cee (2026-08-13 13:45:27) — F12 미충족 픽스처 adb1f25 위에서 캡처, 폐기"
 ```
 
 ## 산출물
@@ -48,16 +52,40 @@ backend.routers.sectors.DAILY_DB_PATH  → tests/fixtures/frozen/aggregation-202
 backend.routers.stage.WEEKLY_DB_PATH   → tests/fixtures/frozen/aggregation-2026-08-11/weekly.db
 ```
 
+## 폐기 기록 (M1.0-b 재캡처 — acceptance.md §9 DoD · §8.4 규약 4)
+
+**구 baseline 은 폐기됐다.** `b839cee (2026-08-13 13:45:27) — F12 미충족 픽스처 adb1f25 위에서 캡처, 폐기`
+
+구 baseline 은 F12 미충족 픽스처(`adb1f25` 빌드분 — AG-5 통과 18섹터 중 유효 시총
+`n > 10` 이 게임 하나뿐) 위에서 떠졌다. INV-CAP-1 축퇴(`cap_eff = max(0.10, 1/n)`,
+`n <= 10` 이면 시총가중 == 등가중)로 AC-SAG-002 가 완전한 무게이팅이 됐고, 그 픽스처는
+더 이상 리포에 존재하지 않는다. 그 위에서 R1/R4/R5 를 판정하면 v0.4.1 의 결함을 그대로
+상속하므로 재캡처했다. 비가역 경계는 M1.0-b 가 아니라 **M2** 이므로(§8.5) 이 재캡처
+경로가 살아 있었다.
+
+현 baseline 이 선 픽스처 빌드: `git_sha=a224593` · `f13_1_superset_of=adb1f25`.
+
+## 초과수익률 비축퇴 확인
+
+`excess_returns` 가 `returns` 와 **동일하지 않은** 섹터가 존재함을 캡처 시 단언한다.
+지수 행 부재나 벤치마크 산출 실패로 초과수익률이 원수익률로 degenerate 하면 R1/R4/R5
+비교가 무의미해지므로, 캡처가 그 상태에서 통과하지 못하게 막는다.
+
+| 지표 | 값 |
+| --- | --- |
+| `excess != returns` 인 섹터 수 | **18** / 18 |
+| 세 기간 최대 절대 격차 `|excess − returns|` | **16.166200** |
+
 ## 실측 요약 (캡처 시점)
 
 | 지표 | 값 |
 | --- | --- |
 | `ranking.date` | `2026-08-11` |
 | `len(sectors)` | **18** |
-| `distribution.total` | **135** |
-| `distribution` stage1/2/3/4 | 1 / 42 / 2 / 90 |
+| `distribution.total` | **321** |
+| `distribution` stage1/2/3/4 | 3 / 94 / 9 / 215 |
 | `len(by_sector)` | **18** |
-| `len(stage2_candidates)` | **6** |
-| `len(all_stocks)` | **135** |
+| `len(stage2_candidates)` | **11** |
+| `len(all_stocks)` | **321** |
 | `sector_excess_return` 문자열 | **0건** (D12 재도입 방지) |
 | `total_count` 문자열 | **0건** (D12 — 실제 키는 `distribution.total`) |

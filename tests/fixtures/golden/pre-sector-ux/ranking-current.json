@@ -1,173 +1,1655 @@
 {
-  "date": "2026-08-11",
-  "sectors": [
+  "as_of_date": "2026-08-11",
+  "as_of_is_partial_week": true,
+  "return_window_days": {
+    "1w": null,
+    "1m": null,
+    "3m": null
+  },
+  "market_filter": "all",
+  "weight_cap": 0.1,
+  "grid_version": "canonical-v1",
+  "benchmark": null,
+  "data": [
     {
       "name": "화장품",
-      "stock_count": 6,
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 16.1499,
-        "m1": 25.4084,
-        "m3": 30.4431
+        "1w": {
+          "value": 13.9127,
+          "reason": null
+        },
+        "1m": {
+          "value": 43.6292,
+          "reason": null
+        },
+        "3m": {
+          "value": 23.9562,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": 11.0328,
-        "m1": 28.95,
-        "m3": 46.6092
+        "1w": {
+          "value": 8.7955,
+          "reason": null
+        },
+        "1m": {
+          "value": 47.1708,
+          "reason": null
+        },
+        "3m": {
+          "value": 40.1223,
+          "reason": null
+        }
       },
-      "rs_avg": 96.73,
-      "rs_top_pct": 100.0,
-      "nh_pct": 66.67,
-      "stage2_pct": 100.0,
-      "composite_score": 97.91,
+      "rs_avg": {
+        "value": 91.17,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 77.78,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 44.44,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 77.78,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 99.02,
+        "reason": null
+      },
       "rank": 1,
-      "rank_change": 3
+      "rank_change": 4
     },
     {
       "name": "디스플레이",
-      "stock_count": 6,
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 17.3832,
-        "m1": 8.1592,
-        "m3": -0.4584
+        "1w": {
+          "value": 14.3919,
+          "reason": null
+        },
+        "1m": {
+          "value": 9.1316,
+          "reason": null
+        },
+        "3m": {
+          "value": -18.4265,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": 12.2661,
-        "m1": 11.7008,
-        "m3": 15.7077
+        "1w": {
+          "value": 9.2747,
+          "reason": null
+        },
+        "1m": {
+          "value": 12.6733,
+          "reason": null
+        },
+        "3m": {
+          "value": -2.2603,
+          "reason": null
+        }
       },
-      "rs_avg": 56.68,
-      "rs_top_pct": 33.33,
-      "nh_pct": 16.67,
-      "stage2_pct": 33.33,
-      "composite_score": 66.1,
+      "rs_avg": {
+        "value": 57.45,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 33.33,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 38.89,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 48.24,
+        "reason": null
+      },
       "rank": 2,
-      "rank_change": -1
+      "rank_change": 0
     },
     {
-      "name": "비철금속",
-      "stock_count": 6,
+      "name": "인터넷",
+      "member_count": 19,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 8.996,
-        "m1": 24.206,
-        "m3": -32.8957
+        "1w": {
+          "value": 5.9058,
+          "reason": null
+        },
+        "1m": {
+          "value": 14.6532,
+          "reason": null
+        },
+        "3m": {
+          "value": -6.9226,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": 3.8789,
-        "m1": 27.7477,
-        "m3": -16.7296
+        "1w": {
+          "value": 0.7887,
+          "reason": null
+        },
+        "1m": {
+          "value": 18.1948,
+          "reason": null
+        },
+        "3m": {
+          "value": 9.2435,
+          "reason": null
+        }
       },
-      "rs_avg": 73.38,
-      "rs_top_pct": 66.67,
-      "nh_pct": 0.0,
-      "stage2_pct": 33.33,
-      "composite_score": 55.74,
+      "rs_avg": {
+        "value": 54.7,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 36.84,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.26,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 26.32,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 41.79,
+        "reason": null
+      },
       "rank": 3,
-      "rank_change": 12
-    },
-    {
-      "name": "통신",
-      "stock_count": 6,
-      "returns": {
-        "w1": 9.3028,
-        "m1": 15.0261,
-        "m3": -11.235
-      },
-      "excess_returns": {
-        "w1": 4.1857,
-        "m1": 18.5677,
-        "m3": 4.9312
-      },
-      "rs_avg": 60.84,
-      "rs_top_pct": 33.33,
-      "nh_pct": 16.67,
-      "stage2_pct": 50.0,
-      "composite_score": 55.47,
-      "rank": 4,
       "rank_change": 4
     },
     {
       "name": "스마트폰",
-      "stock_count": 6,
+      "member_count": 17,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 13.259,
-        "m1": 11.8003,
-        "m3": -25.448
+        "1w": {
+          "value": 9.4795,
+          "reason": null
+        },
+        "1m": {
+          "value": 13.667,
+          "reason": null
+        },
+        "3m": {
+          "value": -22.2438,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": 8.1418,
-        "m1": 15.3419,
-        "m3": -9.2819
+        "1w": {
+          "value": 4.3624,
+          "reason": null
+        },
+        "1m": {
+          "value": 17.2086,
+          "reason": null
+        },
+        "3m": {
+          "value": -6.0776,
+          "reason": null
+        }
       },
-      "rs_avg": 56.73,
-      "rs_top_pct": 16.67,
-      "nh_pct": 0.0,
-      "stage2_pct": 16.67,
-      "composite_score": 52.0,
+      "rs_avg": {
+        "value": 59.96,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 35.29,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 17.65,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 40.0,
+        "reason": null
+      },
+      "rank": 4,
+      "rank_change": 9
+    },
+    {
+      "name": "통신",
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 7.6194,
+          "reason": null
+        },
+        "1m": {
+          "value": 15.5159,
+          "reason": null
+        },
+        "3m": {
+          "value": -22.4064,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": 2.5023,
+          "reason": null
+        },
+        "1m": {
+          "value": 19.0575,
+          "reason": null
+        },
+        "3m": {
+          "value": -6.2403,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 48.82,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 22.22,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 22.22,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 37.68,
+        "reason": null
+      },
       "rank": 5,
+      "rank_change": 9
+    },
+    {
+      "name": "게임",
+      "member_count": 32,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 4.6409,
+          "reason": null
+        },
+        "1m": {
+          "value": 10.6013,
+          "reason": null
+        },
+        "3m": {
+          "value": -4.4377,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -0.4762,
+          "reason": null
+        },
+        "1m": {
+          "value": 14.1429,
+          "reason": null
+        },
+        "3m": {
+          "value": 11.7284,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 53.14,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 21.88,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 6.25,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 28.12,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 37.14,
+        "reason": null
+      },
+      "rank": 6,
+      "rank_change": -2
+    },
+    {
+      "name": "비철금속",
+      "member_count": 17,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 6.0435,
+          "reason": null
+        },
+        "1m": {
+          "value": 14.5204,
+          "reason": null
+        },
+        "3m": {
+          "value": -20.683,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": 0.9263,
+          "reason": null
+        },
+        "1m": {
+          "value": 18.062,
+          "reason": null
+        },
+        "3m": {
+          "value": -4.5169,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 63.55,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 35.29,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 29.41,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 34.56,
+        "reason": null
+      },
+      "rank": 7,
       "rank_change": 5
     },
     {
-      "name": "내수",
-      "stock_count": 6,
+      "name": "반도체",
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 2.9869,
-        "m1": 7.267,
-        "m3": 20.0457
+        "1w": {
+          "value": 13.4464,
+          "reason": null
+        },
+        "1m": {
+          "value": -3.9714,
+          "reason": null
+        },
+        "3m": {
+          "value": -24.407,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": -2.1303,
-        "m1": 10.8086,
-        "m3": 36.2118
+        "1w": {
+          "value": 8.3293,
+          "reason": null
+        },
+        "1m": {
+          "value": -0.4298,
+          "reason": null
+        },
+        "3m": {
+          "value": -8.2409,
+          "reason": null
+        }
       },
-      "rs_avg": 79.31,
-      "rs_top_pct": 66.67,
-      "nh_pct": 66.67,
-      "stage2_pct": 83.33,
-      "composite_score": 50.0,
-      "rank": 6,
-      "rank_change": -4
+      "rs_avg": {
+        "value": 52.18,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 16.67,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 50.0,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 32.09,
+        "reason": null
+      },
+      "rank": 8,
+      "rank_change": 1
     },
     {
-      "name": "음식료",
-      "stock_count": 6,
+      "name": "Auto",
+      "member_count": 17,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 4.7047,
-        "m1": 12.757,
-        "m3": -3.9561
+        "1w": {
+          "value": 3.8303,
+          "reason": null
+        },
+        "1m": {
+          "value": 16.6591,
+          "reason": null
+        },
+        "3m": {
+          "value": -20.6377,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": -0.4124,
-        "m1": 16.2986,
-        "m3": 12.21
+        "1w": {
+          "value": -1.2868,
+          "reason": null
+        },
+        "1m": {
+          "value": 20.2007,
+          "reason": null
+        },
+        "3m": {
+          "value": -4.4716,
+          "reason": null
+        }
       },
-      "rs_avg": 69.4,
-      "rs_top_pct": 66.67,
-      "nh_pct": 16.67,
-      "stage2_pct": 50.0,
-      "composite_score": 48.37,
-      "rank": 7,
-      "rank_change": -4
+      "rs_avg": {
+        "value": 61.14,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 29.41,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 35.29,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 31.88,
+        "reason": null
+      },
+      "rank": 9,
+      "rank_change": 2
     },
     {
       "name": "철강",
-      "stock_count": 6,
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
       "returns": {
-        "w1": 5.5142,
-        "m1": 15.3881,
-        "m3": -15.1173
+        "1w": {
+          "value": 3.637,
+          "reason": null
+        },
+        "1m": {
+          "value": 13.0661,
+          "reason": null
+        },
+        "3m": {
+          "value": -14.8095,
+          "reason": null
+        }
       },
       "excess_returns": {
-        "w1": 0.397,
-        "m1": 18.9297,
-        "m3": 1.0489
+        "1w": {
+          "value": -1.4801,
+          "reason": null
+        },
+        "1m": {
+          "value": 16.6077,
+          "reason": null
+        },
+        "3m": {
+          "value": 1.3566,
+          "reason": null
+        }
       },
-      "rs_avg": 63.88,
+      "rs_avg": {
+        "value": 68.11,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 50.0,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 50.0,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 31.6,
+        "reason": null
+      },
+      "rank": 10,
+      "rank_change": -2
+    },
+    {
+      "name": "내수",
+      "member_count": 16,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 1.8593,
+          "reason": null
+        },
+        "1m": {
+          "value": 5.9579,
+          "reason": null
+        },
+        "3m": {
+          "value": 0.2752,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -3.2578,
+          "reason": null
+        },
+        "1m": {
+          "value": 9.4995,
+          "reason": null
+        },
+        "3m": {
+          "value": 16.4413,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 59.51,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 37.5,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 37.5,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 43.75,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 30.11,
+        "reason": null
+      },
+      "rank": 11,
+      "rank_change": -8
+    },
+    {
+      "name": "헬스케어",
+      "member_count": 20,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 4.3325,
+          "reason": null
+        },
+        "1m": {
+          "value": 13.4165,
+          "reason": null
+        },
+        "3m": {
+          "value": -21.0998,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -0.7847,
+          "reason": null
+        },
+        "1m": {
+          "value": 16.9581,
+          "reason": null
+        },
+        "3m": {
+          "value": -4.9337,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 35.67,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 20.0,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 10.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 20.0,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 29.93,
+        "reason": null
+      },
+      "rank": 12,
+      "rank_change": 3
+    },
+    {
+      "name": "방산",
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 6.6081,
+          "reason": null
+        },
+        "1m": {
+          "value": 10.1768,
+          "reason": null
+        },
+        "3m": {
+          "value": -29.0223,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": 1.491,
+          "reason": null
+        },
+        "1m": {
+          "value": 13.7184,
+          "reason": null
+        },
+        "3m": {
+          "value": -12.8562,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 48.16,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 27.78,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 11.11,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 27.58,
+        "reason": null
+      },
+      "rank": 13,
+      "rank_change": 4
+    },
+    {
+      "name": "음식료",
+      "member_count": 17,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 0.4543,
+          "reason": null
+        },
+        "1m": {
+          "value": 6.4315,
+          "reason": null
+        },
+        "3m": {
+          "value": -5.1622,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -4.6628,
+          "reason": null
+        },
+        "1m": {
+          "value": 9.9732,
+          "reason": null
+        },
+        "3m": {
+          "value": 11.0039,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 65.13,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 41.18,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.88,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 29.41,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 24.73,
+        "reason": null
+      },
+      "rank": 14,
+      "rank_change": -13
+    },
+    {
+      "name": "조선",
+      "member_count": 17,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 3.8581,
+          "reason": null
+        },
+        "1m": {
+          "value": 9.8117,
+          "reason": null
+        },
+        "3m": {
+          "value": -25.9319,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -1.2591,
+          "reason": null
+        },
+        "1m": {
+          "value": 13.3533,
+          "reason": null
+        },
+        "3m": {
+          "value": -9.7658,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 36.21,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 5.88,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 5.88,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 23.34,
+        "reason": null
+      },
+      "rank": 15,
+      "rank_change": 3
+    },
+    {
+      "name": "PCB",
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 9.2278,
+          "reason": null
+        },
+        "1m": {
+          "value": -1.9727,
+          "reason": null
+        },
+        "3m": {
+          "value": -31.8697,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": 4.1107,
+          "reason": null
+        },
+        "1m": {
+          "value": 1.5689,
+          "reason": null
+        },
+        "3m": {
+          "value": -15.7036,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 39.34,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 27.78,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 21.17,
+        "reason": null
+      },
+      "rank": 16,
+      "rank_change": -6
+    },
+    {
+      "name": "패션",
+      "member_count": 5,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": -0.349,
+          "reason": null
+        },
+        "1m": {
+          "value": 11.7844,
+          "reason": null
+        },
+        "3m": {
+          "value": -17.6862,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -5.4662,
+          "reason": null
+        },
+        "1m": {
+          "value": 15.3261,
+          "reason": null
+        },
+        "3m": {
+          "value": -1.5201,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 36.59,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 0.0,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 20.86,
+        "reason": null
+      },
+      "rank": 17,
+      "rank_change": -1
+    },
+    {
+      "name": "유통",
+      "member_count": 18,
+      "valid_count": null,
+      "coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "cap_coverage_ratio": {
+        "value": null,
+        "reason": "missing"
+      },
+      "coverage": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "valid_counts": {
+        "rs": null,
+        "nh": null,
+        "stage": null,
+        "chg": null,
+        "trading_value": null
+      },
+      "weight_cap": 0.1,
+      "effective_n": {
+        "value": null,
+        "reason": "missing"
+      },
+      "capped_members": [],
+      "cap_weighted_available": false,
+      "low_confidence": false,
+      "returns": {
+        "1w": {
+          "value": 0.7694,
+          "reason": null
+        },
+        "1m": {
+          "value": 0.9734,
+          "reason": null
+        },
+        "3m": {
+          "value": -13.6636,
+          "reason": null
+        }
+      },
+      "excess_returns": {
+        "1w": {
+          "value": -4.3477,
+          "reason": null
+        },
+        "1m": {
+          "value": 4.5151,
+          "reason": null
+        },
+        "3m": {
+          "value": 2.5025,
+          "reason": null
+        }
+      },
+      "rs_avg": {
+        "value": 56.44,
+        "reason": null
+      },
+      "rs_top_pct": {
+        "value": 22.22,
+        "reason": null
+      },
+      "nh_pct": {
+        "value": 5.56,
+        "reason": null
+      },
+      "stage2_pct": {
+        "value": 27.78,
+        "reason": null
+      },
+      "composite_score": {
+        "value": 16.22,
+        "reason": null
+      },
+      "rank": 18,
+      "rank_change": -12
+    }
+  ],
+  "excluded": [],
+  "warnings": [],
+  "date": "2026-08-11",
+  "sectors": [
+    {
+      "name": "화장품",
+      "stock_count": 18,
+      "returns": {
+        "w1": 13.9127,
+        "m1": 43.6292,
+        "m3": 23.9562
+      },
+      "excess_returns": {
+        "w1": 8.7955,
+        "m1": 47.1708,
+        "m3": 40.1223
+      },
+      "rs_avg": 91.17,
+      "rs_top_pct": 77.78,
+      "nh_pct": 44.44,
+      "stage2_pct": 77.78,
+      "composite_score": 99.02,
+      "rank": 1,
+      "rank_change": 4
+    },
+    {
+      "name": "디스플레이",
+      "stock_count": 18,
+      "returns": {
+        "w1": 14.3919,
+        "m1": 9.1316,
+        "m3": -18.4265
+      },
+      "excess_returns": {
+        "w1": 9.2747,
+        "m1": 12.6733,
+        "m3": -2.2603
+      },
+      "rs_avg": 57.45,
       "rs_top_pct": 33.33,
-      "nh_pct": 16.67,
-      "stage2_pct": 16.67,
-      "composite_score": 47.72,
-      "rank": 8,
-      "rank_change": 5
+      "nh_pct": 5.56,
+      "stage2_pct": 38.89,
+      "composite_score": 48.24,
+      "rank": 2,
+      "rank_change": 0
+    },
+    {
+      "name": "인터넷",
+      "stock_count": 19,
+      "returns": {
+        "w1": 5.9058,
+        "m1": 14.6532,
+        "m3": -6.9226
+      },
+      "excess_returns": {
+        "w1": 0.7887,
+        "m1": 18.1948,
+        "m3": 9.2435
+      },
+      "rs_avg": 54.7,
+      "rs_top_pct": 36.84,
+      "nh_pct": 5.26,
+      "stage2_pct": 26.32,
+      "composite_score": 41.79,
+      "rank": 3,
+      "rank_change": 4
+    },
+    {
+      "name": "스마트폰",
+      "stock_count": 17,
+      "returns": {
+        "w1": 9.4795,
+        "m1": 13.667,
+        "m3": -22.2438
+      },
+      "excess_returns": {
+        "w1": 4.3624,
+        "m1": 17.2086,
+        "m3": -6.0776
+      },
+      "rs_avg": 59.96,
+      "rs_top_pct": 35.29,
+      "nh_pct": 0.0,
+      "stage2_pct": 17.65,
+      "composite_score": 40.0,
+      "rank": 4,
+      "rank_change": 9
+    },
+    {
+      "name": "통신",
+      "stock_count": 18,
+      "returns": {
+        "w1": 7.6194,
+        "m1": 15.5159,
+        "m3": -22.4064
+      },
+      "excess_returns": {
+        "w1": 2.5023,
+        "m1": 19.0575,
+        "m3": -6.2403
+      },
+      "rs_avg": 48.82,
+      "rs_top_pct": 22.22,
+      "nh_pct": 5.56,
+      "stage2_pct": 22.22,
+      "composite_score": 37.68,
+      "rank": 5,
+      "rank_change": 9
     },
     {
       "name": "게임",
@@ -186,93 +1668,219 @@
       "rs_top_pct": 21.88,
       "nh_pct": 6.25,
       "stage2_pct": 28.12,
-      "composite_score": 45.56,
+      "composite_score": 37.14,
+      "rank": 6,
+      "rank_change": -2
+    },
+    {
+      "name": "비철금속",
+      "stock_count": 17,
+      "returns": {
+        "w1": 6.0435,
+        "m1": 14.5204,
+        "m3": -20.683
+      },
+      "excess_returns": {
+        "w1": 0.9263,
+        "m1": 18.062,
+        "m3": -4.5169
+      },
+      "rs_avg": 63.55,
+      "rs_top_pct": 35.29,
+      "nh_pct": 0.0,
+      "stage2_pct": 29.41,
+      "composite_score": 34.56,
+      "rank": 7,
+      "rank_change": 5
+    },
+    {
+      "name": "반도체",
+      "stock_count": 18,
+      "returns": {
+        "w1": 13.4464,
+        "m1": -3.9714,
+        "m3": -24.407
+      },
+      "excess_returns": {
+        "w1": 8.3293,
+        "m1": -0.4298,
+        "m3": -8.2409
+      },
+      "rs_avg": 52.18,
+      "rs_top_pct": 16.67,
+      "nh_pct": 5.56,
+      "stage2_pct": 50.0,
+      "composite_score": 32.09,
+      "rank": 8,
+      "rank_change": 1
+    },
+    {
+      "name": "Auto",
+      "stock_count": 17,
+      "returns": {
+        "w1": 3.8303,
+        "m1": 16.6591,
+        "m3": -20.6377
+      },
+      "excess_returns": {
+        "w1": -1.2868,
+        "m1": 20.2007,
+        "m3": -4.4716
+      },
+      "rs_avg": 61.14,
+      "rs_top_pct": 29.41,
+      "nh_pct": 0.0,
+      "stage2_pct": 35.29,
+      "composite_score": 31.88,
       "rank": 9,
-      "rank_change": -3
+      "rank_change": 2
+    },
+    {
+      "name": "철강",
+      "stock_count": 18,
+      "returns": {
+        "w1": 3.637,
+        "m1": 13.0661,
+        "m3": -14.8095
+      },
+      "excess_returns": {
+        "w1": -1.4801,
+        "m1": 16.6077,
+        "m3": 1.3566
+      },
+      "rs_avg": 68.11,
+      "rs_top_pct": 50.0,
+      "nh_pct": 5.56,
+      "stage2_pct": 50.0,
+      "composite_score": 31.6,
+      "rank": 10,
+      "rank_change": -2
+    },
+    {
+      "name": "내수",
+      "stock_count": 16,
+      "returns": {
+        "w1": 1.8593,
+        "m1": 5.9579,
+        "m3": 0.2752
+      },
+      "excess_returns": {
+        "w1": -3.2578,
+        "m1": 9.4995,
+        "m3": 16.4413
+      },
+      "rs_avg": 59.51,
+      "rs_top_pct": 37.5,
+      "nh_pct": 37.5,
+      "stage2_pct": 43.75,
+      "composite_score": 30.11,
+      "rank": 11,
+      "rank_change": -8
     },
     {
       "name": "헬스케어",
-      "stock_count": 8,
+      "stock_count": 20,
       "returns": {
-        "w1": 5.1709,
-        "m1": 12.9746,
-        "m3": -23.2125
+        "w1": 4.3325,
+        "m1": 13.4165,
+        "m3": -21.0998
       },
       "excess_returns": {
-        "w1": 0.0538,
-        "m1": 16.5162,
-        "m3": -7.0464
+        "w1": -0.7847,
+        "m1": 16.9581,
+        "m3": -4.9337
       },
-      "rs_avg": 22.99,
-      "rs_top_pct": 25.0,
-      "nh_pct": 12.5,
-      "stage2_pct": 12.5,
-      "composite_score": 40.69,
-      "rank": 10,
-      "rank_change": 4
-    },
-    {
-      "name": "인터넷",
-      "stock_count": 6,
-      "returns": {
-        "w1": 4.645,
-        "m1": 10.5807,
-        "m3": -15.5279
-      },
-      "excess_returns": {
-        "w1": -0.4721,
-        "m1": 14.1223,
-        "m3": 0.6382
-      },
-      "rs_avg": 30.93,
-      "rs_top_pct": 33.33,
-      "nh_pct": 0.0,
-      "stage2_pct": 16.67,
-      "composite_score": 40.52,
-      "rank": 11,
-      "rank_change": -4
+      "rs_avg": 35.67,
+      "rs_top_pct": 20.0,
+      "nh_pct": 10.0,
+      "stage2_pct": 20.0,
+      "composite_score": 29.93,
+      "rank": 12,
+      "rank_change": 3
     },
     {
       "name": "방산",
-      "stock_count": 6,
+      "stock_count": 18,
       "returns": {
-        "w1": 5.4316,
-        "m1": 8.6499,
-        "m3": -24.5868
+        "w1": 6.6081,
+        "m1": 10.1768,
+        "m3": -29.0223
       },
       "excess_returns": {
-        "w1": 0.3145,
-        "m1": 12.1915,
-        "m3": -8.4207
+        "w1": 1.491,
+        "m1": 13.7184,
+        "m3": -12.8562
       },
-      "rs_avg": 43.85,
-      "rs_top_pct": 33.33,
+      "rs_avg": 48.16,
+      "rs_top_pct": 27.78,
       "nh_pct": 0.0,
-      "stage2_pct": 16.67,
-      "composite_score": 35.52,
-      "rank": 12,
+      "stage2_pct": 11.11,
+      "composite_score": 27.58,
+      "rank": 13,
       "rank_change": 4
     },
     {
-      "name": "조선",
-      "stock_count": 6,
+      "name": "음식료",
+      "stock_count": 17,
       "returns": {
-        "w1": 3.3619,
-        "m1": 12.5652,
-        "m3": -28.6997
+        "w1": 0.4543,
+        "m1": 6.4315,
+        "m3": -5.1622
       },
       "excess_returns": {
-        "w1": -1.7552,
-        "m1": 16.1068,
-        "m3": -12.5336
+        "w1": -4.6628,
+        "m1": 9.9732,
+        "m3": 11.0039
       },
-      "rs_avg": 24.85,
-      "rs_top_pct": 0.0,
+      "rs_avg": 65.13,
+      "rs_top_pct": 41.18,
+      "nh_pct": 5.88,
+      "stage2_pct": 29.41,
+      "composite_score": 24.73,
+      "rank": 14,
+      "rank_change": -13
+    },
+    {
+      "name": "조선",
+      "stock_count": 17,
+      "returns": {
+        "w1": 3.8581,
+        "m1": 9.8117,
+        "m3": -25.9319
+      },
+      "excess_returns": {
+        "w1": -1.2591,
+        "m1": 13.3533,
+        "m3": -9.7658
+      },
+      "rs_avg": 36.21,
+      "rs_top_pct": 5.88,
       "nh_pct": 0.0,
-      "stage2_pct": 0.0,
-      "composite_score": 34.67,
-      "rank": 13,
-      "rank_change": 5
+      "stage2_pct": 5.88,
+      "composite_score": 23.34,
+      "rank": 15,
+      "rank_change": 3
+    },
+    {
+      "name": "PCB",
+      "stock_count": 18,
+      "returns": {
+        "w1": 9.2278,
+        "m1": -1.9727,
+        "m3": -31.8697
+      },
+      "excess_returns": {
+        "w1": 4.1107,
+        "m1": 1.5689,
+        "m3": -15.7036
+      },
+      "rs_avg": 39.34,
+      "rs_top_pct": 5.56,
+      "nh_pct": 5.56,
+      "stage2_pct": 27.78,
+      "composite_score": 21.17,
+      "rank": 16,
+      "rank_change": -6
     },
     {
       "name": "패션",
@@ -291,93 +1899,30 @@
       "rs_top_pct": 0.0,
       "nh_pct": 0.0,
       "stage2_pct": 0.0,
-      "composite_score": 32.48,
-      "rank": 14,
-      "rank_change": -2
-    },
-    {
-      "name": "Auto",
-      "stock_count": 6,
-      "returns": {
-        "w1": 4.0898,
-        "m1": 8.4926,
-        "m3": -35.7937
-      },
-      "excess_returns": {
-        "w1": -1.0273,
-        "m1": 12.0342,
-        "m3": -19.6276
-      },
-      "rs_avg": 35.7,
-      "rs_top_pct": 0.0,
-      "nh_pct": 0.0,
-      "stage2_pct": 16.67,
-      "composite_score": 27.99,
-      "rank": 15,
-      "rank_change": 2
-    },
-    {
-      "name": "반도체",
-      "stock_count": 6,
-      "returns": {
-        "w1": 13.3753,
-        "m1": -7.8801,
-        "m3": -29.6071
-      },
-      "excess_returns": {
-        "w1": 8.2581,
-        "m1": -4.3385,
-        "m3": -13.441
-      },
-      "rs_avg": 37.41,
-      "rs_top_pct": 0.0,
-      "nh_pct": 0.0,
-      "stage2_pct": 50.0,
-      "composite_score": 27.6,
-      "rank": 16,
-      "rank_change": -11
+      "composite_score": 20.86,
+      "rank": 17,
+      "rank_change": -1
     },
     {
       "name": "유통",
-      "stock_count": 6,
+      "stock_count": 18,
       "returns": {
-        "w1": 2.6564,
-        "m1": 0.6519,
-        "m3": -26.7615
+        "w1": 0.7694,
+        "m1": 0.9734,
+        "m3": -13.6636
       },
       "excess_returns": {
-        "w1": -2.4607,
-        "m1": 4.1935,
-        "m3": -10.5954
+        "w1": -4.3477,
+        "m1": 4.5151,
+        "m3": 2.5025
       },
-      "rs_avg": 48.33,
-      "rs_top_pct": 16.67,
-      "nh_pct": 0.0,
-      "stage2_pct": 16.67,
-      "composite_score": 20.6,
-      "rank": 17,
-      "rank_change": -6
-    },
-    {
-      "name": "PCB",
-      "stock_count": 6,
-      "returns": {
-        "w1": 8.25,
-        "m1": -9.2516,
-        "m3": -29.2765
-      },
-      "excess_returns": {
-        "w1": 3.1328,
-        "m1": -5.7099,
-        "m3": -13.1104
-      },
-      "rs_avg": 40.33,
-      "rs_top_pct": 16.67,
-      "nh_pct": 16.67,
-      "stage2_pct": 33.33,
-      "composite_score": 17.5,
+      "rs_avg": 56.44,
+      "rs_top_pct": 22.22,
+      "nh_pct": 5.56,
+      "stage2_pct": 27.78,
+      "composite_score": 16.22,
       "rank": 18,
-      "rank_change": -9
+      "rank_change": -12
     }
   ]
 }

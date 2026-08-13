@@ -40,6 +40,11 @@ AS_OF = "2026-08-11"
 CAPTURE_COMMAND = "python tests/fixtures/golden/pre-sector-ux/capture_baseline.py"
 FIXTURE_ID = "tests/fixtures/frozen/aggregation-2026-08-11"
 
+# 폐기된 선행 캡처 (acceptance.md §8.6 · §9 DoD). 구 baseline 은 F12 미충족 픽스처
+# (`adb1f25` 빌드분 — AG-5 통과 18섹터 중 유효 시총 `n > 10` 이 게임 하나뿐) 위에서
+# 떠졌으므로 그 위에서 R1/R4/R5 를 판정하면 v0.4.1 의 결함을 그대로 상속한다.
+SUPERSEDED_CAPTURE = "b839cee (2026-08-13 13:45:27) — F12 미충족 픽스처 adb1f25 위에서 캡처, 폐기"
+
 # 현행 `/sectors/ranking`은 무파라미터이며 단일 응답에 세 기간이 모두 실린다
 # (plan.md M1.0-b, v0.4.0 정정 D4). 기간별 3파일 캡처는 동일 응답 3부일 뿐이다.
 PERIODS = ["w1", "m1", "m3"]
@@ -96,13 +101,46 @@ def capture() -> dict[str, object]:
     assert "sector_excess_return" not in raw, "dataclass 필드명 `sector_excess_return` 누출"
     assert "total_count" not in raw, "존재하지 않는 키 `total_count` 누출"
 
+    # 비축퇴 확인 — 지수 행이 없거나 벤치마크 산출이 실패하면 초과수익률이 원수익률과
+    # 동일해지고(초과 = 원 − 0), 그 baseline 위에서는 R1/R4/R5 비교가 무의미해진다.
+    diff = [
+        s["name"] for s in ranking["sectors"]
+        if any(s["excess_returns"].get(p) != s["returns"].get(p) for p in PERIODS)
+    ]
+    assert diff, "축퇴 baseline — 전 섹터에서 excess_returns == returns (벤치마크 미산출)"
+
     return {"ranking": ranking, "stage": stage}
+
+
+def _fixture_manifest_meta() -> tuple[str, str]:
+    """집계 픽스처 MANIFEST 의 `git_sha` · `f13_1_superset_of` 를 읽어 온다.
+
+    baseline 이 **어느 픽스처 빌드 위에서 떠졌는지**를 기록으로 남긴다 — 픽스처가
+    재빌드되면 baseline 도 재캡처돼야 하고(§8.4 규약 4), 그 판단의 근거가 이 값이다.
+    """
+    import re
+
+    text = (FIXTURE_DIR / "MANIFEST.md").read_text(encoding="utf-8")
+    sha = re.search(r'^git_sha:\s*"([^"]*)"', text, re.M)
+    sup = re.search(r'^f13_1_superset_of:\s*"([^"]*)"', text, re.M)
+    return (sha.group(1) if sha else "unknown"), (sup.group(1) if sup else "unknown")
 
 
 def write_manifest(ranking: dict, stage: dict) -> None:
     captured_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sha = _git_sha()
+    fixture_sha, fixture_superset_of = _fixture_manifest_meta()
     dist = stage["distribution"]
+
+    n_sectors = len(ranking["sectors"])
+    n_diff = sum(
+        1 for s in ranking["sectors"]
+        if any(s["excess_returns"].get(p) != s["returns"].get(p) for p in PERIODS)
+    )
+    max_gap = max(
+        abs((s["excess_returns"].get(p) or 0.0) - (s["returns"].get(p) or 0.0))
+        for s in ranking["sectors"] for p in PERIODS
+    )
 
     body = f"""# Golden Baseline Manifest — `pre-sector-ux`
 
@@ -121,8 +159,12 @@ as_of: "{AS_OF}"
 captured_at: "{captured_at}"
 git_sha: "{sha}"
 fixture: "{FIXTURE_ID}"
+fixture_manifest_git_sha: "{fixture_sha}"
+fixture_superset_of: "{fixture_superset_of}"
 capture_command: "{CAPTURE_COMMAND}"
 periods: [{", ".join(f'"{p}"' for p in PERIODS)}]
+golden_baseline_discarded: true
+supersedes: "{SUPERSEDED_CAPTURE}"
 ```
 
 ## 산출물
@@ -153,6 +195,30 @@ backend.routers.sectors.WEEKLY_DB_PATH → {FIXTURE_ID}/weekly.db
 backend.routers.sectors.DAILY_DB_PATH  → {FIXTURE_ID}/daily.db
 backend.routers.stage.WEEKLY_DB_PATH   → {FIXTURE_ID}/weekly.db
 ```
+
+## 폐기 기록 (M1.0-b 재캡처 — acceptance.md §9 DoD · §8.4 규약 4)
+
+**구 baseline 은 폐기됐다.** `{SUPERSEDED_CAPTURE}`
+
+구 baseline 은 F12 미충족 픽스처(`adb1f25` 빌드분 — AG-5 통과 18섹터 중 유효 시총
+`n > 10` 이 게임 하나뿐) 위에서 떠졌다. INV-CAP-1 축퇴(`cap_eff = max(0.10, 1/n)`,
+`n <= 10` 이면 시총가중 == 등가중)로 AC-SAG-002 가 완전한 무게이팅이 됐고, 그 픽스처는
+더 이상 리포에 존재하지 않는다. 그 위에서 R1/R4/R5 를 판정하면 v0.4.1 의 결함을 그대로
+상속하므로 재캡처했다. 비가역 경계는 M1.0-b 가 아니라 **M2** 이므로(§8.5) 이 재캡처
+경로가 살아 있었다.
+
+현 baseline 이 선 픽스처 빌드: `git_sha={fixture_sha}` · `f13_1_superset_of={fixture_superset_of}`.
+
+## 초과수익률 비축퇴 확인
+
+`excess_returns` 가 `returns` 와 **동일하지 않은** 섹터가 존재함을 캡처 시 단언한다.
+지수 행 부재나 벤치마크 산출 실패로 초과수익률이 원수익률로 degenerate 하면 R1/R4/R5
+비교가 무의미해지므로, 캡처가 그 상태에서 통과하지 못하게 막는다.
+
+| 지표 | 값 |
+| --- | --- |
+| `excess != returns` 인 섹터 수 | **{n_diff}** / {n_sectors} |
+| 세 기간 최대 절대 격차 `|excess − returns|` | **{max_gap:.6f}** |
 
 ## 실측 요약 (캡처 시점)
 
