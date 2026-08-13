@@ -9,11 +9,14 @@ Per SPEC-TOPDOWN-001A R1-R4.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass, field
 from typing import Any
 
 from my_chart.analysis.weekly_grid import compute_weekly_grid, history
+
+logger = logging.getLogger(__name__)
 
 # Index names excluded from breadth calculations
 _INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
@@ -476,6 +479,16 @@ def compute_breadth_history(
     #   쓴다 — grid.dates 를 쓰면 진행 중인 주가 섞여 CG-2 가 죽는다.
     grid = compute_weekly_grid(db_path)
     hist = history(grid, weeks)
+
+    if hist.returned_weeks < hist.requested_weeks:
+        # 조용한 축소 금지(REQ-MBR-004) — 요청값과 실제 반환 개수를 함께 남긴다.
+        logger.warning(
+            "compute_breadth_history: 가용 주간 격자 이력 부족 — "
+            "요청 %d주 대비 %d주만 반환한다 (db=%s)",
+            hist.requested_weeks,
+            hist.returned_weeks,
+            db_path,
+        )
 
     if not hist.bars:
         return []

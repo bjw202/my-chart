@@ -17,8 +17,9 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -115,6 +116,46 @@ def frozen_history_dates(frozen_clock: None) -> list[str]:
 
     results = compute_breadth_history(FROZEN_DB, "KOSPI", weeks=EXPECTED_WEEKS)
     return [r.date for r in results]
+
+
+# AC-MBR-005 — 이력 부족 합성 픽스처
+SHORT_HISTORY_WEEKS = 10
+SHORT_HISTORY_REQUEST = 52
+
+_SHORT_DDL = """
+CREATE TABLE stock_prices (
+    Name TEXT NOT NULL,
+    Date TEXT NOT NULL,
+    Close REAL, SMA10 REAL, SMA40 REAL, CHG_1W REAL,
+    MAX52 REAL, min52 REAL, Volume REAL, VolumeSMA10 REAL,
+    PRIMARY KEY (Name, Date)
+)
+"""
+
+
+@pytest.fixture
+def short_history_db(tmp_path: Path) -> str:
+    """ISO 주 10개만 담은 합성 주봉 DB (주당 1날짜, 진행 중인 주 없음).
+
+    프로즌 스냅샷은 격자 이력이 345바이므로 "가용 이력 < 요청"을 재현할 수 없다.
+    모든 날짜를 **금요일**로 잡아 CG-2(진행 중인 주) 판정이 벽시계와 무관하게
+    항상 False 가 되도록 고정한다.
+    """
+    db_path = str(tmp_path / "short_history.db")
+    conn = sqlite3.connect(db_path)
+    conn.execute(_SHORT_DDL)
+
+    last_friday = date(2024, 3, 1)  # 금요일
+    for week in range(SHORT_HISTORY_WEEKS):
+        dt = (last_friday - timedelta(weeks=week)).isoformat()
+        for i in range(1, 6):
+            conn.execute(
+                "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (f"Stock{i}", dt, 100.0, 90.0, 80.0, 0.01, 120.0, 70.0, 1e6, 8e5),
+            )
+    conn.commit()
+    conn.close()
+    return db_path
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +293,51 @@ def test_ac_mbr_003_iso_week_uniqueness(frozen_history_dates: list[str]) -> None
     못하므로(§1.4, F4) 고유 주 수가 실제 판별자다.
     """
     assert_ac_mbr_003(frozen_history_dates)
+
+
+# ---------------------------------------------------------------------------
+# AC-MBR-005 — 이력 부족의 비침묵 공개 (REQ-MBR-004)
+# ---------------------------------------------------------------------------
+
+
+def test_ac_mbr_005_insufficient_history_is_disclosed(
+    short_history_db: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """AC-MBR-005: 요청보다 적게 반환할 때 요청값과 반환 개수를 **둘 다** 남긴다.
+
+    반환 타입 `list[BreadthResult]` 는 소비자 계약이라 바꾸지 않으므로(§4) 공개
+    채널은 로그다. 레벨만 확인하거나 레코드 개수만 세는 검사는 금지한다 — 어느
+    값이 부족했는지 식별할 수 없으면 진단 가치가 없다.
+
+    잡는 잘못된 구현: 요청보다 적게 반환하면서 아무 신호도 남기지 않는 조용한 축소.
+    """
+    from my_chart.analysis.market_breadth import compute_breadth_history
+
+    with caplog.at_level(logging.WARNING):
+        results = compute_breadth_history(
+            short_history_db, "KOSPI", weeks=SHORT_HISTORY_REQUEST
+        )
+
+    assert len(results) == SHORT_HISTORY_WEEKS
+    assert any(
+        str(SHORT_HISTORY_REQUEST) in r.message and str(SHORT_HISTORY_WEEKS) in r.message
+        for r in caplog.records
+    ), f"요청값/반환 개수를 함께 담은 WARNING 부재: {[r.message for r in caplog.records]}"
+
+
+def test_ac_mbr_005_sufficient_history_is_silent(
+    frozen_clock: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    """이력이 충분하면 경고를 남기지 않는다 — 경고의 신호 가치를 지킨다.
+
+    이 단언이 없으면 "항상 경고를 남기는" 구현도 위 테스트를 통과한다.
+    """
+    from my_chart.analysis.market_breadth import compute_breadth_history
+
+    with caplog.at_level(logging.WARNING):
+        compute_breadth_history(FROZEN_DB, "KOSPI", weeks=EXPECTED_WEEKS)
+
+    assert [r.message for r in caplog.records] == []
 
 
 # ---------------------------------------------------------------------------
