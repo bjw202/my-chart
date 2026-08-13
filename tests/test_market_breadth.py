@@ -511,11 +511,23 @@ class TestComputeBreadthHistory:
         assert all(isinstance(r, BreadthResult) for r in results)
 
     def test_history_length_matches_weeks_param(self, weekly_db_12weeks: str) -> None:
-        """compute_breadth_history() returns up to `weeks` results."""
+        """compute_breadth_history() returns exactly `weeks` results when history suffices.
+
+        SPEC-MARKET-BREADTH-001 AC-MBR-009 — 단언 승격(`<= 4` → `== 4`).
+        이전의 `<=` 는 금지 형태 F3(부분집합 크기 부등식)이었다: 격자 바가 원시 날짜에서
+        선별되므로 어떤 구현에서도 참이라 `weeks=N` 을 "가능하면 N 근처"로 해석하는
+        느슨한 구현을 잡지 못했다. 이 픽스처는 12 ISO 주를 정확히 1주 간격으로 담으므로
+        올바른 구현에서 정확히 4를 반환한다.
+
+        **한계 명시**: 이 픽스처는 주당 정확히 1날짜라 다중 날짜 주 오염이 존재하지
+        않는다 — 본 SPEC 의 핵심 결함(V0)은 이 픽스처 위에서 재현되지 않으며 잡을 것을
+        기대해서도 안 된다. 핵심 판별은 tests/test_market_breadth_grid.py 의 프로즌
+        스냅샷 AC-MBR-001/002/003 이 전담한다.
+        """
         from my_chart.analysis.market_breadth import compute_breadth_history
 
         results = compute_breadth_history(weekly_db_12weeks, "KOSPI", weeks=4)
-        assert len(results) <= 4
+        assert len(results) == 4
 
     def test_history_ordered_by_date(self, weekly_db_12weeks: str) -> None:
         """Results are ordered chronologically (oldest first)."""

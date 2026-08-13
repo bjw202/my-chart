@@ -341,6 +341,98 @@ def test_ac_mbr_005_sufficient_history_is_silent(
 
 
 # ---------------------------------------------------------------------------
+# AC-MBR-004 — 앵커 창 정합 참조 (선행 TG-1 재확인, **비게이팅**)
+# ---------------------------------------------------------------------------
+
+ANCHOR_WINDOW_DAYS = 364
+
+
+@pytest.mark.xfail(
+    strict=False,
+    reason="비게이팅 — 선행 AC-SGR-007(TG-1)이 이미 소유한 계약의 재확인. "
+    "실패는 선행 SPEC 의 회귀를 뜻하므로 리포트로 남기되 본 SPEC 의 CI 를 막지 않는다.",
+)
+def test_ac_mbr_004_anchor_window_agreement_nongating(
+    frozen_history_dates: list[str],
+) -> None:
+    """AC-MBR-004: `(t − 364d, t]` 구간의 `grid.history` 바 집합이 반환 집합과 동등하다.
+
+    **F2 근접 형태의 명시 공개 [정직성 고지]**: 좌·우변이 같은 `compute_weekly_grid(db)`
+    객체에서 파생된다. 구현이 `history(grid, 52)` 로 확정되고 나면 이 동등성은 본 SPEC 이
+    강제하는 성질이 아니라 선행 격자의 앵커 성질(TG-1)로부터 **구조적으로 따라 나온다** —
+    "격자에서 유도하지 않은 구현"에는 판별력이 있으나 "격자에서 유도한 뒤 미세하게 어긋난
+    구현"에는 좌우변이 함께 움직일 수 있다. **이 약점 때문에 비게이팅으로 유지한다.**
+
+    본 SPEC 의 실질 판별은 프로즌 리터럴 기반의 AC-MBR-001/002/003 이 전담한다.
+    """
+    from my_chart.analysis.weekly_grid import compute_weekly_grid
+
+    grid = compute_weekly_grid(FROZEN_DB, as_of=FROZEN_AS_OF.isoformat())
+    t = date.fromisoformat(frozen_history_dates[-1])
+    lower = t - timedelta(days=ANCHOR_WINDOW_DAYS)
+
+    window = {b.date for b in grid.history if lower < date.fromisoformat(b.date) <= t}
+    assert window == set(frozen_history_dates)
+
+
+# ---------------------------------------------------------------------------
+# AC-MBR-010 — 하류 소비자 `detect_choppy` 창의 실질 변화
+# ---------------------------------------------------------------------------
+
+
+def test_ac_mbr_010_downstream_window(frozen_history_dates: list[str]) -> None:
+    """AC-MBR-010: `market_service.py:139` 의 `history[-8:]` 창이 실질적으로 바뀐다.
+
+    판별자는 "며칠인가"가 아니라 "**어느 8개인가**"다 — 정규 격자에서 연속한 8개 바는
+    위치와 무관하게 항상 약 49일을 덮으므로 span 만으로는 창의 *위치*를 판별할 수 없다.
+    그래서 (1) 창 양끝 프로즌 리터럴 앵커가 주 판별자다.
+
+    **잡지 못하는 것 [정직 고지]**: V3(`history(grid, 51)`)는 이 AC 를 통과한다 —
+    V3 의 마지막 8바가 V★ 와 문자 그대로 동일하기 때문이며, 이는 회피 가능한 결함이
+    아니라 이 AC 의 관측 범위(마지막 8바)의 논리적 귀결이다. V3 판별은 AC-MBR-001
+    (`span == 358`)이 전담한다.
+    """
+    assert_ac_mbr_010(frozen_history_dates[-WINDOW_SIZE:])
+
+
+# 실측한 AC-MBR-010 catch 행렬. 입력은 **창 자체**다.
+# V0~V3 는 소비자 슬라이싱(`dates[-8:]`)을 거친 창이고, 뒤의 두 행은 슬라이싱
+# 자체를 오배선한 창이다(검출력 증명 — 소비자 코드 변경에 대한 게이트가 아니다).
+_AC010_CATCH_MATRIX = [
+    ("V*", False),
+    ("V0", True),
+    ("V1", True),
+    ("V2", True),
+    ("V3", False),           # 마지막 8바가 V★ 와 동일 — AC-MBR-001 이 전담
+    ("history[:8]", True),
+    ("history[-16:]", True),
+]
+
+
+@pytest.mark.parametrize(("variant_name", "should_catch"), _AC010_CATCH_MATRIX)
+def test_ac_mbr_010_variant_harness(variant_name: str, should_catch: bool) -> None:
+    """AC-MBR-010 술어에 각 변형의 창을 실제로 투입해 실패를 관측한다.
+
+    SPEC v0.1.0 은 이 열에 거짓 반증 주장(`history[:8]` 을 span 으로 잡는다)을 담고
+    있었고 실측으로 반증됐다(plan-audit iter-1 D1). 열을 *읽는* 리뷰는 그 거짓을
+    통과시켰으므로, 여기서는 열을 읽지 않고 **실행**한다.
+    """
+    variants = _build_variants()
+    v_star = variants["V*"]
+    windows = {
+        "history[:8]": v_star[:WINDOW_SIZE],
+        "history[-16:]": v_star[-2 * WINDOW_SIZE:],
+    }
+    window = windows.get(variant_name) or variants[variant_name][-WINDOW_SIZE:]
+
+    if should_catch:
+        with pytest.raises(AssertionError):
+            assert_ac_mbr_010(window)
+    else:
+        assert_ac_mbr_010(window)
+
+
+# ---------------------------------------------------------------------------
 # AC-MBR-006 — 금지 관용구 부재 (정적 스캔, REQ-MBR-006)
 # ---------------------------------------------------------------------------
 
