@@ -117,21 +117,36 @@ grep -rnE --include="*.py" \
 
 - **[HARD] 이 명령은 `bash -n` 을 **exit 0** 으로 통과해야 한다.** 테스트는 이 명령 문자열을 **문자 그대로** 사용하며, 자체 판단으로 옵션·제외를 추가하지 않는다. 추가가 필요하면 본 AC를 먼저 개정한다.
 - **Then** 출력 행을 `(경로, 매칭된 관용구 텍스트)`로 정규화한 집합이 **§1.2.2 allowlist와 정확히 동등**하다 — 초과(신규 위반)와 부족(허용 지점 소실) 양쪽 모두 실패다.
-- **기대 잔류 집합** (2026-08-12 실측, 총 10행 = 실행 쿼리 5 + `universe.py` 산문 5):
+- **기대 잔류 집합** (2026-08-13 실측, 총 9행 = 실행 쿼리 4 + `universe.py` 산문 5):
   | # | 경로 | 매칭 텍스트 | 종류 |
   | --- | --- | --- | --- |
   | L1 | `backend/routers/db.py` | `SELECT MAX(Date) FROM stock_prices` | 실행 쿼리 |
   | L2 | `my_chart/analysis/sector_advanced.py` | `SELECT COUNT(DISTINCT Date) FROM stock_prices …` | 실행 쿼리 |
   | L3 | `backend/services/meta_service.py` | `SELECT MAX(Date) FROM stock_prices WHERE Name = ?` | 실행 쿼리 (일봉) |
   | L4 | `my_chart/analysis/universe.py` | `SELECT Name, MAX(Date) FROM stock_prices GROUP BY Name` | 실행 쿼리 (일봉 stale) |
-  | L5 | `my_chart/analysis/market_breadth.py` | `SELECT DISTINCT Date FROM stock_prices` | 실행 쿼리 (O-G6 보류) |
+  | ~~L5~~ | ~~`my_chart/analysis/market_breadth.py`~~ | ~~`SELECT DISTINCT Date FROM stock_prices`~~ | **제거됨** — SPEC-MARKET-BREADTH-001 (아래 amendment) |
   | P1~P5 | `my_chart/analysis/universe.py` | 주석·docstring 내 `MAX(Date)` 언급 5행 | 비실행 산문 |
 - **And** **대조 단언**: 주봉 소비자 한 곳을 순진한 경로로 되돌린 변형에서 잔류 집합에 **새 원소가 나타나** 집합 동등이 **실패**한다.
 
 #### AC-SGR-005.3 — allowlist 상한 (기계 단언)
 
-- **Then** §1.2.2 allowlist의 **실행 쿼리 지점 수가 5개 이하**다 — `assert len(EXECUTABLE_ALLOWLIST) <= 5`.
-- **And** 상한은 v0.2.2의 6에서 **5로 축소**되었다(공허했던 `chart_service.py` 항목 제거 — 실측 `grep -c` → **0**, 3종 관용구를 하나도 갖지 않아 제외할 대상 자체가 없었다). 축소는 완화가 아니라 **강화**다.
+- **Then** §1.2.2 allowlist의 **실행 쿼리 지점 수가 4개 이하**다 — `assert len(EXECUTABLE_ALLOWLIST) <= 4`.
+- **And** 상한은 v0.2.2의 6 → v0.3.0의 5 → **4로 축소**되었다. 5→4 축소 근거는 아래 amendment(L5 제거)이며, 그 이전 6→5 축소는 공허했던 `chart_service.py` 항목 제거였다(실측 `grep -c` → **0**, 3종 관용구를 하나도 갖지 않아 제외할 대상 자체가 없었다). 축소는 완화가 아니라 **강화**다.
+
+> **Amendment (2026-08-13) — SPEC-MARKET-BREADTH-001 에 의한 L5 제거 + 상한 5 → 4**
+>
+> §7 **O-G6**("`market_breadth.py:472` 격자 미적용 — 현재 출하 중인 사용자 가시 오계산")이 제시한
+> 세 선택지 중 **(b) 별도 SPEC 으로 분리**가 채택되어 `SPEC-MARKET-BREADTH-001` 이 해당 쿼리를
+> 정규 주간 격자로 전환했다. L5 는 "무해하다"가 아니라 "이번 SPEC 범위 밖"이라는 **범위 판정**으로
+> 등재됐던 항목이며, 그 범위 판정이 후속 SPEC 으로 해소되었으므로 allowlist 에서 공허해진다.
+> 실측: `grep -nE 'MAX\(Date\)|DISTINCT[[:space:]]+Date|GROUP[[:space:]]+BY[[:space:]]+Date'
+> my_chart/analysis/market_breadth.py` → **0건**.
+>
+> **잔여 불일치 [미수행 — 후속 필요]**: 본 amendment 는 `acceptance.md` 만 갱신한다.
+> allowlist 원본 표인 **`spec.md` §1.2.2 (L5 행)** 와 **§7 O-G6 항목**은 갱신하지 않았다 —
+> `SPEC-MARKET-BREADTH-001` plan.md M5 가 승인한 범위가 `acceptance.md` 로 한정되며, 완료된
+> SPEC 의 `spec.md` 본문 수정은 별도 결정 사안이다. 두 곳은 여전히 L5 를 유효한 allowlist
+> 항목으로, O-G6 을 미결로 기술한다.
 - **And** 비실행 산문 행(P1~P5)은 실행 쿼리 상한과 **별도로** 집계한다 — 산문 증가가 실행 지점 상한을 잠식하지 못하게 한다.
 - **And** **신규 주봉 소비자 관용구를 allowlist에 추가해 회피하는 경로는 여전히 위반**이다. 항목마다 §1.2.2에 사유가 명시되어야 하며, 사유 없는 신규 항목은 리뷰에서 거부한다.
 
@@ -474,4 +489,4 @@ R3의 단언은 두 층이다:
 - [ ] `@MX:WARN` — supersede DELETE 지점에 `@MX:REASON` 동반 주석 부착
 - [ ] ship commit에 frontmatter `status` 갱신 포함 (Lesson #6)
 - [ ] 릴리스 노트에 AC-SGR-020 R1~R5의 "고장처럼 보이지만 올바른 변화" 문구 반영
-- [ ] §7 미결 O-G1~O-G7이 사용자 확인 대기 상태로 progress.md에 명시 (O-G6 = `market_breadth.py:472` 격자 미적용 / **O-G7 = `meta_service.py:135` 일봉 기준일 격자 미적용** — 둘 다 AC-SGR-005 allowlist 잔류 항목)
+- [ ] §7 미결 O-G1~O-G7이 사용자 확인 대기 상태로 progress.md에 명시 (O-G6 = `market_breadth.py:472` 격자 미적용 — **2026-08-13 SPEC-MARKET-BREADTH-001 로 해소, allowlist L5 제거** / **O-G7 = `meta_service.py:135` 일봉 기준일 격자 미적용** — allowlist 잔류 항목)

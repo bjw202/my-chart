@@ -341,6 +341,69 @@ def test_ac_mbr_005_sufficient_history_is_silent(
 
 
 # ---------------------------------------------------------------------------
+# AC-MBR-006 — 금지 관용구 부재 (정적 스캔, REQ-MBR-006)
+# ---------------------------------------------------------------------------
+
+_MBR006_PATTERN = r"MAX\(Date\)|DISTINCT[[:space:]]+Date|GROUP[[:space:]]+BY[[:space:]]+Date"
+_MARKET_BREADTH_REL = "my_chart/analysis/market_breadth.py"
+
+# 되돌림 변형 — M2 가 제거한 원시 쿼리(선행 REQ-SGR-005 금지 관용구 I2).
+_REVERTED_QUERY = """        date_rows = conn.execute(
+            \"\"\"SELECT DISTINCT Date FROM stock_prices
+               WHERE Name NOT IN ('KOSPI', 'KOSDAQ')
+               ORDER BY Date DESC
+               LIMIT ?\"\"\",
+            (weeks,),
+        ).fetchall()
+"""
+
+
+def _scan(path: str) -> tuple[int, str]:
+    """AC-MBR-006 규범 스캔. ``(returncode, stdout)`` — exit 1 = 매칭 0건."""
+    import subprocess
+
+    proc = subprocess.run(
+        ["grep", "-nE", _MBR006_PATTERN, path],
+        capture_output=True,
+        text=True,
+        cwd=_REPO_ROOT,
+    )
+    return proc.returncode, proc.stdout
+
+
+def test_ac_mbr_006_forbidden_idioms_absent() -> None:
+    """AC-MBR-006: `market_breadth.py` 에 3종 금지 관용구가 0건이다.
+
+    잡는 잘못된 구현: 격자를 쓰는 새 경로를 추가하면서 낡은 쿼리를 삭제하지 않고
+    남겨둔 상태 — 사용되지 않더라도 재도입 경로가 된다. 산문(주석·docstring)이라도
+    잔류하면 선행 SPEC 의 allowlist 집합 동등을 통과시켜 제거를 **가린다.**
+    """
+    rc, out = _scan(_MARKET_BREADTH_REL)
+    assert rc == 1, f"금지 관용구 잔존:\n{out}"
+
+
+def test_ac_mbr_006_scan_has_detection_power(tmp_path: Path) -> None:
+    """대조 단언: 되돌림 변형에서 같은 스캔이 **1건 이상** 매칭한다.
+
+    스캔 자체의 검출력을 증명한다 — 스캔이 아무것도 잡지 못하도록 잘못 작성되면
+    이 단언이 실패한다. 되돌림은 임시 사본에 적용하며 원본을 수정하지 않는다.
+    """
+    original = (_REPO_ROOT / _MARKET_BREADTH_REL).read_text(encoding="utf-8")
+    reverted = tmp_path / "market_breadth_reverted.py"
+    reverted.write_text(original + "\n" + _REVERTED_QUERY, encoding="utf-8")
+
+    rc, out = _scan(str(reverted))
+    assert rc == 0, "되돌림 변형에서도 매칭 0건 — 스캔에 검출력이 없다"
+    assert "DISTINCT Date" in out
+
+
+def test_ac_mbr_006_consumes_weekly_grid() -> None:
+    """`market_breadth.py` 가 정규 격자 모듈을 import 한다(새 날짜 해석 헬퍼 금지)."""
+    source = (_REPO_ROOT / _MARKET_BREADTH_REL).read_text(encoding="utf-8")
+    assert "from my_chart.analysis.weekly_grid import" in source
+
+
+# ---------------------------------------------------------------------------
 # AC-MBR-007 — 기간 표기 3중 일치 (REQ-MBR-005)
 # ---------------------------------------------------------------------------
 

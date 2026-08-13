@@ -463,8 +463,9 @@ def compute_breadth_history(
     """Compute breadth indicators for the last N weeks.
 
     대상 날짜는 ``my_chart.analysis.weekly_grid`` 의 정규 주간 격자 히스토리 뷰에서
-    유도한다(SPEC-MARKET-BREADTH-001 REQ-MBR-001). 원시 ``DISTINCT Date`` 조회는
-    다중 날짜 ISO 주를 중복 반환해 N개 행이 N주보다 짧은 구간을 덮으므로 쓰지 않는다.
+    유도한다(SPEC-MARKET-BREADTH-001 REQ-MBR-001). 원시 날짜를 직접 뽑아 쓰는
+    관용구(선행 REQ-SGR-005 금지 I1~I3)는 다중 날짜 ISO 주를 중복 반환해 N개 행이
+    N주보다 짧은 구간을 덮으므로 쓰지 않는다.
 
     Args:
         db_path: Path to weekly SQLite database file.

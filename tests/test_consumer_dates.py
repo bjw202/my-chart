@@ -147,14 +147,14 @@ _AC005_GREP = r'''grep -rnE --include="*.py" \
 # 3종 관용구(§1.2.1 I1~I3). 잔류 행을 (경로, 매칭 텍스트) 로 정규화할 때 쓰는 키.
 _IDIOM_RE = re.compile(r"MAX\(Date\)|max\(Date\)|DISTINCT Date|GROUP BY Date")
 
-# §1.2.2 allowlist — **실행 쿼리 지점** (상한 5, v0.2.2 의 6 에서 축소).
-# chart_service.py 는 3종 관용구를 하나도 갖지 않아(실측 grep -c → 0) 제거됐다.
+# §1.2.2 allowlist — **실행 쿼리 지점** (상한 4).
+# 축소 이력: v0.2.2 의 6 → v0.3.0 의 5(공허했던 chart_service.py 제거, 실측 grep -c → 0)
+#   → 4 (L5 market_breadth.py 제거 — SPEC-MARKET-BREADTH-001 이 O-G6 을 격자로 전환).
 EXECUTABLE_ALLOWLIST: set[tuple[str, str]] = {
     ("backend/routers/db.py", "MAX(Date)"),                    # L1 적재 상태 표시
     ("my_chart/analysis/sector_advanced.py", "DISTINCT Date"),  # L2 COUNT(개수)
     ("backend/services/meta_service.py", "MAX(Date)"),          # L3 일봉 (O-G7)
     ("my_chart/analysis/universe.py", "MAX(Date)"),             # L4 일봉 stale (O-G7)
-    ("my_chart/analysis/market_breadth.py", "DISTINCT Date"),   # L5 보류 (O-G6)
 }
 
 # 비실행 산문 행(주석·docstring)은 실행 쿼리 상한과 **별도로** 집계한다 —
@@ -295,21 +295,23 @@ def test_ac005_residual_set_equality_with_allowlist() -> None:
         f"AC-SGR-005.2 잔류 다중집합 불일치.\n  실측: {dict(observed)}\n"
         f"  기대: {dict(EXPECTED_RESIDUAL)}"
     )
-    assert sum(observed.values()) == 10, (
-        f"기대 잔류 총 10행(실행 5 + 산문 5), 실측 {sum(observed.values())}행"
+    assert sum(observed.values()) == 9, (
+        f"기대 잔류 총 9행(실행 4 + 산문 5), 실측 {sum(observed.values())}행"
     )
 
 
-def test_ac005_executable_allowlist_cap_is_five() -> None:
-    """AC-SGR-005.3: 실행 쿼리 allowlist 지점 수가 **5개 이하**다.
+def test_ac005_executable_allowlist_cap_is_four() -> None:
+    """AC-SGR-005.3: 실행 쿼리 allowlist 지점 수가 **4개 이하**다.
 
-    상한은 v0.2.2 의 6 에서 5 로 **축소**되었다(공허했던 ``chart_service.py`` 항목 제거
-    — 실측 ``grep -c`` → 0, 3종 관용구를 하나도 갖지 않아 제외할 대상 자체가 없었다).
+    상한 축소 이력: v0.2.2 의 6 → v0.3.0 의 5(공허했던 ``chart_service.py`` 항목 제거
+    — 실측 ``grep -c`` → 0, 3종 관용구를 하나도 갖지 않아 제외할 대상 자체가 없었다)
+    → **4**(L5 ``market_breadth.py`` 제거 — SPEC-MARKET-BREADTH-001 이 §7 O-G6 을
+    정규 주간 격자로 전환해 해당 관용구가 실측 0건이 되었다).
     **축소는 완화가 아니라 강화다** — 공허한 항목이 상한 1칸을 잠식해 실질 상한을
     부풀리고 있었다.
     """
-    assert len(EXECUTABLE_ALLOWLIST) <= 5, (
-        f"실행 쿼리 allowlist 상한 5 초과: {len(EXECUTABLE_ALLOWLIST)}개 — "
+    assert len(EXECUTABLE_ALLOWLIST) <= 4, (
+        f"실행 쿼리 allowlist 상한 4 초과: {len(EXECUTABLE_ALLOWLIST)}개 — "
         f"신규 주봉 소비자를 allowlist 에 추가해 회피하는 경로는 여전히 위반이다"
     )
     # 산문 행은 실행 상한과 별도 집계 — 산문이 상한을 잠식하지 못한다.
