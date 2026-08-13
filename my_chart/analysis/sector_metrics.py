@@ -281,6 +281,42 @@ def _load_market_caps(daily_db_path: str | None) -> dict[str, float]:
     return caps
 
 
+# @MX:NOTE: [AUTO] AC-SAG-029/REQ-SAG-026 · O-A4 — trading_value 는 daily
+#   `stock_prices.VolumeWon` 을 원천으로 하며, 집계 창은 수익률과 **동일한**
+#   `anchor(t, N)` 호출에서 나온 `[anchor_date, t]` 다(기간 토글 연동). 종가×거래량
+#   재계산을 금지한다 — 집계 경로(이 모듈)에서 그 표현은 어디에도 없다.
+def compute_trading_value_by_period(
+    daily_db_path: str | None,
+    anchor_dates: dict[str, str | None],
+    t: str,
+) -> dict[str, dict[str, float | None]]:
+    """``{기간: {종목: Σ VolumeWon over (anchor_date, t]}}`` — anchor 부재 시 그 기간은 빈 dict.
+
+    반환은 `_anchor_returns` 와 동형(같은 ``_PERIODS`` 라벨 키)이라 동일한 anchor 창을
+    공유함이 타입 수준에서 보인다(수익률·거래대금이 서로 다른 창을 쓰는 사고를 방지).
+    """
+    if not daily_db_path or not os.path.exists(daily_db_path):
+        return {label: {} for label in _PERIODS}
+    conn = sqlite3.connect(daily_db_path)
+    try:
+        per_period: dict[str, dict[str, float | None]] = {}
+        for label in _PERIODS:
+            a = anchor_dates.get(label)
+            if a is None:
+                per_period[label] = {}
+                continue
+            rows = conn.execute(
+                "SELECT Name, SUM(VolumeWon) FROM stock_prices "
+                "WHERE Date > ? AND Date <= ? GROUP BY Name",
+                (a, t),
+            ).fetchall()
+            per_period[label] = {
+                name: float(total) for name, total in rows if total is not None}
+    finally:
+        conn.close()
+    return per_period
+
+
 # @MX:NOTE: [AUTO] 앵커 기준 기간 수익률 — `Close(t) / Close(anchor(t, N)) − 1`.
 #   앵커 바가 없거나(이력 부족, E7) 어느 한쪽 Close 가 결측·0 이면 **0 으로 접지 않고**
 #   `None` 을 돌려준다(§9.1 상태 1). `anchor()` 는 정의상 완성 바(history_grid)만
