@@ -65,6 +65,9 @@ class StockBubbleResponse(EnvelopeMixin):
     sector_name: str
     period: str
     stocks: list[StockBubbleItem]
+    # M6 신설 (AC-SAG-042) — /sectors/ranking 의 동일 섹터·동일 기간
+    # sector_return 과 일치하는 섹터 기준선.
+    sector_aggregate: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +134,12 @@ class SectorHistoryResponse(EnvelopeMixin):
 
     weeks: int
     sectors: list[SectorHistoryItem]
+    # M6 신설 (spec.md §12.3, AC-SAG-040) — dates[] / span_days / rankings[date][sector].
+    # rankings 는 그 날짜에 순위 대상이 아니었던 섹터의 키가 없다(null 유지,
+    # 최하위 순위값으로 대체하지 않는다 — TG-4).
+    dates: list[str] = []
+    span_days: int | None = None
+    rankings: dict[str, dict[str, int | None]] = {}
 
 
 # ---------------------------------------------------------------------------

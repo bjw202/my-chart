@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 
+from my_chart.analysis.aggregate_types import WEIGHT_CAP
 from my_chart.analysis.stage_classifier import (
     _load_stocks_for_classification,
     classify_stage_or_none,
@@ -12,6 +13,7 @@ from my_chart.analysis.stage_classifier import (
 )
 from my_chart.analysis.universe import ETC_SECTOR
 from my_chart.analysis.weekly_grid import _get_latest_valid_date
+from my_chart.analysis.weighting import capped_weights_detail
 from my_chart.registry import get_sector_registry
 from backend.schemas.stage import (
     SectorStageBreakdown,
@@ -22,21 +24,107 @@ from backend.schemas.stage import (
 
 logger = logging.getLogger(__name__)
 
+# AC-SAG-041 근접 신고가 판정 — sector_metrics._NH_THRESHOLD 와 동일 관용(2% 이내).
+_NEAR_52W_THRESHOLD = 0.02
+
 
 def _get_latest_date(db_path: str) -> str | None:
     """정규 주간 격자 기반 최신 기준일 (SPEC-SECTOR-GRID-001 REQ-SGR-005 공유 헬퍼 경유)."""
     return _get_latest_valid_date(db_path)
 
 
-def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
+def _market_matches(market: str | None, market_key: str) -> bool:
+    if market_key in ("", "all"):
+        return True
+    return str(market or "").strip().upper() == market_key.upper()
+
+
+def _pct(decimal_value: float | None) -> float | None:
+    """decimal → % 변환(chg_1m 과 동일 관용). None 은 결측으로 보존."""
+    return round(decimal_value * 100, 2) if decimal_value is not None else None
+
+
+def _load_extended_weekly_fields(weekly_db_path: str, date: str) -> dict[str, dict]:
+    """CHG_1W / CHG_3M / MAX52 / trading_value 보조 필드 — AC-SAG-041 3열 확장.
+
+    `_load_stocks_for_classification`(stage_classifier.py) 는 이 SPEC 범위 밖의
+    다른 호출자와 공유하므로 건드리지 않고, 이 서비스에서 필요한 보조 컬럼만
+    별도 쿼리로 읽는다(scope discipline).
+    """
+    conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
+    try:
+        rows = conn.execute(
+            """SELECT Name, CHG_1W, CHG_3M, Close, MAX52, Volume
+               FROM stock_prices WHERE Date = ?""",
+            (date,),
+        ).fetchall()
+    finally:
+        conn.close()
+    out: dict[str, dict] = {}
+    for name, chg_1w, chg_3m, close, max52, volume in rows:
+        near_52w_high = None
+        if close is not None and max52 is not None and float(max52) > 0:
+            near_52w_high = float(close) >= float(max52) * (1 - _NEAR_52W_THRESHOLD)
+        out[name] = {
+            "chg_1w": chg_1w, "chg_3m": chg_3m,
+            # trading_value 원천은 daily VolumeWon(M5 REQ-SAG-XXX)이 정규 경로이나
+            # 이 종목 목록은 weekly DB 만 소비하므로 weekly Close*Volume 으로 근사한다
+            # — 정확한 daily VolumeWon 배선은 후속 과제(progress.md §E.2 Gap 기재).
+            "trading_value": (
+                float(close) * float(volume) if close is not None and volume is not None
+                else None),
+            "near_52w_high": near_52w_high,
+        }
+    return out
+
+
+def _weight_in_sector_map(
+    daily_db_path: str, sector_map: dict[str, str], names: set[str],
+) -> dict[str, float]:
+    """섹터별 시총 상한 재배분 가중치(AC-SAG-041, INV-CAP-1) — 종목별 flat map.
+
+    `weighting.capped_weights_detail` 을 섹터별로 호출해 재사용한다(같은 산식을
+    두 번 구현하지 않는다 — INV-CAP-1 재발 방지).
+    """
+    conn = sqlite3.connect(daily_db_path, check_same_thread=False)
+    try:
+        rows = conn.execute(
+            "SELECT name, market_cap FROM stock_meta WHERE market_cap IS NOT NULL"
+        ).fetchall()
+    finally:
+        conn.close()
+    caps_by_sector: dict[str, dict[str, float]] = {}
+    for name, cap in rows:
+        if name not in names or cap is None or float(cap) <= 0:
+            continue
+        sector = sector_map.get(name)
+        if sector is None:
+            continue
+        caps_by_sector.setdefault(sector, {})[name] = float(cap)
+
+    out: dict[str, float] = {}
+    for _sector, caps in caps_by_sector.items():
+        weights = capped_weights_detail(caps, cap=WEIGHT_CAP).weights
+        out.update(weights)
+    return out
+
+
+def get_stage_overview(
+    weekly_db_path: str, daily_db_path: str | None = None, market: str = "all",
+) -> StageOverviewResponse:
     """Compute stage distribution and entry candidates.
 
     Args:
         weekly_db_path: Full path to weekly SQLite database file.
+        daily_db_path: 일봉 DB 경로(``stock_meta.market_cap``) — M6 신설.
+            ``weight_in_sector``(AC-SAG-041) 산출에 쓰인다. ``None`` 이면 그
+            필드는 전 종목 ``None``으로 채워진다.
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
 
     Returns:
         StageOverviewResponse with distribution, by_sector, and candidates.
     """
+    market_key = (market or "all").lower()
     date = _get_latest_date(weekly_db_path)
     if not date:
         logger.warning("No date found in weekly DB: %s", weekly_db_path)
@@ -45,13 +133,17 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
                 stage1=0, stage2=0, stage3=0, stage4=0, unclassified_count=0, total=0),
             by_sector=[],
             stage2_candidates=[],
+            market_filter=market_key or "all",
         )
 
     # Build sector map from registry
     df_sector = get_sector_registry()
     sector_map: dict[str, str] = {}
+    registry_market_of: dict[str, str] = {}
     for _, row in df_sector.iterrows():
-        sector_map[str(row["Name"])] = str(row.get("산업명(대)") or ETC_SECTOR)
+        name = str(row["Name"])
+        sector_map[name] = str(row.get("산업명(대)") or ETC_SECTOR)
+        registry_market_of[name] = str(row.get("Market") or "")
 
     # AC-SAG-025/026/027 — REQ-SAG-023: SMA40/SMA10 결측 종목은 stage=None(분류 불가)
     # 으로 분류 카운트 분모에서 제외하고, distribution/by_sector 는 그 개수를
@@ -61,6 +153,20 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
         raw_stocks = _load_stocks_for_classification(conn, date)
     finally:
         conn.close()
+
+    # M6 — market 파라미터(AC-SAG-039). 집계 시점 필터이므로 distribution 자체가
+    # 달라진다.
+    if market_key not in ("", "all"):
+        raw_stocks = [
+            s for s in raw_stocks
+            if _market_matches(registry_market_of.get(s["Name"]), market_key)
+        ]
+
+    extended = _load_extended_weekly_fields(weekly_db_path, date)
+    weight_map: dict[str, float] = {}
+    if daily_db_path:
+        names = {s["Name"] for s in raw_stocks}
+        weight_map = _weight_in_sector_map(daily_db_path, sector_map, names)
 
     counts = {1: 0, 2: 0, 3: 0, 4: 0}
     unclassified = 0
@@ -108,6 +214,11 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
 
     # Stage 2 entry candidates
     candidates_raw = screen_stage2_entry(weekly_db_path, date)
+    if market_key not in ("", "all"):
+        candidates_raw = [
+            c for c in candidates_raw
+            if _market_matches(registry_market_of.get(c["name"]), market_key)
+        ]
 
     # Load additional info (code, market, etc.) from sector registry
     code_map: dict[str, str] = {}
@@ -130,10 +241,15 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
             stage_detail=c.get("stage_detail", "Stage 2"),
             rs_12m=round(c["rs_12m"], 2),
             chg_1m=round(c["chg_1m"] * 100, 2),  # decimal → %
+            chg_1w=_pct(extended.get(c["name"], {}).get("chg_1w")),
+            chg_3m=_pct(extended.get(c["name"], {}).get("chg_3m")),
             volume_ratio=round(c["volume_ratio"], 2),
             close=round(c["close"], 2),
             sma50=round(c["sma50"], 2),
             sma200=round(c["sma200"], 2),
+            weight_in_sector=weight_map.get(c["name"]),
+            trading_value=extended.get(c["name"], {}).get("trading_value"),
+            near_52w_high=extended.get(c["name"], {}).get("near_52w_high"),
         )
         for c in candidates_raw
     ]
@@ -157,6 +273,7 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
         vol = float(stock.get("Volume", 0.0) or 0.0)
         vol_sma = float(stock.get("VolumeSMA10", 0.0) or 0.0)
         vol_ratio = vol / max(vol_sma, 1.0)
+        ext = extended.get(sname, {})
 
         all_stocks_list.append(StageStock(
             code=code_map.get(sname, ""),
@@ -168,10 +285,15 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
             stage_detail=detail_val,
             rs_12m=round(rs, 2),
             chg_1m=round(chg_1m_val * 100, 2),
+            chg_1w=_pct(ext.get("chg_1w")),
+            chg_3m=_pct(ext.get("chg_3m")),
             volume_ratio=round(vol_ratio, 2),
             close=round(close, 2),
             sma50=round(sma50_val, 2),
             sma200=round(sma200_val, 2),
+            weight_in_sector=weight_map.get(sname),
+            trading_value=ext.get("trading_value"),
+            near_52w_high=ext.get("near_52w_high"),
         ))
 
     return StageOverviewResponse(
@@ -179,4 +301,5 @@ def get_stage_overview(weekly_db_path: str) -> StageOverviewResponse:
         by_sector=by_sector,
         stage2_candidates=candidates,
         all_stocks=all_stocks_list,
+        market_filter=market_key or "all",
     )

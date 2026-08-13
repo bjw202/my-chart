@@ -31,6 +31,7 @@ def get_sector_ranking(
     weekly_db_path: str,
     daily_db_path: str | None = None,
     as_of: str | None = None,
+    market: str = "all",
 ) -> SectorRankingResponse:
     """Compute sector rankings and return API response.
 
@@ -40,6 +41,8 @@ def get_sector_ranking(
             M2 부터 소비한다. ``None`` 이면 시총이 결측으로 취급된다.
         as_of: 기준일(ISO ``YYYY-MM-DD``). ``None`` 이면 구현 기본값. 게이팅 테스트는
             §8.4 규약 8 에 따라 **명시 인자**로 고정한다.
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039). 집계 시점
+            필터이므로 ``member_count`` 자체가 달라진다.
 
     Returns:
         SectorRankingResponse with sectors ordered by rank.
@@ -47,11 +50,12 @@ def get_sector_ranking(
     date = _get_latest_date(weekly_db_path, as_of)
     if not date:
         logger.warning("No date found in weekly DB: %s", weekly_db_path)
-        return SectorRankingResponse(date="", sectors=[], **envelope_fields())
+        return SectorRankingResponse(
+            date="", sectors=[], **envelope_fields(market_filter=market))
 
-    rankings = compute_sector_ranking(weekly_db_path, date, daily_db_path)
+    rankings = compute_sector_ranking(weekly_db_path, date, daily_db_path, market)
     agg = compute_sector_aggregates(
-        weekly_db_path, date, daily_db_path=daily_db_path, market="all", as_of=as_of)
+        weekly_db_path, date, daily_db_path=daily_db_path, market=market, as_of=as_of)
 
     # 기존 응답 키(하위 호환, plan.md §1 D4) — 프론트엔드가 읽던 형태 그대로 유지한다.
     sector_items = [
@@ -89,6 +93,7 @@ def get_sector_ranking(
             as_of_date=date,
             as_of_is_partial_week=partial,
             return_window_days=agg.return_window_days,
+            market_filter=market,
             weight_cap=WEIGHT_CAP,
             benchmark=agg.benchmark,
             data=agg.aggregates,

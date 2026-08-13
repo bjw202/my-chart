@@ -41,17 +41,25 @@ async def sectors() -> list[SectorInfo]:
 
 
 @router.get("/sectors/ranking", response_model=SectorRankingResponse)
-async def sector_ranking() -> SectorRankingResponse:
+async def sector_ranking(
+    market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
+    period: str = Query(default="1m", pattern="^(1w|1m|3m)$"),
+) -> SectorRankingResponse:
     """Return sector strength ranking ordered by composite score.
 
     Uses weekly DB for breadth and return data.
     Returns 503 if weekly DB is not available.
+
+    ``market`` filters the aggregation universe (AC-SAG-039, M6). ``period``
+    is accepted for §12.3 parity with ``/sectors/{name}/detail`` but does not
+    change the response shape in M6 — the ranking response always carries all
+    three windows (1w/1m/3m) per AC-SAG-036.
     """
     from backend.services.sector_ranking_service import get_sector_ranking
 
     try:
         # 시총가중 집계(AG-1)의 시총 원천은 일봉 stock_meta 다 — 경로를 함께 넘긴다.
-        return get_sector_ranking(WEEKLY_DB_PATH, DAILY_DB_PATH)
+        return get_sector_ranking(WEEKLY_DB_PATH, DAILY_DB_PATH, market=market)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -81,16 +89,24 @@ async def sector_bubble(
 
 
 @router.get("/sectors/rrg", response_model=RRGResponse)
-async def sector_rrg() -> RRGResponse:
+async def sector_rrg(
+    market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
+) -> RRGResponse:
     """RRG(Relative Rotation Graph) 데이터를 반환한다.
 
     각 섹터의 RS-Ratio와 RS-Momentum을 JdK 방식으로 정규화한다.
     Returns 503 if weekly DB is not available.
+
+    ``market`` 은 §12.3 요건(AC-SAG-039)에 따라 파라미터로 신설됐다. RRG 는 섹터
+    지수 시계열(주봉 격자)을 소비하며 시장(코스피/코스닥)별 지수 계열이 별도로
+    저장되어 있지 않다 — M6 단계에서는 파라미터를 수신·검증하고
+    ``market_filter`` 로 echo 하되, 실제 데이터 재계산은 하지 않는다
+    (deferred — progress.md §E.2 M6 Gap 참조).
     """
     from backend.services.sector_advanced_service import get_rrg_data
 
     try:
-        return get_rrg_data(WEEKLY_DB_PATH)
+        return get_rrg_data(WEEKLY_DB_PATH, market=market)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -101,6 +117,7 @@ async def sector_rrg() -> RRGResponse:
 @router.get("/sectors/history", response_model=SectorHistoryResponse)
 async def sector_history(
     weeks: int = Query(default=12, ge=1, le=52),
+    market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
 ) -> SectorHistoryResponse:
     """섹터 랭킹 N주 히스토리를 반환한다.
 
@@ -109,7 +126,8 @@ async def sector_history(
     from backend.services.sector_advanced_service import get_sector_history
 
     try:
-        return get_sector_history(WEEKLY_DB_PATH, weeks=weeks)
+        return get_sector_history(WEEKLY_DB_PATH, weeks=weeks, daily_db_path=DAILY_DB_PATH,
+                                   market=market)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -120,14 +138,24 @@ async def sector_history(
 # @MX:NOTE: [AUTO] 경로 파라미터 엔드포인트는 고정 경로 엔드포인트 다음에 선언해야 한다
 # FastAPI가 "bubble", "rrg", "history"를 sector_name으로 잘못 라우팅하는 것을 방지
 @router.get("/sectors/{sector_name}/detail", response_model=SectorDetailResponse)
-async def sector_detail(sector_name: str) -> SectorDetailResponse:
+async def sector_detail(
+    sector_name: str,
+    market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
+    period: str = Query(default="1m", pattern="^(1w|1m|3m)$"),
+) -> SectorDetailResponse:
     """Return sub-sector breakdown and top 5 stocks by RS for a major sector.
 
     Uses daily DB (stock_meta) for stock data.
     Returns empty lists if sector is not found.
+
+    ``market`` filters ``stock_meta`` rows by market (AC-SAG-039, M6).
+    ``period`` is accepted for §12.3 parity but does not change ``top_stocks``
+    (which always carries ``chg_1m`` only in M6 — the sub-sector 3-column
+    return breakdown is out of this milestone's scope; documented Gap).
     """
     from backend.services.sector_detail_service import get_sector_detail
-    return get_sector_detail(DAILY_DB_PATH, sector_name, weekly_db_path=WEEKLY_DB_PATH)
+    return get_sector_detail(
+        DAILY_DB_PATH, sector_name, weekly_db_path=WEEKLY_DB_PATH, market=market)
 
 
 # @MX:NOTE: [AUTO] /sectors/{sector_name}/bubble은 /sectors/bubble 다음에 선언
@@ -136,15 +164,21 @@ async def sector_detail(sector_name: str) -> SectorDetailResponse:
 async def stock_bubble(
     sector_name: str,
     period: str = Query(default="1w", pattern="^(1w|1m|3m)$"),
+    market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
 ) -> StockBubbleResponse:
     """특정 섹터 내 종목 버블 차트 데이터를 반환한다.
 
     Returns 503 if weekly DB is not available.
+
+    ``sector_aggregate`` 는 ``/sectors/ranking`` 의 동일 섹터·동일 기간
+    ``sector_return`` 과 일치한다(AC-SAG-042).
     """
     from backend.services.sector_advanced_service import get_stock_bubble
 
     try:
-        return get_stock_bubble(WEEKLY_DB_PATH, sector_name=sector_name, period=period)
+        return get_stock_bubble(
+            WEEKLY_DB_PATH, sector_name=sector_name, period=period,
+            market=market, daily_db_path=DAILY_DB_PATH)
     except Exception as exc:
         raise HTTPException(
             status_code=503,

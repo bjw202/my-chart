@@ -49,6 +49,13 @@ class StageStock(BaseModel):
     close: float
     sma50: float
     sma200: float
+    # M6 신설 (spec.md §12.3, AC-SAG-041) — 종목 목록 3열 확장.
+    chg_1w: float | None = None
+    chg_3m: float | None = None
+    # 섹터 내 시총 상한 재배분 가중치(INV-CAP-1) — daily DB 부재 시 None.
+    weight_in_sector: float | None = None
+    trading_value: float | None = None
+    near_52w_high: bool | None = None
 
 
 # Keep backward-compatible alias

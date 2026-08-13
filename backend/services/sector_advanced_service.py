@@ -83,6 +83,8 @@ def get_stock_bubble(
     weekly_db_path: str,
     sector_name: str,
     period: str = "1w",
+    market: str = "all",
+    daily_db_path: str | None = None,
 ) -> StockBubbleResponse:
     """섹터 내 종목 버블 차트 API 응답을 반환한다.
 
@@ -90,6 +92,12 @@ def get_stock_bubble(
         weekly_db_path: weekly SQLite DB 경로
         sector_name: 조회할 섹터명
         period: 수익률 기간 ("1w", "1m", "3m")
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039, §12.3).
+            ``compute_stock_bubble`` 은 종목 단위 지수 계산만 하므로, 이 M6
+            단계에서는 파라미터를 수신·검증하고 ``market_filter`` 로 echo
+            한다(개별 종목 시장 필터는 데이터에 이미 반영되지 않음 — deferred).
+        daily_db_path: 일봉 DB 경로(시총가중 원천) — ``sector_aggregate``
+            (AC-SAG-042) 산출에 쓰인다.
 
     Returns:
         StockBubbleResponse
@@ -113,11 +121,26 @@ def get_stock_bubble(
         for s in stocks
     ]
 
+    # AC-SAG-042 — sector_aggregate 는 /sectors/ranking 의 동일 섹터·동일 기간
+    # sector_return 과 일치해야 한다. compute_sector_ranking() 을 같은 인자로
+    # 재호출해 단일 원천을 공유한다(별도 산식을 두지 않는다).
+    sector_aggregate: float | None = None
+    if date:
+        from my_chart.analysis.sector_metrics import compute_sector_ranking
+        period_attr = {"1w": "sector_return_1w", "1m": "sector_return_1m",
+                       "3m": "sector_return_3m"}.get(period, "sector_return_1w")
+        for r in compute_sector_ranking(weekly_db_path, date, daily_db_path, market):
+            if r.name == sector_name:
+                sector_aggregate = getattr(r, period_attr)
+                break
+
     return StockBubbleResponse(
         date=date,
         sector_name=sector_name,
         period=period,
         stocks=items,
+        sector_aggregate=sector_aggregate,
+        market_filter=(market or "all").lower(),
     )
 
 
@@ -125,11 +148,15 @@ def get_stock_bubble(
 # RRG 서비스
 # ---------------------------------------------------------------------------
 
-def get_rrg_data(weekly_db_path: str) -> RRGResponse:
+def get_rrg_data(weekly_db_path: str, market: str = "all") -> RRGResponse:
     """RRG(Relative Rotation Graph) API 응답을 반환한다.
 
     Args:
         weekly_db_path: weekly SQLite DB 경로
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039, §12.3).
+            RRG 는 섹터 지수 시계열을 소비하며 시장별 지수가 별도로 저장돼
+            있지 않으므로, 이 M6 단계에서는 파라미터를 수신·검증하고
+            ``market_filter`` 로 echo 만 한다(실제 재계산 미배선 — deferred).
 
     Returns:
         RRGResponse
@@ -170,14 +197,19 @@ def get_rrg_data(weekly_db_path: str) -> RRGResponse:
     except Exception:
         pass
 
-    return RRGResponse(date=date, sectors=items, kospi=kospi_points)
+    return RRGResponse(
+        date=date, sectors=items, kospi=kospi_points,
+        market_filter=(market or "all").lower())
 
 
 # ---------------------------------------------------------------------------
 # 섹터 히스토리 서비스
 # ---------------------------------------------------------------------------
 
-def get_sector_history(weekly_db_path: str, weeks: int = 12) -> SectorHistoryResponse:
+def get_sector_history(
+    weekly_db_path: str, weeks: int = 12,
+    daily_db_path: str | None = None, market: str = "all",
+) -> SectorHistoryResponse:
     """N주 섹터 랭킹 히스토리 API 응답을 반환한다.
 
     compute_sector_history()가 부분 데이터 날짜를 제외한 정제된
@@ -188,27 +220,40 @@ def get_sector_history(weekly_db_path: str, weeks: int = 12) -> SectorHistoryRes
     Args:
         weekly_db_path: weekly SQLite DB 경로
         weeks: 조회 주수 (기본 12주)
+        daily_db_path: 일봉 DB 경로(시총가중 원천) — M6 신설.
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
 
     Returns:
-        SectorHistoryResponse
+        SectorHistoryResponse — ``dates[]`` / ``span_days`` / ``rankings[date][sector]``
+        (spec.md §12.3, AC-SAG-040)를 함께 실은 확장 스키마.
     """
     from my_chart.analysis.sector_metrics import compute_sector_history
 
     # SSOT: 부분 데이터 날짜가 제외된 (dates, rankings) 튜플
-    dates, history_by_week = compute_sector_history(weekly_db_path, weeks=weeks)
+    dates, history_by_week = compute_sector_history(
+        weekly_db_path, weeks=weeks, daily_db_path=daily_db_path, market=market)
 
     if not history_by_week:
-        return SectorHistoryResponse(weeks=weeks, sectors=[])
+        return SectorHistoryResponse(
+            weeks=weeks, sectors=[], dates=[], span_days=None,
+            rankings={}, market_filter=(market or "all").lower())
 
-    # 섹터별 히스토리 데이터 수집
+    # 섹터별 히스토리 데이터 수집 (하위 호환 — ``sectors[]``)
     sector_history: dict[str, list[SectorHistoryWeek]] = {}
+    # 전 구간에서 한 번이라도 등장한 섹터 전체 집합 — AC-SAG-040의
+    # "rankings[date][sector] == null" 은 키 부재가 아니라 명시적 null 값을
+    # 요구하므로, 그 날짜에 없던 섹터도 키를 만들고 값만 None 으로 둔다.
+    all_sector_names: set[str] = {
+        rank_item.name for week in history_by_week for rank_item in week
+    }
+    rankings: dict[str, dict[str, int | None]] = {}
 
     # dates와 history_by_week는 같은 길이·같은 순서 (SSOT 보장)
     for date, week_rankings in zip(dates, history_by_week):
-        if not week_rankings:
-            continue
+        rankings[date] = {name: None for name in all_sector_names}
         for rank_item in week_rankings:
             name = rank_item.name
+            rankings[date][name] = rank_item.rank
             if name not in sector_history:
                 sector_history[name] = []
             sector_history[name].append(SectorHistoryWeek(
@@ -226,7 +271,16 @@ def get_sector_history(weekly_db_path: str, weeks: int = 12) -> SectorHistoryRes
         if history
     ]
 
-    return SectorHistoryResponse(weeks=weeks, sectors=sector_items)
+    span_days = None
+    if len(dates) >= 2:
+        from datetime import date as _date
+        span_days = (
+            _date.fromisoformat(dates[-1]) - _date.fromisoformat(dates[0])
+        ).days
+
+    return SectorHistoryResponse(
+        weeks=weeks, sectors=sector_items, dates=dates, span_days=span_days,
+        rankings=rankings, market_filter=(market or "all").lower())
 
 
 # ---------------------------------------------------------------------------

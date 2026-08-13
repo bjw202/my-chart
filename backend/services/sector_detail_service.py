@@ -45,7 +45,8 @@ def _load_weekly_classification(
 
 
 def get_sector_detail(
-    daily_db_path: str, sector_name: str, weekly_db_path: str | None = None
+    daily_db_path: str, sector_name: str, weekly_db_path: str | None = None,
+    market: str = "all",
 ) -> SectorDetailResponse:
     """대분류 섹터의 소그룹 분석 및 상위 종목을 반환한다.
 
@@ -58,25 +59,42 @@ def get_sector_detail(
         sector_name: 조회할 대분류 섹터명 (산업명(대)).
         weekly_db_path: 주봉 Weinstein stage 분류에 쓰는 weekly SQLite DB 경로.
             ``None`` 이면 stage 조회 없이(전 종목 분류 불가로) 진행한다.
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
+            ``stock_meta.market`` 컬럼(대문자 ``KOSPI``/``KOSDAQ``)으로 필터한다.
 
     Returns:
         SectorDetailResponse with sub_sectors and top_stocks.
     """
     stage_map = _load_weekly_classification(weekly_db_path) if weekly_db_path else {}
+    market_key = (market or "all").lower()
 
     conn = _connect(daily_db_path)
     try:
-        rows = conn.execute(
-            """
-            SELECT code, name, sector_minor, rs_12m, chg_1m
-            FROM stock_meta
-            WHERE sector_major = ?
-              AND code IS NOT NULL
-              AND name IS NOT NULL
-            ORDER BY rs_12m DESC NULLS LAST
-            """,
-            (sector_name,),
-        ).fetchall()
+        if market_key in ("", "all"):
+            rows = conn.execute(
+                """
+                SELECT code, name, sector_minor, rs_12m, chg_1m
+                FROM stock_meta
+                WHERE sector_major = ?
+                  AND code IS NOT NULL
+                  AND name IS NOT NULL
+                ORDER BY rs_12m DESC NULLS LAST
+                """,
+                (sector_name,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT code, name, sector_minor, rs_12m, chg_1m
+                FROM stock_meta
+                WHERE sector_major = ?
+                  AND code IS NOT NULL
+                  AND name IS NOT NULL
+                  AND UPPER(market) = ?
+                ORDER BY rs_12m DESC NULLS LAST
+                """,
+                (sector_name, market_key.upper()),
+            ).fetchall()
     finally:
         conn.close()
 
@@ -85,6 +103,7 @@ def get_sector_detail(
             sector_name=sector_name,
             sub_sectors=[],
             top_stocks=[],
+            market_filter=market_key or "all",
         )
 
     # 소그룹별 종목 그룹화
@@ -164,4 +183,5 @@ def get_sector_detail(
         sector_name=sector_name,
         sub_sectors=sub_sectors,
         top_stocks=top_stocks,
+        market_filter=market_key or "all",
     )

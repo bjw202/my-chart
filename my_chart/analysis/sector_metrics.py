@@ -941,7 +941,8 @@ def _compute_sector_metrics(
 
 
 def compute_sector_ranking(
-    db_path: str, date: str, daily_db_path: str | None = None
+    db_path: str, date: str, daily_db_path: str | None = None,
+    market: str = "all",
 ) -> list[SectorRank]:
     """Compute sector ranking for all sectors on a given date.
 
@@ -956,6 +957,8 @@ def compute_sector_ranking(
         date: Date string in YYYY-MM-DD format.
         daily_db_path: 일봉 DB 경로(``stock_meta.market_cap``). ``None`` 이면 시총이
             전부 결측으로 취급돼 등가중 폴백이 걸린다(라이브 DB 를 암묵 개방하지 않는다).
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039). 종목별 소속
+            시장(registry ``Market`` 컬럼)으로 구성종목을 필터링한다.
 
     Returns:
         List of SectorRank ordered by composite_score descending (rank 1 = best).
@@ -985,14 +988,21 @@ def compute_sector_ranking(
         conn.close()
 
     # Load sector registry to map stock names to sectors
-    sector_to_stocks, _market_of = _load_registry_mapping()
+    sector_to_stocks, market_of = _load_registry_mapping()
     caps = _load_market_caps(daily_db_path)
+    market_key = (market or "all").lower()
+
+    def _filter_by_market(names: list[str]) -> list[str]:
+        if market_key in ("", "all"):
+            return names
+        return [n for n in names if _market_matches(market_of.get(n), market_key)]
 
     # Compute current metrics for each sector
     current_results: list[SectorRank] = []
     for sector_name, stock_names in sector_to_stocks.items():
         metrics = _compute_sector_metrics(
-            sector_name, stock_names, snapshot, kospi_returns, caps, returns_now, high52_map)
+            sector_name, _filter_by_market(stock_names), snapshot, kospi_returns, caps,
+            returns_now, high52_map)
         if metrics:
             current_results.append(metrics)
 
@@ -1028,7 +1038,8 @@ def compute_sector_ranking(
         prev_results: list[SectorRank] = []
         for sector_name, stock_names in sector_to_stocks.items():
             metrics = _compute_sector_metrics(
-                sector_name, stock_names, prev_snapshot, prev_kospi, caps, returns_prev)
+                sector_name, _filter_by_market(stock_names), prev_snapshot, prev_kospi, caps,
+                returns_prev)
             if metrics:
                 prev_results.append(metrics)
 
@@ -1058,6 +1069,8 @@ def compute_sector_ranking(
 def compute_sector_history(
     db_path: str,
     weeks: int = 12,
+    daily_db_path: str | None = None,
+    market: str = "all",
 ) -> tuple[list[str], list[list[SectorRank]]]:
     """최근 N주 섹터 랭킹 히스토리를 계산한다.
 
@@ -1069,6 +1082,9 @@ def compute_sector_history(
     Args:
         db_path: weekly SQLite DB 경로.
         weeks: 조회 주수.
+        daily_db_path: 일봉 DB 경로 — M6 신설. ``compute_sector_ranking`` 에 그대로
+            넘긴다(시총가중 원천).
+        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
 
     Returns:
         (dates, rankings) 튜플. dates는 정규 격자 history 의 최근 weeks 개(오름차순),
@@ -1081,5 +1097,8 @@ def compute_sector_history(
     if not history_dates:
         return [], []
 
-    rankings = [compute_sector_ranking(db_path, date) for date in history_dates]
+    rankings = [
+        compute_sector_ranking(db_path, date, daily_db_path, market)
+        for date in history_dates
+    ]
     return history_dates, rankings
