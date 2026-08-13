@@ -1464,12 +1464,188 @@ $ git status --short   (신설 파일만)
 
 ---
 
+### M5 — 지표 정정 (독립 커밋 단위, 2026-08-13)
+
+#### E1 — 구현 개요 (5개 독립 커밋)
+
+plan.md M5 규약대로 지표별 개별 commit — rollback 입도를 지표 단위로 확보했다.
+
+| # | 커밋 SHA | 대상 | 파일 |
+| --- | --- | --- | --- |
+| 1 | `9f2318c` | MAX52 → `MAX(High)` over 364d (규약 Y) | `my_chart/analysis/sector_metrics.py`(`_high52_map` 신설 · `_build_member`/`_compute_sector_metrics`/`compute_sector_ranking` 배선) + `tests/test_ac_sag_024_high52.py`(신설) |
+| 2 | `d17c737` | Stage 분류기 단일화 + 일봉 분류기 삭제 | `my_chart/analysis/stage_classifier.py`(`classify_stage_or_none` 신설) · `backend/services/sector_detail_service.py`(`_classify_stage_simple` 삭제) · `backend/routers/sectors.py` · `backend/schemas/stage.py`(`unclassified_count`/`total` 신설) · `backend/services/stage_service.py` + 테스트 2종 |
+| 3 | `5c14e17` | `volume_ratio` → weekly `VolumeSMA10` | `my_chart/analysis/sector_advanced.py`(`compute_stock_bubble`) · `backend/schemas/sector_advanced.py` + `backend/tests/test_sector_advanced.py` |
+| 4 | `b7e9f97` | `trading_value` → daily `VolumeWon`, 창 = 기간 토글 연동 | `my_chart/analysis/sector_metrics.py`(`compute_trading_value_by_period` 신설) + `tests/test_ac_sag_029_trading_value.py`(신설) |
+| 5 | `98f5809` | RS 평균 결측 제외 — 회귀 없음 확인(게이팅 테스트만) | `tests/test_ac_sag_030_rs_avg.py`(신설) |
+
+**RS 평균(#5)은 프로덕션 코드 변경이 없다.** 기존 `_equal_mean(rs_values)`(sector_metrics.py:451 부근)가 이미 M2 시점부터 결측 제외 등가중 평균을 산출하고 있었다 — 게이팅 테스트를 신설해 그 사실을 회귀 방지선으로 고정했다.
+
+**M2~M4 함수-수준 진입점 관행 유지**: `compute_trading_value_by_period`는 M2~M4의 "함수 수준까지만 제공, 라우터 배선은 M6 소관" 패턴을 그대로 따른다. `SectorAggregate.trading_value` 필드 신설 및 응답 배선은 M6 산출물이다(deferred-to-M6, Gap G16).
+
+#### E2 — fixture_stage_divergent 구축 증거 (AC-SAG-025 — GREEN 전 작성 요건)
+
+plan.md M5는 "`fixture_stage_divergent`(두 분류기가 다른 답을 내는 3케이스)를 GREEN 전에 작성"을 명시한다. 구축 순서:
+
+1. `_classify_stage_simple`이 여전히 존재하는 상태에서 C1(일봉 상승배열→구2, 주봉 SMA40 하락+RS낮음→기대 1|4)/C2(일봉 하락배열→구4, 주봉 골든크로스+RS높음→기대 2)/C3(일봉 상승배열→구2, 주봉 SMA40 NULL→기대 None) 3케이스를 리터럴로 설계.
+2. 각 케이스에서 구 분류기(`_old_daily_classify`, 폐기된 `_classify_stage_simple` 재현)의 실제 반환값을 단언(`old == 2` / `old == 4` / `old == 2`) — 전제 검증.
+3. 신설 `classify_stage_or_none`(주봉 Weinstein)의 실제 반환값을 실행해 기대 stage와 일치함 + 구 분류기 값과 **실제로 다름**(`new_stage != old`)을 단언.
+
+verbatim(구현 완료 후 재확인, 논리는 구현 전 설계와 동일 — 3케이스 모두 구·신 분류기가 실제로 분기함을 실행으로 확인):
+
+```
+$ pytest backend/tests/test_sector_detail_service.py -k "fixture_stage_divergent" -q
+...                                                                       [100%]
+3 passed in 0.4x s
+```
+
+C1: old=2(daily heuristic) vs new=4(weekly Weinstein, close<sma10 and close<sma40 and slope<-0.01) — 분기.
+C2: old=4(daily heuristic) vs new=2(weekly Weinstein, golden cross+RS강) — 분기.
+C3: old=2(daily heuristic) vs new=None(SMA40 NULL, 분류 불가) — 분기.
+
+동일성 단독 단언이면 양쪽 모두 구 분류기여도 통과했을 것 — 대신 각 케이스가 리터럴 기대값과 일치**하고** 구 분류기 값과 **다름**을 함께 확인해 검출력을 실증했다(acceptance.md AC-SAG-025 결함 (1) 대응).
+
+#### E3 — `_classify_stage_simple` 삭제 확인 (AC-SAG-025 행동 단언)
+
+```
+$ grep -rn "_classify_stage_simple" --include="*.py" .
+backend/tests/test_sector_detail_service.py:291:    """폐기된 `_classify_stage_simple` 의 재현(대조 전용, 프로덕션에서는 삭제됨)."""
+```
+
+프로덕션 코드(0건) — 테스트 파일의 대조용 재현 함수(`_old_daily_classify`) docstring 참조 1건만 남음(함수 자체는 프로덕션에서 완전 삭제, 테스트가 폐기된 알고리즘의 값을 재현할 뿐 import하지 않음).
+
+정적 스캔(§8 규약, 보조 확인):
+
+```
+$ grep -nE "def .*stage|sma200" backend/services/sector_detail_service.py
+(no output, exit=1)
+```
+
+행동 단언(이름 변경 내성) — `test_ac_sag_025_no_three_input_daily_stage_classifier_in_module`이 모듈의 모든 public/private 함수 시그니처를 순회해 `{close, sma50, sma200}` 3입력 shape을 검사한다 — rename으로 회피되지 않는다.
+
+#### E4 — AC Binary PASS/FAIL 매트릭스 (AC-SAG-024/025/026/027/028/029/030 + AC-SAG-045 R3/R4)
+
+| AC | 상태 | 검증 커맨드 | 실제 출력 | 비고 |
+| --- | --- | --- | --- | --- |
+| AC-SAG-024 | PASS | `pytest tests/test_ac_sag_024_high52.py -q` | `5 passed` | Given/Then(98/100/92 케이스) · 규약 Y NULL 제외 · 게이팅(집계 픽스처 프로덕션 신고가 수 == 참조) · 되돌림 대조(diverging>=5) · 정적 스캔 |
+| AC-SAG-025 | PASS | `pytest backend/tests/test_sector_detail_service.py -k "divergent or ac_sag_025" -q` | `5 passed` | fixture_stage_divergent 3케이스 + 행동 단언(rename 내성) + 정적 스캔 |
+| AC-SAG-026 | PASS | `pytest backend/tests/test_sector_detail_service.py -k "excludes_unclassified" -q` + `pytest backend/tests/test_stage_service.py -k "ac_sag_026" -q` | `1 passed` + `1 passed` | SMA40/SMA10 NULL → stage=None, stage2_pct/distribution 분모 제외 |
+| AC-SAG-027 | PASS | `pytest backend/tests/test_stage_service.py -k "ac_sag_027" -q` | `2 passed` | distribution·by_sector 전 엔트리 합계 항등식 + Stage1 미흡수 확인 |
+| AC-SAG-028 | PASS | `pytest backend/tests/test_sector_advanced.py -k "ac_sag_028" -q` | `4 passed` | Given/Then(200/100→2.0) · NULL/0→None(파라미터화 2케이스) · 정적 스캔 |
+| AC-SAG-029 | PASS | `pytest tests/test_ac_sag_029_trading_value.py -q` | `3 passed` | Given/Then(VolumeWon=1e9) · anchor 창 합산(`(anchor_date, t]`) · 정적 스캔 |
+| AC-SAG-030 | PASS | `pytest tests/test_ac_sag_030_rs_avg.py -q` | `4 passed` | Given/Then(8/10 결측 제외) · 비시총가중(1/n 비례) · 게이팅(참조 1e-9 이내) · 되돌림 대조 |
+| AC-SAG-045 R3 | PASS(파생) | AC-SAG-024와 동일 규칙 공유 — `mut_stored_max52` 대조 동일 | 위 AC-SAG-024 게이팅 절이 R3의 파생 규칙("신고가 수 == 참조 구현값")을 그대로 충족 | 골든 baseline 대비 M7 최종 확정은 M7 소관(회귀 게이트) |
+| AC-SAG-045 R4 | 함수 수준 확인(NOT골든대비) | `pytest tests/test_ac_sag_030_rs_avg.py -k "gating" -q` | `1 passed` | rs_avg 전 섹터 정합성은 M5에서 확인. 골든 baseline 대비 "전반적 상승" 비교는 M7이 baseline JSON을 로드해 수행(M5는 baseline 파일에 접근하지 않음 — Gap G17) |
+
+전건 `pytest tests/test_ac_sag_024_high52.py tests/test_ac_sag_029_trading_value.py tests/test_ac_sag_030_rs_avg.py backend/tests/test_sector_detail_service.py backend/tests/test_stage_service.py backend/tests/test_sector_advanced.py -q` → `74 passed`.
+
+#### E5 — 대조/되돌림 실증 (Lesson #9 — 실제 적용 → RED 관측 → 복원 → GREEN)
+
+4건을 실제로 적용해 RED를 verbatim 캡처하고 백업본(`cp`)으로 복원했다(`git checkout-index` 미사용). AC-SAG-029(거래대금)는 정적 스캔이 실제 되돌림을 검출하는지를 개발 중 우연히 실증했다(아래 4번).
+
+**변형 1 — `mut_stored_max52`**(`_high52_map`을 저장 `MAX52` 컬럼 직조회로 되돌림):
+
+```
+FAILED tests/test_ac_sag_024_high52.py::test_ac_sag_024_gating_production_nh_count_matches_reference
+AssertionError: 프로덕션 신고가 종목 수 26 != 참조 2
+assert 26 == 2
+```
+
+**변형 2 — `mut_daily_simple_retained`**(`_load_weekly_classification`을 항상 빈 dict 반환으로 되돌림 — 구 일봉 근사 분류기 부재 상태 재현):
+
+```
+FAILED backend/tests/test_sector_detail_service.py::test_sub_sector_stage2_pct
+AssertionError: 소프트웨어 stage2_pct=0.0, 기대값=50.0
+FAILED backend/tests/test_sector_detail_service.py::test_sub_sector_stage2_pct_excludes_unclassified_from_denominator
+AssertionError: 분류 불가 종목이 분모에 남았다: stage2_pct=0.0, 기대값=100.0
+```
+
+**변형 3 — `mut_price_sma10_approx`**(`raw_volume_sma10 = sma10` 가격 근사로 되돌림):
+
+```
+FAILED backend/tests/test_sector_advanced.py::test_ac_sag_028_volume_ratio_uses_weekly_volume_sma10_not_price_sma10
+AssertionError: assert 0.004 is None (기대 2.0)
+FAILED backend/tests/test_sector_advanced.py::test_ac_sag_028_volume_ratio_none_when_volume_sma10_missing[None]
+FAILED backend/tests/test_sector_advanced.py::test_ac_sag_028_volume_ratio_none_when_volume_sma10_missing[0.0]
+FAILED backend/tests/test_sector_advanced.py::test_ac_sag_028_static_scan_no_price_sma10_volume_approximation
+AssertionError: 'volume_sma10 = sma10' is contained here
+```
+
+**변형 4 — `mut_rs_zero_fill`**(`rs_avg`를 `or 0.0` + `member_count` 분모로 되돌림):
+
+```
+FAILED tests/test_ac_sag_030_rs_avg.py::test_ac_sag_030_given_then_rs_avg_excludes_missing_from_denominator
+FAILED tests/test_ac_sag_030_rs_avg.py::test_ac_sag_030_mut_rs_zero_fill_reference_diverges
+AssertionError: 결측 제외 방식(프로덕션)과 0.0 치환+member_count 분모 방식이 최소 1개 섹터에서 실제로 갈려야 한다
+assert 0 >= 1
+```
+
+**AC-SAG-029 정적 스캔의 우연한 실증**: `compute_trading_value_by_period` 상단 주석 초안에 `Close*Volume`이라는 리터럴을 실수로 남긴 채 정적 스캔 테스트(`test_ac_sag_029_static_scan_no_close_times_volume_recomputation`)를 실행했더니 그 주석 1건을 실제로 검출해 RED가 됐다(`AssertionError: Close*Volume 재계산 표현이 남아있다: ['Close*Volume']`) — 스캔의 검출력을 개발 중 실측으로 확인한 부수 증거. 주석을 "종가×거래량"으로 정정해 GREEN 복원했다(코드 로직 변경 없음, 주석 표현만 교체).
+
+4건 모두 복원 후 `diff /tmp/moai-verify/*.bak <대상파일>` 바이트 동일 확인 + 해당 테스트 재실행 GREEN 재확인.
+
+#### E6 — 전체 테스트 스위트 델타 (M4 → M5)
+
+```
+$ pytest tests/ -q
+8 failed, 844 passed, 68 skipped, 1 xpassed, 25 errors in 95.78s
+```
+
+| | M4 완료 후 | M5 완료 후 | 델타 |
+| --- | --- | --- | --- |
+| passed | 832 | **844** | +12(신규 `test_ac_sag_024_high52.py` 5 · `test_ac_sag_029_trading_value.py` 3 · `test_ac_sag_030_rs_avg.py` 4) |
+| failed | 8 | **8** | 0 — 동일 집합(`test_api` 1 · `test_meta_service` 2 · `test_rs_line` 2 · `test_screen_service` 3) |
+| errors | 25 | **25** | 0 — 전건 pre-existing `tests/fnguide/*` |
+
+`backend/tests/` 신규/변경 테스트(개별 파일 실행, 이 저장소의 `backend/tests/` 전체 일괄 실행은 사전 존재 test-isolation 결함으로 별도 관리 — 아래 Gaps G18 참조): `test_sector_detail_service.py`(13 passed) · `test_stage_service.py`(3 passed) · `test_sector_advanced.py`(46 passed) 개별 실행 전건 GREEN.
+
+M2~M4 게이트(`test_aggregation_fixture.py` + `test_sector_aggregation.py` + `test_sector_benchmark_ranking.py` + `test_sector_rrg.py` + `test_sector_metrics.py`) M5 완료 후 재확인: `146 passed`. item1(MAX52) 커밋 직후 단독 재검증 시에도 동일 5파일 `146 passed`.
+
+#### E7 — 커버리지
+
+`coverage` 모듈 미설치(M2~M4 연속, G6/G13/G15 연속). 대리 지표: 신설 21개 테스트가 `_high52_map`/`compute_trading_value_by_period`/`classify_stage_or_none`/`_load_weekly_classification`/`compute_stock_bubble`(volume_ratio 분기) 전 신규·수정 함수의 정상/결측/되돌림 분기를 직접 실행한다.
+
+#### E8 — @MX 태그
+
+| 태그 | 위치 | 내용 |
+| --- | --- | --- |
+| `@MX:NOTE` | `sector_metrics.py` `_high52_map` 상단 | 규약 Y(NULL MAX52 종목 분자·분모 제외) — 0.0 치환 시 가짜 divergence 20건 발생 근거 명시 |
+| `@MX:NOTE` | `sector_metrics.py` `compute_trading_value_by_period` 상단 | anchor(t,N) 창 공유 — 수익률·거래대금이 다른 창을 쓰는 사고 방지 |
+| `@MX:NOTE` | `sector_detail_service.py` `_load_weekly_classification` 상단 | REQ-SAG-023 단일화 근거 + AC-SAG-026 결측 처리 위임 |
+| `@MX:NOTE` | `stage_classifier.py` `classify_stage_or_none` 상단 | classify_stage() 시그니처(항상 int) 불변 유지 이유(SPEC-TOPDOWN-001A 소관) |
+
+기존 파일에 대한 추가라 파일별 한도 재확인: `sector_metrics.py` NOTE 기존분 포함 다수(한도 미접근), `sector_detail_service.py`/`stage_classifier.py` 각 NOTE 1건 추가(한도 10 이내).
+
+#### E9 — 스코프 규율
+
+```
+$ git status --short   (M5 5개 커밋 누적, 최종 상태)
+(모두 커밋됨 — git log 9f2318c..98f5809)
+```
+
+`my_chart/analysis/sector_advanced.py`의 RRG(z-score) 관련 코드·`_rolling_zscore`/`compute_rrg_data`는 손대지 않았다(volume_ratio 수정은 `compute_stock_bubble` 함수 국소). `backend/routers/sectors.py`는 `get_sector_detail` 호출부 1줄(`weekly_db_path=` 추가)만 수정 — 라우터 파라미터 신설은 M6 소관. `spec.md`/`plan.md`/`acceptance.md` 본문은 손대지 않았다.
+
+#### Gaps / 잔여 위험 (M5)
+
+| # | 항목 | 처분 |
+| --- | --- | --- |
+| **G16** | `compute_trading_value_by_period`는 함수 수준까지만 제공 — `SectorAggregate.trading_value`/`trading_value_window_days` 응답 필드 신설·라우터 배선은 M6 산출물 의존 | plan.md M6 명시 소관("라우터 파라미터 + 종목 목록 필드"). M2~M4와 동일 처분 패턴 |
+| **G17** | AC-SAG-045 R4("골든 baseline 대비 rs_avg 전반적 상승")의 baseline 비교는 M5에서 미실행 — `tests/fixtures/golden/pre-sector-ux/ranking-current.json` 로드 로직은 M7 회귀 게이트 소관 | plan.md M7이 R1/R4/R5를 명시적으로 담당("R1/R4/R5는 M1.0-b에서 캡처한 골든 baseline과 비교"). M5는 함수 수준 정합성(rs_avg == 참조)만 확인 |
+| **G18** | `backend/tests/` 디렉토리 전체 일괄 실행 시 사전 존재 test-isolation 결함(`generate_price_db` import 실패 등 — `backend/tests/test_minervini_template.py`/`test_stocks_master.py` 등에서 다수 관측) 확인. M5 신설 테스트 3개 파일과 무관하게 M5 착수 **전**에도 존재(개별 파일 실행은 전건 GREEN, 디렉토리 일괄 실행만 실패) | 회귀 아님 — SPEC 범위 밖 사전 결함. `tests/` 단독 실행(공식 pre-flight 커맨드)은 영향 없음(151→154→844 델타로 확인). manager-spec 표기 권고 후속 SPEC 대상 |
+| **G19** | 커버리지 미측정(G6/G13/G15 연속) | 위 §E7 참조 |
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M4 완료. 다음 = M5(지표 정정) 또는 M6(라우터 배선) — 별도 위임
-milestone_completed: M4            # RRG(함수 수준). 라우터 배선(/sectors/rrg)은 M6 의존(Gap G14)
-run_commit_sha: 8a3a7f7            # M4 커밋 (backfill — D3 예외, M2 25f3fa9/M3 1815d30 전례)
+run_status: in-progress            # M5 완료(5개 독립 커밋). 다음 = M6(라우터 배선) — 별도 위임
+milestone_completed: M5            # 지표 정정 5건(MAX52/Stage단일화/volume_ratio/trading_value/RS평균). 응답 필드·라우터 배선은 M6 의존(Gap G16)
+run_commit_sha: 98f5809            # M5 #5(RS 평균, 최종 커밋)
+prior_run_commit_sha_m5_1: 9f2318c # M5 #1(MAX52)
+prior_run_commit_sha_m5_2: d17c737 # M5 #2(Stage 단일화)
+prior_run_commit_sha_m5_3: 5c14e17 # M5 #3(volume_ratio)
+prior_run_commit_sha_m5_4: b7e9f97 # M5 #4(trading_value)
+prior_run_commit_sha_m4: 8a3a7f7   # M4 커밋
 prior_run_commit_sha_m3: 1815d30   # M3 커밋
 prior_run_commit_sha_m2: 25f3fa9   # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
@@ -1509,9 +1685,9 @@ fixture_rebuild_measurements: "종목 331(지수 2) · 유효 유니버스 321 �
 f7_convention: "Y"                 # NULL MAX52 를 신·구 양쪽 분자·분모에서 제외. 규약 X 51 → 규약 Y 24, 차이 27 = NULL 종목 수
 golden_baseline_discarded: true    # [완료 8e51176] b839cee 캡처분(F12 미충족 픽스처 위) 폐기 후 재빌드 픽스처에서 재캡처. 폐기 전 sha256 은 §E.2 M1.0-b 재캡처 E1 에 기록
 relief_valve_used: none            # F13-2 14→12 축소 미사용. 크기 16.8 MB 로 예산(16~17 MB) 내
-next_gate: "M5 — 지표 정정(독립 커밋 단위). 또는 M6 — 라우터 파라미터 + 종목 목록 필드(RRG 배선 포함). 별도 위임"
-deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절(D19) · AC-SAG-021 라우터 엔드투엔드(G10) · AC-SAG-023/046 최상위 응답 노출(G10) · compute_rrg 라우터 배선(G14, M4 신설) — M6 산출물 의존. M2~M5 미실행은 Gap 이 아니다"
-total_run_phase_files: 30          # M2 27 + M3 1종 + M4 2종(rrg.py 신설 · test_sector_rrg.py 신설)
+next_gate: "M6 — 라우터 파라미터 + 종목 목록 필드(RRG 배선 · trading_value 응답 필드 배선 포함)"
+deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절(D19) · AC-SAG-021 라우터 엔드투엔드(G10) · AC-SAG-023/046 최상위 응답 노출(G10) · compute_rrg 라우터 배선(G14, M4 신설) · SectorAggregate.trading_value/trading_value_window_days 응답 필드 + 라우터 배선(G16, M5 신설) — M6 산출물 의존. M2~M5 미실행은 Gap 이 아니다"
+total_run_phase_files: 44          # M2 27 + M3 1종 + M4 2종 + M5 14종(`git diff --stat b2f45d2..98f5809` 실측)
 # --- M2 (2026-08-13) ---------------------------------------------------------
 m2_new_tests: 48                   # test_weighting 18 · test_sector_aggregation 23 · test_inv_cap1_scan 7
 m2_full_suite: "8 failed, 786 passed, 68 skipped, 1 xpassed, 25 errors — B-2 baseline 과 실패 집합 동일, 신규 실패 0"
@@ -1553,6 +1729,16 @@ m4_interpretation_note: "AC-SAG-032 워밍업 산식 미명시 — lookback_week
 mutation_verification_m4: observed-red-3   # mut_current_weight(1 RED) · mut_no_warmup(2 RED) · mut_rs_ratio_100_fallback(1 RED). 3건 모두 복원 후 GREEN + 바이트 동등 확인(diff /tmp/rrg.py.bak)
 m4_counter_naive_jump: "naive(날짜별 Σ(close×cap)/Σcap, 현재 가중치) 방식은 구성종목 변동 시점(d2→d3)에서 비율 1.000098 (기대 1.01 대비 0.0099 이탈, 임계 0.005 초과) — 체인 방식은 같은 구간에서 1.01±0.001 유지(test_ac_sag_033_index_chain_no_jump_on_membership_change)"
 m4_open_gaps: "G14(compute_rrg 라우터 배선 미실행 — M6 의존) · G15(커버리지 미측정, G6/G13 연속)"
+# --- M5 (2026-08-13) ---------------------------------------------------------
+m5_new_tests: "tests/ 신규 12(test_ac_sag_024_high52.py 5 + test_ac_sag_029_trading_value.py 3 + test_ac_sag_030_rs_avg.py 4, pytest 844−832 델타로 실측) + backend/tests/ 함수정의 기준 신규 13(test_sector_detail_service.py +7 · test_stage_service.py +3(신설 파일) · test_sector_advanced.py +3, git show b2f45d2 대비 AST 함수정의 카운트)"
+m5_full_suite: "8 failed, 844 passed, 68 skipped, 1 xpassed, 25 errors — M4 baseline 과 실패 집합 동일, 신규 실패 0"
+m5_gate_tests_still_green: 146     # test_aggregation_fixture + test_sector_aggregation + test_sector_benchmark_ranking + test_sector_rrg + test_sector_metrics 5파일 합산 실측(M5 완료 후 재확인)
+m5_fixtures_touched: false         # git status --porcelain tests/fixtures/ 공백
+m5_commit_strategy: "지표별 5개 독립 커밋(plan.md M5 규약) — 9f2318c(MAX52)·d17c737(Stage단일화)·5c14e17(volume_ratio)·b7e9f97(trading_value)·98f5809(RS평균, 테스트 전용)"
+m5_f7_convention_reused: true      # AC-SAG-024 규약 Y 는 M1.0-a 재빌드가 이미 확정한 것을 프로덕션 경로(near_52w_high)에 적용 — F7 MANIFEST 기록과 동일 규약
+m5_rs_avg_production_unchanged: true   # #5 RS 평균은 프로덕션 코드 변경 없음(_equal_mean 은 M2 시점부터 이미 정합) — 게이팅 테스트만 신설
+mutation_verification_m5: observed-red-4   # mut_stored_max52(1 RED)·mut_daily_simple_retained(2 RED)·mut_price_sma10_approx(4 RED)·mut_rs_zero_fill(2 RED). 4건 모두 복원 후 GREEN + 바이트 동등 확인(diff /tmp/moai-verify/*.bak). AC-SAG-029 정적 스캔은 개발 중 우발적 RED로 검출력 실증(§E5 참조)
+m5_open_gaps: "G16(trading_value 응답 필드·라우터 배선 미실행 — M6 의존) · G17(AC-SAG-045 R4 골든 baseline 비교 미실행 — M7 소관) · G18(backend/tests/ 디렉토리 일괄 실행 시 사전 존재 test-isolation 결함, SPEC 범위 밖) · G19(커버리지 미측정, G6/G13/G15 연속)"
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
