@@ -50,7 +50,8 @@ async def sector_ranking() -> SectorRankingResponse:
     from backend.services.sector_ranking_service import get_sector_ranking
 
     try:
-        return get_sector_ranking(WEEKLY_DB_PATH)
+        # 시총가중 집계(AG-1)의 시총 원천은 일봉 stock_meta 다 — 경로를 함께 넘긴다.
+        return get_sector_ranking(WEEKLY_DB_PATH, DAILY_DB_PATH)
     except Exception as exc:
         raise HTTPException(
             status_code=503,

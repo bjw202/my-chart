@@ -8,14 +8,35 @@ Per SPEC-TOPDOWN-001A R7-R8.
 
 from __future__ import annotations
 
+import logging
+import os
 import sqlite3
 from dataclasses import dataclass, field
 from typing import Any
 
+from my_chart.analysis.aggregate_types import (
+    WEIGHT_CAP,
+    Coverage,
+    ExcludedSector,
+    MetricValue,
+    SectorAggregate,
+    ValidCounts,
+    insufficient,
+    missing,
+    present,
+)
 from my_chart.analysis.stage_classifier import classify_stage, _compute_slope
-from my_chart.analysis.universe import ETC_SECTOR
+from my_chart.analysis.universe import ETC_SECTOR, compute_universe
 from my_chart.analysis.weekly_grid import anchor, compute_weekly_grid
-from my_chart.registry import get_sector_registry
+from my_chart.analysis.weighting import (
+    capped_weights_detail,
+    effective_n,
+    weighted_mean,
+)
+from my_chart.config import SECTORMAP_PATH
+from my_chart.registry import get_sector_registry, load_sector_registry_with_diagnostics
+
+logger = logging.getLogger(__name__)
 
 # Index names excluded from sector metrics
 _INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
@@ -31,16 +52,50 @@ _COMPOSITE_W_3M = 0.3
 # RS top threshold per SPEC R7
 _RS_TOP_THRESHOLD = 80.0
 
+# --- SPEC-SECTOR-AGGREGATION-001 M2 집계 규칙 상수 -------------------------------
+#: AG-5 — 섹터 최소 구성종목 수. 미달 섹터는 ``data[]`` 에서 빠지고 ``excluded[]`` 로 간다.
+MIN_SECTOR_MEMBERS = 5
+#: AG-4 — 시총가중 산출에 필요한 최소 유효 시총 종목 수. 미달이면 시총가중 필드가 null.
+MIN_CAP_VALID_MEMBERS = 5
+#: AG-7 — 최상위 ``coverage_ratio`` 가 이 값 **미만**이면 값을 null 로 만든다(경계 포함 유지).
+COVERAGE_NULL_THRESHOLD = 0.50
+#: AG-7 — 이 값 **미만**이면 ``low_confidence: true``(경계 0.80 정확히는 플래그 없음).
+COVERAGE_LOW_CONFIDENCE_THRESHOLD = 0.80
+
+# @MX:NOTE: [AUTO] 기간 라벨 → `anchor(t, N)` 의 라벨 일수(REQ-SAG-043 · O-A4/O-A8).
+#   기간 수익률의 원천은 저장된 `CHG_*` 컬럼이 **아니라** `Close(t) / Close(anchor(t, N)) − 1`
+#   이다. 저장된 `CHG_1M` 은 고정 바 오프셋(집계 픽스처 실측: `2026-08-11` 대비
+#   `2026-07-16` = 4바 전)으로 산출돼 `anchor(t, 28)`(= `2026-07-10`)과 **다른 바**를 가리킨다
+#   — spec.md §1.2 가 고정 바 오프셋 관용구를 `anchor(t, 28)` 로 교체하라고 적은 결함과
+#   같은 계열이며, `as_of` 가 미완성 주 바일 때 창이 라벨보다 길어지는 O-A8 과도 어긋난다.
+#   섹터·벤치마크가 **같은 `anchor(t, N)` 호출**을 공유하는 것이 BM-6 보존의 유일 조건이다.
+_PERIOD_LABEL_DAYS = {"1w": 7, "1m": 28, "3m": 91}
+#: 기간 라벨 목록(응답 키 순서 고정).
+_PERIODS = tuple(_PERIOD_LABEL_DAYS)
+
 
 @dataclass
 class SectorRank:
-    """Sector ranking result with all SPEC-required fields."""
+    """Sector ranking result with all SPEC-required fields.
+
+    하위 호환 표면이다(plan.md §1 D4). SPEC-SECTOR-AGGREGATION-001 의 결측 3상태·커버리지
+    계약은 :class:`~my_chart.analysis.aggregate_types.SectorAggregate` (응답 ``data[]``)가
+    소유하며, 이 dataclass 의 float 필드는 **null 을 표현할 수 없다** — 따라서 시총가중
+    산출이 불가능한 경우(AG-4/AG-7) 등가중 값으로 되돌아간다(아래 각 필드 주석).
+    """
 
     name: str                      # 산업명(대)
     stock_count: int
-    sector_return_1w: float        # market-cap weighted avg 1W return (%)
-    sector_return_1m: float        # market-cap weighted avg 1M return (%)
-    sector_return_3m: float        # market-cap weighted avg 3M return (%)
+    # @MX:NOTE: [AUTO] 아래 세 필드는 M2 부터 **상한 재배분 시총가중**(AG-1) 값이다.
+    #   M2 이전 주석은 "market-cap weighted" 라고 적혀 있었으나 실제 구현은 `sum/n`
+    #   등가중이었다(구 :173-175). 주석만 시총가중이고 코드는 등가중인 상태가 오래
+    #   유지됐고, 그 괴리가 본 SPEC 의 출발점이다(plan.md §2 M2 "거짓 주석 정정").
+    #   현재 계약: 유효 시총 종목 >= 5 이고 커버리지 >= 0.50 이면 시총가중,
+    #   그렇지 않으면 **등가중으로 폴백**한다(이 표면은 null 을 실을 수 없다).
+    #   null 이 필요한 소비자는 응답 `data[]` 의 SectorAggregate.returns 를 읽어야 한다.
+    sector_return_1w: float        # 상한재배분 시총가중, anchor(t,7) 기준 (%) — 폴백 등가중
+    sector_return_1m: float        # 상한재배분 시총가중, anchor(t,28) 기준 (%) — 폴백 등가중
+    sector_return_3m: float        # 상한재배분 시총가중, anchor(t,91) 기준 (%) — 폴백 등가중
     sector_excess_return_1w: float # sector - KOSPI 1W return
     sector_excess_return_1m: float # sector - KOSPI 1M return
     sector_excess_return_3m: float # sector - KOSPI 3M return
@@ -116,95 +171,442 @@ def _normalize_list(values: list[float]) -> list[float]:
     return [(v - min_v) / (max_v - min_v) * 100 for v in values]
 
 
+@dataclass(frozen=True)
+class _Member:
+    """집계 입력 1종목. 결측은 ``None`` 이며 **어떤 대체값도 부여하지 않는다**(§9.1)."""
+
+    name: str
+    market_cap: float | None
+    returns: dict[str, float | None]      # % 스케일
+    rs: float | None
+    nh: bool | None                       # 52주 신고가 판정(판정 불가면 None)
+    stage2: bool | None                   # Stage 2 여부(분류 불가면 None)
+
+    @property
+    def cap_valid(self) -> bool:
+        """규칙 AG-3 — 시총이 NULL 이거나 ``<= 0`` 이면 시총가중에서 제외한다."""
+        return self.market_cap is not None and self.market_cap > 0
+
+
+@dataclass
+class SectorAggregationResult:
+    """`compute_sector_aggregates` 산출물 — 봉투의 ``data`` / ``excluded`` / ``warnings``."""
+
+    aggregates: list[SectorAggregate]
+    excluded: list[ExcludedSector]
+    warnings: list[str]
+
+
+def _load_market_caps(daily_db_path: str | None) -> dict[str, float]:
+    """일봉 ``stock_meta`` 에서 시가총액을 읽는다(단일 원천 — 규칙 UN-2).
+
+    경로가 없거나 파일이 없으면 **빈 dict** 를 돌려준다. 이때 전 종목이 AG-3 결측으로
+    취급돼 시총가중이 불가능해지고 등가중 폴백이 걸린다 — 라이브 DB 를 암묵적으로 열지
+    않기 위한 의도적 동작이다(``sqlite3.connect`` 는 없는 파일을 새로 만든다).
+    """
+    if not daily_db_path or not os.path.exists(daily_db_path):
+        logger.warning("시총 원천(daily stock_meta) 없음 — 시총가중 불가: %s", daily_db_path)
+        return {}
+    conn = sqlite3.connect(daily_db_path)
+    try:
+        rows = conn.execute("SELECT name, market_cap FROM stock_meta").fetchall()
+    except sqlite3.Error as exc:            # 테이블 부재 등
+        logger.warning("stock_meta 조회 실패 — 시총가중 불가: %s", exc)
+        return {}
+    finally:
+        conn.close()
+    caps: dict[str, float] = {}
+    for name, cap in rows:
+        if cap is None:
+            continue
+        val = float(cap)
+        if val > 0:                          # AG-3: NULL / <= 0 은 대체값 없이 제외
+            caps[str(name)] = val
+    return caps
+
+
+# @MX:NOTE: [AUTO] 앵커 기준 기간 수익률 — `Close(t) / Close(anchor(t, N)) − 1`.
+#   앵커 바가 없거나(이력 부족, E7) 어느 한쪽 Close 가 결측·0 이면 **0 으로 접지 않고**
+#   `None` 을 돌려준다(§9.1 상태 1). `anchor()` 는 정의상 완성 바(history_grid)만
+#   반환하므로 앵커 쪽에 미완성 주 바가 섞이지 않는다(O-A8).
+def _anchor_returns(
+    conn: sqlite3.Connection, grid: Any, t: str
+) -> tuple[dict[str, dict[str, float | None]], dict[str, str | None]]:
+    """``({종목: {기간: 수익률%}}, {기간: 앵커 날짜})`` 를 돌려준다."""
+    latest = dict(conn.execute(
+        "SELECT Name, Close FROM stock_prices WHERE Date = ?", (t,)).fetchall())
+    anchor_dates: dict[str, str | None] = {}
+    per_period: dict[str, dict[str, float | None]] = {}
+    for label, days in _PERIOD_LABEL_DAYS.items():
+        bar = anchor(grid, t, days)
+        anchor_dates[label] = bar.date if bar is not None else None
+        if bar is None:
+            per_period[label] = {}
+            continue
+        base = dict(conn.execute(
+            "SELECT Name, Close FROM stock_prices WHERE Date = ?", (bar.date,)).fetchall())
+        vals: dict[str, float | None] = {}
+        for name, close in latest.items():
+            b = base.get(name)
+            if close is None or b is None or float(b) == 0:
+                continue                       # 결측 — 대체값 없이 빠진다
+            vals[name] = (float(close) / float(b) - 1.0) * 100
+        per_period[label] = vals
+
+    by_name: dict[str, dict[str, float | None]] = {
+        name: {label: per_period[label].get(name) for label in _PERIODS}
+        for name in latest
+    }
+    return by_name, anchor_dates
+
+
+def _build_member(
+    name: str,
+    row: dict[str, Any],
+    caps: dict[str, float],
+    returns: dict[str, float | None] | None = None,
+) -> _Member:
+    close = row.get("Close")
+    max52 = row.get("MAX52")
+    nh: bool | None = None
+    if close is not None and max52 is not None and float(max52) > 0:
+        nh = float(close) >= float(max52) * (1 - _NH_THRESHOLD)
+
+    stage2: bool | None = None
+    if row.get("SMA10") is not None and row.get("SMA40") is not None:
+        stage2 = classify_stage({**row, "Name": name}).stage == 2
+
+    rs = row.get("RS_12M_Rating")
+    return _Member(
+        name=name,
+        market_cap=caps.get(name),
+        returns=dict(returns) if returns else {label: None for label in _PERIODS},
+        rs=None if rs is None else float(rs),
+        nh=nh,
+        stage2=stage2,
+    )
+
+
+def _ratio(valid: int, total: int) -> float | None:
+    return None if total <= 0 else valid / total
+
+
+def _equal_mean(values: list[float]) -> float | None:
+    """결측을 **제외한** 등가중 평균. 유효 값이 없으면 ``None`` (0 반환 금지 — §9.1)."""
+    return sum(values) / len(values) if values else None
+
+
+def _metric(value: float | None) -> MetricValue:
+    return missing() if value is None else present(value)
+
+
+def _aggregate_members(
+    sector_name: str,
+    members: list[_Member],
+    cap: float = WEIGHT_CAP,
+) -> tuple[SectorAggregate, dict[str, float | None]]:
+    """단일 섹터 집계 — ``(SectorAggregate, 등가중 폴백 수익률)``.
+
+    규칙 적용:
+      * **AG-3** 시총 NULL/``<=0`` 종목은 시총가중 분자·분모에서 제외하되 등가중 지표
+        (``rs_avg`` / ``nh_pct`` / ``stage2_pct`` / ``member_count``)에는 포함한다.
+      * **AG-4** 유효 시총 종목 < :data:`MIN_CAP_VALID_MEMBERS` → 시총가중 필드가
+        ``null`` + ``reason:"insufficient"``, ``cap_weighted_available=False``.
+      * **AG-7** 최상위 ``coverage_ratio`` 가 :data:`COVERAGE_NULL_THRESHOLD` **미만**이면
+        시총가중 필드를 ``null``, :data:`COVERAGE_LOW_CONFIDENCE_THRESHOLD` 미만이면
+        ``low_confidence=True``. 경계값(0.50 / 0.80 정확히)은 값을 유지한다.
+    """
+    n = len(members)
+    cap_valid = [m for m in members if m.cap_valid]
+    cap_valid_caps = {m.name: float(m.market_cap) for m in cap_valid}  # type: ignore[arg-type]
+
+    # --- 지표별 유효 수 / 커버리지 (O-A6) -----------------------------------
+    rs_values = [m.rs for m in members if m.rs is not None]
+    nh_values = [m.nh for m in members if m.nh is not None]
+    stage_values = [m.stage2 for m in members if m.stage2 is not None]
+    chg_valid_by_period = {
+        label: [m for m in members if m.returns[label] is not None]
+        for label in _PERIODS
+    }
+    chg_valid_min = min(len(v) for v in chg_valid_by_period.values())
+
+    coverage = Coverage(
+        rs=_ratio(len(rs_values), n),
+        nh=_ratio(len(nh_values), n),
+        stage=_ratio(len(stage_values), n),
+        chg=_ratio(chg_valid_min, n),
+        # @MX:NOTE: [AUTO] trading_value 의 원천은 daily VolumeWon 이며 배선은 M5 소관이다.
+        #   산출 대상이 아닌 지표를 0 으로 접으면 AG-7 최소값이 0 이 되어 전 섹터가 null
+        #   이 되므로, None(미산출)으로 두고 Coverage.ratio 의 최소값에서 제외한다.
+        trading_value=None,
+    )
+    valid_counts = ValidCounts(
+        rs=len(rs_values), nh=len(nh_values), stage=len(stage_values),
+        chg=chg_valid_min, trading_value=None,
+    )
+    coverage_ratio = coverage.ratio
+
+    # --- 시총 커버리지 (AC-SAG-005) ------------------------------------------
+    # 정의: 시총가중에 실제로 반영된 시총합 / 유효 시총합. 지표가 결측인 종목은 분자에서
+    # 빠지므로 "이 숫자가 섹터 시총의 몇 %를 대표하는가"를 나타낸다. 기간별 최소값을 쓴다
+    # (coverage_ratio 가 최소값인 것과 동일 관용).
+    total_cap = sum(cap_valid_caps.values())
+    cap_coverage: float | None = None
+    if total_cap > 0:
+        cap_coverage = min(
+            sum(cap_valid_caps[m.name] for m in chg_valid_by_period[label] if m.cap_valid)
+            / total_cap
+            for label in _PERIODS
+        )
+
+    # --- 상한 재배분 가중치 (AG-1/AG-2) --------------------------------------
+    weight_res = capped_weights_detail(cap_valid_caps, cap=cap)
+    sector_effective_n = effective_n(weight_res.weights)
+
+    ag4_ok = len(cap_valid) >= MIN_CAP_VALID_MEMBERS
+    ag7_ok = coverage_ratio is not None and coverage_ratio >= COVERAGE_NULL_THRESHOLD
+    cap_weighted_available = bool(ag4_ok and ag7_ok and weight_res.weights)
+    low_confidence = bool(
+        cap_weighted_available
+        and coverage_ratio is not None
+        and coverage_ratio < COVERAGE_LOW_CONFIDENCE_THRESHOLD
+    )
+
+    # --- 기간별 수익률 -------------------------------------------------------
+    returns: dict[str, MetricValue] = {}
+    equal_fallback: dict[str, float | None] = {}
+    for label in _PERIODS:
+        valid_members = chg_valid_by_period[label]
+        equal_fallback[label] = _equal_mean(
+            [m.returns[label] for m in valid_members])  # type: ignore[misc]
+
+        if not valid_members:
+            returns[label] = missing()          # 원천 값 없음(§9.1 상태 1)
+            continue
+        if not cap_weighted_available:
+            returns[label] = insufficient()     # 산출 조건 미달(§9.1 상태 3)
+            continue
+        # 결측 종목을 제외한 뒤 **가중치를 재정규화**한다(AC-SAG-004).
+        subset = {m.name: cap_valid_caps[m.name] for m in valid_members if m.cap_valid}
+        sub_weights = capped_weights_detail(subset, cap=cap).weights
+        value = weighted_mean(
+            {m.name: m.returns[label] for m in valid_members}, sub_weights)  # type: ignore[misc]
+        returns[label] = missing() if value is None else present(value)
+
+    rs_avg = _equal_mean(rs_values)                       # 결측 제외(§2.3)
+    rs_top = (sum(1 for r in rs_values if r >= _RS_TOP_THRESHOLD) / len(rs_values) * 100
+              if rs_values else None)
+    nh_pct = sum(1 for v in nh_values if v) / len(nh_values) * 100 if nh_values else None
+    stage2_pct = (sum(1 for v in stage_values if v) / len(stage_values) * 100
+                  if stage_values else None)
+
+    aggregate = SectorAggregate(
+        name=sector_name,
+        member_count=n,
+        valid_count=chg_valid_min,
+        coverage_ratio=_metric(coverage_ratio),
+        cap_coverage_ratio=_metric(cap_coverage),
+        coverage=coverage,
+        valid_counts=valid_counts,
+        weight_cap=cap,
+        effective_n=(_metric(sector_effective_n) if cap_weighted_available
+                     else insufficient()),
+        capped_members=weight_res.capped_members,
+        cap_weighted_available=cap_weighted_available,
+        low_confidence=low_confidence,
+        returns=returns,
+        # 초과수익률·composite·rank 는 벤치마크가 붙는 M3 소관이다. 지수 행 기준
+        # 초과수익률을 여기에 실으면 규칙 BM-1(지수 행 사용 금지)을 어기게 된다.
+        excess_returns={label: missing() for label in _PERIODS},
+        rs_avg=_metric(rs_avg),
+        rs_top_pct=_metric(rs_top),
+        nh_pct=_metric(nh_pct),
+        stage2_pct=_metric(stage2_pct),
+        composite_score=missing(),
+    )
+    return aggregate, equal_fallback
+
+
+def _market_matches(market: str | None, market_key: str) -> bool:
+    if market_key in ("", "all"):
+        return True
+    return str(market or "").strip().upper() == market_key.upper()
+
+
+def _load_registry_mapping(
+    registry_path: str | None = None,
+) -> tuple[dict[str, list[str]], dict[str, str]]:
+    """registry → ``(섹터별 종목 목록, 종목별 시장)`` (규칙 UN-1 — 섹터 소속 단일 원천).
+
+    ``registry_path`` 를 주면 그 파일을 직접 dedup 로드한다. ``None`` 이면 모듈 수준에
+    캐시되는 :func:`get_sector_registry` 를 쓴다 — 캐시는 경로 인자를 받지 않으므로
+    픽스처 고정이 필요한 호출자는 **반드시 경로를 명시**한다.
+    """
+    if registry_path:
+        df_sector, _dups = load_sector_registry_with_diagnostics(registry_path)
+    else:
+        df_sector = get_sector_registry()
+    sector_to_stocks: dict[str, list[str]] = {}
+    market_of: dict[str, str] = {}
+    for _, row in df_sector.iterrows():
+        name = str(row["Name"])
+        sector = str(row.get("산업명(대)") or ETC_SECTOR)
+        sector_to_stocks.setdefault(sector, []).append(name)
+        if "Market" in row:
+            market_of[name] = str(row.get("Market") or "")
+    return sector_to_stocks, market_of
+
+
+def _valid_universe(
+    weekly_db_path: str,
+    daily_db_path: str | None,
+    registry_path: str | None,
+    as_of: str | None,
+) -> set[str] | None:
+    """유효 유니버스(규칙 UN-3) — ① SPEC-SECTOR-GRID-001 의 산출물을 **소비만** 한다.
+
+    일봉 DB 경로가 없으면 ``None``(=제한 없음)을 돌려준다. 라이브 DB 를 암묵적으로
+    열지 않기 위한 의도적 동작이며, 그 경우 registry ∩ 주봉 스냅샷이 구성원이 된다.
+    """
+    if not daily_db_path or not os.path.exists(daily_db_path):
+        return None
+    try:
+        snap = compute_universe(
+            weekly_db_path, daily_db_path,
+            registry_path or str(SECTORMAP_PATH), as_of=as_of)
+    except Exception as exc:                    # 원천 부재 등 — 제한 없이 진행
+        logger.warning("유효 유니버스 산출 실패 — 유니버스 제한 없이 집계한다: %s", exc)
+        return None
+    return set(snap.valid_names)
+
+
+def compute_sector_aggregates(
+    weekly_db_path: str,
+    date: str,
+    daily_db_path: str | None = None,
+    registry_path: str | None = None,
+    market: str = "all",
+    cap: float = WEIGHT_CAP,
+    as_of: str | None = None,
+    apply_min_members: bool = True,
+) -> SectorAggregationResult:
+    """섹터별 시총가중 집계(규칙 AG-1 ~ AG-7) — 응답 ``data[]`` 의 단일 산출 경로.
+
+    Args:
+        weekly_db_path: 주봉 DB 경로.
+        date: 기준일(정규 격자 대표 바).
+        daily_db_path: 일봉 DB 경로(``stock_meta.market_cap`` 단일 원천).
+        registry_path: registry xlsx 경로. ``None`` 이면 모듈 캐시를 쓴다.
+        market: ``all`` / ``kospi`` / ``kosdaq``. 필터는 **집계 시점**에 적용되므로
+            ``member_count`` 자체가 달라진다.
+        cap: 종목 비중 상한(AG-1).
+        as_of: 진행 중인 주 판정 기준일. 게이팅 호출은 **반드시 명시**한다
+            (acceptance.md §8.4 규약 8 — 기본값 ``date.today()`` 의존 금지).
+        apply_min_members: ``True`` 면 AG-5(최소 구성종목 5) 미달 섹터를 ``data[]`` 에서
+            빼고 ``excluded[]`` 에 등록한다.
+    """
+    grid = compute_weekly_grid(weekly_db_path, as_of or date)
+    conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
+    try:
+        snapshot = _load_weekly_snapshot(conn, date)
+        returns_by_name, _anchors = _anchor_returns(conn, grid, date)
+    finally:
+        conn.close()
+
+    caps = _load_market_caps(daily_db_path)
+    sector_to_stocks, market_of = _load_registry_mapping(registry_path)
+    universe = _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date)
+
+    warnings: list[str] = []
+    if not caps:
+        warnings.append(
+            "시총 원천(daily stock_meta)을 읽지 못해 시총가중 집계가 불가능하다 — "
+            "AG-4 에 따라 시총가중 필드가 null 로 보고된다")
+
+    market_key = (market or "all").lower()
+    aggregates: list[SectorAggregate] = []
+    excluded: list[ExcludedSector] = []
+    for sector_name, stock_names in sector_to_stocks.items():
+        members = [
+            _build_member(name, snapshot[name], caps, returns_by_name.get(name))
+            for name in stock_names
+            if name in snapshot
+            and name not in _INDEX_NAMES
+            and (universe is None or name in universe)
+            and _market_matches(market_of.get(name), market_key)
+        ]
+        if not members:
+            excluded.append(ExcludedSector(sector_name, "no_members", 0))
+            continue
+        if apply_min_members and len(members) < MIN_SECTOR_MEMBERS:
+            # 규칙 AG-5 — 구성종목 부족 섹터는 순위 대상에서 제외한다.
+            excluded.append(
+                ExcludedSector(sector_name, "insufficient_members", len(members)))
+            continue
+        aggregate, _fallback = _aggregate_members(sector_name, members, cap=cap)
+        aggregates.append(aggregate)
+
+    return SectorAggregationResult(
+        aggregates=aggregates, excluded=excluded, warnings=warnings)
+
+
 def _compute_sector_metrics(
     sector_name: str,
     stock_names: list[str],
     snapshot: dict[str, dict[str, Any]],
     kospi_returns: dict[str, float],
+    caps: dict[str, float] | None = None,
+    returns_by_name: dict[str, dict[str, float | None]] | None = None,
 ) -> SectorRank | None:
-    """Compute all metrics for a single sector.
+    """하위 호환 표면용 단일 섹터 지표(:class:`SectorRank`).
+
+    M2 부터 수익률은 :func:`_aggregate_members` 의 **상한 재배분 시총가중** 값이며,
+    AG-4/AG-7 로 시총가중이 불가능한 경우에만 등가중으로 폴백한다(이 표면의 float
+    필드는 null 을 실을 수 없다). AG-5 제외는 여기에 적용하지 않는다 — 기존 응답의
+    섹터 구성을 보존하기 위함이며 규칙 AG-5 는 ``data[]`` 가 소유한다.
 
     Returns None if no valid stocks found in sector.
     """
-    # Filter to stocks present in snapshot
-    sector_stocks = [
-        snapshot[name] for name in stock_names
+    rets = returns_by_name or {}
+    members = [
+        _build_member(name, snapshot[name], caps or {}, rets.get(name))
+        for name in stock_names
         if name in snapshot and name not in _INDEX_NAMES
     ]
-
-    if not sector_stocks:
+    if not members:
         return None
 
-    n = len(sector_stocks)
+    aggregate, equal_fallback = _aggregate_members(sector_name, members)
 
-    # Simple average (equal-weight) returns - % scale
-    # @MX:NOTE: [AUTO] CHG values in weekly DB are decimal (0.02 = 2%), convert to %
-    returns_1w = []
-    returns_1m = []
-    returns_3m = []
-    rs_values = []
-    nh_count = 0
-    stage2_count = 0
+    def _value(metric: MetricValue, fallback: float | None) -> float:
+        if metric.value is not None:
+            return float(metric.value)
+        return float(fallback) if fallback is not None else 0.0
 
-    for s in sector_stocks:
-        chg_1w = float(s.get("CHG_1W") or 0.0) * 100  # decimal → %
-        chg_1m = float(s.get("CHG_1M") or 0.0) * 100
-        chg_3m = float(s.get("CHG_3M") or 0.0) * 100
-        rs = float(s.get("RS_12M_Rating") or 0.0)
-        close = float(s.get("Close") or 0.0)
-        max52 = float(s.get("MAX52") or 0.0)
-
-        returns_1w.append(chg_1w)
-        returns_1m.append(chg_1m)
-        returns_3m.append(chg_3m)
-        rs_values.append(rs)
-
-        # 52-week high: Close within 2% of MAX52
-        if max52 > 0 and close >= max52 * (1 - _NH_THRESHOLD):
-            nh_count += 1
-
-        # Stage classification
-        stage_row = {**s, "Name": "tmp", "RS_12M_Rating": rs}
-        stage_result = classify_stage(stage_row)
-        if stage_result.stage == 2:
-            stage2_count += 1
-
-    avg_1w = sum(returns_1w) / n
-    avg_1m = sum(returns_1m) / n
-    avg_3m = sum(returns_3m) / n
-    rs_avg = sum(rs_values) / n if rs_values else 0.0
-
-    # RS top % (stocks with RS >= 80)
-    rs_top_count = sum(1 for r in rs_values if r >= _RS_TOP_THRESHOLD)
-    rs_top_pct = rs_top_count / n * 100
-
-    # 52W high % and Stage 2 %
-    nh_pct = nh_count / n * 100
-    stage2_pct = stage2_count / n * 100
-
-    # Excess returns vs KOSPI
-    excess_1w = avg_1w - kospi_returns["chg_1w"]
-    excess_1m = avg_1m - kospi_returns["chg_1m"]
-    excess_3m = avg_3m - kospi_returns["chg_3m"]
+    avg_1w = _value(aggregate.returns["1w"], equal_fallback["1w"])
+    avg_1m = _value(aggregate.returns["1m"], equal_fallback["1m"])
+    avg_3m = _value(aggregate.returns["3m"], equal_fallback["3m"])
 
     return SectorRank(
         name=sector_name,
-        stock_count=n,
+        stock_count=aggregate.member_count,
         sector_return_1w=round(avg_1w, 4),
         sector_return_1m=round(avg_1m, 4),
         sector_return_3m=round(avg_3m, 4),
-        sector_excess_return_1w=round(excess_1w, 4),
-        sector_excess_return_1m=round(excess_1m, 4),
-        sector_excess_return_3m=round(excess_3m, 4),
-        sector_rs_avg=round(rs_avg, 2),
-        sector_rs_top_pct=round(rs_top_pct, 2),
-        sector_nh_pct=round(nh_pct, 2),
-        sector_stage2_pct=round(stage2_pct, 2),
+        sector_excess_return_1w=round(avg_1w - kospi_returns["chg_1w"], 4),
+        sector_excess_return_1m=round(avg_1m - kospi_returns["chg_1m"], 4),
+        sector_excess_return_3m=round(avg_3m - kospi_returns["chg_3m"], 4),
+        sector_rs_avg=round(aggregate.rs_avg.value or 0.0, 2),
+        sector_rs_top_pct=round(aggregate.rs_top_pct.value or 0.0, 2),
+        sector_nh_pct=round(aggregate.nh_pct.value or 0.0, 2),
+        sector_stage2_pct=round(aggregate.stage2_pct.value or 0.0, 2),
         composite_score=0.0,  # computed after normalization
     )
 
 
-def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
+def compute_sector_ranking(
+    db_path: str, date: str, daily_db_path: str | None = None
+) -> list[SectorRank]:
     """Compute sector ranking for all sectors on a given date.
 
     Per SPEC R7-R8:
@@ -216,22 +618,28 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
     Args:
         db_path: Path to weekly SQLite database file.
         date: Date string in YYYY-MM-DD format.
+        daily_db_path: 일봉 DB 경로(``stock_meta.market_cap``). ``None`` 이면 시총이
+            전부 결측으로 취급돼 등가중 폴백이 걸린다(라이브 DB 를 암묵 개방하지 않는다).
 
     Returns:
         List of SectorRank ordered by composite_score descending (rank 1 = best).
     """
+    grid = compute_weekly_grid(db_path)
     conn = sqlite3.connect(db_path, check_same_thread=False)
     try:
         snapshot = _load_weekly_snapshot(conn, date)
         kospi_returns = _load_kospi_returns(conn, date)
+        # M2 — 기간 수익률은 `anchor(t, N)` 기준이며 저장된 CHG_* 컬럼이 아니다.
+        returns_now, _anchors = _anchor_returns(conn, grid, date)
 
         # rank_change 기준일: anchor(t, 28) — t−28일 이하 최근 정규 격자 바
         # (SPEC-SECTOR-GRID-001 AC-SGR-006-B / AC-SGR-020 R2). 1M = 28d(REQ-SGR-006).
-        # 기존 raw 날짜 오프셋(3칸) 기준 → 정규 격자 기준으로 의미 변경.
-        grid = compute_weekly_grid(db_path)
+        # 기존 raw 날짜 오프셋 기준 → 정규 격자 기준으로 의미 변경.
         prev_bar = anchor(grid, date, 28)
         prev_date = prev_bar.date if prev_bar is not None else None
         prev_snapshot = _load_weekly_snapshot(conn, prev_date) if prev_date else {}
+        returns_prev = (
+            _anchor_returns(conn, grid, prev_date)[0] if prev_date else {})
         prev_kospi = _load_kospi_returns(conn, prev_date) if prev_date else {
             "chg_1w": 0.0, "chg_1m": 0.0, "chg_3m": 0.0
         }
@@ -239,19 +647,14 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
         conn.close()
 
     # Load sector registry to map stock names to sectors
-    df_sector = get_sector_registry()
-    sector_to_stocks: dict[str, list[str]] = {}
-    for _, row in df_sector.iterrows():
-        name = str(row["Name"])
-        sector = str(row.get("산업명(대)") or ETC_SECTOR)
-        if sector not in sector_to_stocks:
-            sector_to_stocks[sector] = []
-        sector_to_stocks[sector].append(name)
+    sector_to_stocks, _market_of = _load_registry_mapping()
+    caps = _load_market_caps(daily_db_path)
 
     # Compute current metrics for each sector
     current_results: list[SectorRank] = []
     for sector_name, stock_names in sector_to_stocks.items():
-        metrics = _compute_sector_metrics(sector_name, stock_names, snapshot, kospi_returns)
+        metrics = _compute_sector_metrics(
+            sector_name, stock_names, snapshot, kospi_returns, caps, returns_now)
         if metrics:
             current_results.append(metrics)
 
@@ -286,7 +689,8 @@ def compute_sector_ranking(db_path: str, date: str) -> list[SectorRank]:
     if prev_snapshot:
         prev_results: list[SectorRank] = []
         for sector_name, stock_names in sector_to_stocks.items():
-            metrics = _compute_sector_metrics(sector_name, stock_names, prev_snapshot, prev_kospi)
+            metrics = _compute_sector_metrics(
+                sector_name, stock_names, prev_snapshot, prev_kospi, caps, returns_prev)
             if metrics:
                 prev_results.append(metrics)
 

@@ -891,19 +891,294 @@ $ git status --short my_chart/ backend/ frontend/
 
 ---
 
+### M2 — 가중·집계 코어 (2026-08-13) **[비가역 경계 통과]**
+
+> **`point_of_no_return_crossed: true`.** 구 등가중 집계 구현이 교체됐다 — 골든 baseline
+> 재캡처 창이 이 커밋으로 영구히 닫혔다. 진입 전제(AC-SAG-048 PASS · AC-SAG-047 PASS)는
+> 착수 시점에 105/105 GREEN 으로 확인했다.
+
+#### E1 — AC PASS/FAIL 매트릭스
+
+| AC | 상태 | 검사 | 실측 |
+| --- | --- | --- | --- |
+| **AC-SAG-001 (A 축퇴)** | PASS | `test_ac_sag_001_a_degenerate_n5_is_exactly_equal_weight` | `cap_eff = max(0.10, 1/5) = 0.20`, 결과 `[0.2]×5` (각 `1e-12` 이내), `Σw = 1.0` |
+| **AC-SAG-001 (B 비례)** | PASS | `test_ac_sag_001_b_proportional_redistribution_observable_at_n15` | `n=15`, `w[0] = cap_eff = 0.10`, `w[1]/w[2] = 1.5`, `w[1] = 0.0931034483`, `w[2] = 0.0620689655` |
+| **AC-SAG-001 (종료 계약)** | PASS | `test_ac_sag_001_termination_is_structural_not_a_count_threshold` | 6개 입력 전부 `iterations <= min(n,20)` · `exhausted is False` |
+| **AC-SAG-001 (무구속)** | PASS | `test_ac_sag_001_uniform_caps_need_no_redistribution` | 15종목 동일 시총 → `iterations = 0`, `w = 1/15`, `capped_members = ()` |
+| **AC-SAG-002 (값 절)** | PASS | `test_ac_sag_002_production_matches_independent_reference` | AG-5 통과 18섹터 중 프로덕션 non-null 16섹터 전건 일치. 최대 편차 **`3.553e-15`**(화장품), 임계 `1e-9` |
+| **AC-SAG-002 (null 집합)** | PASS | `test_ac_sag_002_null_sector_set_equality` | 프로덕션 null = 참조 null = `{패션(AG-4), 헬스케어(AG-7 rs 0.45)}` |
+| **AC-SAG-002 (F12-b 크기 절)** | PASS | `test_ac_sag_002_f12b_delta_set_matches_manifest` | 13섹터, MANIFEST `f12b_delta_ge_50bp_sectors_1m` 와 집합 동등, `>= 3` |
+| **AC-SAG-002 (F12-c 순위 절)** | PASS | `test_ac_sag_002_f12c_rank_shift_set_matches_manifest` | 12섹터, MANIFEST `f12c_rank_shifted_sectors_1m` 와 집합 동등, 비공집합, `>= 5` |
+| **AC-SAG-003** | PASS | `test_ac_sag_003_*` (weighting 2 + aggregation 2) | `n=12` → `capped_members` 1건, `raw 0.5769230769` / `capped = cap_eff`, 미상한 11종목 각 `0.0818181818`, `iterations = 1`. 축퇴 대조 `n=6` → `cap_eff = 1/6`, 리터럴 아님 |
+| **AC-SAG-004** | PASS | `test_ac_sag_004_*` | 10종목 중 3 NULL → `member_count 10 · valid_count 7 · coverage 0.7`, 값 `5.0` vs 0-치환 `< 5.0`. 재정규화 후 값이 `[1,7]` 범위 내 |
+| **AC-SAG-005** | PASS | `test_ac_sag_005_*` (3건) | 시총 NULL 3종목 제외 후 값이 "3종목 제거 픽스처"와 `1e-9` 일치(대체값 흔적 0). `cap_coverage_ratio = 1.0`; 유효 시총 1종목 수익률만 NULL → `1 − mc/Σmc` 와 `1e-9` 일치 (폐기 해석 판별) |
+| **AC-SAG-006** | PASS | `test_ac_sag_006_insufficient_cap_valid_members_null_cap_weighted_fields` | 유효 시총 3 → `returns/effective_n = null + insufficient`, `cap_weighted_available False`, 등가중 3지표 값 유지 |
+| **AC-SAG-008** | PASS | `test_ac_sag_008_*` | `data[]` 18/18 항목이 `member_count·valid_count·coverage_ratio·cap_coverage_ratio` 보유(누락 0). 최상위 = `min(coverage.*)` 확인(rs 0.8 / chg 1.0 → 0.8) |
+| **AC-SAG-009** | PASS | `test_ac_sag_009_*` (3건) | 0.95 → 값·플래그 없음 / 0.75 → 값·`low_confidence` / 0.45 → null·`insufficient`. 경계 0.80 플래그 없음, 0.50 값 유지. 전원 NULL → `missing`(≠`insufficient`) |
+| **AC-SAG-010 (A)** | PASS | `test_ac_sag_010_a_effective_n_at_n25_is_160_over_7` | `n=25` → `22.8571428571 (=160/7)`, 무상한 `3.1558441558`, 배율 `7.24`, `<= n` |
+| **AC-SAG-010 (축퇴 대조)** | PASS | `test_ac_sag_010_degenerate_effective_n_collapses_to_n` | `n=5 → 5.0`, `n=6 → 6.0` (각 `1e-9` 이내) |
+| **AC-SAG-010 (응답 절)** | PASS | `test_ac_sag_010_response_*` | 시총가중 가능 16섹터 전건 `effective_n` non-null 이고 `<= member_count`. 합성 25종목 응답 `= 160/7` |
+| **AC-SAG-049** | PASS | `test_ac_sag_049_*` (4건) | 시드 20260813 · 4,000 케이스: 불변식 1/2/3 위반 **0건**, `exhausted` 0건, 반복 히스토그램 `{1:165, 2:1030, 3:1580, 4:912, 5:290, 6:23}` 최악 **6회**. §3.1 고정점 편차 `6.695e-12`, 닫힌 해 편차 `5.551e-17` |
+| **AC-SAG-050 (스캔 1)** | PASS | `test_ac_sag_050_scan1_*` | 1a `my_chart/ backend/ tests/` **0행**, 1b `min(x, 0.10\|WEIGHT_CAP)` **0행**. `WEIGHT_CAP` 정의 1곳(`aggregate_types.py`), `weighting.py` 실행 토큰에 상한 리터럴 0개 |
+| **AC-SAG-050 (스캔 2)** | PASS | `test_ac_sag_050_scan2_*` | acceptance.md 본문 **0행**. 스캔 3종 `bash -n` 문법 검증 통과 |
+| AC-SAG-007 | deferred-to-M6 | — | `market` 파라미터가 M6 산출물(D19). 미실행은 Gap 이 아니다 |
+
+신규 테스트 **48건** (`test_weighting.py` 18 · `test_sector_aggregation.py` 23 · `test_inv_cap1_scan.py` 7·중 파라미터화 포함) 전건 GREEN.
+
+#### E2 — Lesson #9 되돌림 실증 (**관측된 RED**)
+
+네 변형 전건을 **실제로 적용**하고 실패 출력을 verbatim 캡처한 뒤 복원했다.
+로그: `.moai/state/verify/m2-run/mut_*-RED.log`.
+
+**(1) `mut_equal_weight`** — `capped_weights_detail` 의 초기 가중치를 `w = {k: 1/n}` 등가중으로 되돌림.
+
+```
+E   AssertionError: Auto: 프로덕션 8.468826134827173 != 참조 4.723254990954548
+E   AssertionError: 등가중 변형과 어긋나는 섹터가 1개뿐 — 무게이팅이다
+E   AssertionError: 최상위가 cap_eff 로 고정되지 않았다
+E     assert 0.06666666666666667 == 0.1 ± 1.0e-12
+10 failed, 30 passed
+```
+
+FAILED: `002_production_matches_independent_reference` · `002_mut_equal_weight_is_detectable` ·
+`003_response_exposes_weight_cap_and_capped_members` · `010_response_effective_n_matches_synthetic_literal` ·
+`001_b_proportional_redistribution_observable_at_n15` · `003_capped_members_expose_raw_and_cap_eff_at_n12` ·
+`010_a_effective_n_at_n25_is_160_over_7` · `010_mut_effective_n_uncapped_is_detectable` ·
+`049_matches_plan31_fixed_point` · `049_matches_closed_form`
+
+**(2) `mut_effective_n_uncapped`** — `effective_n` 을 상한 **적용 전** 원비중으로 산출.
+
+```
+E   assert 3.1558441558441555 == 22.857142857142858 ± 1.0e-09
+FAILED tests/test_sector_aggregation.py::test_ac_sag_010_response_effective_n_matches_synthetic_literal
+1 failed, 39 passed
+```
+
+AC 본문이 예고한 `22.8571428571 → 3.1558441558` 과 **정확히 일치**한다.
+
+**(3) `mut_plan31_verbatim`** — 동결(`frozen`)을 제거해 §3.1 v0.4.1 형태로 되돌림.
+
+```
+E   AssertionError: 불변식 1 위반 3183건: [(13, 0.10007495748496975, 0.1), (32, 0.10000066791015419, 0.1), (18, 0.10006016997242106, 0.1)]
+E   AssertionError: n=5 반복 20 > min(n, 20)
+E   AssertionError: s0=0.20000000661526854 — 균등해가 아니다
+E   AssertionError: §3.1 고정점과 최대 편차 1.234e-01
+8 failed, 32 passed
+```
+
+위반 케이스 **3,183 / 4,000** — acceptance.md AC-SAG-049 의 실측 기재와 **바이트 동일**하다.
+
+**(4) `mut_reintroduce_cap_literal`** — acceptance.md 말미에 위반형 절 1행을 임시 추가.
+
+```
+E   AssertionError: acceptance.md 가 INV-CAP-1 작성 규약을 위반한다:
+E     1003:- **And (mut)** 상한이 적용된 종목의 `weight_in_sector == 0.10` 이다.
+FAILED tests/test_inv_cap1_scan.py::test_ac_sag_050_scan2_spec_body_has_no_cap_literal_expectation
+1 failed, 7 passed
+```
+
+**복원 증거** — 네 변형 모두 복원 후 재실행 GREEN, 그리고
+
+```
+$ diff -q <백업> my_chart/analysis/weighting.py   → RESTORED byte-identical
+$ git status --short -- .moai/specs/SPEC-SECTOR-AGGREGATION-001/acceptance.md
+(공백)
+```
+
+> **부수 사건 (정직한 기재)**: 변형 (2) 복원 시 `git checkout-index -f` 를 써서 **스테이징된
+> cherry-pick 판본**으로 되돌려 M2 편집분이 일시 소실됐다. 즉시 전량 재적용하고 179 tests
+> GREEN 으로 확인한 뒤, 이후 변형은 scratchpad 백업 사본으로만 복원했다. 최종 산출물에
+> 영향 없음(§E.2 E1 매트릭스가 재적용 후 상태에서 측정됐다).
+
+#### E3 — INV-CAP-1 스캔 1 (신규 코드 대상)
+
+```
+$ grep -rnE '(capped_weight|weight_in_sector)[^=<>!]*[=!]=[^=]*0\.10?([^0-9]|$)' \
+       my_chart/ backend/ tests/ --include='*.py'
+(0행)
+
+$ grep -rnE 'min\([^,]*,\s*(0\.10?|WEIGHT_CAP|weight_cap)\s*\)' \
+       my_chart/ backend/ --include='*.py'
+(0행)
+```
+
+첫 실행은 **RED 였다** — 신설 테스트 2곳의 독스트링이 위반형 문자열을 담고 있어
+스캔 1a 가 잡았다(`tests/test_weighting.py:201` · `tests/test_inv_cap1_scan.py:87`).
+문구를 `cap_eff` 경유 표현으로 고쳐 해소했다. **집행 장치가 실제로 작동함의 직접 증거다.**
+
+#### E4 — AC-SAG-049 종료 스윕 (verbatim)
+
+```
+AC-SAG-049 sweep — seed=20260813, cases=4000, n~U{2..40}, cap=10**U(0,4)*random()
+iteration histogram : {1: 165, 2: 1030, 3: 1580, 4: 912, 5: 290, 6: 23}
+max iterations      : 6
+cap violations (INV1): 0
+exhausted exits(INV2): 0
+bound violations     : 0
+norm violations(INV3): 0
+fixed-point max dev  : 6.695e-12  (AC 기재 6.696e-12)
+closed-form max dev  : 5.551e-17  (AC 기재 3.053e-16)
+mut_plan31@20 cap violations: 3183 / 4000  (AC 기재 3183)
+```
+
+로그: `.moai/state/verify/m2-run/5-ac049-sweep.log`.
+
+#### E5 — 참조 구현 독립성 (§8.3)
+
+* `tests/test_weighting.py` 의 오라클 `_plan31_verbatim` / `_closed_form` — 프로덕션 **미import**.
+  상한 상수도 파일 지역 리터럴 `CAP = 0.10` 이다.
+* `tests/test_sector_aggregation.py` 의 참조 `_ref_capped_weights` / `_ref_sector_values` /
+  `_f12_sets` / `fixture_raw` — 프로덕션 **미import**. 픽스처 `weekly.db` · `daily.db` ·
+  `registry.xlsx` 에서 원시 컬럼을 직접 읽는다. 상한도 지역 리터럴이며 프로덕션 상수와의
+  일치는 `test_reference_cap_matches_production_constant` 가 **별도 단언**한다(D3 단일 정의).
+* 프로덕션 import 는 (a) 대조의 프로덕션 변 `compute_sector_aggregates`, (b) 합성 AC 의
+  피검사 대상 `_Member` / `_aggregate_members`, (c) 결측 사유 상수뿐이다.
+
+**§8.3 AG-3/4/5/7 처리 (참조 = 프로덕션)**
+
+| 규칙 | 참조 동작 |
+| --- | --- |
+| AG-3 (`market_cap` NULL/`<=0`) | 시총가중 분자·분모에서 제외, 등가중 분모에는 포함 |
+| AG-4 (유효 시총 `< 5`) | 시총가중 값을 산출하지 않고 **null 집합**에 넣는다 |
+| AG-5 (구성종목 `< 5`) | `data[]` 대상에서 제외(값·null 어느 집합에도 넣지 않는다) |
+| AG-7 (최상위 `coverage_ratio < 0.50`) | 참조도 null 취급. `coverage = min(rs, nh, stage, chg)` 를 독립 재계산 |
+
+F5-a(시총 NULL 9종목) · F5-b(RS 결측 10섹터) · F6(패션 유효 시총 3)이 실제로 발화했다 —
+null 집합이 `{패션, 헬스케어}` 로 **비공집합**임이 그 증거다(`test_ac_sag_002_null_sector_set_equality`).
+
+#### E6 — `capped_weights` 구조적 보장 (D1/D2)
+
+`capped_weights_detail` 이 AG-1 의 **단일 진입점**이다. M2 시점 fan_in = 3
+(`capped_weights` 래퍼 + `sector_metrics._aggregate_members` 2곳 — 섹터 전체 가중치, 기간별
+결측 제외 후 재정규화 가중치).
+
+| 항목 | 상태 |
+| --- | --- |
+| 섹터 집계가 이 함수를 호출한다 | **실증 완료** — 위 grep + AC-SAG-002 값 일치 |
+| 벤치마크 집계가 **같은** 함수를 호출한다 | **구조만 준비 · 미실증** — 벤치마크 경로는 M3 산출물이다. 현재 리포에 벤치마크 산출 코드가 존재하지 않으므로 EX-1/BM-2 는 M3 에서 실증된다 |
+| `@MX:ANCHOR` fan_in 수치 | M2 실측 3 으로 기재. M3 에서 갱신 |
+
+#### E7 — 게이트 불변성
+
+```
+$ git status --porcelain tests/fixtures/
+(공백)
+```
+
+`tests/test_aggregation_fixture.py`(65) + `tests/test_golden_baseline.py`(40) = **105 passed**
+(M2 착수 전 · 완료 후 동일). 프로즌 픽스처 · 골든 baseline · `build_fixture.py` 미수정.
+
+#### E8 — 하위 호환
+
+`tests/test_api.py` · `test_response_contract.py` · `test_sector_metrics.py` ·
+`test_sector_detail.py` · `test_sector_history_consistency.py` · `test_analysis_api.py`
+→ **77 passed, 1 failed**. 유일 실패는 pre-existing `TestScreenEndpoint::test_too_many_patterns_rejected`
+(B-2 baseline 동일 항목, 섹터와 무관). 로그: `.moai/state/verify/m2-run/7-backcompat.log`.
+
+* 응답 필드 추가는 **가산적**이다 — 기존 `sectors[]` 키 형태 불변, 신규 값은 봉투
+  `data[]` / `excluded[]` / `warnings[]` 로만 들어간다.
+* 라우터 파라미터 미변경(M6 소관). `backend/routers/sectors.py` 변경은 내부 호출 인자
+  `DAILY_DB_PATH` 전달 1줄뿐이며 쿼리 파라미터를 신설하지 않았다.
+* **값은 바뀐다** — `sectors[].returns` 가 등가중 → 상한재배분 시총가중, 그리고 저장된
+  `CHG_*` → `anchor(t, N)` 기준으로 바뀌었다. 이는 SPEC 이 의도한 변화이며 골든 baseline 이
+  비교 대상으로 보존돼 있다(AC-SAG-045 R1, M7).
+
+#### E9 — 전체 회귀 (B-2 baseline 대비)
+
+```
+8 failed, 786 passed, 68 skipped, 1 xpassed, 25 errors in 90.79s
+```
+
+| | B-2 baseline | M2 완료 후 | 델타 |
+| --- | --- | --- | --- |
+| passed | 737 | **786** | +49 (신규 48 + `test_consumer_dates` 1건 재계수 없음 — 신규 테스트 증가분) |
+| failed | 8 | **8** | 0 — **동일 집합** |
+| errors | 25 | **25** | 0 — 전건 `tests/fnguide/*` pre-existing |
+
+**신규 실패 0건.** 실패 집합: `test_api`(1) · `test_meta_service`(2) · `test_rs_line`(2) ·
+`test_screen_service`(3). 로그: `.moai/state/verify/m2-run/6-full-final.log`.
+
+중간 1회 신규 실패가 있었고 **수정했다** — `test_consumer_dates.py::test_ac006b_rank_change_uses_anchor_not_offset`
+가 내 `@MX:NOTE` 주석이 인용한 `LIMIT 1 OFFSET` 문자열을 잔존으로 오판했다(①의 정적 스캔).
+주석 문구를 "고정 바 오프셋 관용구"로 바꿔 해소했다. 로그: `1-full-suite.log` → `2-full-suite.log`.
+
+#### E10 — `sector_metrics.py` 거짓 주석 정정
+
+`plan.md` 는 `:42-44` 로 인용했으나 **실측 위치는 `d4a560a:41-43`** 이다(M1.1 §E.9 기재와 일치).
+
+```
+# before (d4a560a:41-43)
+    sector_return_1w: float        # market-cap weighted avg 1W return (%)
+    sector_return_1m: float        # market-cap weighted avg 1M return (%)
+    sector_return_3m: float        # market-cap weighted avg 3M return (%)
+
+# after (:96-98)
+    sector_return_1w: float        # 상한재배분 시총가중, anchor(t,7) 기준 (%) — 폴백 등가중
+    sector_return_1m: float        # 상한재배분 시총가중, anchor(t,28) 기준 (%) — 폴백 등가중
+    sector_return_3m: float        # 상한재배분 시총가중, anchor(t,91) 기준 (%) — 폴백 등가중
+```
+
+주석이 참이 된 것은 **구현이 실제로 시총가중이 된 같은 커밋에서**다. `:89-95` 의
+`@MX:NOTE` 가 괴리의 이력과 현재 계약(AG-4/AG-7 시 등가중 폴백)을 함께 기록한다.
+
+#### E11 — @MX 태그
+
+| 태그 | 위치 | 내용 |
+| --- | --- | --- |
+| `@MX:ANCHOR` + `@MX:REASON` | `weighting.py:74-80` | AG-1 상한 재배분 계약 — 섹터·벤치마크 공용 진입점. fan_in 3(M2 실측) · 불변식 4종 |
+| `@MX:NOTE` | `sector_metrics.py:65-71` | 기간 수익률 원천이 `CHG_*` 가 아니라 `anchor(t, N)` 인 이유 + 픽스처 실측 근거 |
+| `@MX:NOTE` | `sector_metrics.py:89-95` | 거짓 주석 이력 + 현재 폴백 계약 |
+| `@MX:NOTE` | `sector_metrics.py:228-231` | 앵커 기준 수익률의 결측 처리(0 접기 금지) |
+| `@MX:NOTE` | `sector_metrics.py:338-340` | `trading_value` 미산출을 0 이 아니라 `None` 으로 두는 이유 |
+| `@MX:NOTE` (기존) | `aggregate_types.py:56` | 결측 3상태 헬퍼 — B-15 지정 항목, M1.1 에서 이미 작성됨 |
+
+파일당 한도 준수 — ANCHOR 1/3, NOTE 4/10(`sector_metrics.py`).
+
+#### E12 — 스코프 규율
+
+```
+$ git status --short   (첫 열이 M/A 인 항목만)
+M  backend/routers/sectors.py
+M  backend/services/sector_ranking_service.py
+M  my_chart/analysis/sector_metrics.py
+A  my_chart/analysis/weighting.py
+A  tests/test_inv_cap1_scan.py
+A  tests/test_sector_aggregation.py
+A  tests/test_weighting.py
+```
+
+`git add -A` / `git add .` **미사용** — 7개 경로를 개별 지정했다.
+`frontend/src/components/SectorAnalysis/BumpChart.tsx`(마지막 커밋 `4c89d79`, 2026-03-15,
+본 작업과 무관) · MoAI 하네스 대량 변경 · `tests/Untitled.md` · `backend/reports/` 는
+**스테이징하지 않았다.** `tests/fixtures/` 는 무변경(E7).
+
+#### Gaps / 잔여 위험 (M2)
+
+| # | 항목 | 처분 |
+| --- | --- | --- |
+| **G6** | **커버리지를 측정하지 못했다.** `coverage.py` C-tracer 가 numpy 2.4.2 에서 `ImportError: cannot load module more than once per process` 로 죽는다(`COVERAGE_CORE=sysmon` / `pytrace` 모두 동일). 임시 설치한 `pytest-cov` · `coverage` 는 venv 원상복구를 위해 **제거**했다 | **Gap 으로 기재** — §9 DoD "신규/변경 모듈 커버리지 >= 85%" 는 **미측정**이다. 관측하지 않은 수치를 기재하지 않는다. 대리 지표: 신규 48 테스트가 `weighting.py` 전 공개 함수 4종과 `_aggregate_members` 의 AG-1/3/4/6/7 분기를 직접 실행한다. 환경 해소(numpy/coverage 조합) 후 재측정 필요 |
+| **G7** | **AC-SAG-002 본문의 `CHG_1M` 표기와 MANIFEST 가 어긋난다.** AC 본문은 참조 입력을 `(종목, market_cap, CHG_1M)` 으로 적었으나, MANIFEST 의 `f12b`/`f12c` 집합은 `f12_anchor_1m: "2026-07-10"` = `anchor(t,28)` 기준 Close 비율로 산출됐다. 픽스처 실측 결과 저장된 `CHG_1M` 은 `2026-07-16`(고정 바 오프셋) 기준이라 **다른 바**다. `CHG_1M` 을 문자 그대로 쓰면 F12-b 12개(≠MANIFEST 13) · F12-c 14개(≠MANIFEST 12)로 **집합 동등 절이 RED** 가 된다 | **앵커 해석을 채택**했다. 근거 3점: (a) 이미 GREEN 인 AC-SAG-048 의 F12 참조가 앵커 기준이고 MANIFEST 를 그 정의로 검증했다, (b) MANIFEST 가 `f12_anchor_1m` 를 명시 기록한다, (c) spec.md §1.2 가 고정 바 오프셋 관용구를 `anchor(t, N)` 로 교체하라고 적었고 REQ-SAG-043(`return_window_days = [anchor(t,N), t]`)이 이를 강제한다. **AC 본문의 `CHG_1M` 은 앵커 결정(v0.3.0 O-A8) 이전 표기의 잔존으로 판단**했다. `manager-spec` 의 표기 정정 대상이며, 정정 없이도 현재 구현·MANIFEST·AC-SAG-048 은 서로 정합적이다 |
+| **G8** | **F12 참조와 프로덕션 참조의 AG-7 적용 범위가 다르다.** F12(§8.2 · MANIFEST)는 AG-7 을 "1M 수익률 가용률"에 적용하고, 프로덕션·§8.3 참조는 최상위 `min(coverage.*)` 에 적용한다. 그래서 헬스케어(rs 커버리지 0.45)가 MANIFEST `f12b` 집합에는 있고 프로덕션 `data[]` 에서는 null 이다 | 두 절이 서로 다른 대상을 검사하므로 **모순이 아니다** — F12 는 "픽스처가 검출력을 갖는가"(픽스처 속성), AC-SAG-002 값·null 절은 "프로덕션이 규칙대로 계산하는가"다. 테스트 코드에 `_f12_sets` 독스트링으로 명시했다. M1.0-a 의 **G2 가 예고한 지점**이며 여기서 실제로 발화했다 |
+| **G9** | `compute_sector_aggregates` 가 유효 유니버스를 `compute_universe`(UN-3)로 제한하도록 바뀌었다. 라이브 경로에서 이 필터가 섹터 구성원 수를 줄인다 | 의도된 동작이다 — spec.md §5 "유효 유니버스는 ① 소관, ②는 소비만 한다". `daily_db_path` 가 없으면 제한 없이 동작하도록 폴백을 뒀다(라이브 DB 암묵 개방 금지) |
+| **잔여 위험** | 하위 호환 표면(`SectorRank`)의 수익률도 앵커·시총가중으로 바뀌었으므로 프론트엔드가 보는 **숫자가 달라진다** | SPEC 이 의도한 변화(R1~R8 "고장처럼 보이지만 올바른 변화"). 골든 baseline 이 비교 기준으로 보존돼 있고 M7 이 판정한다 |
+| **잔여 위험** | `excess_returns` 는 여전히 KOSPI 지수 행(`_load_kospi_returns`) 기준이라 **방법론 혼합** 상태다 | M3 소관(BM-1 — 지수 행 사용 금지). `data[]` 의 `excess_returns` 는 `missing()` 으로 두어 잘못된 값을 싣지 않았다 |
+| **잔여 위험** | `test_sector_aggregation.py` 의 `fixture_raw` 는 유효 유니버스를 3중 교집합(registry ∩ stock_meta ∩ 최신바)으로 근사한다. 프로덕션은 stale 배제까지 포함한 4중 교집합이다 | 이 픽스처에 stale 종목이 없음이 F13 으로 보장돼 두 결과가 일치한다(값 최대 편차 `3.553e-15`가 그 증거). 다른 픽스처로 옮기면 재확인 필요 |
+
+---
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M1.0 재실행 완료(재빌드 + 재캡처). 다음 = M2
-milestone_completed: M1.0-c        # 재실행분 — M1.0-a 재빌드 → 048 PASS → M1.0-b 재캡처 → 047 PASS
-run_commit_sha: 8e51176            # M1.0-b 재캡처 커밋 (M1.0-a 재빌드는 a000add)
+run_status: in-progress            # M2 완료 (비가역 경계 통과). 다음 = M3 (별도 위임)
+milestone_completed: M2            # 가중·집계 코어. 선행 M1.0-a 재빌드 → 048 → M1.0-b 재캡처 → 047 전건 충족 후 착수
+run_commit_sha: TBD-BACKFILL       # M2 커밋 — 커밋 직후 backfill
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
 prior_milestone_commits: "adb1f25 (M1.0-a 구) · b839cee (M1.0-a §E.3 구) · 6f00ba5 (M1.0-b/c 구) · 7b5fc45 (M1.0-b/c §E.3 구) · 7305e2e (M1.1) · a000add (M1.0-a 재빌드) · 8e51176 (M1.0-b 재캡처)"
-ac_gate: AC-SAG-047
-ac_pass_count: 6                   # 048 + 047 + 036 + 038 + 043(부분) + 008
-ac_fail_count: 0                   # M2 는 착수 자체를 하지 않았다(FAIL 이 아니라 미실행)
+ac_gate: "AC-SAG-001~010 · 049 · 050 (M2 RED 목록 전건)"
+ac_pass_count: 17                  # M2 분: 001·002·003·004·005·006·008·009·010·049·050 (11) + 기존 048·047·036·038·043(부분) (6). 007 은 deferred-to-M6
+ac_fail_count: 0                   # M2 RED 목록 전건 GREEN
 ac_blocked: "없음 — v0.4.2에서 해소 (D16: F12 신설 + AC-SAG-002 재작성 / D17: §3.1 동결형 교체 + AC-SAG-049 신설). [v0.5.0] 추가 정정 — N1(AC-SAG-041 cap_eff) · D22(AC-SAG-010) · D20(045 R1) · D23(AC-SAG-015) · D21(045 R5-b) · N4(AC-SAG-012) · N3(AC-SAG-016) · N7(AC-SAG-044) · D24(AC-SAG-013) · N2(F7 규약 Y) · D25(F4·F8 폐지) · R-C1~R-C8(F13 신설) · D29(합성 바) · N5/D26(고아 AC)"
-blocker_open: false               # [v0.4.2 2026-08-13] manager-spec 재위임 완료. SPEC 층 해소 — 다음 행동은 M1.0-a 재빌드
+blocker_open: false               # M2 blocker(D16/D17)는 v0.4.2/v0.5.0 에서 해소됐고 M2 가 완주했다. 신규 blocker 없음 — G7 은 표기 정정 권고(비차단)
 blocker_owner: manager-develop    # 소유권 반환. acceptance.md 본문 수정 완료(v0.4.2)
 blocker_resolution_version: "0.5.0"   # 0.4.2에서 M2 blocker 2건(D16·D17) 해소, 0.5.0에서 전수 스윕 결함 14건 일괄 해소
 spec_layer_deltas: "F12 신설(§8.2) · AC-SAG-002 절 2·3 집합 동등 재작성 · AC-SAG-045 R1 대조 mut_service_not_rewired 교체 · plan.md §3.1 동결형 + 종료 증명 · AC-SAG-001 A/B 분리 · AC-SAG-049 신설 · AC-SAG-003 순수 합성 교체 · AC-SAG-005 정의 확정 · AC-SAG-007/043 M6 의존 명시 · §8.4 규약 10 신설"
@@ -923,20 +1198,37 @@ new_warnings_or_lints_introduced: 0
 full_suite_delta: "+35 passed (702 → 737, AC-SAG-048 F12/F13 테스트 신설) / failed 8 (전건 pre-existing, 동일 집합) / errors 25 (pre-existing) / 신규 실패 0"
 date_axis_fixture_touched: false   # tests/fixtures/frozen/weekly-2026-08-12/ 미변경 (git status/diff 공백 확인)
 aggregation_fixture_touched: true  # [재실행] M1.0-a 재빌드 — 145 → 331 이름 / 9.0 → 16.8 MB
-production_code_touched: false     # [재실행] my_chart/ · backend/ · frontend/ 스테이징 0건. 프로덕션 near_52w_high 규약 Y 적용은 M5
+production_code_touched: true      # [M2] weighting.py 신설 + sector_metrics.py 집계 교체 + 서비스/라우터 배선. near_52w_high 규약 Y 적용은 여전히 M5
 live_db_mutated: false             # /api/db/update 미실행
 negative_verification: observed-red-3        # NEG-1 F2→999 RED · NEG-2 F12-a→999 RED · NEG-4 golden 파일 이동 RED. 3건 모두 복원 후 sha256 바이트 동등 확인
 negative_verification_f13_1: not-reproduced  # [Gap G1] 상위집합 OFF 시 4/4 green, 순수 시총순에서도 2/4(F5-a·F6)만 RED. 빌더의 플래그 인지 선별이 제2 충족 경로
-mutation_verification_m2: not-run  # mut_equal_weight 미실증 — M2 착수 시 수행(Gap 유지). 픽스처는 이제 F12 를 충족하므로 검출력 전제는 확보됐다
-point_of_no_return_crossed: false  # **M2 미커밋 — 재캡처 경로 여전히 열려 있다**
+mutation_verification_m2: observed-red-4   # mut_equal_weight(10 RED) · mut_effective_n_uncapped(1) · mut_plan31_verbatim(8, 위반 3183/4000) · mut_reintroduce_cap_literal(1). 4건 모두 복원 후 GREEN + 바이트 동등 확인
+point_of_no_return_crossed: true   # **M2 커밋 — 구 등가중 구현 교체. 골든 baseline 재캡처 창이 영구히 닫혔다**
 fixture_rebuild_required: false    # [해소 a000add] F1~F13 전건 충족. F12-a 17(1.42x) · F12-b 13(4.33x) · F12-c 12(2.40x) · F13-2 17(1.21x) · F13-3 13/12(목표 9)
 fixture_rebuild_measurements: "종목 331(지수 2) · 유효 유니버스 321 · weekly 31,254행/385날짜 · 격자 346바 · 16.8 MB · F2 18 · F3 2·1 · F5-a 9 · F5-b 10 · F6 1 · F7(규약 Y) 24 · F9 345 · F10 0·0 · F13-1 누락 0 · F13-4 패션 5·3 · F13-6 323행/0행"
 f7_convention: "Y"                 # NULL MAX52 를 신·구 양쪽 분자·분모에서 제외. 규약 X 51 → 규약 Y 24, 차이 27 = NULL 종목 수
 golden_baseline_discarded: true    # [완료 8e51176] b839cee 캡처분(F12 미충족 픽스처 위) 폐기 후 재빌드 픽스처에서 재캡처. 폐기 전 sha256 은 §E.2 M1.0-b 재캡처 E1 에 기록
 relief_valve_used: none            # F13-2 14→12 축소 미사용. 크기 16.8 MB 로 예산(16~17 MB) 내
-next_gate: "M2 — 가중·집계 코어. 강제 순서상 선행 조건(M1.0-a 재빌드 → 048 PASS → M1.0-b 재캡처 → 047 PASS) 전건 충족. M2 는 별도 위임"
+next_gate: "M3 — 벤치마크 + 순위/정규화. AC-SAG-011~014 · 045 R1/R3/R4/R5-a. 별도 위임(리뷰 포인트 뒤)"
 deferred_to_m6: "AC-SAG-007 전체 · AC-SAG-043 파생 구조 절 — M6 산출물 의존(D19). M2~M5 미실행은 Gap 이 아니다"
-total_run_phase_files: 20          # 기존 18 + f13-1-superset-baseline.tsv(신설) + 재빌드 산출물(기존 파일 갱신)
+total_run_phase_files: 27          # 기존 20 + M2 7종(weighting.py · sector_metrics.py · sector_ranking_service.py · sectors.py · test_weighting.py · test_sector_aggregation.py · test_inv_cap1_scan.py)
+# --- M2 (2026-08-13) ---------------------------------------------------------
+m2_new_tests: 48                   # test_weighting 18 · test_sector_aggregation 23 · test_inv_cap1_scan 7
+m2_full_suite: "8 failed, 786 passed, 68 skipped, 1 xpassed, 25 errors — B-2 baseline 과 실패 집합 동일, 신규 실패 0"
+m2_gate_tests_still_green: 105     # test_aggregation_fixture 65 + test_golden_baseline 40 (착수 전/후 동일)
+m2_fixtures_touched: false         # git status --porcelain tests/fixtures/ 공백
+m2_ac002_max_deviation: 3.553e-15  # 프로덕션 vs 독립 참조, AG-5 통과 non-null 16섹터. 임계 1e-9
+m2_ac002_null_sectors: "패션(AG-4 유효시총 3) · 헬스케어(AG-7 rs 커버리지 0.45)"
+m2_ac049_iteration_histogram: "{1:165, 2:1030, 3:1580, 4:912, 5:290, 6:23} — 최악 6회, exhausted 0"
+m2_ac049_fixed_point_dev: 6.695e-12
+m2_ac049_closed_form_dev: 5.551e-17
+m2_ac050_scan1_hits: 0             # 첫 실행은 RED(신설 테스트 독스트링 2곳) — 문구 수정 후 0
+m2_ac050_scan2_hits: 0
+m2_return_source_changed: "저장 CHG_* → Close(t)/Close(anchor(t,N))−1. 픽스처 실측 CHG_1M 기준 바 = 2026-07-16, anchor(t,28) = 2026-07-10 (다른 바)"
+m2_universe_restriction_added: true  # compute_sector_aggregates 가 compute_universe(UN-3) 유효 유니버스로 제한
+coverage_m2: not-measured          # [Gap G6] coverage.py C-tracer x numpy 2.4.2 = "cannot load module more than once per process". 관측하지 않은 수치를 기재하지 않는다
+m2_open_gaps: "G6(커버리지 미측정) · G7(AC-SAG-002 CHG_1M 표기 ↔ MANIFEST 앵커 불일치 — manager-spec 표기 정정 권고) · G8(F12 vs 프로덕션 AG-7 범위 차 — 무모순, 명시화 완료) · G9(유니버스 제한 도입)"
+m2_benchmark_path_status: "미존재 — EX-1/BM-2 구조 보장은 준비만 완료. 실증은 M3"
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
 ```
 
