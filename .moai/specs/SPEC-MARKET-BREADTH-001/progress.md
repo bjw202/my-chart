@@ -211,7 +211,7 @@ evidence_dir: .moai/state/verify/SPEC-MARKET-BREADTH-001/
 ```yaml
 sync_status: complete
 sync_complete_at: 2026-08-13
-sync_commit_sha: pending-backfill
+sync_commit_sha: b0dbded
 tier: S
 route: A
 changelog_entry_position: "CHANGELOG.md [Unreleased] 말미, ### Fixed (SPEC-MARKET-BREADTH-001 v0.1.1, 2026-08-13) — SPEC-SECTOR-GRID-001/SPEC-SECTOR-MINOR-COLOR-001 등 기존 항목 이후 추가(순수 삽입, 기존 항목 무변경)"
