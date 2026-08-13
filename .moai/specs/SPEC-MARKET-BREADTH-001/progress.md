@@ -74,3 +74,32 @@ _&lt;pending run-phase&gt;_
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _&lt;pending sync-phase&gt;_
+
+## §F Phase 4 Mode Selection
+
+Decision: sub-agent (Mode 5)
+
+**Phase 1 (Plan Audit Gate)**: 실행됨 — plan-auditor iter-1 **PASS-WITH-DEBT 0.85** (Tier S 임계 0.75). 스킵 자격 없음(감사 이력 0건)이므로 정규 실행. D1/D2/D6 결함은 run 진입 전 수리 완료(`b165947`).
+
+**Implementation Kickoff Approval**: 획득 (2026-08-13, 사용자 결정 = "D1+D2+D6 수리 → 수리 후 바로 착수"). 진행 모드 = 세미자율(마일스톤마다 보고).
+
+Input parameters:
+- tier: S
+- scope: 구현 1지점(`market_breadth.py:472`) + 표기 정정 2지점 + 신규 테스트 1파일 + 선행 SPEC allowlist 동기화 1건
+- domain count: 1 (주봉 격자 계약 소비)
+- file language mix: Python 90% / TypeScript 10%(차트 제목 문자열)
+- concurrency benefit: LOW (coding-heavy, 단일 도메인, M1→M6 순차 의존)
+
+Mode evaluation:
+- Mode 1 trivial: N — 의미 변경 동반(기간 계약), 단일 라인 아님
+- Mode 2 background: N — write 작업
+- Mode 3 agent-team: N — RETIRED (tombstone)
+- Mode 4 parallel: N — coding-heavy 단일 도메인, Anthropic coding-task parallelism caveat
+- **Mode 5 sub-agent: SELECTED**
+- Mode 6 workflow: N — 파일 수 ~5로 ~30 임계 미달, 기계적 균일 변환 아님
+
+Decision: sub-agent (Mode 5)
+Justification: Tier S 최소 범위이며 M1(baseline 캡처·변형 하네스) → M2(격자 전환) → M3~M6이 순차 의존이다. M1이 코드 변경 전 게이트라 병렬화 여지가 구조적으로 없다. manager-develop 단일 순차 위임, 마일스톤마다 보고.
+
+Route: A (Hybrid Trunk main-direct) — Tier S 기본, PR·브랜치 없음.
+Development: cycle_type=tdd (quality.yaml `development_mode: tdd`).
