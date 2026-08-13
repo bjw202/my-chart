@@ -1469,7 +1469,7 @@ $ git status --short   (신설 파일만)
 ```yaml
 run_status: in-progress            # M4 완료. 다음 = M5(지표 정정) 또는 M6(라우터 배선) — 별도 위임
 milestone_completed: M4            # RRG(함수 수준). 라우터 배선(/sectors/rrg)은 M6 의존(Gap G14)
-run_commit_sha: pending-backfill-m4   # M4 커밋 (D3 예외 — 자기참조 해저드, 후속 커밋에서 backfill)
+run_commit_sha: 8a3a7f7            # M4 커밋 (backfill — D3 예외, M2 25f3fa9/M3 1815d30 전례)
 prior_run_commit_sha_m3: 1815d30   # M3 커밋
 prior_run_commit_sha_m2: 25f3fa9   # M2 커밋 (M1.0-b 재캡처는 8e51176, M1.0-a 재빌드는 a000add)
 coverage_m11: "aggregate_types 94% · envelope 99% · sector_ranking_service 91% (TOTAL 95%, 임계 85%)"
