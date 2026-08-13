@@ -1,7 +1,7 @@
 ---
 id: SPEC-SECTOR-AGGREGATION-001
 title: "섹터 집계 계층 — 시총가중·벤치마크·순위·RRG 지수·응답 공통 스키마"
-version: "0.4.1"
+version: "0.4.2"
 status: in-progress
 created: 2026-08-12
 updated: 2026-08-13
@@ -28,6 +28,7 @@ tier: L
 | 0.3.0 | 2026-08-13 | manager-spec | **O-A8 해소 — 선택지 (a) 채택(미완성 주 포함)** + 그 귀결인 **창 일수 응답 계약 신설**. (1) `as_of` = `latest`(미완성 주 포함, `_get_latest_valid_date()` 현행 동작), 앵커 = `history_grid`(완성 바만). 근거: 사용자가 이 화면을 실시간으로 보므로 진행 중인 주의 움직임이 반영되어야 한다. (2) 그 결과 **창은 라벨보다 짧아지는 게 아니라 길어진다** — 실측 프로즌(as_of 2026-08-11 화) 1W=11일/1M=32일/3M=95일(+4), 라이브(as_of 2026-08-12 수) 12/33/96일(+5). 초과분은 요일 의존이며 세 기간에 **동일**하다(7·28·91이 모두 7의 배수). (3) **REQ-SAG-043 신설 + AC-SAG-046 신설** — `return_window_days: {1w,1m,3m}`를 응답에 실어 ③이 "1W (11일치)"로 표기할 수 있게 한다(O-A4의 `trading_value_window_days` 선례를 수익률에 확장). (4) REQ-SAG-012에 **BM-6 보존 조건 명시** — 섹터·벤치마크가 **같은 `anchor(t, N)` 호출**에서 앵커를 얻어야 하며, 창 길이 ≠ N은 오류가 아니라 기대되는 상태다. (5) REQ-SAG-021에 미완성 주 시 baseline 간격이 28일 초과임을 명시(AC-SAG-023의 `>= 28`이 이미 수용). AC 45 → 46. |
 | 0.4.0 | 2026-08-13 | manager-spec | **plan-audit iteration 1 FAIL 0.78**(L, thresh 0.85; MUST-PASS 전항 통과, Testability 0.55가 원인) 결함 D1~D9 해소. **(D1 BLOCKING) 프로즌 픽스처가 게이팅 기대값 8개 중 7개를 호스팅할 수 없었다** — `weekly-2026-08-12`는 ①이 **날짜 축** 재현용으로 만든 41종목 스냅샷이라 AG-5(최소 5종목)를 통과하는 섹터가 **게임 하나뿐**이고 헬스케어·방산·디스플레이는 아예 없다(실측: `stock_meta` 33행 = 게임 32 / 반도체 1, registry 41행 / 8섹터). 해소: **횡단면 집계용 제2 프로즌 픽스처를 신설 명세**(§8.2 F1~F11 — 값이 아니라 **구조** 요건)하고, 그 위의 게이팅 AC를 **리터럴이 아니라 파생 규칙**으로 재작성했다(§8.3). 파생 규칙은 픽스처 재빌드 시 acceptance.md 본문 수정이 불필요하므로 run-phase 소유권 위반(manager-develop의 acceptance.md 편집 금지)을 구조적으로 제거한다. **(D2 BLOCKING) 설계결정 3이 실증적으로 거짓이었다** — `as_of_is_partial_week == false ⇒ 창 == N`은 성립하지 않는다(실측 `as_of=2026-08-17` → partial `False`인데 창은 11/32/95). `as_of`는 날짜 축을 자르지 않기 때문이다. 참 조건은 **"최신 대표 바가 금요일(완성 주 대표 바)"**이며, 이에 맞춰 설계결정 3을 정정하고 AC-SAG-046의 마감 주 대조를 `as_of` override가 아닌 **금요일 종단 픽스처 변형**으로 재작성했다(실증: `Date <= '2026-08-07'` 절단본에서 partial `False` + 창 정확히 7/28/91). **(D3 BLOCKING) `as_of` 리터럴 미기재** — 사용자 결정으로 **`as_of = 2026-08-11` 고정**(기존 프로즌 유지, AC-SAG-046의 검증된 리터럴 4개 불변). 게이팅 테스트의 `as_of` 기본값(`None` → today) 사용을 금지하고 정적 스캔으로 강제한다(§8 규약 8). **(D5 BLOCKING) R1/R4/R5** — R1을 R4/R5와 동일하게 골든 baseline에 결속, R5의 `최상위>=95 / 최하위<=5`를 **등간격 파생 단언**(순위 백분위의 정의적 성질, min-max에서 불성립)으로 대체해 N 의존 우연을 제거. **(D4) AC-SAG-047 신설** — 골든 baseline 캡처 완결성의 **기계적 M1 종료 게이트**. 캡처 목록도 정정했다(`/sectors/ranking`은 무파라미터이나 응답이 1W/1M/3M을 **모두** 싣고 있으므로 기간별 3파일이 아니라 **단일 파일**로 캡처한다). **(D6) AC-SAG-014**를 출력 동등에서 **구조 단언**(공유 `anchor()` 호출 횟수·인자)으로 전환 — 실증으로 출력 동등의 검출력이 0임을 확인했다(`latest=2026-08-11`·`history 마지막=2026-08-07` 양쪽에서 `anchor(·,7/28/91)`이 **동일하게** 07-31/07-10/05-08). **(D7) 되돌림 변형 신설** — 002/011/013/014/045 R3·R4·R5·R6에 명명된 변형 추가 + **관측된 RED 증거를 요구하는 DoD 항목** 신설(Lesson #9: 작성 여부가 아니라 되돌림 RED 관측이 판정 기준). **(D8) GEARS 라벨 정정** REQ-SAG-029 → Unwanted Behavior, REQ-SAG-032 → Where. **(D9) AC-SAG-007** 라이브 구성수 인용을 픽스처 구조 요건(F3)으로 재기술하고 게이팅 표로 이동. AC 46 → **47**. |
 | 0.4.1 | 2026-08-13 | manager-spec | **plan-audit iteration 2 PASS-WITH-DEBT 0.845**(L, thresh 0.85; MUST-PASS 전항 통과, Testability +0.17). iteration 1 결함 D2/D3/D5/D6/D7/D8/D9 RESOLVED, D1/D4 PARTIALLY-RESOLVED. **신규 결함 D10~D15를 단일 배치로 해소한다.** **(D10 CRITICAL) AC-SAG-013의 파생 항등식이 올바른 구현에서 거짓이었다** — v0.4.0은 초과수익률의 시총가중 평균이 `0.0 ± 0.05%p`이며 *"정의상"* 성립한다고 적었으나, **상한 재배분은 그룹핑 계층을 넘어 합성되지 않는다**(섹터는 섹터 내부에, 벤치마크는 유니버스 전체에 상한을 적용한다). 실측(2026-08-13, plan.md §3.1을 두 계층에 그대로 구현): `cap=0.10`에서 가중평균 `+1.496127 %p`(허용오차의 30배) / 상한 없음에서 `-0.000000 %p`. 게다가 픽스처 요건 **F4가 상한 구속을 강제**하므로 이 단언은 **요건상 반드시 실패**했다. 추가 실측으로 **감사가 제시한 (a)"무상한 항등식" 대안도 채택 불가**임을 확인했다 — AG-5/AG-4 제외 섹터가 있으면 상한을 꺼도 0이 아니다(제외 2섹터에서 `+0.035526 %p`)이며 F3/F6이 그 제외를 강제한다. 해소: 주 단언을 **참조 구현 대조**(섹터별 `S_s^ref − B^ref` 일치 + `ω_s^ref` 가중 잔차 일치)로 교체하고 **`0` 리터럴을 삭제**했다. 상한을 끈 완전 분할에서의 `0` 항등식은 **참조 측 자기검사(비게이팅)** 로만 남겼다. `mut_benchmark_index_row`에서 편차 `0.957391 %p`(허용 `1e-9`)로 RED 검출 실측 확인. **(D12 CRITICAL) AC-SAG-047이 존재하지 않는 응답 키를 단언했다** — `sector_excess_return_1w/1m/3m`는 내부 dataclass `sector_metrics.SectorRank`의 필드명이며 **직렬화되지 않고**(실측: 캡처 JSON에 해당 문자열 0건), 실제 키는 `sectors[i].excess_returns.{w1,m1,m3}`이다(`backend/schemas/sector.py:24-37`). `total_count`도 존재하지 않으며 실제 키는 `distribution.total`이다(`backend/schemas/stage.py:8-15`). 정상 캡처에서 게이트가 RED가 되는 상태였다. 실측 직렬화 결과로 전 키를 정정하고 컨테이너명(`sectors`)을 명시했으며, **동일 결함 재도입 방지용 정적 확인**(`sector_excess_return` 문자열 0건)을 추가했다. 같은 결함이 파급된 **AC-SAG-027 · REQ-SAG-024 · plan.md M1.0-b 주석**도 함께 정정했다. **(D11 MAJOR) AC-SAG-014의 `anchor()` 호출 횟수 `== 1` 단언이 SPEC이 지시한 구조에서 스스로 RED가 됐다** — plan.md D1/D2의 공용 함수 구조에서는 섹터 N회 + 벤치마크 1회로 `N+1`회가 정상이며, 어느 REQ도 앵커 호이스팅을 요구하지 않는다. 주 단언을 **인자 `t`(앵커 기준일)의 유일성**으로 옮기고 호출 횟수 제약을 삭제했다 — `mut_benchmark_own_anchor`는 `t`를 `2026-08-07`로 바꾸므로 검출력이 보존된다. 반환 객체 아이덴티티는 두 `t`가 같은 `GridBar`를 반환하므로 **비게이팅 보조**로 강등했다. **(D13 MAJOR) 참조 구현 계약이 AG-3/AG-4/AG-7에 대해 미규정이었다** — 같은 픽스처가 F5/F6으로 그 케이스를 의도적으로 주입하므로 두 가지 defensible한 참조 동작이 갈릴 수 있었다. §8.3에 **제외·null 처리 계약**(AG-3/AG-4/AG-5/AG-7 + 대조 집합 제한 + null 섹터 집합 동등 단언)을 신설해 허용 동작을 하나로 못 박았다. **(D14 MINOR) F1~F11 검증이 캡처 뒤에 있었다** — **AC-SAG-048 신설**로 M1.0-a **종료 조건**으로 끌어올렸다(MANIFEST 기록값과 검사 산출 실측값의 일치까지 요구). **(D15 MINOR) AC-SAG-014·045 R5-a에 픽스처 지정과 `as_of` 고정 누락**(규약 1·8 위반) — 태그와 Given을 정정했다. **감사 판정 기록 — 비가역 경계는 M1.0-b가 아니라 M2다**(§8.5 신설): M1.0-c까지는 코드가 그대로이므로 재캡처 경로가 남아 있고, 이것이 D12/D14를 회복 가능한 결함으로 만든 근거다. 강제 순서 `M1.0-a → AC-SAG-048 → M1.0-b → M1.0-c(AC-SAG-047) → M2`. AC 47 → **48**. |
+| 0.4.2 | 2026-08-13 | manager-spec | **run-phase M2 blocker 2건 해소 (D16 · D17) + 파생 3건 (D18 · D19 · AC-SAG-049 신설).** run-phase가 M1.0-a~M1.1을 완료하고 **M2 착수 직전에 커밋 없이 blocker를 반환**했으며(`point_of_no_return_crossed: false`), 비가역 경계가 M2라는 §8.5 판정 덕분에 픽스처 재빌드·baseline 재캡처 경로가 살아 있었다. **(D16 CRITICAL) AC-SAG-002의 절 2건이 지정 픽스처 위에서 산술적으로 성립 불가였다** — `cap = 0.10`에서 `n <= 10`이면 `cap_eff = 1/n`이라 `n × cap_eff = 1`이 되어 `max(w) <= cap_eff ∧ Σw = 1`의 해가 **균등 하나뿐**이다. 즉 **구성종목 10개 이하 섹터에서 시총가중은 등가중과 완전히 동일**하다(실측 차 `0.0000%p`, 부동소수 오차조차 0). 픽스처는 F4(최상위 원비중 > 10% 섹터 >= 3)를 **18/18 섹터에서 충족**하고 AC-SAG-048도 PASS였으나 AG-5 통과 18섹터 중 `n > 10`이 게임(32) 하나뿐이라, `|시총가중 − 등가중| >= 0.5%p` 섹터 = **1개**(요구 >= 3) / 평균 절대 순위 이동 = **0.3750**(요구 >= 1.0)으로 게이팅 AC가 **완전한 무게이팅**이 됐다. **F4가 구성종목 수를 규정하지 않으므로 이 효과를 함의하지 않는다** — "구조 요건이 검출력을 함의한다"는 전제가 거짓임이 드러난 사례다. 해소: **픽스처 요건 F12 신설**(F12-a 유효 시총 `n >= 11` ∧ 최상위 원비중 > 0.10인 섹터 >= 12개 / F12-b 1M `|Δ| >= 0.5%p` 섹터 >= 3개 + 섹터명 집합 MANIFEST 기록 / F12-c 1M 순위 이동 섹터 >= 5개 + 집합 기록) — **효과 자체를 요건으로 승격**해 같은 실패가 재발할 수 없게 했다. AC-SAG-002의 두 절을 **MANIFEST 집합 동등**으로 재작성하고, *"평균 절대 순위 이동 >= 1.0"* 은 **삭제**했다(실측: 3개 주봉 바 × 12섹터 `n=15`에서 0.500/0.750/0.500, 14섹터 `n=20`에서도 0.778/1.333/0.889로 임계를 가로질러 **어떤 실용적 픽스처 크기에서도 보장 불가**한 데이터 의존 임계였다). AC-SAG-045 R1의 되돌림 대조를 `mut_equal_weight` → **`mut_service_not_rewired`** 로 교체하고, `mut_equal_weight`가 R1의 판별자가 **아님**을 본문에 명시했다(가중 전환 단독 기여 0.500~1.333 < 임계 2.5). **§8.4 규약 10 신설** — 대조 단언의 검출력을 실측으로 확인한다. **(D17 CRITICAL) plan.md §3.1의 verbatim 알고리즘이 종료하지 않았다** — 상한에 걸린 종목을 `cap_eff`로 고정하지만 다음 반복에서 `over` 조건(`> cap_eff + 1e-12`)에 걸리지 않아 `rest`로 분류되어 **재배분을 다시 받고**, 진동하다 20회 상한에서 **상한 초과 상태로 종료**한다. 실측(seed 20260813, 4,000 케이스): **3,183건(79.6%)이 상한 초과**, 최악 `n=6`에서 `cap_eff=0.166667` 대비 `max(w)=0.211925`(**+27.2%**). AC-SAG-001의 "최대값 <= cap_eff"와 "5회 이하 수렴"을 **동시에** 위반했다. 해소: §3.1을 **동결형**(상한 종목을 재배분 집합에서 영구 제외)으로 교체하고 **종료 증명**(매 회 `frozen`이 진부분집합으로 엄격 증가 → `<= min(n, 20)`회 종료)을 명시했다. 고정점은 불변임을 실측 확인 — verbatim 2,000회 결과와 최대 편차 `6.696e-12`, 닫힌 해와 `3.053e-16`. 반복 횟수 실측 최악은 **6회**(4,000 케이스) / **7회**(60,000 케이스, `n <= 60`)이므로 *"섹터당 <= 5회"* 임계는 **폐기**하고 구조적 종료 계약으로 대체했다. AC-SAG-001의 비례 배분 절(`w[1]/w[3] == 2.0`)은 지정 입력 `[70,10,10,5,5]`에서 **어떤 인덱싱 규약으로도 성립 불가**였으므로(해가 균등뿐 → 모든 비율 1.0), 축퇴 케이스(A)와 `n >= 11` 비례 케이스(B, `[1000,15,10×13]` → `w[1]/w[2] == 1.5`)로 분리했다. **AC-SAG-049 신설** — 시드 고정 무작위 스윕으로 상한·종료·정규화 불변식 + §3.1 고정점 등가 + 닫힌 해 대조를 검증한다(대조 변형 `mut_plan31_verbatim`). **(D17 파생) AC-SAG-003**이 라이브 반도체(삼성전자)를 인용하며 `capped_weight: 0.10`을 적었으나 픽스처 반도체는 6종목이라 `cap_eff = 0.1667`로 **거짓**이었고 §8.4 규약 5의 "순수 합성" 분류와도 어긋났다 — 12종목 순수 합성 입력(`[600, 40×11]`)으로 교체하고 6종목 축퇴 대조를 추가했다. **(D18) AC-SAG-005의 `cap_coverage_ratio` 정의가 모호했다** — `유효시총합 / 전체시총합`은 NULL 종목의 시총을 합산할 수 없어 분자와 분모가 항상 같아지는 **항진명제**였고, 본 AC 시나리오에서는 두 해석이 모두 1.0을 내어 모호성이 **무증상**이었다. `Σ market_cap(유효 시총 ∧ 기간 수익률 non-null) / Σ market_cap(유효 시총 종목)`(기간별 최솟값)으로 확정하고, 유효 시총 종목 1개의 수익률만 NULL로 바꾸는 **판별 대조 절**을 추가했다. **(D19) M6 의존 절의 평가 시점 명시** — AC-SAG-007 전체(`market` 파라미터 전제)와 AC-SAG-043의 파생 구조 절(`by_sector` · 상세 축약 리스트)은 M6 산출물에 의존하므로 M2~M5 구간의 미실행이 Gap이 아니라 **설계상 지연**임을 본문·DoD·§8.4 규약 6에 명시하고 `deferred-to-M6` 기재를 요구했다. AC 48 → **49**. |
 
 ---
 
@@ -50,7 +51,7 @@ tier: L
 | `GET /sectors/ranking` P50 / P95 | 현행 무파라미터 응답 실측 | (period, market) 조합별 P95 < baseline × 1.5 |
 | `GET /sectors/rrg` P95 | 현행 실측 | 지수 연쇄 + 시총 역산 추가로 baseline × 2.0 이내 |
 | `GET /sectors/history` P95 | 현행 실측 | baseline × 1.5 이내 |
-| 상한 재배분 반복(AG-1) 수렴 횟수 | 신규 | 섹터당 <= 5회 (01 §5.2 실측) |
+| 상한 재배분 반복(AG-1) 수렴 횟수 | 신규 | **[v0.4.2 정정 — D17]** `<= min(n, 20)`회 (동결형 구조적 종료 계약). 이전 판의 *"섹터당 <= 5회"* 는 실측과 어긋나 폐기 — 최악 6회(4,000 케이스) / 7회(60,000 케이스, `n <= 60`) |
 | 전 섹터 집계 1회 (29 섹터 × 2,546 종목) | 신규 | < 300ms |
 
 **③ UI가 기간 토글마다 서버 재조회를 유발**하므로(CT-4 trade-off) 응답 지연이 곧 사용자 체감이다. baseline 미측정 상태에서 M 착수를 금지한다.
@@ -161,9 +162,14 @@ tier: L
 
 #### REQ-SAG-001 (Ubiquitous) — 시총가중 + 반복 상한 재배분
 
-The aggregation module **shall** compute sector returns as `Σ(wᵢ×rᵢ)/Σwᵢ` where `wᵢ` is derived by the iterative capping algorithm: `wᵢ = capᵢ/Σcap`, `cap_eff = max(0.10, 1/N)`, then iteratively clip over-cap weights and redistribute the excess proportionally until no weight exceeds `cap_eff`, with `Σwᵢ = 1` (규칙 AG-1).
+The aggregation module **shall** compute sector returns as `Σ(wᵢ×rᵢ)/Σwᵢ` where `wᵢ` is derived by the iterative capping algorithm: `wᵢ = capᵢ/Σcap`, `cap_eff = max(0.10, 1/N)`, then iteratively clip over-cap weights and redistribute the excess proportionally **among the not-yet-capped constituents only**, with `Σwᵢ = 1` (규칙 AG-1).
 
-- 검증: AC-SAG-001, AC-SAG-002
+The capping loop **shall not** return a weight vector whose maximum exceeds `cap_eff`. A constituent clipped to `cap_eff` **shall** be excluded from every subsequent redistribution set (동결), so that the frozen set grows strictly monotonically and the loop terminates within `min(N, 20)` iterations.
+
+- **[v0.4.2 신설 — D17]** 재배분 대상에서 상한 종목을 제외하지 않는 형태는 진동하며 **상한을 초과한 채 반복 상한에서 종료**한다(실측 4,000 케이스 중 3,183건, 최악 +27.2%). 동결형은 그 형태의 **고정점을 바꾸지 않는다**(수렴까지 돌린 값과 최대 편차 `6.696e-12`, 닫힌 해와 `3.053e-16`) — 종료 성질만 고친다. 알고리즘 본문은 plan.md §3.1.
+- **[v0.4.2 신설 — D16] 축퇴 경계**: `cap = 0.10`에서 `N <= 10`이면 `cap_eff = 1/N`이므로 `N × cap_eff = 1`이 되어 해가 **균등 하나뿐**이다 — 시총가중이 등가중과 **완전히 동일**해지며, 상한 재배분이 관측 가능한 하한은 `N >= 11`이다. 이 경계가 acceptance.md §8.2 F12의 근거다.
+
+- 검증: AC-SAG-001, AC-SAG-002, **AC-SAG-049**
 
 #### REQ-SAG-002 (Ubiquitous) — 상한 적용 사실의 노출
 
@@ -180,6 +186,8 @@ When a constituent's period return (`CHG_*`) is NULL, the aggregation **shall** 
 #### REQ-SAG-004 (When) — NULL market_cap 처리
 
 When a constituent's `market_cap` is NULL or `<= 0`, the aggregation **shall** exclude it from cap-weighted metrics while **including** it in equal-weighted metrics (RS 평균, Stage 비율, 신고가 비율, 종목 수), and **shall** report `cap_coverage_ratio` (규칙 UN-6, AG-3). 대체값(1.0·중앙값) 부여를 금지한다.
+
+- **[v0.4.2 확정 — D18] `cap_coverage_ratio`의 정의는 정확히 하나다**: `Σ market_cap(유효 시총 ∧ 해당 기간 수익률 non-null 종목) / Σ market_cap(유효 시총 종목)`, 기간이 여럿이면 **기간별 최솟값**. 즉 `coverage_ratio`(종목 수 공간)의 **시총 공간** 짝이다. 이전 판 표현 `유효시총합 / 전체시총합`은 NULL 종목의 시총을 합산할 수 없어 **항상 1.0이 되는 항진명제**였으므로 폐기한다.
 
 - 검증: AC-SAG-005
 
@@ -518,7 +526,7 @@ Every sector-related endpoint response **shall** include `return_window_days`, a
 
 | REQ | AC | 01 부록B 불변식 |
 | --- | --- | --- |
-| REQ-SAG-001 | AC-SAG-001, 002 | — |
+| REQ-SAG-001 | AC-SAG-001, 002, **049** | — |
 | REQ-SAG-002 | AC-SAG-003 | — |
 | REQ-SAG-003 | AC-SAG-004 | — |
 | REQ-SAG-004 | AC-SAG-005 | — |
