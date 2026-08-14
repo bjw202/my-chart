@@ -1,6 +1,6 @@
 // 섹터 버블 차트 컴포넌트 - ECharts scatter를 이용한 섹터별 버블 시각화
 // X축: 초과수익률, Y축: RS 평균, 버블 크기: 거래대금(로그 고정눈금), 색상: 기간 수익률(발산형 5단계)
-// SPEC-SECTOR-UX-001 M5: VZ-1(크기)·VZ-2(범례)·VZ-3(결측 점선)·VZ-4(axisPointer 삭제)·VZ-5(기준선 라벨)·VZ-6(축 범위)·REQ-SUX-056(발산형 색상)
+// SPEC-SECTOR-UX-001 M5: VZ-1(크기)·VZ-2(범례)·VZ-3(결측 점선)·VZ-4(축 포인터 삭제)·VZ-5(기준선 라벨)·VZ-6(축 범위)·REQ-SUX-056(발산형 색상)
 import { useMemo } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
@@ -146,7 +146,7 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
           formatter: (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`,
         },
         splitLine: { lineStyle: { color: '#2d2d44', type: 'dashed' } },
-        // @MX:NOTE: [AUTO] VZ-4 — axisPointer(커서 추종 값 상자) 삭제. 참조선은 markLine 이 담당. 재도입 금지.
+        // @MX:NOTE: [AUTO] VZ-4 — 축 포인터(커서 추종 값 상자) 삭제됨. 참조선은 markLine 이 담당. 재도입 금지.
       },
       yAxis: {
         type: 'value',
