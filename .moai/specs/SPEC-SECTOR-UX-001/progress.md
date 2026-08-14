@@ -118,31 +118,100 @@ Tier L이나 `design.md` / `research.md`를 신규 작성하지 않는다 — `d
 - `git push origin main` → `b9dc448..7975c7c main -> main` (fast-forward, 병렬 세션 race 무).
 - `git show --stat 7975c7c` → 20 M3 파일 정확; `.agency/*`·`expert-*.md`·`BumpChart.tsx`(선행 변경)·`MarketContext.test.tsx`(선행 변경) 전부 **미유입**(B-CRITICAL git-add discipline — 명시적 경로만 staging, pre-existing uncommitted 변경 2건 제외).
 
+### M4 (표·컨트롤 규약 — 화면별 commit `dc4ad26` / `d28d505` / `cfdb87a`)
+
+> Baseline 재확인(run 착수 시점과 동일): tsc 총 28 / TS2353 0. vitest 430 pass + e2e 2 file-load 선행 결함. cycle_type=tdd(RED-GREEN-REFACTOR), 반자율 progression(per-screen commit).
+
+**tsc 게이트 (a) HARD — TS2353 == 0 [PASS — 불변]**
+- **Evidence(verbatim)**: `tsc -p tsconfig.app.json --noEmit | grep -c TS2353` → **0**.
+
+**tsc 게이트 (b) — 총량 비증가 + ③ 수정 파일 NEW 0건 [PASS]**
+- **Claim**: M4 수정 파일이 NEW tsc 오류 0건, 총량 ≤ N.
+- **Evidence(verbatim)**: `grep -c "error TS"` → **28**(최종) == baseline 28(비증가). M4 수정 파일(SectorRankingTable/SectorAnalysis/StockTable/StageDistributionBar/StockExplorer/BumpChart/bumpFormat/stockTableColumns/useCollapseLevel/sort/WeeklyHighlights/types·api + 7 신규 테스트) 전부 file:code baseline-vs-final diff **NEW 0건**.
+- **Baseline-attribution**: run 착수 시점 baseline 28(§E.2 Baseline). `rank_change:number→number|null` 확장 cascade(WeeklyHighlights prop 보수), `unclassified_count?` 확장 cascade(StageDistributionBar readCount 방어) — 전부 M4 수정 파일 안에서 해소.
+- **Gaps**: 없음. **Residual-risk**: 선행 결함 28건(StockBubbleChart.test node:fs 9건 등)은 범위 밖.
+
+**AC PASS/FAIL matrix (M4)** — 16 AC(019~032 / 058 / 061, 057 결번 skip)
+| AC | Status | Verification (verbatim command + output) |
+|----|--------|------------------------------------------|
+| AC-SUX-019 (제외 섹터 가시성 Table·Bubble·RRG + Bump 반대) | **PASS** | Table: `vitest SectorRankingTable.m4.test` excluded-sectors 렌더 4 passed. Bump 반대: `vitest BumpChart.m4.test` "Bump 반대 방향" 2 passed(제외 영역 미렌더 + 디스플레이·스마트폰 선 존재). **mut_bump_applies_ag5 되돌림 RED(아래 verbatim)**. 섹터 Bubble·RRG: excluded 섹터는 sectors[] 에 없어 순위 버블/RRG 점에 자연 제외(data[] 소스) |
+| AC-SUX-020 (선택 섹터 제외 시 선택 유지) | **PASS** | `vitest SectorAnalysis.m4` — selectedSectorExcluded 시 sector-excluded-notice 렌더(패널 대신 안내) |
+| AC-SUX-021 (rank 열 응답값 그대로) | **PASS** | 정적 스캔 `grep -rnE "\.rank\s*=..." SectorAnalysis/ utils/` → **0행**. 행동 단언: rank [3,1,2] 픽스처 → rank-value 텍스트 `['3','1','2']`(재계산 시 1,2,3 이 됨) |
+| AC-SUX-022 (정렬 고지 띠) | **PASS** | `vitest SectorAnalysis.m4` AC-SUX-022 — rs_avg 정렬 시 sort-notice 렌더(sort/period/market 포함) + [순위순으로] 클릭 시 소멸 3 passed |
+| AC-SUX-023 (정렬 리셋) | **PASS** | AC-SUX-023 — rs_avg desc 후 market/period 변경 시 rank/asc 리셋(띠 소멸) 2 passed |
+| AC-SUX-024 (null 정렬) | **PASS** | `vitest utils/sort.test` — compareNumericNullsLast asc/desc 모두 null 맨 뒤 + NaN + 결정성 6 passed |
+| AC-SUX-025 (순위변동 4상태+기준일) | **PASS** | `vitest SectorRankingTable.m4` — ▲3/▼2/–/신규 + 0≠null 클래스 + baseline_date 헤더 4 passed |
+| AC-SUX-026 (가중 배지) | **PASS** | thead ⓦ×3(1W/1M/3M) ⓔ×4(RS/RS Top/52W/Stage) + 범례 2 passed |
+| AC-SUX-027 (RRG/Bump 기간 토글 비활성) | **PASS** | AC-SUX-027 — RRG/Bump 서브탭 시 period-toggle button disabled + title 툴팁 + Table 복귀 시 활성 5 passed |
+| AC-SUX-028 (Bump weeks+span_days) | **PASS** | `vitest BumpChart.m4` AC-SUX-028 — 8/12/26주 토글(기본12) + weeks=26 요청 + "12주 (84일)" 캡션 + span_days 무 시 주수만 5 passed |
+| AC-SUX-029 (분포 모집단 일치) | **PASS** | `vitest StageDistributionBar.m4` AC-SUX-029 — headerLabel(섹터명·종목수) 렌더. StockExplorer sectorScopeFollow 시 by_sector 분호 사용 |
+| AC-SUX-030 (미분류 세그먼트) | **PASS** | AC-SUX-030 — 미분류 세그먼트 렌더 + 5세그먼트 너비 합 100% + click→unclassified + 범례 "미분류(SMA40 부족)" 5 passed |
+| AC-SUX-031 (종목 표 신규 열) | **PASS** | `vitest StockTable.m4` AC-SUX-031 — 1W/1M/3M/섹터비중 4열 상설 + weight_capped ⊤ 마커 3 passed |
+| AC-SUX-032 (default 진입 가시성) | **PASS-WITH-DEBT** | columns(1W/3M/섹터비중) + 미분류 세그먼트 default 모드 상설 렌더(collapseLevel=0). **Debt**: 기준일/진행중 배지는 M6(AC-SUX-037) 소관 — 본 M4 에서 StockExplorer 헤더 배지 미구현 |
+| AC-SUX-058 (순위 총수 7/27) | **PASS** | rank 셀 `{rank} / {totalRanked}` — totalRanked = sectors.filter(rank!=null).length. 정적 스캔 `grep -rnE "/\s*29|29\s*개 섹터" SectorAnalysis/` → **0행** |
+| AC-SUX-061 (좁은 화면 열 접기) | **PASS** | `vitest stockTableColumns.test` COLLAPSE_ORDER=[weight_in_sector,volume_ratio,near_52w_high] + INVARIANT(기간3열·Stage·RS·Name) 4 passed. `vitest StockTable.m4` AC-SUX-061 — collapseLevel 1/2/3 순서 + 불변 열 비숨김 + data-overflow-scroll 5 passed |
+
+**AC-SUX-019 — mut_bump_applies_ag5 되돌림 RED(Lesson #9 [HARD] 실증) verbatim**
+- 변형: BumpChart filteredSectors useMemo 에 `AG5_ALLOWED = new Set(['반도체','은행']); return base.filter(s => AG5_ALLOWED.has(s.name))` 주입(Table data[] 교집합 — 디스플레이·스마트폰 제거).
+- **RED 출력(verbatim, /tmp/m4-mut-red.log)**:
+  ```
+  TestingLibraryElementError: Unable to find an element with the text: 디스플레이. ...
+    ❯ src/components/SectorAnalysis/__tests__/BumpChart.m4.test.tsx:107:19
+      expect(screen.getByText('디스플레이')).toBeInTheDocument()
+  Test Files  1 failed (1)
+       Tests  1 failed | 1 passed | 5 skipped (7)
+  ```
+- **복원 실증**: `cp /tmp/m4-bump-backup.tsx BumpChart.tsx`(scratchpad 백업, git checkout-index 미사용 — 미커밋 작업물 보호) → `diff backup file` **empty** + `grep -c "mut_bump_applies_ag5\|AG5_ALLOWED" BumpChart.tsx` → **0**(변형 마커 소멸). 복원 후 `vitest BumpChart.m4.test` → **7 passed**(GREEN 복귀).
+- **판정**: GREEN 아닌 RED 관측 성공 → 항진명제 아님 실증(Lesson #9 충족).
+
+**정적 스캔 ACs [PASS]**
+- AC-SUX-021: `grep -rnE "\.rank\s*=|rank:\s*(idx|index|i)\s*\+\s*1|map\(\(.*,\s*(idx|i)\).*rank" SectorAnalysis/ utils/` → **0행**(rank 재부여 코드 없음).
+- AC-SUX-058: `grep -rnE "/\s*29|29\s*개 섹터" SectorAnalysis/` → **0행**(총 섹터 수 상수 박기 없음).
+- REQ-SUX-054 철회(AC-SUX-057 결번): `grep -cn "sector_minor" StockTable.tsx` → **0행**(중분류 필터 분기 없음, sector_major-only 술어 유지).
+
+### §1.2 보존 대상 회귀 확인 (PRESERVE 10항목) [PASS]
+- `git diff a18417f..cfdb87a -- StockBubbleChart.tsx` → **빈 diff**(색상 채널 @MX:ANCHOR 미수정).
+- BumpChart.tsx: connectNulls:false(@:130)·날짜 합집합 축(@:75-84)·focus:'series'(@:99-108) **유지**(AC-SUX-051 회귀 단언 대상 — 변경 금지). 본 파일의 선행 미커밋 PRESERVE 계약 버전이 AC-SUX-028 화면 정당 대상이므로 비분리 가능해 함께 커밋됨(connectNulls:false 를 저장소에 실체화).
+- RRGChart.tsx·나머지 보존 항목 M4 미수정.
+
+### 회귀 (기존 프론트엔드 테스트) [PASS — 회귀 0건]
+- 최종 `vitest run` → **490 tests passed (490)**(baseline 430 + M4 신규 60), 2 e2e file-load failures(선행 결함 불변). 기존 430 전량 통과, 신규 회귀 0건.
+
+### eslint (M4 수정 파일) [신규 error class 0]
+- M4 신규 도입 eslint error class: **0**. 잔여 선행 baseline 패턴(react-refresh/only-export-components 등) 불변.
+
+### 커밋 + push (Route A Hybrid Trunk) — M4 화면별 3 commit
+- M4-1 `dc4ad26` — `feat(SPEC-SECTOR-UX-001): M4 (1/3) 순위표·컨트롤 규약` (10 files).
+- M4-2 `d28d505` — `feat(SPEC-SECTOR-UX-001): M4 (2/3) 종목 탐색 규약` (9 files).
+- M4-3 `cfdb87a` — `feat(SPEC-SECTOR-UX-001): M4 (3/3) Bump 구간 컨트롤 + AC-SUX-019 반대 방향 단언` (5 files).
+- `git push origin main` → `a18417f..cfdb87a main -> main`(fast-forward, 병렬 세션 race 무).
+- `git show --stat` 3 commit → `.agency/*`·`expert-*.md`·`.claude/agents/*`·`.moai/config|rules|project` migration mass **미유입**(B-CRITICAL git-add discipline — 명시적 경로만 staging). 단 BumpChart.tsx 는 AC-SUX-028 정당 대상으로 M4-3 에 포함(선행 PRESERVE 계약 버전 비분리 — 위 §1.2 항 참조).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-> 반자율 progression: **M3 GREEN** (NavIntent 교체 — 전면 rollback 경계 통과). M4~M7 잔여(표·컨트롤 / 시각화 / 로딩상태 / 회귀게이트). 본 신호는 M1+M2+M3 구간 — 전 run-phase 완료 아님.
+> 반자율 progression: **M4 GREEN** (표·컨트롤 규약 — 화면별 3 commit 통과). M5~M7 잔여(시각화 / 로딩상태 / 회귀게이트). 본 신호는 M1+M2+M3+M4 구간 — 전 run-phase 완료 아님. **M5 착수 전 STOP(반자율 checkpoint 대기)**.
 
 ```yaml
 run_complete_at: 2026-08-14
-run_commit_sha: 7975c7c          # M3 (전면 rollback 경계 단일 commit). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c.
-run_status: M3-complete          # M1+M2+M3 GREEN. M4~M7 잔여(반자율 progression). 전 run-phase 아님.
-ac_pass_count: 16                # M1(001/002/034)+M2(008/009)+M3(003/004/005/006/007/011/012/013/014/015/016) = 16
-ac_pass_with_debt_count: 2       # AC-SUX-018(M2, RRG/Bump/StockExplorer 경로 잔여) + AC-SUX-017(M3, RRG/Bump 로컬 state 보존 미구현 — M5 keep-mounted)
+run_commit_sha: cfdb87a          # M4-3(최신). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a.
+run_status: M4-complete          # M1+M2+M3+M4 GREEN. M5~M7 잔여(반자율 progression). 전 run-phase 아님. M5 착수 전 STOP.
+ac_pass_count: 31                # M1-M3(16) + M4 PASS 15(019/020/021/022/023/024/025/026/027/028/029/030/031/058/061) = 31
+ac_pass_with_debt_count: 3       # AC-SUX-018(M2) + AC-SUX-017(M3) + AC-SUX-032(M4: columns·미분류 default 가시 PASS, 기준일/진행중 배지 M6 AC-SUX-037 연계 debt)
 ac_fail_count: 0
-ac_total_this_segment: 18        # M1(3)+M2(3)+M3(12). 전 SPEC 60 AC 중 42 잔여(M4-M7)
-preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(StockBubbleChart 색상 채널 포함, 회귀 0)
-l44_pre_commit_fetch: "synced (단일 세션) — b9dc448 기준 0 0 divergence"
-l44_post_push_fetch: "synced — b9dc448..7975c7c fast-forward, 병렬 세션 race 무"
+ac_total_this_segment: 34        # M1-M3(18) + M4(16: 019~032/058/061, 057 결번 skip). 전 SPEC 60 AC 중 26 잔여(M5-M7)
+preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(StockBubbleChart 색상 채널·BumpChart connectNulls 포함, 회귀 0)
+l44_pre_commit_fetch: "synced (단일 세션) — a18417f 기준 0 0 divergence"
+l44_post_push_fetch: "synced — a18417f..cfdb87a fast-forward, 병렬 세션 race 무"
 new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0; tsc 수정파일 NEW 0
 cross_platform_build:
   applicable: false              # 프론트엔드 전용 SPEC (Go 빌드 태그 / C-HRA-008 N/A)
-tsc_gate_b_total: 28             # baseline N=33 → 28 (비증가; X5 타입 삭제로 필연 −5)
-tsc_gate_a_ts2353: 0             # M3 HARD 게이트 (a) 달성 — MarketOverview.tsx:46 TS2353 근본 소멸(CrossTabParams 타입 삭제)
+tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M4 비증가; 수정파일 NEW 0)
+tsc_gate_a_ts2353: 0             # HARD 게이트 (a) 유지(M3 달성 후 불변)
 modified_files_new_tsc_errors: 0
-total_run_phase_files: 37        # M1(8)+M2(9)+M3(20) — 겹침 없음(각 마일스톤 독립 파일)
-m1_to_mN_commit_strategy: per-milestone   # M1 c27a050 / M2 fc3dfc1 / M3 7975c7c 각 conventional commit + 🗿 MoAI trailer; push at end
-regression_tests: "430 pass (419 baseline + M3 신규 11) / 2 e2e file-load baseline 불변 / 기존 419 전량 통과, 신규 회귀 0"
-next_checkpoint: "M4 표·컨트롤 규약 (반자율 progression). M3 는 전면 rollback 경계 통과(단일 commit 7975c7c). M4~M7 순차 진행"
+total_run_phase_files: 61        # M1(8)+M2(9)+M3(20)+M4(24: 13 source + 11 test/new) — 겹침 없음
+m1_to_mN_commit_strategy: per-screen   # M4 화면별 3 commit(dc4ad26/d28d505/cfdb87a) + 각 conventional commit + 🗯 MoAI trailer; push at end
+regression_tests: "490 pass (430 baseline + M4 신규 60) / 2 e2e file-load baseline 불변 / 기존 430 전량 통과, 신규 회귀 0"
+next_checkpoint: "M5 시각화(차트별 개별 commit) — 반자율 progression checkpoint 대기. AC-SUX-048 색상 채널 회귀 금지 테스트 M5 착수 전 선행 작성(PLAN M5). M4 는 표·컨트롤 규약 완료"
 ```
 
 ## §E.4 Sync-phase Audit-Ready Signal
