@@ -130,6 +130,8 @@ function setupMocks() {
     applyFilters: vi.fn(() => Promise.resolve()),
     updateFilters: vi.fn(),
     clearResults: vi.fn(),
+    visibleCount: null,
+    publishVisibleCount: vi.fn(),
   })
 
   mockUseTab.mockReturnValue({
@@ -334,6 +336,8 @@ describe('MP-3: useScreen().request deep-equal 보존 (AC-INTEGRATE-003)', () =>
       applyFilters: mockApplyFilters,
       updateFilters: vi.fn(),
       clearResults: vi.fn(),
+      visibleCount: null,
+      publishVisibleCount: vi.fn(),
     })
 
     const stockA = makeStock('MP3-A')

@@ -4,7 +4,7 @@ import { useScreen } from '../../contexts/ScreenContext'
 import { useWatchlist } from '../../contexts/WatchlistContext'
 
 export function StatusBar(): React.ReactElement {
-  const { results, loading } = useScreen()
+  const { results, loading, visibleCount } = useScreen()
   const { checkedCount } = useWatchlist()
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
@@ -14,7 +14,9 @@ export function StatusBar(): React.ReactElement {
       .catch(() => setLastUpdated(null))
   }, [])
 
-  const total = results?.total ?? 0
+  // 화면에 보이는 모집단이 게시되어 있으면 그 수를 따른다 — 헤더·Stage 분포·표·푸터가
+  // 모두 같은 숫자를 가리키게 한다. 게시자가 없는 탭에서는 스크리닝 전체 수로 되돌아간다.
+  const total = visibleCount ?? results?.total ?? 0
 
   return (
     <footer className="status-bar">

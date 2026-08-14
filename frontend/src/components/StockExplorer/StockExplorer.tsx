@@ -11,6 +11,8 @@ import { useCollapseLevel } from './useCollapseLevel'
 import { buildQueryKey, useQuery } from '../../contexts/DataLoadContext'
 import { DataStatusBar } from '../common/DataStatusBar'
 import { EmptyStateWithCause } from '../common/EmptyStateWithCause'
+import { filterCandidates } from './stockFilter'
+import { usePublishVisibleCount } from '../../contexts/ScreenContext'
 
 // 백엔드 미응답 시 재시도 설정 (2초, 4초, 8초) — §1.2 보존 8. M6 부터 실제 백오프는
 // DataLoadContext.RETRY_DELAYS_MS 가 수행하며, 이 상수는 같은 값을 유지한다(계약 공유).
@@ -33,6 +35,7 @@ export function StockExplorer(): ReactElement {
   const { selectedSector, sectorScopeFollow, setSectorScopeFollow } = useSelection()
   // AC-SUX-018: 시장은 헤더 단일 인스턴스(AnalysisParamsContext) 소유. 종목 표 모집단에 실제로 적용된다.
   const { market, setMarket } = useAnalysisParams()
+  const publishVisibleCount = usePublishVisibleCount()
   // AC-SUX-033/034/035/036: 공용 조회 계층(TTL + 2/4/8초 백오프 + stale-but-showing).
   const query = useQuery<StageOverviewResponse>(
     buildQueryKey('stage-overview', {}),
@@ -150,6 +153,23 @@ export function StockExplorer(): ReactElement {
   const tableWrapperRef = useRef<HTMLDivElement>(null)
   const collapseLevel = useCollapseLevel(tableWrapperRef)
 
+  // 표에 실제로 보이는 행 — 표(StockTable)와 같은 술어(stockFilter.ts)를 통과한 집합이다.
+  const visibleRows = data
+    ? filterCandidates(
+        data.all_stocks?.length ? data.all_stocks : data.stage2_candidates,
+        { stageFilter, sectorFilter, marketFilter: market },
+      )
+    : null
+
+  // 푸터(StatusBar)가 읽을 수 있도록 보이는 모집단 수를 게시한다. 이 탭이 활성이 아니거나
+  // 데이터가 없으면 null 을 게시해 푸터가 스크리닝 전체 수로 되돌아가게 한다.
+  const explorerActive = activeTab === 'stock-explorer'
+  const publishedCount = explorerActive && visibleRows ? visibleRows.length : null
+  useEffect(() => {
+    publishVisibleCount(publishedCount)
+  }, [publishedCount, publishVisibleCount])
+  useEffect(() => () => publishVisibleCount(null), [publishVisibleCount])
+
   // AC-SUX-035: 표시할 데이터가 아예 없을 때만 자리 표시자를 렌더한다.
   // 재조회(refetching) 중에는 아래 본문이 그대로 유지된다 — 표가 사라지지 않는다.
   if (!data) {
@@ -170,15 +190,6 @@ export function StockExplorer(): ReactElement {
       </div>
     )
   }
-
-  const visibleRows = (data.all_stocks?.length ? data.all_stocks : data.stage2_candidates)
-    .filter(c => {
-      if (sectorFilter && c.sector_major !== sectorFilter) return false
-      if (market !== 'all' && (c.market ?? '').toLowerCase() !== market) return false
-      if (stageFilter === 'unclassified') return c.stage == null
-      if (stageFilter !== null) return c.stage === stageFilter
-      return true
-    })
 
   return (
     <div className="stock-explorer">
@@ -243,7 +254,7 @@ export function StockExplorer(): ReactElement {
       />
 
       {/* AC-SUX-054 (ER-3): 결과 0건이면 원인(활성 필터 3개)과 해제 액션을 함께 보여준다 */}
-      {visibleRows.length === 0 && (
+      {(visibleRows?.length ?? 0) === 0 && (
         <EmptyStateWithCause
           filters={[
             stageFilter !== null

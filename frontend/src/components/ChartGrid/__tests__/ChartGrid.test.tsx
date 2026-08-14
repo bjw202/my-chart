@@ -89,6 +89,8 @@ function setupDefaultMocks(intent: unknown = null) {
     applyFilters: vi.fn(() => Promise.resolve()),
     updateFilters: vi.fn(),
     clearResults: vi.fn(),
+    visibleCount: null,
+    publishVisibleCount: vi.fn(),
   })
 
   mockUseTab.mockReturnValue({
@@ -176,6 +178,8 @@ describe('ChartGrid — v2.0.0 props 기반 렌더', () => {
       applyFilters: mockApplyFilters,
       updateFilters: vi.fn(),
       clearResults: vi.fn(),
+      visibleCount: null,
+      publishVisibleCount: vi.fn(),
     })
     // ST-7 / TR-2: MarketOverview treemap click이 보내는 focusStock intent.
     setupDefaultMocks({ id: 1, target: 'chart-grid', payload: { focusStock: '삼성전자' } })

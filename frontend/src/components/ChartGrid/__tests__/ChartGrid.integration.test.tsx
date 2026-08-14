@@ -155,6 +155,8 @@ function setupMocks(overrides: { intent?: unknown } = {}) {
     applyFilters: mockApplyFilters,
     updateFilters: vi.fn(),
     clearResults: vi.fn(),
+    visibleCount: null,
+    publishVisibleCount: vi.fn(),
   })
 
   mockUseTab.mockReturnValue({

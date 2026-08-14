@@ -4,6 +4,7 @@ import type { Stage2Candidate } from '../../types/stage'
 import { COLLAPSE_ORDER, hiddenColumnKeys, INVARIANT_COLUMN_KEYS } from './stockTableColumns'
 // D6 / AC-SUX-052: 셀 5상태는 공용 MetricCell 이 전담한다 (화면별 표기 발산 방지).
 import { MetricCell, percent1, percent2 } from '../common/MetricCell'
+import { filterCandidates } from './stockFilter'
 
 interface StockTableProps {
   candidates: Stage2Candidate[]
@@ -65,11 +66,6 @@ function getStageBadgeClass(candidate: Stage2Candidate): string {
   return 'stage-badge--s1'
 }
 
-// 분류 불가(unclassified) 종목 판정 — stage 가 1~4 범위 밖이면 분류 불가 (AC-SUX-030).
-function isUnclassified(c: Stage2Candidate): boolean {
-  return c.stage == null || ![1, 2, 3, 4].includes(c.stage)
-}
-
 // @MX:NOTE: [AUTO] StockTable renders filtered/sorted stage candidates with multi-select support.
 // AC-SUX-031 (REQ-SUX-029/030): 1W%/1M%/3M%/섹터비중 4열 상설 + ⊤(weight_capped) 마커.
 // AC-SUX-061 (REQ-SUX-058): 좁은 화면 열 접기 — 섹터비중→Vol배→52W고 단일 상수 순서.
@@ -97,18 +93,8 @@ export function StockTable({
     }
   }
 
-  // Apply filters — stageFilter: 정수(해당 stage) · 'unclassified'(분류 불가) · null(전체).
-  // sectorFilter 는 sector_major 만 비교(REQ-SUX-054 철회 — 중분류 산업명 분기 추가 금지).
-  const filtered = candidates.filter((c) => {
-    if (stageFilter === 'unclassified') {
-      if (!isUnclassified(c)) return false
-    } else if (stageFilter !== null && c.stage !== stageFilter) {
-      return false
-    }
-    if (sectorFilter && c.sector_major !== sectorFilter) return false
-    if (marketFilter !== 'all' && (c.market ?? '').toLowerCase() !== marketFilter) return false
-    return true
-  })
+  // 모집단 판정은 stockFilter.ts 단일 출처를 쓴다 — 푸터 종목 수도 같은 술어를 통과한다.
+  const filtered = filterCandidates(candidates, { stageFilter, sectorFilter, marketFilter })
 
   // Apply sorting
   const sorted = [...filtered].sort((a, b) => {
