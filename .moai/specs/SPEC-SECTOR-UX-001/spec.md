@@ -2,7 +2,7 @@
 id: SPEC-SECTOR-UX-001
 title: "섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약"
 version: "0.4.0"
-status: in-progress
+status: completed
 created: 2026-08-12
 updated: 2026-08-14
 author: manager-spec

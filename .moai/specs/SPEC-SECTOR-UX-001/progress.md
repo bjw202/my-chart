@@ -526,7 +526,38 @@ next_checkpoint: "/moai sync SPEC-SECTOR-UX-001"
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+```yaml
+sync_complete_at: 2026-08-14
+sync_commit_sha: pending-backfill-sync   # 커밋 자신의 SHA는 커밋 시점에 알 수 없음 — 후속 커밋에서 backfill
+changelog:
+  status: added
+  duplicate_guard_pre_count: 0           # grep -c 'SPEC-SECTOR-UX-001' CHANGELOG.md (작성 전)
+  section: "### Added (SPEC-SECTOR-UX-001 v0.4.0, 2026-08-14)"
+  placement: "[Unreleased] 최상단 — SPEC-SECTOR-AGGREGATION-001 v0.5.0 항목 바로 위"
+readme:
+  status: unchanged
+  reason: "섹터 분석 화면은 README §2 Sector Analysis(SPEC-TOPDOWN-002 귀속)로 이미 개괄 서술됨. 형제 SPEC(SECTOR-GRID-001/SECTOR-AGGREGATION-001)도 동일 사유로 README 미등재 — 기존 관례 유지, 신규 사용자 표면 기능 없음(내부 상태모델·시각화 규약 리팩터)"
+frontmatter_status_transitions:
+  spec_md: "in-progress -> completed (updated: 2026-08-14 불변, 동일 날짜)"
+  plan_md: "frontmatter 없음 — 전환 대상 아님"
+  acceptance_md: "frontmatter 없음 — 전환 대상 아님"
+  progress_md: "frontmatter 없음 — 전환 대상 아님"
+mx_tag_validation:
+  navintent_consume_guard: "PASS — frontend/src/contexts/TabContext.tsx:24 @MX:ANCHOR (TabProvider active-tab + NavIntent hub, fan_in>=5)"
+  analysis_params_ownership: "PASS — frontend/src/contexts/AnalysisParamsContext.tsx:30 @MX:ANCHOR"
+  bubble_size_mapping: "PASS — frontend/src/components/SectorAnalysis/bubbleRadius.ts:3 @MX:ANCHOR"
+  stock_bubble_color_anchor_preserved: "PASS — frontend/src/components/SectorAnalysis/StockBubbleChart.tsx:37 @MX:ANCHOR (M5 미수정, §1.2 보존)"
+  metric_cell_note: "PASS — frontend/src/components/common/MetricCell.tsx:4,57 @MX:NOTE + @MX:ANCHOR(metricDisplay)"
+  axispointer_removed_note: "PASS — frontend/src/components/SectorAnalysis/SectorBubbleChart.tsx:150 @MX:NOTE (VZ-4 재도입 금지)"
+  dataload_context_note: "PASS(추가 확인) — frontend/src/contexts/DataLoadContext.tsx:45 @MX:ANCHOR + :56 @MX:NOTE"
+  missing: "없음 — plan.md mx_plan 6항목 전부 확인"
+ac_tally_final:
+  total: 60
+  pass: 54
+  pass_with_debt: 6
+  fail: 0
+  source: acceptance.md (SSOT)
+```
 
 ---
 

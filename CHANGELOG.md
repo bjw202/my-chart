@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-SECTOR-UX-001 v0.4.0, 2026-08-14)
+
+- **섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약** (M1~M7, `run_commit_sha` `ccb9068`)
+  - **상태 모델**: `AnalysisParamsContext`(market/period 사용자 제어 + `asOfDate`/`asOfIsPartialWeek`/`gridVersion` 읽기 전용)와 `SelectionContext`를 의도적으로 **분리**(D2) — period 변경이 섹터 선택 소비자를 리렌더시키지 않도록 함
+  - **NavIntent 교체**: 기존 `CrossTabParams` 삭제(전역 clear 부재), `NavIntent` 3조건 소비 가드(target/id/active + `lastHandledId`)로 대체 — 전역 clear 경쟁 상태(ST-2) 해소
+  - **토글 단일화**: 기간·시장 토글을 헤더 단일 인스턴스로 통합, 시장 토글이 실제로 5개 경로(Table/Bubble 섹터·종목/RRG/Bump/종목 탐색)에 반영되도록 배선(ST-4 해소)
+  - **표·컨트롤 규약** (M4): rank 열 응답값 그대로 렌더, 정렬 변경 시 고지 띠, 순위변동 3상태(▲/▼/–/신규), 기준일 헤더 표기, 가중 방식 배지(ⓦ/ⓔ), 제외 섹터 하단 영역, `1W%`/`1M%`/`3M%`/섹터비중 신규 열, 순위 총수(`N/M`) 병기, Stage 분포 바 모집단 일치, 좁은 화면 열 접기(섹터비중 → Vol배 → 52W고 순, 기간 3열·Stage·RS·Name은 불변)
+  - **시각화 규약** (M5): `bubbleRadius` 공용 유틸(면적 비례 + 로그 정규화, 기간별 고정 눈금 참조값)을 섹터·종목 버블 차트가 공유, 섹터 버블 발산형 5단계 색상(기준점 0%), 버블 테두리 채널 단일화(섹터=결측 거래대금 점선 / 종목=Stage 단독), RRG 사분면 의미 표기·축 자동 대칭(`half = max(5, ceil(maxDev × 1.1))`), 섹터 분석 서브탭 keep-mounted(탭 왕복 remount 0)
+  - **로딩·오류·빈 상태** (M6): `DataLoadContext` 공용 조회 계층(쿼리 키 + TTL 1시간 + stale-but-showing + 2s/4s/8s 백오프 3회 후 정지 + 수동 새로고침 + 기준일 합치 검증 + `grid_version` 변경 시 전 캐시 무효화), `MetricCell` 공용 5상태 셀(`–`/`0.00%`/`계산 불가`/`42 ⚠`/`42 ❗`), 빈 상태 원인 표기(활성 필터별 해제 액션), 섹터 상세 오류 표시 + 재시도
+  - **회귀 게이트** (M7): AC-SUX-056 R1~R5(기간 변경 시 로딩, 정렬 변경 시 고지 띠, 버블 크기 분포 변화, RRG 궤적 단축, KOSPI 필터 시 순위표 행 감소 + 제외 영역 — 전부 **의도된 변화**이며 회귀가 아님), §0.3 X1~X6 제거 목록 정적 스캔, §1.2 보존 10항목 회귀 0 확인, `metricText` 공용 헬퍼로 표 셀 ↔ 차트 툴팁(섹터버블/RRG/Bump)의 결측 표기 문자열 통일(D2), 캐시 적중 경로의 전역 기준일 미기록 결함(F1) 수정
+  - **AG-5(Bump 최소 구성수 5) 미적용 확정** (2026-08-14 사용자 결정): `AC-SUX-019`/`AC-SUX-056 R5`의 검증 범위를 Table·섹터 Bubble·RRG로 한정(Bump 제외)하고, 제외 섹터의 선이 Bump에 남아 있어야 한다는 반대 방향 단언을 신설. `SPEC-SECTOR-AGGREGATION-001` 백엔드 변경 없음(출하 구현이 이미 미적용)
+  - **AC 결과**: 60개 AC 중 **54 PASS / 6 PASS-WITH-DEBT / 0 FAIL**(AC-SUX-057은 REQ-SUX-054 철회로 결번). Debt 6건 — AC-SUX-018(RRG/Bump/StockExplorer 3경로 시장 미소구, 주 경로는 해소), AC-SUX-032(default 진입 시 기준일·진행중 배지 미구현, M6 소관), AC-SUX-042(벤치마크 절대값 백엔드 미전달), AC-SUX-046(`lookback_weeks`/`trail_start_date`/RRG `market` 파라미터 백엔드 미지원), AC-SUX-060(저커버리지 툴팁 ⚠ + 하단 요약 미구현), AC-SUX-033(**2026-08-14 사용자 결정** — `MarketProvider` 현행 유지, 부팅 시 sector fetch 1회 잔존은 후속 SPEC 항목)
+  - **회귀처럼 보이지만 올바른 변화** (`acceptance.md` AC-SUX-056 R1~R5 참조): 기간 변경 시 로딩 발생, 정렬 변경 시 안내 띠 노출, 버블 크기 분포 변화(선형 매핑 대비 표준편차 증가), RRG 궤적 단축(TRAIL_WINDOW 적용), KOSPI 필터 시 순위표 행 감소 + 제외 영역 노출 — 전부 되돌림 금지
+  - **검증**: `vitest run` 655 passed(run 착수 baseline 430 대비 +225), tsc 총 오류 28건(baseline 28 대비 비증가) · `TS2353` 0건(HARD 게이트 유지), eslint 45 errors(신규 error class 0 — 전부 기존 `react-refresh/only-export-components` 클래스), 기존 프론트엔드 테스트 전량 통과(회귀 0건). e2e 파일 로드 실패 2건(`e2e/ai-report-deep.spec.ts`, `e2e/preset-flow.spec.ts`)은 SPEC 범위 밖 선행 결함
+  - Gap: §0.2 성능 목표 중 INP P95 / FCP / 토글 P95는 실브라우저 계측이 필요해 미측정. '종목 표 3열 추가 +20% 이내'는 비교 baseline이 M4 착수 전에 측정되지 않아 사후 판정 불가(절대 실측 500행 median 104.9ms + 3열 델타 +3.6% 대리 지표만 기록)
+
 ### Added (SPEC-SECTOR-AGGREGATION-001 v0.5.0, 2026-08-13~14)
 
 - **섹터 집계 계층 — 시총가중·벤치마크·순위·RRG 지수·응답 공통 스키마** (M1~M7 + AC-SAG-037 closure, `run_commit_sha` `753a529`, closure `b703dc2`)
