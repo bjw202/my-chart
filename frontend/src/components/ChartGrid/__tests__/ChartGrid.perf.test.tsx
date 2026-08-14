@@ -69,6 +69,7 @@ vi.mock('../../../contexts/ScreenContext', () => ({
 
 vi.mock('../../../contexts/TabContext', () => ({
   useTab: vi.fn(),
+  useNavIntent: vi.fn(),
 }))
 
 vi.mock('../../../contexts/NavigationContext', () => ({
@@ -77,10 +78,11 @@ vi.mock('../../../contexts/NavigationContext', () => ({
 
 import { ChartGrid } from '../ChartGrid'
 import { useScreen } from '../../../contexts/ScreenContext'
-import { useTab } from '../../../contexts/TabContext'
+import { useTab, useNavIntent } from '../../../contexts/TabContext'
 
 const mockUseScreen = vi.mocked(useScreen)
 const mockUseTab = vi.mocked(useTab)
+const mockUseNavIntent = vi.mocked(useNavIntent)
 
 function makeStock(code: string): StockItem {
   return {
@@ -133,9 +135,11 @@ function setupMocks() {
   mockUseTab.mockReturnValue({
     activeTab: 'chart-grid',
     setActiveTab: vi.fn(),
-    navigateToTab: vi.fn(),
-    crossTabParams: null,
-    clearCrossTabParams: vi.fn(),
+  })
+  // NavIntent consumer mock (M3).
+  mockUseNavIntent.mockReturnValue({
+    intent: null,
+    navigate: vi.fn(),
   })
 }
 
@@ -366,7 +370,7 @@ describe('MP-3: useScreen().request deep-equal 보존 (AC-INTEGRATE-003)', () =>
     )
     const source = await readFile(chartGridPath, 'utf-8')
     // 검색 injection 동선에서 applyFilters나 setRequest 호출이 없어야 함
-    // (crossTabParams 처리는 AppContent로 이전됨)
+    // (legacy cross-tab param handling moved to AppContent)
     const hasApplyFiltersCall = /applyFilters\s*\(/.test(source)
     const hasSetRequestCall = /setRequest\s*\(/.test(source)
     expect(hasApplyFiltersCall).toBe(false)

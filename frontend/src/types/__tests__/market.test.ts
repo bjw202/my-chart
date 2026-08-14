@@ -1,6 +1,6 @@
-// RED: Tests for market types - verifying type structure and TabId constraints
+// RED: Tests for market types - verifying type structure (AC-SUX-004 / AC-SUX-006, M3)
 import { describe, it, expect } from 'vitest'
-import type { TabId, CrossTabParams, MarketOverviewResponse, SectorRankingResponse, SectorRankItem } from '../market'
+import type { TabId, NavIntent, NavIntentPayload, MarketOverviewResponse, SectorRankingResponse, SectorRankItem } from '../market'
 
 describe('TabId type', () => {
   it('should accept valid tab ids', () => {
@@ -10,20 +10,32 @@ describe('TabId type', () => {
   })
 })
 
-describe('CrossTabParams', () => {
-  it('should allow optional sectorName and stockCodes', () => {
-    const params: CrossTabParams = {}
-    expect(params).toBeDefined()
+describe('NavIntent type contract (AC-SUX-004 (b) / AC-SUX-006)', () => {
+  it('payload shall define subTab, stockCodes, focusStock', () => {
+    const payload: NavIntentPayload = { subTab: 'bubble', stockCodes: ['005930', '000660'], focusStock: '삼성전자' }
+    expect(payload.subTab).toBe('bubble')
+    expect(payload.stockCodes).toEqual(['005930', '000660'])
+    expect(payload.focusStock).toBe('삼성전자')
   })
 
-  it('should accept sectorName', () => {
-    const params: CrossTabParams = { sectorName: 'IT' }
-    expect(params.sectorName).toBe('IT')
+  it('all payload fields are optional', () => {
+    const payload: NavIntentPayload = {}
+    expect(payload).toBeDefined()
   })
 
-  it('should accept stockCodes', () => {
-    const params: CrossTabParams = { stockCodes: ['005930', '000660'] }
-    expect(params.stockCodes).toEqual(['005930', '000660'])
+  it('NavIntent carries id (monotonic), target, payload', () => {
+    const intent: NavIntent = { id: 7, target: 'stock-explorer', payload: { focusStock: '삼성전자' } }
+    expect(intent.id).toBe(7)
+    expect(intent.target).toBe('stock-explorer')
+    expect(intent.payload.focusStock).toBe('삼성전자')
+  })
+
+  it('payload shall NOT carry sectorName (AC-SUX-006, type-level)', () => {
+    // sectorName is intentionally absent from NavIntentPayload — sector selection
+    // is written directly to SelectionContext (REQ-SUX-005 / SM-4).
+    // @ts-expect-error sectorName is NOT a NavIntent payload field
+    const bad: NavIntentPayload = { sectorName: '반도체' }
+    expect(bad).toBeDefined()
   })
 })
 

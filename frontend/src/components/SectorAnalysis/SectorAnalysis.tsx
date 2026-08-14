@@ -1,11 +1,12 @@
 // @MX:ANCHOR: [AUTO] SectorAnalysis is the container for sector ranking tab, consumes MarketContext and TabContext
 // @MX:REASON: Called from AppContent for sector-analysis tab; orchestrates SectorRankingTable + SectorDetailPanel + BubbleChart + BumpChart
 // @MX:SPEC: SPEC-TOPDOWN-001D, SPEC-TOPDOWN-002F, SPEC-TOPDOWN-002D
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import type { ReactElement } from 'react'
 import type { SectorRankItem } from '../../types/market'
 import { useMarket } from '../../contexts/MarketContext'
-import { useTab } from '../../contexts/TabContext'
+import { useNavIntent } from '../../contexts/TabContext'
+import { useSelection } from '../../contexts/SelectionContext'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
 import type { Period, Market } from '../../contexts/AnalysisParamsContext'
 import { SectorRankingTable } from './SectorRankingTable'
@@ -52,7 +53,9 @@ function getSortValue(sector: SectorRankItem, field: string): number {
 
 export function SectorAnalysis(): ReactElement {
   const { sectorRanking } = useMarket()
-  const { crossTabParams, clearCrossTabParams, setCrossTabParams } = useTab()
+  // SM-4: selectedSector 는 SelectionContext 전역 단일 슬롯 (02 §3.3 소유권 표).
+  const { selectedSector, selectSector, clearSector } = useSelection()
+  const { navigate } = useNavIntent()
   // AC-SUX-008/018: period·market 는 AnalysisParamsContext 전역 단일 인스턴스 (헤더 토글이 소유)
   const { market, period, setMarket, setPeriod } = useAnalysisParams()
 
@@ -61,15 +64,6 @@ export function SectorAnalysis(): ReactElement {
 
   const [sortField, setSortField] = useState('rank')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
-  const [selectedSector, setSelectedSector] = useState<string | null>(null)
-
-  // Handle cross-tab navigation from Market Overview heatmap click
-  useEffect(() => {
-    if (crossTabParams?.sectorName) {
-      setSelectedSector(crossTabParams.sectorName)
-      clearCrossTabParams()
-    }
-  }, [crossTabParams, clearCrossTabParams])
 
   // Sort sectors based on current sort field/direction
   const sortedSectors = useMemo((): SectorRankItem[] => {
@@ -161,14 +155,19 @@ export function SectorAnalysis(): ReactElement {
             sortDirection={sortDirection}
             onSort={handleSort}
             onSectorClick={(name) => {
-              setSelectedSector(name)
-              setCrossTabParams({ sectorName: name })
+              // TR-3/TR-3b: row click sets sector + opens detail panel WITHOUT navigate (REQ-SUX-009).
+              //   재클릭 시 clearSector → selectedSector=null + 패널 닫힘.
+              if (name === selectedSector) clearSector()
+              else selectSector(name)
             }}
             selectedSector={selectedSector}
           />
 
           {selectedSector && selectedSectorData && (
-            <SectorDetailPanel sector={selectedSectorData} />
+            <SectorDetailPanel
+              sector={selectedSectorData}
+              onViewStocks={() => navigate({ target: 'stock-explorer' })}
+            />
           )}
         </>
       )}
@@ -182,7 +181,8 @@ export function SectorAnalysis(): ReactElement {
       {subTab === 'rrg' && (
         <RRGChart
           onSectorClick={(name) => {
-            setSelectedSector(name)
+            // TR-7: RRG trail click → selectSector + subTab 'table'. 로컬 state(visibleSectors/windowEnd)는 M5 keep-mounted 개편 시 보존.
+            selectSector(name)
             setSubTab('table')
           }}
         />
@@ -192,7 +192,8 @@ export function SectorAnalysis(): ReactElement {
       {subTab === 'bump' && (
         <BumpChart
           onSectorClick={(name) => {
-            setSelectedSector(name)
+            // TR-8: Bump line click → selectSector + subTab 'table'. topFilter 보존은 M5 keep-mounted 개편 시.
+            selectSector(name)
             setSubTab('table')
           }}
         />

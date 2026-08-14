@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useMarket } from '../../contexts/MarketContext'
-import { useTab } from '../../contexts/TabContext'
+import { useNavIntent } from '../../contexts/TabContext'
+import { useSelection } from '../../contexts/SelectionContext'
 import { fetchStageOverview } from '../../api/stage'
 import { MarketPhaseCard } from './MarketPhaseCard'
 import { BreadthChart } from './BreadthChart'
@@ -16,7 +17,8 @@ type HeatmapView = 'mini' | 'treemap'
 
 export function MarketOverview(): ReactElement {
   const { overview, sectorRanking, loading, error } = useMarket()
-  const { navigateToTab } = useTab()
+  const { navigate } = useNavIntent()
+  const { selectSector } = useSelection()
 
   // R7: Fetch Stage 2 count for WeeklyHighlights
   const [stage2Count, setStage2Count] = useState<number | null>(null)
@@ -38,12 +40,17 @@ export function MarketOverview(): ReactElement {
     return <div className="market-overview-error">Failed to load market data</div>
   }
 
+  // TR-3 / SM-4: heatmap sector click → sector selection writes to SelectionContext
+  // (sectorName is NOT carried in NavIntent payload — REQ-SUX-005), then switch tab.
   const handleSectorClick = (sectorName: string): void => {
-    navigateToTab('sector-analysis', { sectorName })
+    selectSector(sectorName)
+    navigate({ target: 'sector-analysis' })
   }
 
+  // ST-7 / TR-2: treemap stock click → chart-grid focusStock consumer (REQ-SUX-012).
+  // (Formerly passed a write-only `{ stockName }` → TS2353; focusStock is now a typed payload field.)
   const handleStockClick = (stockName: string): void => {
-    navigateToTab('chart-grid', { stockName })
+    navigate({ target: 'chart-grid', payload: { focusStock: stockName } })
   }
 
   return (

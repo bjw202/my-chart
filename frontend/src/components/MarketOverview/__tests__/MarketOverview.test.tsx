@@ -26,10 +26,14 @@ vi.mock('../WeeklyHighlights', () => ({
   WeeklyHighlights: () => <div data-testid="weekly-highlights">WeeklyHighlights</div>,
 }))
 
-const mockNavigateToTab = vi.fn()
+const mockNavigate = vi.fn()
+const mockSelectSector = vi.fn()
 
 vi.mock('../../../contexts/TabContext', () => ({
-  useTab: () => ({ navigateToTab: mockNavigateToTab }),
+  useNavIntent: () => ({ navigate: mockNavigate }),
+}))
+vi.mock('../../../contexts/SelectionContext', () => ({
+  useSelection: () => ({ selectSector: mockSelectSector }),
 }))
 
 // MarketContext mock - uses a variable so we can change it per test
@@ -119,11 +123,13 @@ describe('MarketOverview container (with data)', () => {
     expect(screen.getByTestId('weekly-highlights')).toBeInTheDocument()
   })
 
-  it('navigates to sector-analysis tab when sector cell is clicked', async () => {
+  it('selects sector + navigates to sector-analysis tab when sector cell is clicked', async () => {
     const user = userEvent.setup()
     render(<MarketOverview />)
     await user.click(screen.getByText('Technology Cell'))
-    expect(mockNavigateToTab).toHaveBeenCalledWith('sector-analysis', { sectorName: 'Technology' })
+    // SM-4: sector selection writes to SelectionContext (not in NavIntent payload); tab switch via navigate.
+    expect(mockSelectSector).toHaveBeenCalledWith('Technology')
+    expect(mockNavigate).toHaveBeenCalledWith({ target: 'sector-analysis' })
   })
 
   it('renders market-overview wrapper element', () => {

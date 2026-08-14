@@ -8,6 +8,8 @@ import type { SectorBubbleItem, StockBubbleItem } from '../../types/bubble'
 import { SectorBubbleChart } from './SectorBubbleChart'
 import { StockBubbleChart } from './StockBubbleChart'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
+import { useNavIntent } from '../../contexts/TabContext'
+import { useSelection } from '../../contexts/SelectionContext'
 
 type ViewMode = 'sector' | 'stock'
 
@@ -19,6 +21,8 @@ interface Props {
 export function BubbleChart({ initialSector }: Props): ReactElement {
   // AC-SUX-008: period·market 는 헤더 단일 인스턴스(AnalysisParamsContext)에서 소비 — 로컬 토글 제거 (X2)
   const { period, market } = useAnalysisParams()
+  const { navigate } = useNavIntent()
+  const { selectSector: selectSectorGlobal } = useSelection()
   const [view, setView] = useState<ViewMode>('sector')
   const [selectedSector, setSelectedSector] = useState<string | null>(initialSector ?? null)
 
@@ -80,10 +84,18 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
     setView('stock')
   }, [])
 
-  // 섹터 뷰로 돌아가기
+  // TR-9 (AC-SUX-013 / ST-8): 종목 버블 클릭 → 종목 탐색 focusStock 진입.
+  //   현재 섹터를 전역 SelectionContext 슬롯에 동기화(StockExplorer 모집단 일치).
+  //   selectedStocks 초기화는 StockExplorer NavIntent consumer에서 수행(TR-16).
+  const handleStockClick = useCallback((stockName: string) => {
+    if (selectedSector) selectSectorGlobal(selectedSector)
+    navigate({ target: 'stock-explorer', payload: { focusStock: stockName } })
+  }, [selectedSector, selectSectorGlobal, navigate])
+
+  // 섹터 뷰로 돌아가기 — TR-6 (AC-SUX-016): selectedSector 유지(현행 null 삭제 결함 수정).
+  //   stockData/stockError만 초기화한다.
   const handleBack = useCallback(() => {
     setView('sector')
-    setSelectedSector(null)
     setStockData([])
     setStockError(null)
   }, [])
@@ -139,6 +151,7 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
               <StockBubbleChart
                 stocks={stockData}
                 sectorName={selectedSector}
+                onStockClick={handleStockClick}
               />
             )}
           </>

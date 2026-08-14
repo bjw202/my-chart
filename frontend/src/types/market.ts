@@ -1,10 +1,25 @@
 // Tab navigation types for SPEC-TOPDOWN-001B
 export type TabId = 'market-overview' | 'sector-analysis' | 'stock-explorer' | 'chart-grid' | 'theme-analysis'
 
-// Cross-tab navigation parameters
-export interface CrossTabParams {
-  sectorName?: string
+// @MX:ANCHOR: [AUTO] NavIntent — cross-tab navigation single source of truth (SPEC-SECTOR-UX-001 M3, REQ-SUX-003)
+// @MX:REASON: Replaces the legacy cross-tab navigation type. Consumer fan_in >= 3 (ChartGrid/StockExplorer/AppContent guard).
+//   3-condition consumer guard: target === MY_TAB_ID && activeTab === MY_TAB_ID && id !== lastHandledId.
+//   payload intentionally omits sectorName (REQ-SUX-005/SM-4) — sector selection writes to SelectionContext.
+
+// NavIntent payload — subTab / stockCodes / focusStock only (AC-SUX-004 (b), AC-SUX-006).
+// sectorName MUST NOT appear here (REQ-SUX-005).
+export interface NavIntentPayload {
+  subTab?: string
   stockCodes?: string[]
+  focusStock?: string
+}
+
+// Addressed navigation intent. `id` is monotonic per navigate() call so consumers
+// can distinguish a re-send (same payload, new id) from a re-render (same id).
+export interface NavIntent {
+  id: number
+  target: TabId
+  payload: NavIntentPayload
 }
 
 // Market overview API response types (matching GET /api/market/overview)

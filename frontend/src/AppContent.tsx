@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useTab } from './contexts/TabContext'
+import { useNavIntent } from './contexts/TabContext'
 import { useScreen } from './contexts/ScreenContext'
 import { DEFAULT_SCREEN_REQUEST } from './types/filter'
 import type { StockItem } from './types/stock'
@@ -22,19 +23,27 @@ import { ThemeAnalysis } from './components/ThemeAnalysis/ThemeAnalysis'
 //   → React.memo(ChartGrid) shallow equal로 ScreenContext cascade 차단 가능.
 
 export function AppContent(): ReactElement {
-  const { activeTab, crossTabParams, clearCrossTabParams } = useTab()
+  const { activeTab } = useTab()
+  const { intent } = useNavIntent()
   const { applyFilters, results } = useScreen()
 
   // searchedStock: StockSearchBox onSelect 결과 — ChartGrid injectedStock으로 전달
   const [searchedStock, setSearchedStock] = useState<StockMasterItem | null>(null)
 
-  // R1: Chart-grid 탭 활성화 시 crossTabParams.stockCodes로 필터 적용
+  // NavIntent consumer (chart-grid target) — StockExplorer "View Charts" 버튼이 보낸 stockCodes 적용.
+  // 3-condition guard (target / activeTab / lastHandledId); 전역 clear 호출 없음 (AC-SUX-005, REQ-SUX-004).
+  const lastHandled = useRef<number | null>(null)
   useEffect(() => {
-    if (activeTab === 'chart-grid' && crossTabParams?.stockCodes?.length) {
-      void applyFilters({ ...DEFAULT_SCREEN_REQUEST, codes: crossTabParams.stockCodes })
-      clearCrossTabParams()
+    if (!intent) return
+    if (intent.target !== 'chart-grid') return
+    if (activeTab !== 'chart-grid') return
+    if (lastHandled.current === intent.id) return
+    lastHandled.current = intent.id
+    const codes = intent.payload.stockCodes
+    if (codes && codes.length) {
+      void applyFilters({ ...DEFAULT_SCREEN_REQUEST, codes })
     }
-  }, [activeTab, crossTabParams, clearCrossTabParams, applyFilters])
+  }, [intent, activeTab, applyFilters])
 
   // REQ-PERF-001: useScreen().results를 flat StockItem[]으로 변환
   // useMemo: results reference가 바뀔 때만 재계산

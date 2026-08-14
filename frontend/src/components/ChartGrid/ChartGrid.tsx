@@ -12,7 +12,7 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VariableSizeList } from 'react-window'
-import { useTab } from '../../contexts/TabContext'
+import { useTab, useNavIntent } from '../../contexts/TabContext'
 import { useNavigation } from '../../contexts/NavigationContext'
 import { useChartGrid } from '../../hooks/useChartGrid'
 import { useScrollSync } from '../../hooks/useScrollSync'
@@ -71,7 +71,8 @@ function ChartGridInner({
   injectedStock = null,
   onSelectStock,
 }: ChartGridProps): React.ReactElement {
-  const { crossTabParams, clearCrossTabParams } = useTab()
+  const { activeTab } = useTab()
+  const { intent } = useNavIntent()
   const { selectedIndex } = useNavigation()
   const listRef = useRef<VariableSizeList | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly'>('daily')
@@ -80,12 +81,13 @@ function ChartGridInner({
   // highlight 관련 ref
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // crossTabParams는 ChartGrid에서 직접 처리하지 않음 — AppContent에서 처리
-  // (REQ-PERF-001: useScreen() 직접 호출 제거)
-  // NOTE: crossTabParams는 AppContent의 useEffect에서 이미 처리됨
-  // crossTabParams/clearCrossTabParams 참조만 유지 (기존 compat)
-  void crossTabParams
-  void clearCrossTabParams
+  // @MX:ANCHOR: [AUTO] NavIntent focusStock consumer guard — ST-7 / TR-2 (REQ-SUX-012)
+  // @MX:REASON: MarketOverview treemap click → chart-grid focusStock. 3-condition guard (target/activeTab/id).
+  //   O-U6 결정: 그리드에 이미 있으면 scroll+highlight(중복 추가 금지), 없으면(데이터 한정) 추가 생략.
+  //   기존 그리드를 교체하지 않는다.
+  const navLastHandled = useRef<number | null>(null)
+  const [focusCode, setFocusCode] = useState<string | null>(null)
+  void selectedIndex // 향후 selection 동기화 예비 (현재 미사용)
 
   // Stage 데이터 1회 페치 (useScreen과 독립적 — REQ-PERF-001 위반 없음)
   useEffect(() => {
@@ -128,6 +130,20 @@ function ChartGridInner({
 
   const { currentPage, gridSize, totalPages, visibleStocks, goToPage, toggleGridSize } =
     useChartGrid(displayedStocks)
+
+  // NavIntent focusStock consumer — 3-condition guard (target / activeTab / lastHandledId).
+  useEffect(() => {
+    if (!intent) return
+    if (intent.target !== 'chart-grid') return
+    if (activeTab !== 'chart-grid') return
+    if (navLastHandled.current === intent.id) return
+    navLastHandled.current = intent.id
+    const focus = intent.payload.focusStock
+    if (!focus) return
+    // O-U6 결정: 이미 그리드에 있으면 scroll+highlight(중복 추가 금지); 없으면(이름만 수신, 데이터 한정) 추가 생략.
+    const match = displayedStocks.find((s) => s.name === focus)
+    if (match) setFocusCode(match.code)
+  }, [intent, activeTab, displayedStocks])
 
   const { onPageChange } = useScrollSync(listRef)
 
@@ -229,6 +245,40 @@ function ChartGridInner({
   const cols = gridSize === 4 ? 2 : 3
   const rows = gridSize === 4 ? 2 : 3
 
+  // focusStock(focusCode) 변경 시 scroll + highlight (ST-7 / TR-2).
+  // injectedStock highlight effect 와 별도 분리 — 기존 M-2 timing race 튜닝을 건드리지 않는다.
+  useEffect(() => {
+    if (!focusCode) return
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current)
+      highlightTimeoutRef.current = null
+    }
+    const targetIndex = displayedStocks.findIndex((s) => s.code === focusCode)
+    if (targetIndex < 0) return
+    goToPage(Math.floor(targetIndex / Math.max(1, gridSize)))
+    const applyId = setTimeout(() => {
+      const wrapper = document.querySelector(`[data-focus-target="${focusCode}"]`)
+      const cell = wrapper?.querySelector('.chart-cell') ?? wrapper
+      if (cell) {
+        cell.classList.remove('cell-search-highlight')
+        void (cell as HTMLElement).offsetWidth
+        cell.classList.add('cell-search-highlight')
+        highlightTimeoutRef.current = setTimeout(() => {
+          cell.classList.remove('cell-search-highlight')
+          highlightTimeoutRef.current = null
+        }, 2500)
+      }
+    }, 0)
+    return () => {
+      clearTimeout(applyId)
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusCode])
+
   if (displayedStocks.length === 0) {
     return (
       <div className="chart-grid chart-grid--empty">
@@ -304,6 +354,7 @@ function ChartGridInner({
               data-highlight-target={
                 injectedStock?.code === stock.code ? stock.code : undefined
               }
+              data-focus-target={focusCode === stock.code ? stock.code : undefined}
               data-testid={testId}
             >
               <ChartCell

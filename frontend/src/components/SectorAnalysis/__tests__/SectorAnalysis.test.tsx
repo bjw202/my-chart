@@ -47,32 +47,31 @@ vi.mock('../../../contexts/MarketContext', () => ({
   useMarket: () => mockMarketState,
 }))
 
-// Mock TabContext — default: no crossTabParams
-let mockCrossTabParams: { sectorName?: string } | null = null
-const mockClearCrossTabParams = vi.fn()
-const mockSetCrossTabParams = vi.fn()
-
+// Mock TabContext useNavIntent (M3) — navigate spy; SectorAnalysis uses it for TR-4 detail-panel button.
+const mockNavigate = vi.fn()
 vi.mock('../../../contexts/TabContext', () => ({
-  useTab: () => ({
-    crossTabParams: mockCrossTabParams,
-    clearCrossTabParams: mockClearCrossTabParams,
-    setCrossTabParams: mockSetCrossTabParams,
-  }),
+  useNavIntent: () => ({ navigate: mockNavigate, intent: null }),
 }))
 
 // Import after mocks
 import { SectorAnalysis } from '../SectorAnalysis'
 import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { SelectionProvider } from '../../../contexts/SelectionContext'
 
-// AC-SUX-008/018: SectorAnalysis 는 AnalysisParamsContext(market/period 전역 단일 인스턴스) 를 소비 → Provider 로 감싼다
+// AC-SUX-008/018 + M3: SectorAnalysis 는 AnalysisParamsContext(market/period) + SelectionContext(selectedSector) 소비.
+// 실제 SelectionProvider 로 감싸 selectSector/clearSector 가 상태를 갱신하도록 한다 (TR-3/3b 검증).
 function renderWithProviders(ui: ReactElement) {
-  return render(<AnalysisParamsProvider>{ui}</AnalysisParamsProvider>)
+  return render(
+    <AnalysisParamsProvider>
+      <SelectionProvider>{ui}</SelectionProvider>
+    </AnalysisParamsProvider>,
+  )
 }
 
 describe('SectorAnalysis — initial render', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockNavigate.mockClear()
   })
 
   it('renders the sector-analysis container', () => {
@@ -113,7 +112,7 @@ describe('SectorAnalysis — initial render', () => {
 describe('SectorAnalysis — sector selection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockNavigate.mockClear()
   })
 
   it('shows detail panel when a sector row is clicked', async () => {
@@ -135,7 +134,7 @@ describe('SectorAnalysis — sector selection', () => {
 describe('SectorAnalysis — period toggle', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockNavigate.mockClear()
   })
 
   it('changes active period when 1W button is clicked', async () => {
@@ -162,25 +161,44 @@ describe('SectorAnalysis — period toggle', () => {
   })
 })
 
-describe('SectorAnalysis — cross-tab navigation', () => {
-  it('auto-selects sector from crossTabParams on mount', () => {
-    mockCrossTabParams = { sectorName: 'Technology' }
+describe('SectorAnalysis — TR-3/TR-3b row click (REQ-SUX-009 / AC-SUX-011)', () => {
+  it('TR-3: row click opens detail panel WITHOUT navigate', async () => {
+    const user = userEvent.setup()
     renderWithProviders(<SectorAnalysis />)
-    // Detail panel should be shown with the pre-selected sector
+    await user.click(screen.getByText('Technology'))
+    // 행 클릭은 selectedSector 설정 + 패널 오픈 — navigate 는 호출하지 않는다.
     expect(document.querySelector('.sector-detail-panel')).toBeInTheDocument()
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 
-  it('calls clearCrossTabParams after handling cross-tab navigation', () => {
-    mockCrossTabParams = { sectorName: 'Technology' }
+  it('TR-3b: re-clicking the selected row clears selection + closes panel', async () => {
+    const user = userEvent.setup()
     renderWithProviders(<SectorAnalysis />)
-    expect(mockClearCrossTabParams).toHaveBeenCalled()
+    await user.click(screen.getByText('Technology'))
+    expect(document.querySelector('.sector-detail-panel')).toBeInTheDocument()
+    // 재클릭 — 테이블 행(첫 번째 'Technology' 매치) 클릭 → clearSector → 패널 닫힘.
+    const matches = screen.getAllByText('Technology')
+    await user.click(matches[0])
+    expect(document.querySelector('.sector-detail-panel')).not.toBeInTheDocument()
+  })
+})
+
+describe('SectorAnalysis — TR-4 detail-panel button (REQ-SUX-010 / AC-SUX-012)', () => {
+  it('[이 섹터 종목 보기 →] 클릭 시 stock-explorer 로 navigate 한다', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<SectorAnalysis />)
+    await user.click(screen.getByText('Technology'))
+    // 상세 패널에 버튼이 실제 렌더된다 (현행 부재 → M3 신설).
+    const btn = screen.getByRole('button', { name: /view technology stocks/i })
+    await user.click(btn)
+    expect(mockNavigate).toHaveBeenCalledWith({ target: 'stock-explorer' })
   })
 })
 
 describe('SectorAnalysis — sorting', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockNavigate.mockClear()
   })
 
   it('clicking column header changes sort', async () => {
@@ -200,7 +218,7 @@ describe('SectorAnalysis — sorting', () => {
 describe('SectorAnalysis — market filter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockNavigate.mockClear()
   })
 
   it('renders market toggle buttons', () => {
@@ -237,7 +255,7 @@ describe('SectorAnalysis — market filter', () => {
 describe('AC-SUX-008 — 컨트롤 단일 인스턴스', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockNavigate.mockClear()
   })
 
   it('기간 토글 인스턴스가 정확히 1개 (getAllByTestId("period-toggle").length === 1)', () => {

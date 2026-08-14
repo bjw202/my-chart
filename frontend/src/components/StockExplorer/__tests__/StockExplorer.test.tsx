@@ -9,16 +9,21 @@ vi.mock('../../../api/stage', () => ({
   fetchStageOverview: vi.fn(),
 }))
 
-// Mock TabContext
-const mockNavigateToTab = vi.fn()
-const mockClearCrossTabParams = vi.fn()
-let mockCrossTabParams: { sectorName?: string; stockCodes?: string[] } | null = null
+// Mock TabContext (M3: activeTab + NavIntent) + SelectionContext (selectedSector/scopeFollow)
+const mockNavigate = vi.fn()
+const mockSetSectorScopeFollow = vi.fn()
+let mockSelectedSector: string | null = null
+let mockSectorScopeFollow = true
 
 vi.mock('../../../contexts/TabContext', () => ({
-  useTab: () => ({
-    navigateToTab: mockNavigateToTab,
-    crossTabParams: mockCrossTabParams,
-    clearCrossTabParams: mockClearCrossTabParams,
+  useTab: () => ({ activeTab: 'stock-explorer', setActiveTab: vi.fn() }),
+  useNavIntent: () => ({ intent: null, navigate: mockNavigate }),
+}))
+vi.mock('../../../contexts/SelectionContext', () => ({
+  useSelection: () => ({
+    selectedSector: mockSelectedSector,
+    sectorScopeFollow: mockSectorScopeFollow,
+    setSectorScopeFollow: mockSetSectorScopeFollow,
   }),
 }))
 
@@ -67,7 +72,8 @@ const originalDelays = [...RETRY_DELAYS_MS]
 describe('StockExplorer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCrossTabParams = null
+    mockSelectedSector = null
+    mockSectorScopeFollow = true
     vi.mocked(fetchStageOverview).mockResolvedValue(mockStageData)
     RETRY_DELAYS_MS.splice(0, RETRY_DELAYS_MS.length, 0, 0, 0)
   })
@@ -123,14 +129,12 @@ describe('StockExplorer', () => {
     expect(fetchStageOverview).toHaveBeenCalledTimes(4)
   })
 
-  it('should apply sector filter from crossTabParams', async () => {
-    mockCrossTabParams = { sectorName: 'Healthcare' }
+  it('should apply sector filter from SelectionContext (selectedSector + scopeFollow)', async () => {
+    // M3: sectorFilter = sectorScopeFollow ? selectedSector : null (AC-SUX-007).
+    mockSelectedSector = 'Healthcare'
+    mockSectorScopeFollow = true
 
     render(<StockExplorer />)
-
-    await waitFor(() => {
-      expect(mockClearCrossTabParams).toHaveBeenCalled()
-    })
 
     // Sector filter chip should be shown
     await waitFor(() => {
@@ -173,8 +177,31 @@ describe('StockExplorer', () => {
     // Click View Charts
     await user.click(screen.getByRole('button', { name: /view charts/i }))
 
-    expect(mockNavigateToTab).toHaveBeenCalledWith('chart-grid', {
-      stockCodes: ['005930'],
+    expect(mockNavigate).toHaveBeenCalledWith({
+      target: 'chart-grid',
+      payload: { stockCodes: ['005930'] },
+    })
+  })
+
+  it('AC-SUX-015 / TR-16: selectedSector change resets selectedStocks (no stale count)', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<StockExplorer />)
+    await waitFor(() => {
+      expect(screen.getByText('삼성전자')).toBeInTheDocument()
+    })
+    // 2 stocks selected
+    const checkboxes = screen.getAllByRole('checkbox')
+    await user.click(checkboxes[1])
+    await user.click(checkboxes[2])
+    expect(screen.getByText(/2 selected/i)).toBeInTheDocument()
+
+    // 모집단 변경: selectedSector 전환 → selectedStocks 초기화 (TR-16).
+    mockSelectedSector = 'Healthcare'
+    mockSectorScopeFollow = true
+    rerender(<StockExplorer />)
+
+    await waitFor(() => {
+      expect(screen.queryByText(/selected/i)).not.toBeInTheDocument()
     })
   })
 

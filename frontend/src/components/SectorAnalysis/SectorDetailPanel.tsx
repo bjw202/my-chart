@@ -8,6 +8,8 @@ import { fetchSectorDetail } from '../../api/sectors'
 
 interface SectorDetailPanelProps {
   sector: SectorRankItem
+  // TR-4 (REQ-SUX-010 / AC-SUX-012): 상세 패널에서 종목 탐색으로 진입. sectorScopeFollow 강제는 selectSector 경로에서 이미 true.
+  onViewStocks?: () => void
 }
 
 interface MetricCardProps {
@@ -49,7 +51,7 @@ function ReturnBar({ period, excessReturn }: { period: string; excessReturn: num
   )
 }
 
-export function SectorDetailPanel({ sector }: SectorDetailPanelProps): ReactElement {
+export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelProps): ReactElement {
   const [detail, setDetail] = useState<SectorDetailResponse | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
 
@@ -72,6 +74,18 @@ export function SectorDetailPanel({ sector }: SectorDetailPanelProps): ReactElem
   return (
     <div className="sector-detail-panel">
       <div className="sector-detail-panel-title">{sector.name}</div>
+
+      {/* TR-4 (AC-SUX-012): [이 섹터 종목 보기 →] — 종목 탐색으로 진입 + selectedStocks 초기화(StockExplorer consumer) */}
+      {onViewStocks && (
+        <button
+          type="button"
+          className="sector-view-stocks-btn"
+          onClick={onViewStocks}
+          aria-label={`View ${sector.name} stocks`}
+        >
+          이 섹터 종목 보기 →
+        </button>
+      )}
 
       {/* Returns comparison bars */}
       <div style={{ marginBottom: 12 }}>

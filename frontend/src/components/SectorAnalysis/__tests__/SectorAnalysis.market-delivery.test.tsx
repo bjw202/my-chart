@@ -11,9 +11,18 @@ vi.mock('../../../api/market', () => ({
   fetchMarketOverview: (...args: unknown[]) => mockFetchMarketOverview(...(args as [])),
 }))
 
-// SectorAnalysis 는 useTab 을 소비
+// SectorAnalysis (M3) 는 useNavIntent + useSelection 을 소비
 vi.mock('../../../contexts/TabContext', () => ({
-  useTab: () => ({ crossTabParams: null, clearCrossTabParams: vi.fn(), setCrossTabParams: vi.fn() }),
+  useNavIntent: () => ({ navigate: vi.fn(), intent: null }),
+}))
+vi.mock('../../../contexts/SelectionContext', () => ({
+  useSelection: () => ({
+    selectedSector: null,
+    selectSector: vi.fn(),
+    clearSector: vi.fn(),
+    sectorScopeFollow: true,
+    setSectorScopeFollow: vi.fn(),
+  }),
 }))
 
 import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'

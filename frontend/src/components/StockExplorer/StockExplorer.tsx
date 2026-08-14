@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { useTab } from '../../contexts/TabContext'
+import { useTab, useNavIntent } from '../../contexts/TabContext'
+import { useSelection } from '../../contexts/SelectionContext'
 import { fetchStageOverview } from '../../api/stage'
 import type { StageOverviewResponse } from '../../types/stage'
 import { StageDistributionBar } from './StageDistributionBar'
@@ -13,12 +14,16 @@ export const RETRY_DELAYS_MS = [2000, 4000, 8000]
 // Fetches /api/stage/overview, manages stage/sector filters, and handles cross-tab navigation
 
 export function StockExplorer(): ReactElement {
-  const { crossTabParams, clearCrossTabParams, navigateToTab } = useTab()
+  const { activeTab } = useTab()
+  const { intent, navigate } = useNavIntent()
+  // SM-5/SM-6: selectedSector·sectorScopeFollow 는 전역 SelectionContext 소유 (02 §3.3).
+  const { selectedSector, sectorScopeFollow, setSectorScopeFollow } = useSelection()
   const [data, setData] = useState<StageOverviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<number | null>(null)
-  const [sectorFilter, setSectorFilter] = useState<string | null>(null)
+  // sectorFilter 는 지역 상태가 아니다 — 스코프 추종 토글이 true 일 때만 전역 selectedSector 로 필터 (AC-SUX-007).
+  const sectorFilter = sectorScopeFollow ? selectedSector : null
   const [selectedStocks, setSelectedStocks] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -46,13 +51,27 @@ export function StockExplorer(): ReactElement {
     return () => { cancelled = true }
   }, [])
 
-  // Apply sector filter from cross-tab navigation (e.g. Sector Analysis tab)
+  // TR-16 (REQ-SUX-013 / AC-SUX-015): 모집단(selectedSector) 변경 시 selectedStocks 초기화.
+  //   render-time adjustment 패턴(React 권장) — effect 내 setState lint 회피.
+  //   Stage 필터 변경(TR-10/11)은 별도 state 이므로 여기서 건드리지 않는다.
+  const [prevSector, setPrevSector] = useState<string | null>(selectedSector)
+  if (selectedSector !== prevSector) {
+    setPrevSector(selectedSector)
+    setSelectedStocks(new Set())
+  }
+
+  // NavIntent consumer (stock-explorer target) — TR-4/TR-9 진입 시 selectedStocks 초기화.
+  //   3-condition guard (target / activeTab / lastHandledId); 전역 clear 없음 (AC-SUX-005).
+  const navLastHandled = useRef<number | null>(null)
   useEffect(() => {
-    if (crossTabParams?.sectorName) {
-      setSectorFilter(crossTabParams.sectorName)
-      clearCrossTabParams()
-    }
-  }, [crossTabParams, clearCrossTabParams])
+    if (!intent) return
+    if (intent.target !== 'stock-explorer') return
+    if (activeTab !== 'stock-explorer') return
+    if (navLastHandled.current === intent.id) return
+    navLastHandled.current = intent.id
+    // TR-16: 인구 변동 진입(TR-4 상세패널 버튼 / TR-9 종목버블) → selectedStocks 초기화.
+    setSelectedStocks(new Set())
+  }, [intent, activeTab])
 
   const handleStockSelect = (code: string) => {
     setSelectedStocks((prev) => {
@@ -77,7 +96,7 @@ export function StockExplorer(): ReactElement {
   }
 
   const handleViewCharts = () => {
-    navigateToTab('chart-grid', { stockCodes: [...selectedStocks] })
+    navigate({ target: 'chart-grid', payload: { stockCodes: [...selectedStocks] } })
   }
 
   const handleStageClick = (stage: string | null) => {
@@ -140,7 +159,12 @@ export function StockExplorer(): ReactElement {
               {sectorFilter}
               <button
                 type="button"
-                onClick={() => setSectorFilter(null)}
+                // AC-SUX-007 (TR-12): 칩 × → sectorScopeFollow=false (selectedSector는 유지).
+                //   TR-16: 모집단 변경(전체)이므로 selectedStocks 초기화.
+                onClick={() => {
+                  setSectorScopeFollow(false)
+                  setSelectedStocks(new Set())
+                }}
                 aria-label={`Remove sector filter ${sectorFilter}`}
               >
                 ×

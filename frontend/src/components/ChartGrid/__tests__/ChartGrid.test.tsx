@@ -4,7 +4,7 @@
  * v2.0.0 변경사항:
  * - ChartGrid는 더 이상 useScreen()을 직접 호출하지 않음 (REQ-PERF-001)
  * - filterResults prop으로 stocks 데이터를 받음
- * - crossTabParams 처리는 AppContent로 이전됨
+ * - legacy cross-tab param handling moved to AppContent
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
@@ -57,16 +57,18 @@ vi.mock('../../../contexts/ScreenContext', () => ({
 
 vi.mock('../../../contexts/TabContext', () => ({
   useTab: vi.fn(),
+  useNavIntent: vi.fn(),
 }))
 
 import { ChartGrid } from '../ChartGrid'
-import { useTab } from '../../../contexts/TabContext'
+import { useTab, useNavIntent } from '../../../contexts/TabContext'
 import { useScreen } from '../../../contexts/ScreenContext'
 
 const mockUseTab = vi.mocked(useTab)
+const mockUseNavIntent = vi.mocked(useNavIntent)
 const mockUseScreen = vi.mocked(useScreen)
 
-function setupDefaultMocks(crossTabParams = null) {
+function setupDefaultMocks(intent: unknown = null) {
   mockUseScreen.mockReturnValue({
     filters: {
       market_cap_min: null,
@@ -92,9 +94,11 @@ function setupDefaultMocks(crossTabParams = null) {
   mockUseTab.mockReturnValue({
     activeTab: 'chart-grid',
     setActiveTab: vi.fn(),
-    navigateToTab: vi.fn(),
-    crossTabParams,
-    clearCrossTabParams: vi.fn(),
+  })
+  // NavIntent consumer mock — ChartGrid consumes focusStock intents targeting chart-grid.
+  mockUseNavIntent.mockReturnValue({
+    intent: intent as ReturnType<typeof useNavIntent>['intent'],
+    navigate: vi.fn(),
   })
 }
 
@@ -150,7 +154,7 @@ describe('ChartGrid — v2.0.0 props 기반 렌더', () => {
     // 기본적으로 렌더 오류가 없어야 함
   })
 
-  it('crossTabParams 처리는 AppContent로 이전됨 — ChartGrid는 더 이상 applyFilters 직접 호출 안 함', () => {
+  it('M3 focusStock NavIntent(chart-grid) 수신 — ChartGrid는 applyFilters를 호출하지 않는다 (AppContent 소관)', () => {
     const mockApplyFilters = vi.fn(() => Promise.resolve())
     mockUseScreen.mockReturnValue({
       filters: {
@@ -173,7 +177,8 @@ describe('ChartGrid — v2.0.0 props 기반 렌더', () => {
       updateFilters: vi.fn(),
       clearResults: vi.fn(),
     })
-    setupDefaultMocks({ stockCodes: ['005930', '000660'] })
+    // ST-7 / TR-2: MarketOverview treemap click이 보내는 focusStock intent.
+    setupDefaultMocks({ id: 1, target: 'chart-grid', payload: { focusStock: '삼성전자' } })
 
     render(
       <ChartGrid
@@ -183,8 +188,7 @@ describe('ChartGrid — v2.0.0 props 기반 렌더', () => {
       />,
     )
 
-    // ChartGrid는 더 이상 crossTabParams로 applyFilters를 호출하지 않음
-    // (AppContent가 처리)
+    // ChartGrid는 focusStock을 highlight로 소비(applyFilters 호출 안 함) — 필터 적용은 AppContent 소관.
     expect(mockApplyFilters).not.toHaveBeenCalled()
   })
 })

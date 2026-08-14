@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act, cleanup } from '@testing-library/react'
+import { render, screen, act, cleanup, waitFor } from '@testing-library/react'
 import React, { Profiler, useCallback } from 'react'
 import type { StockItem } from '../../../types/stock'
 import type { StockMasterItem } from '../../../api/stocks'
@@ -83,6 +83,7 @@ vi.mock('../../../contexts/ScreenContext', () => ({
 
 vi.mock('../../../contexts/TabContext', () => ({
   useTab: vi.fn(),
+  useNavIntent: vi.fn(),
 }))
 
 vi.mock('../../../contexts/NavigationContext', () => ({
@@ -91,11 +92,12 @@ vi.mock('../../../contexts/NavigationContext', () => ({
 
 import { ChartGrid } from '../ChartGrid'
 import { useScreen } from '../../../contexts/ScreenContext'
-import { useTab } from '../../../contexts/TabContext'
+import { useTab, useNavIntent } from '../../../contexts/TabContext'
 import { useChartGrid } from '../../../hooks/useChartGrid'
 
 const mockUseScreen = vi.mocked(useScreen)
 const mockUseTab = vi.mocked(useTab)
+const mockUseNavIntent = vi.mocked(useNavIntent)
 const mockUseChartGrid = vi.mocked(useChartGrid)
 
 // ────────────────────────────────────────────────────────────
@@ -132,7 +134,7 @@ const stockB = makeStock('000002')
 const stockC = makeStock('000003')
 const stockX = makeStock('999999') // 필터 결과에 없는 종목
 
-function setupMocks(overrides: { crossTabParams?: unknown } = {}) {
+function setupMocks(overrides: { intent?: unknown } = {}) {
   mockUseScreen.mockReturnValue({
     filters: {
       market_cap_min: null,
@@ -158,9 +160,11 @@ function setupMocks(overrides: { crossTabParams?: unknown } = {}) {
   mockUseTab.mockReturnValue({
     activeTab: 'chart-grid',
     setActiveTab: vi.fn(),
-    navigateToTab: vi.fn(),
-    crossTabParams: overrides.crossTabParams ?? null,
-    clearCrossTabParams: vi.fn(),
+  })
+  // NavIntent consumer mock (M3) — ChartGrid consumes focusStock intents targeting chart-grid.
+  mockUseNavIntent.mockReturnValue({
+    intent: (overrides.intent ?? null) as ReturnType<typeof useNavIntent>['intent'],
+    navigate: vi.fn(),
   })
 }
 
@@ -774,5 +778,35 @@ describe('Regression (2026-05-12): cell wrapper height CSS Grid chain', () => {
     // wrapper가 block container라 자식에게 height 전달 못함 → chart-cell-canvas height 0.
     // 향후 wrapper의 display를 다시 block/flex로 바꾸면 이 test가 RED.
     expect(wrapper.style.display).toBe('contents')
+  })
+})
+
+// ────────────────────────────────────────────────────────────
+// M3: ChartGrid focusStock NavIntent consumer (ST-7 / TR-2 / AC-SUX-014)
+// ────────────────────────────────────────────────────────────
+describe('M3 — ChartGrid focusStock consumer (AC-SUX-014)', () => {
+  it('focusStock intent(chart-grid) targeting a present stock sets the focus marker', async () => {
+    const { ChartGrid } = await import('../ChartGrid')
+    const stockA = makeStock('005930') // name: "Stock 005930"
+    setupMocks({ intent: { id: 1, target: 'chart-grid', payload: { focusStock: 'Stock 005930' } } })
+
+    const { container } = render(
+      <ChartGrid filterResults={[stockA]} injectedStock={null} onSelectStock={vi.fn()} />,
+    )
+    // focusStock present → 3-condition guard 통과 → focusCode 설정 → cell 에 data-focus-target marker 부착.
+    await waitFor(() => {
+      expect(container.querySelector('[data-focus-target="005930"]')).not.toBeNull()
+    })
+  })
+
+  it('focusStock intent whose name is NOT in the grid sets no marker (no duplicate add)', async () => {
+    const { ChartGrid } = await import('../ChartGrid')
+    setupMocks({ intent: { id: 2, target: 'chart-grid', payload: { focusStock: '없는종목' } } })
+    const { container } = render(
+      <ChartGrid filterResults={[makeStock('000001')]} injectedStock={null} onSelectStock={vi.fn()} />,
+    )
+    await waitFor(() => {
+      expect(container.querySelector('[data-focus-target]')).toBeNull()
+    })
   })
 })
