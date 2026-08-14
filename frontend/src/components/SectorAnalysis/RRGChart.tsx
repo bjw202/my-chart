@@ -1,11 +1,20 @@
 // @MX:NOTE: [AUTO] RRGChart - StockCharts 스타일 Relative Rotation Graph
 // @MX:SPEC: SPEC-TOPDOWN-002B
-// DB 전체 기간에서 8주 윈도우 슬라이딩, KOSPI 스파크라인 + 하이라이트
+// DB 전체 기간에서 8주 윈도우 슬라이딩, 벤치마크 스파크라인 + 하이라이트
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { fetchRRGData } from '../../api/rrg'
 import type { RRGResponse, RRGSectorItem, KospiPoint } from '../../types/rrg'
+import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
+
+// 시장 필터 → 벤치마크 이름 (VZ-7/VZ-10). RRG 기준선 100 = 벤치마크 동일 성과.
+// @MX:NOTE: [AUTO] RRG 벤치마크 라벨은 market 필터 추종. 응답에 benchmark 필드 없어 client 파생.
+const MARKET_BENCHMARK_LABEL: Record<string, string> = {
+  all: '전체 상한가중',
+  kospi: 'KOSPI',
+  kosdaq: 'KOSDAQ',
+}
 
 const SECTOR_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
@@ -22,19 +31,29 @@ const QUADRANT_COLORS = {
 
 const TRAIL_WINDOW = 8 // 8주 트레일 윈도우
 
+// VZ-8 (AC-SUX-045): RRG 축 자동 대칭 반폭. half = max(5, ceil(maxDev × 1.1)).
+// 100 중심 대칭(min=100−half, max=100+half). 최소 반폭 5 로 과확대 방지.
+// @MX:ANCHOR: [AUTO] RRG 축 반폭 공식 — plan §3.3 / 02-screen-flow.md §9.4 VZ-8 리터럴 고정.
+// @MX:REASON: 공식(×1.1 계수·max(5,…) 하한) 변경 시 100-중심 대칭·과확대 방지가 동시에 깨짐. AC-SUX-045 대조 단언이 본 함수에 의존.
+export function rrgHalf(maxDev: number): number {
+  return Math.max(5, Math.ceil(maxDev * 1.1))
+}
+
 interface RRGChartProps {
   onSectorClick?: (sectorName: string) => void
 }
 
-// ── KOSPI 스파크라인 컴포넌트 ──
+// ── 벤치마크 스파크라인 컴포넌트 ──
 function KospiSparkline({
-  kospiData, allDates, windowEnd, windowSize, onWindowEndChange,
+  kospiData, allDates, windowEnd, windowSize, onWindowEndChange, benchmarkLabel, trailStartDate,
 }: {
   kospiData: KospiPoint[]
   allDates: string[]
   windowEnd: number
   windowSize: number
   onWindowEndChange: (idx: number) => void
+  benchmarkLabel: string
+  trailStartDate: string | null
 }): ReactElement {
   const svgWidth = 700
   const svgHeight = 55
@@ -49,7 +68,7 @@ function KospiSparkline({
     )
   }
 
-  // allDates 범위에 해당하는 KOSPI 데이터 매핑
+  // allDates 범위에 해당하는 벤치마크 데이터 매핑
   const dateSet = new Set(allDates)
   const relevantKospi = kospiData.filter((k) => dateSet.has(k.date))
   if (relevantKospi.length < 2) {
@@ -91,7 +110,8 @@ function KospiSparkline({
     <div className="rrg-sparkline-container">
       <div className="rrg-sparkline-header">
         <span className="rrg-sparkline-title">
-          KOSPI ({TRAIL_WINDOW} weeks ending {endDateLabel})
+          {/* VZ-9/VZ-10: 벤치마크 라벨(market 추종) + lookback(TRAIL_WINDOW) + 궤적 시작일. */}
+          {benchmarkLabel} ({TRAIL_WINDOW}주 lookback{trailStartDate ? ` · 궤적 시작 ${trailStartDate}` : ''} · 종료 {endDateLabel})
         </span>
         <span className="rrg-sparkline-price">
           {currentClose.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
@@ -114,6 +134,9 @@ function KospiSparkline({
 
 // ── 메인 RRG 차트 ──
 export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
+  // VZ-10: 벤치마크 라벨은 market 필터 추종 (데이터 시리즈 자체는 API 미지원으로 debt).
+  const { market } = useAnalysisParams()
+  const benchmarkLabel = MARKET_BENCHMARK_LABEL[market] ?? '전체 상한가중'
   const [data, setData] = useState<RRGResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -189,11 +212,12 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       },
     }
 
+    // VZ-7: 사분면 라벨에 벤치마크 대비 의미 병기. 벤치마크 이름은 market 필터 추종.
     const quadrantLabels = [
-      { text: 'Leading', x: '80%', y: '8%', color: 'rgba(34,197,94,0.5)' },
-      { text: 'Weakening', x: '80%', y: '90%', color: 'rgba(250,204,21,0.5)' },
-      { text: 'Lagging', x: '8%', y: '90%', color: 'rgba(239,68,68,0.5)' },
-      { text: 'Improving', x: '8%', y: '8%', color: 'rgba(96,165,250,0.5)' },
+      { text: `Leading (${benchmarkLabel} 대비 강함·개선)`, x: '80%', y: '8%', color: 'rgba(34,197,94,0.5)' },
+      { text: `Weakening (${benchmarkLabel} 대비 강함·약화)`, x: '80%', y: '90%', color: 'rgba(250,204,21,0.5)' },
+      { text: `Lagging (${benchmarkLabel} 대비 약함·미개선)`, x: '8%', y: '90%', color: 'rgba(239,68,68,0.5)' },
+      { text: `Improving (${benchmarkLabel} 대비 약함·개선)`, x: '8%', y: '8%', color: 'rgba(96,165,250,0.5)' },
     ]
 
     const sectorSeries = visible.map((sector, idx) => {
@@ -222,6 +246,17 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       }
     }).filter(Boolean)
 
+    // VZ-8 (AC-SUX-045): 100 중심 자동 대칭 축. half = max(5, ceil(max|v−100| × 1.1)).
+    // 표시 중인 점의 rs_ratio·rs_momentum 에서 최대 편차를 측정. 최소 반폭 5(과확대 방지).
+    let maxDev = 0
+    for (const sector of visible) {
+      const slice = sector.trail.slice(winStart, winEndIdx)
+      for (const p of slice) {
+        maxDev = Math.max(maxDev, Math.abs(p.rs_ratio - 100), Math.abs(p.rs_momentum - 100))
+      }
+    }
+    const half = rrgHalf(maxDev)
+
     return {
       backgroundColor: 'transparent',
       graphic: quadrantLabels.map((q) => ({
@@ -235,7 +270,7 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
         axisLine: { lineStyle: { color: '#9ca3af' } },
         axisLabel: { color: '#9ca3af', fontSize: 11 },
         splitLine: { show: true, lineStyle: { color: '#2d2d44', type: 'dashed' } },
-        min: 75, max: 125,
+        min: 100 - half, max: 100 + half,
       },
       yAxis: {
         type: 'value', name: 'JdK RS-Momentum', nameLocation: 'middle', nameGap: 50,
@@ -243,7 +278,7 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
         axisLine: { lineStyle: { color: '#9ca3af' } },
         axisLabel: { color: '#9ca3af', fontSize: 11 },
         splitLine: { show: true, lineStyle: { color: '#2d2d44', type: 'dashed' } },
-        min: 75, max: 125,
+        min: 100 - half, max: 100 + half,
       },
       legend: { show: false },
       tooltip: {
@@ -267,7 +302,7 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       },
       series: [bgSeries, ...sectorSeries],
     }
-  }, [visibleSectors, windowEnd])
+  }, [visibleSectors, windowEnd, benchmarkLabel])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleChartClick = useCallback((params: any) => {
@@ -281,8 +316,15 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
 
   const option = buildOption(data.sectors)
 
+  // VZ-9: 궤적 시작일 = 이용 가능한 가장 이른 trail 날짜 (응답에 trail_start_date 필드 없어 client 파생).
+  const trailStartDate = allDates.length > 0 ? allDates[0] : null
+
   return (
     <div className="rrg-chart-container">
+      {/* VZ-7: 기준선 100 = 벤치마크 동일성 상설 고지 (벤치마크 이름은 market 추종). */}
+      <div className="rrg-baseline-legend" data-testid="rrg-baseline-legend">
+        기준선 100 = 벤치마크({benchmarkLabel})와 동일 성과 · 롤링 정규화 미적용(표준 JdK RRG와 발산)
+      </div>
       <div className="rrg-main-area">
         <KospiSparkline
           kospiData={data.kospi}
@@ -290,6 +332,8 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
           windowEnd={windowEnd}
           windowSize={TRAIL_WINDOW}
           onWindowEndChange={setWindowEnd}
+          benchmarkLabel={benchmarkLabel}
+          trailStartDate={trailStartDate}
         />
         <div className="rrg-chart-body">
           <ReactECharts
