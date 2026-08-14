@@ -187,6 +187,18 @@ Tier L이나 `design.md` / `research.md`를 신규 작성하지 않는다 — `d
 - `git push origin main` → `a18417f..cfdb87a main -> main`(fast-forward, 병렬 세션 race 무).
 - `git show --stat` 3 commit → `.agency/*`·`expert-*.md`·`.claude/agents/*`·`.moai/config|rules|project` migration mass **미유입**(B-CRITICAL git-add discipline — 명시적 경로만 staging). 단 BumpChart.tsx 는 AC-SUX-028 정당 대상으로 M4-3 에 포함(선행 PRESERVE 계약 버전 비분리 — 위 §1.2 항 참조).
 
+### M5 Baseline (착수 시점 재측정) + AC-SUX-048 RED-FIRST 관측
+- **tsc baseline (M5 착수)**: `grep -cE "error TS"` → **28** (M4 종료와 동일, 비증가). `grep -c "TS2353"` → **0** (HARD 게이트 (a) 불변).
+- **vitest baseline (M5 착수)**: **490 tests pass** (M4 종료값과 동일) + 2 e2e file-load failures(선행 결함 불변).
+- **HEAD**: `5e3ff65` (M4 + BumpChart connectNulls PRESERVE 확정). `git fetch origin main && git rev-list --left-right origin/main...HEAD` → `0 0`(synced).
+- **AC-SUX-048 RED-FIRST (Lesson #9 — 대조 단언 RED 실증)**: M5 시각화 착수 전, 색상 채널 회귀 금지 가드(`StockBubbleChart.ac048-guard.test.tsx`)를 작성·GREEN 관측(5 passed)한 뒤, `SECTOR_MINOR_PALETTE[0]` 를 `'#4E79A7' → '#000000'` 으로 변형(mutate)해 **RED 를 관측**했다:
+  ```
+  AssertionError: expected [ '#000000', '#F28E2B', …(8) ] to deeply equal [ '#4E79A7', '#F28E2B', …(8) ]
+  - Expected / + Received → "#4E79A7" ↔ "#000000"
+  Tests: 2 failed | 3 passed (5)
+  ```
+  변형 직후 즉시 되돌림(revert) — `git diff frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` → **빈 diff**(byte-identical 복원 확인). 이로써 가드가 색상 배열 변화를 실제로 포착함(항진명제 아님)을 실증. REQ-SUX-056 섹터 버블 색상 구현이 종목 버블 색상 배열에 영향을 주지 않음을 본 가드가 지속 단언한다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 > 반자율 progression: **M4 GREEN** (표·컨트롤 규약 — 화면별 3 commit 통과). M5~M7 잔여(시각화 / 로딩상태 / 회귀게이트). 본 신호는 M1+M2+M3+M4 구간 — 전 run-phase 완료 아님. **M5 착수 전 STOP(반자율 checkpoint 대기)**.
