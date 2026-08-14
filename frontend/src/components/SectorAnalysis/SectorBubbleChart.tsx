@@ -15,6 +15,7 @@ import {
   SECTOR_BUBBLE_R_MAX,
 } from './bubbleRadius'
 import type { SizePeriod } from './bubbleRadius'
+import { metricText, toMetricValue } from '../common/MetricCell'
 
 // 시장 필터 → 벤치마크 이름 (VZ-10). X=0 초과수익률 = 벤치마크 동일 성과.
 // @MX:NOTE: [AUTO] 벤치마크 절대 수익률 값(+1.88% 등)은 backend 가 미전달 — VZ-5 절대값은 debt(AC-SUX-042 섹터 PASS-WITH-DEBT).
@@ -201,18 +202,19 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
           const d = params.data.value as (string | number)[]
           const missing = d[7] === 1
           const name = d[4] as unknown as string
-          const excessReturn = Number(d[0]).toFixed(2)
-          const rsAvg = Number(d[1]).toFixed(1)
-          const periodReturn = Number(d[3]).toFixed(2)
-          const sign = Number(d[3]) >= 0 ? '+' : ''
+          // D2: 결측·저신뢰 표기는 표 셀(MetricCell)과 같은 metricText 로 생성한다.
+          // 값이 있을 때의 포맷은 종전과 동일하다 — 바뀐 것은 결측 경로뿐이다.
+          const excessReturn = metricText(toMetricValue(d[0]), n => `${n.toFixed(2)}%`)
+          const rsAvg = metricText(toMetricValue(d[1]), n => n.toFixed(1))
+          const periodReturn = metricText(toMetricValue(d[3]), n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`)
           const tvLine = missing
             ? '거래대금: 데이터 없음'
             : `거래대금: ${formatTradingValueEok(Number(d[5]))}`
           return [
             `<b>${name}</b>`,
-            `초과수익률: ${excessReturn}%`,
+            `초과수익률: ${excessReturn}`,
             `RS 평균: ${rsAvg}`,
-            `기간수익률: ${sign}${periodReturn}%`,
+            `기간수익률: ${periodReturn}`,
             tvLine,
           ].join('<br/>')
         },

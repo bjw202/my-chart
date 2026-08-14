@@ -7,6 +7,7 @@ import ReactECharts from 'echarts-for-react'
 import { fetchRRGData } from '../../api/rrg'
 import type { RRGResponse, RRGSectorItem, KospiPoint } from '../../types/rrg'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
+import { metricText, toMetricValue } from '../common/MetricCell'
 
 // 시장 필터 → 벤치마크 이름 (VZ-7/VZ-10). RRG 기준선 100 = 벤치마크 동일 성과.
 // @MX:NOTE: [AUTO] RRG 벤치마크 라벨은 market 필터 추종. 응답에 benchmark 필드 없어 client 파생.
@@ -292,10 +293,12 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
           const q = Number(pt[0]) > 100
             ? (Number(pt[1]) > 100 ? 'Leading' : 'Weakening')
             : (Number(pt[1]) > 100 ? 'Improving' : 'Lagging')
+          // D2: 결측 표기는 표 셀(MetricCell)과 같은 metricText 로 생성한다.
+          // 값이 있을 때의 포맷(toFixed(2))은 종전과 동일하다.
           return [
             `<b>${params.seriesName}</b>`,
-            `RS-Ratio: ${Number(pt[0]).toFixed(2)}`,
-            `RS-Momentum: ${Number(pt[1]).toFixed(2)}`,
+            `RS-Ratio: ${metricText(toMetricValue(pt[0]), n => n.toFixed(2))}`,
+            `RS-Momentum: ${metricText(toMetricValue(pt[1]), n => n.toFixed(2))}`,
             `Quadrant: ${q}`,
           ].join('<br/>')
         },

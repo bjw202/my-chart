@@ -7,6 +7,7 @@ import ReactECharts from 'echarts-for-react'
 import { fetchSectorHistory } from '../../api/history'
 import type { SectorHistoryItem } from '../../api/history'
 import { formatWeeksSpan } from './bumpFormat'
+import { metricText } from '../common/MetricCell'
 
 // 섹터별 구분색 팔레트 (12색)
 const SECTOR_COLORS = [
@@ -188,7 +189,9 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
         // 해당 섹터·날짜의 composite_score를 sectors에서 찾아 표시
         const sector = sectors.find(s => s.name === sectorName)
         const weekData = sector?.history.find(w => w.date === weekDate)
-        const score = weekData ? weekData.composite_score.toFixed(2) : '-'
+        // D2: 결측 표기는 표 셀(MetricCell)과 같은 metricText 로 생성한다.
+        // 종전의 ASCII '-' 는 표의 '–'(MISSING_TEXT)와 달라 같은 결측이 화면마다 다르게 보였다.
+        const score = metricText(weekData?.composite_score, n => n.toFixed(2))
 
         return [
           `<b>${sectorName}</b>`,
