@@ -156,9 +156,14 @@
 
 ### AC-SUX-019 — 제외 섹터 가시성 (규칙 CT-2)
 
+> **검증 범위 — Table · 섹터 Bubble · RRG 한정. Bump는 대상이 아니다.** O-U9(=②의 O-A7)가 **"AG-5를 Bump에 미적용"으로 확정**되었다(2026-08-14 사용자 결정, §7 참조). Bump는 AG-5 제외를 적용하지 않으므로 제외 영역을 렌더하지 않는다 — 이는 미구현이 아니라 **계약**이다.
+
 - **Given** 응답 `excluded: [{sector:'디스플레이', reason:'insufficient_members', count:4}, {sector:'스마트폰', ..., count:4}]`
 - **Then** 표 하단에 `순위 대상 제외 (2)` 영역이 렌더되고 각 항목에 섹터명·사유·종목 수가 표시된다.
 - **And** 해당 섹터가 `data[]`에 없어도 **화면에서 사라지지 않는다**.
+- **And (Bump 반대 방향 단언 — 미적용 계약의 실증)** 같은 `market` 파라미터의 `/sectors/history` 응답을 렌더한 Bump 차트에는 `순위 대상 제외` 영역이 **렌더되지 않으며**, `excluded`로 분류된 섹터(`디스플레이`·`스마트폰`)의 선이 Bump에 **정상적으로 존재한다**.
+  - **대조 단언 (Lesson #9 — 되돌림 RED 실증 필수)**: 이 단언은 항진명제가 아니다. Bump 소비자에 Table과 동일한 `excluded` 필터링을 주입하는 변형 `mut_bump_applies_ag5`(렌더 직전 `data[]`의 섹터 집합으로 Bump 시계열을 교집합)를 적용하면 두 섹터의 선이 사라져 **RED가 관측되어야 한다**. RED 출력을 verbatim 캡처해 `progress.md §E.2`에 기록하고, 트리 복원을 `git status --short`로 증명한다. 실증하지 못하면 GREEN이 아니라 **Gaps**로 기록한다.
+  - **배경 실측 (2026-08-14)**: `/sectors/history` → `compute_sector_history` → `compute_sector_ranking` → `_compute_sector_metrics`. 이 함수는 `my_chart/analysis/sector_metrics.py:947-948`에서 *"AG-5 제외는 여기에 적용하지 않는다 — 규칙 AG-5는 `data[]`가 소유한다"* 를 명시한다. `get_sector_history`(`backend/services/sector_advanced_service.py:218`)는 `SectorHistoryResponse` 생성 3곳 어디에서도 `excluded=`를 전달하지 않으므로 봉투의 `excluded[]`는 항상 빈 배열이다.
 
 ### AC-SUX-020 — 선택 섹터가 제외될 때 (규칙 CT-3)
 
@@ -455,7 +460,7 @@
 | R2 | 정렬을 바꾸면 안내 띠가 뜬다 | 고지 띠 렌더 단언 + 아래 grep |
 | R3 | 버블 크기 분포가 바뀐다 (15/29가 2px 밴드에 뭉치던 상태 해소) | 크기 배열의 표준편차가 선형 방식 대비 증가 |
 | R4 | RRG 궤적이 짧아진다 | `trail.length < history.length` |
-| R5 | KOSPI 필터 시 순위표 행 수가 줄고 하단 제외 영역이 생긴다 | 행 수 감소 + `excluded` 영역 렌더. **②의 O-A7 결정 선행 필요** (아래) |
+| R5 | KOSPI 필터 시 순위표 행 수가 줄고 하단 제외 영역이 생긴다 | 행 수 감소 + `excluded` 영역 렌더. **검증 범위 = Table · 섹터 Bubble · RRG 한정** (Bump 제외 — O-U9 확정, 아래) |
 
 #### R1 / R2 — "그런 테스트가 없음을 확인한다"를 실행 가능하게
 
@@ -476,13 +481,18 @@
   ```
   → **0행**. 단, `rank` 정렬 상태에서 띠가 없어야 한다는 AC-SUX-022의 정당한 단언은 **allowlist로 명시 제외**한다(테스트 파일명 + 라인 주석으로 표시).
 
-#### R5 — ②의 O-A7 의존 (교차 참조)
+#### R5 — O-U9(②의 O-A7) **해결** (2026-08-14 사용자 결정)
 
-R5와 **AC-SUX-019**(제외 섹터 가시성)는 "AG-5(최소 구성수 5)가 Bump에도 적용된다"를 암묵 전제로 한다. 그런데 그 적용 여부는 **②의 §7 O-A7에서 미결**이다(`01 §5.4 AG-5`는 "순위·버블·RRG"만 명시하고 Bump를 언급하지 않는다).
+R5와 **AC-SUX-019**(제외 섹터 가시성)는 v0.3.0까지 "AG-5(최소 구성수 5)가 Bump에도 적용된다"를 암묵 전제로 했다. 그 전제는 **거짓이었다.**
 
-- 결정 전에는 R5·AC-SUX-019의 검증 범위를 **Table·Bubble·RRG로 한정**하고 Bump는 제외한다.
-- O-A7이 "Bump에도 적용"으로 결정되면 R5에 Bump 케이스를 추가하고, 특정 주에만 5 미만이 되는 섹터의 **선 끊김**(`connectNulls:false`, §1.2 보존 항목) 동작을 함께 단언한다.
-- **③ 착수 전 ②의 O-A7 해소를 확인한다** — plan.md §0 차단 항목.
+**결정: AG-5는 Bump에 적용하지 않는다.** `01 §5.4 AG-5`가 "순위·버블·RRG"만 명시하고 Bump를 언급하지 않은 것이 곧 계약이며, ②의 출하 구현도 이미 그렇게 동작한다(`sector_metrics.py:947-948` 주석 + `get_sector_history`의 `excluded=` 미전달 — AC-SUX-019 배경 실측 참조). 따라서 ②의 백엔드 변경은 **없다.**
+
+확정된 검증 범위:
+
+- R5·AC-SUX-019의 검증 범위는 **Table · 섹터 Bubble · RRG로 한정**한다. Bump는 대상이 아니다.
+- Bump에 대해서는 **반대 방향 단언**을 둔다 — 제외 섹터의 선이 Bump에 **남아 있어야 한다**(AC-SUX-019의 `mut_bump_applies_ag5` 대조 변형). 범위에서 뺀 채 아무 단언도 두지 않으면, 이후 누군가 Bump에 AG-5를 넣어도 어떤 AC도 반대하지 않는다 — Lesson #3(신규 동작이 어떤 게이트에도 안 걸려 그림자 결함이 된 선례)의 재현 경로다.
+- **`connectNulls:false` 선 끊김 단언은 도입하지 않는다.** 그 단언은 "Bump에도 적용" 분기에서만 필요했다. `connectNulls:false` 자체는 §1.2 보존 항목으로 **그대로 유지**되며(다른 사유의 결측 처리), 본 결정으로 변경되지 않는다.
+- **잔여 위험 (범위 밖, 관측만)**: Bump와 Table은 서로 다른 섹터 모집단 위에서 순위를 매긴다(Bump = 전 섹터, Table `data[]` = AG-5 통과 섹터). 따라서 같은 주·같은 섹터의 rank가 두 화면에서 다를 수 있다. 이는 본 결정의 **의도된 귀결**이며 회귀가 아니다. `CT-4`(AC-SUX-021)의 rank 일치 단언은 **순위표 내부**(rank 열 ↔ 행 순서)에 한정되며 Table↔Bump 교차 일치를 요구하지 않는다 — 요구하도록 확대하지 말 것.
 
 ### ~~AC-SUX-057~~ — **결번** (REQ-SUX-054 철회)
 
@@ -559,7 +569,8 @@ R5와 **AC-SUX-019**(제외 섹터 가시성)는 "AG-5(최소 구성수 5)가 Bu
 - [ ] **AC-SUX-032 (default 진입 가시성) PASS** — Lesson #3 [HARD] 게이트
 - [ ] **AC-SUX-048 (색상 채널 회귀 금지) PASS** — `SPEC-SECTOR-MINOR-COLOR-001` 보존 계약
 - [ ] `SPEC-SECTOR-AGGREGATION-001` close 확인
-- [ ] **②의 O-A7(최소 구성수 5의 Bump 적용) 해소 확인** — AC-SUX-019 / AC-SUX-056 R5가 의존 (§7 O-U9)
+- [x] ~~**②의 O-A7(최소 구성수 5의 Bump 적용) 해소 확인**~~ — **해결 (2026-08-14): 미적용 확정.** AC-SUX-019 / AC-SUX-056 R5의 검증 범위를 Table·섹터 Bubble·RRG로 한정. ② 백엔드 변경 없음
+- [ ] **AC-SUX-019의 Bump 반대 방향 단언 PASS** — 제외 섹터의 선이 Bump에 남아 있음 + `mut_bump_applies_ag5` 되돌림 **RED 관측** verbatim 기록 (Lesson #9 [HARD] 게이트)
 - [ ] **tsc 게이트 (a) HARD**: `npx tsc -p tsconfig.app.json --noEmit 2>&1 | grep -c "error TS2353"` → **0**
 - [ ] **tsc 게이트 (b) 회귀**: 총 오류 수 `<= N` (baseline `N`을 progress.md §E.2에 기록 — 측정 시점 실측 `N = 33`) **AND** ③가 수정한 파일에서 NEW 오류 0건
 - [ ] (b)의 완화가 (a)를 약화시키지 않았음을 확인 — `TS2353 == 0`은 총량 조건과 무관하게 독립 HARD 게이트다
@@ -571,5 +582,5 @@ R5와 **AC-SUX-019**(제외 섹터 가시성)는 "AG-5(최소 구성수 5)가 Bu
 - [ ] 모바일(<768px) 시뮬레이션에서 hover-only 정보 0건 (Lesson #1, A5)
 - [ ] `@MX:ANCHOR` — `NavIntent` 소비 조건, `AnalysisParamsContext` 소유권, 버블 크기 매핑 3지점
 - [ ] ship commit에 frontmatter `status` 갱신 포함 (Lesson #6)
-- [ ] §7 미결 해소 상태 확인 — **해결됨**: O-U1(비활성+툴팁, 잠정) · O-U4(기간별 고정 눈금) · O-U6(스크롤·하이라이트 or 추가) · O-U7(접기 우선순위). **미결 유지**: O-U2(URL 동기화) · O-U3(2섹터 비교) · O-U5(워치리스트 접점) · O-U8(저커버리지 시각 인코딩) · **O-U9(②의 O-A7 전파 — 착수 전 해소 필요)**
+- [ ] §7 미결 해소 상태 확인 — **해결됨**: O-U1(비활성+툴팁, 잠정) · O-U4(기간별 고정 눈금) · O-U6(스크롤·하이라이트 or 추가) · O-U7(접기 우선순위). **추가 해결**: **O-U9(②의 O-A7 전파 — 2026-08-14 AG-5 Bump 미적용 확정)**. **미결 유지**: O-U2(URL 동기화) · O-U3(2섹터 비교) · O-U5(워치리스트 접점) · O-U8(저커버리지 시각 인코딩) — **전부 착수 차단 항목 아님**
 - [ ] §0.1 정량 지표가 자동 검증 3항목(rank 불일치 0 / 기준일 불일치 경고 0 / 되돌아가기 UI 0)으로 측정됨. "탭 전환 4회 이하"는 측정 절차 부재로 삭제되어 정성 지표로 이관됨

@@ -8,8 +8,10 @@
 
 | ID | 사항 | 상태 | 차단 대상 |
 | --- | --- | --- | --- |
-| ②의 close | `SPEC-SECTOR-AGGREGATION-001` `status: completed` | 선행 | 전 마일스톤 (필드 없이는 렌더 불가) |
-| **O-U9 / ②의 O-A7** | 최소 구성수 5(AG-5)가 Bump에도 적용되는가 | **미결 — 차단 중** | **M4의 AC-SUX-019**, **M7의 AC-SUX-056 R5**. ③ 단독 결정 불가 — ②에서 해소해야 한다. 결정 전에는 두 AC의 검증 범위를 Table·Bubble·RRG로 한정 |
+| ~~②의 close~~ | `SPEC-SECTOR-AGGREGATION-001` `status: completed` | **해결 (2026-08-14)** — v0.5.0 `completed`, sync commit `13d74d0`, main `65dfe2d`. AC-SAG-037 Gap도 `b703dc2`로 종결 | 차단 해제 |
+| ~~**O-U9 / ②의 O-A7**~~ | 최소 구성수 5(AG-5)가 Bump에도 적용되는가 | **해결 (2026-08-14 사용자 결정)** — **미적용 확정**. ②의 출하 구현이 이미 미적용이므로 백엔드 변경 없음 | M4·M7 차단 해제. AC-SUX-019 / AC-SUX-056 R5의 범위를 Table·섹터 Bubble·RRG로 한정 + Bump 반대 방향 단언 신설 |
+
+**2026-08-14 기준 — run 착수 차단 항목이 전부 해소됐다.** `blocking_before_run: []`. 단, 본 개정으로 plan-artifact hash가 바뀌었으므로 `/moai run` Phase 1의 **plan-audit는 재실행이 필수**다(v0.3.0 PASS 0.87은 skip 근거로 무효).
 | ~~O-U4~~ | 크기 범례 값 산출 | **해결** — 기간별 고정 눈금 (1W 100억/1,000억/1조 · 1M 500억/5,000억/5조 · 3M 1,000억/1조/10조) | M5 차단 해제 |
 | ~~O-U6~~ | `focusStock` 수신 시 차트 그리드 동작 | **해결** — 있으면 스크롤·하이라이트, 없으면 추가. **교체 금지** | M3 차단 해제 |
 | ~~O-U7~~ | 종목 표 12열의 좁은 화면 처리 | **해결** — 섹터비중 → Vol배 → 52W고 순 접기. 기간 3열·Stage·RS·Name 불변 | M4 차단 해제 |
@@ -66,7 +68,7 @@
   - **좁은 화면 열 접기 (REQ-SUX-058, O-U7 결정)**: 섹터비중 → Vol배 → 52W고 순. 기간 3열·Stage·RS·Name은 접지 않는다(Lesson #3). 3열 접은 뒤에도 넘치면 가로 스크롤. **접기 순서는 단일 위치의 상수 배열**로 정의한다 — 컴포넌트마다 다시 적으면 발산한다
 - Bump: `weeks` 컨트롤 + `span_days` 표기
 - RRG/Bump: 기간 토글 **비활성 + 툴팁**(CT-13, O-U1 결정 — 숨기지 않는다)
-- **AC-SUX-019(제외 섹터)는 ②의 O-A7 미해소 시 Table·Bubble·RRG로 범위 한정** — Bump 케이스는 결정 후 추가
+- **AC-SUX-019(제외 섹터)의 검증 범위 = Table·섹터 Bubble·RRG 한정** (O-U9 확정 — AG-5 Bump 미적용). Bump 케이스는 **추가하지 않는다**. 대신 Bump에는 **반대 방향 단언**을 구현한다 — 제외 섹터의 선이 남아 있어야 하며, `mut_bump_applies_ag5` 되돌림에서 RED를 관측해 `progress.md §E.2`에 verbatim 기록한다(Lesson #9)
 - RED: AC-SUX-019 ~ 032, AC-SUX-058, AC-SUX-061 (**AC-SUX-057은 결번**)
 
 ### M5 — 시각화 (차트별 개별 commit)
@@ -90,7 +92,7 @@
 ### M7 — 회귀 게이트 + 성능 측정
 
 - **tsc baseline 기록** — run 착수 시점(M1 이전)에 `npx tsc -p tsconfig.app.json --noEmit`의 총 오류 수 `N`과 **파일:코드 목록 전량**을 progress.md §E.2에 남긴다. 목록이 없으면 (b) 게이트의 "NEW 오류" 판정이 불가능하다. 측정 시점 실측: `N = 33`, `TS2353 = 1`
-- AC-SUX-056 (R1·R2 grep 부재 확인 포함, R3·R4, **R5는 ②의 O-A7 해소 후 Bump 케이스 추가**)
+- AC-SUX-056 (R1·R2 grep 부재 확인 포함, R3·R4, **R5는 Table·섹터 Bubble·RRG 한정** — O-U9 확정으로 Bump 케이스는 추가하지 않는다)
 - §0.3 제거 목록 X1~X6 grep 확인
 - §1.2 보존 대상 10항목 회귀 단언
 - §0.2 성능 측정 → progress.md §E.2 (특히 리렌더 범위)

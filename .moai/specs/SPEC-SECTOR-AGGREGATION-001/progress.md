@@ -13,7 +13,7 @@ design_research_substitute:
 ac_count: 50          # 0.5.0: AC-SAG-050(INV-CAP-1 작성 규약의 기계적 집행 — 정적 스캔 2종, N1 구조적 종결) 신설. 0.4.2: AC-SAG-049(상한 재배분 알고리즘 종료·불변식 계약 — 무작위 스윕, D17) 신설. 0.4.1: AC-SAG-048(M1.0-a 종료 게이트 — 집계 픽스처 F1~F12 충족, D14) 신설. 0.4.0: AC-SAG-047(M1 종료 게이트 — 골든 baseline 캡처 완결성, D4). 0.3.0: AC-SAG-046(창 일수 실측)
 invariants_owned: [EX-1, EX-2, RK-1, RK-2, RRG-1, RRG-2, RRG-3, RRG-4, BM-3, BM-6, SN-3, AG-6, "§8.6"]
 depends_on: [SPEC-SECTOR-GRID-001]
-open_questions: [O-A2, O-A5, O-A7]        # O-A5는 ① close로 착수 가능해졌으나 재측정이 run-phase M3 작업이라 미결 유지
+open_questions: [O-A2, O-A5]              # O-A5는 ① close로 착수 가능해졌으나 재측정이 run-phase M3 작업이라 미결 유지. O-A7은 2026-08-14 해결
 resolved_open_questions:
   - "O-A1 (2026-08-12): RS-Ratio 롤링 정규화 미적용 — 100이 문자 그대로 벤치마크"
   - "O-A3 (2026-08-12): 상수 주식수 한계를 warnings[]에 명시 + '현재주가' = daily 최신 Close"
@@ -23,7 +23,7 @@ resolved_open_questions:
 blocking_before_run: []                   # 2026-08-13 v0.4.1: 착수 차단 항목 없음. ① status: completed(v0.3.0) + O-A8 결정 + plan-audit iteration 1 D1/D3/D5 + iteration 2 D10~D15 전부 SPEC 층에서 해소
 m1_forced_order: "[v0.5.0 재실행] M1.0-a **재빌드**(F12 + **F13 재빌드 구성 계약** 포함, **F13-1 상위집합 필수**, **F7 규약 Y 적용 — 빌더 코드 변경 동반**) → AC-SAG-048 PASS(F1~F13 게이트) → M1.0-b **재캡처**(구 baseline 폐기 — F12 미충족 픽스처 위에서 떠졌다) → M1.0-c(AC-SAG-047 종료 게이트) → M2. M1.1(응답 계약, 7305e2e)은 집계 로직 미변경이므로 되돌리지 않는다"
 point_of_no_return: "M2"                  # [HARD] plan-audit iteration 2 판정. 비가역 경계는 M1.0-b가 아니라 M2다 — M1.0 구간에서는 구현 코드가 그대로이므로 잘못 뜬 baseline의 재캡처가 가능하다. M2가 구 구현을 교체하는 순간 캡처 창이 영구히 닫힌다. 이 여유가 D12/D14를 치명적이 아니라 회복 가능한 결함으로 만든 근거다. run-phase가 M1.0-c에서 AC-SAG-047 RED를 만나면 (1) 산출물 결함 vs 게이트 단언 결함을 구분하고 (2) 산출물 결함이면 M1.0-a로 되돌아가 재캡처, (3) 단언 결함이면 blocker report 반환(acceptance.md 편집 권한 없음). 상세: acceptance.md §8.5 / plan.md §0.2
-blocking_before_ux: [O-A7]                # ③의 AC-SUX-019 / AC-SUX-056 R5가 의존 (③의 O-U9)
+blocking_before_ux: []                    # 2026-08-14 해결. O-A7 = "AG-5를 Bump에 미적용" 확정(사용자 결정) — 본 SPEC의 출하 구현이 이미 그렇게 동작하므로 백엔드 변경 없음(compute_sector_history → compute_sector_ranking → _compute_sector_metrics, sector_metrics.py:947-948 / get_sector_history의 excluded= 미전달). ③는 SPEC-SECTOR-UX-001 v0.4.0에서 AC-SUX-019 / AC-SUX-056 R5 범위 한정으로 흡수. 본 SPEC은 completed 유지 — amendment 불필요
 as_of_pinned: "2026-08-11"                # 사용자 결정 2026-08-13 (D3). 기존 날짜 축 픽스처 유지, AC-SAG-046 리터럴 4개(11/32/95, 앵커 07-31/07-10/05-08, baseline 07-10) 불변. 게이팅 테스트의 as_of 기본값(None → today) 사용 금지 — acceptance.md §8 규약 8
 fixtures:
   date_axis: "tests/fixtures/frozen/weekly-2026-08-12/"        # ① 소관, 읽기 전용. AC-SAG-046만 호스팅

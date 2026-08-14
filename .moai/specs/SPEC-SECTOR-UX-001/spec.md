@@ -1,10 +1,10 @@
 ---
 id: SPEC-SECTOR-UX-001
 title: "섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약"
-version: "0.3.0"
+version: "0.4.0"
 status: draft
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-14
 author: manager-spec
 priority: P1
 phase: "sector-ux v1"
@@ -25,6 +25,7 @@ tier: L
 | 0.1.0 | 2026-08-12 | manager-spec | 초기 SPEC. `docs/sector-ux/02-screen-flow.md` §3(상태 모델)·§5(전환)·§6~§7(컨트롤)·§8(로딩)·§9(시각화)·§10(오류·빈 상태)을 구현 계약으로 전환. Lesson #1/#2/#3/#5/#7 반영. `SPEC-SECTOR-MINOR-COLOR-001`의 색상 채널 계약과 `StockBubbleChart.tsx:28` `@MX:ANCHOR`를 보존 대상으로 명시. |
 | 0.2.0 | 2026-08-12 | manager-spec | plan-audit 0.84 FAIL(L, thresh 0.85) 결함 델타 반영. **(1) tsc 게이트 달성 불가 해소** — 실측 총 33건 오류 중 `TS2353`은 1건(③ 소관)이고 32건은 선행 결함이며 상당수가 ③ 모듈 범위 안이다. AC-SUX-004를 (a) HARD `TS2353 == 0` / (b) 총량 `<= N` + ③ 수정 파일 NEW 0건으로 **2분할**. (b)가 (a)를 약화시키지 않음을 명시. **(2) 실행 불가 단언 3건 재작성** — AC-SUX-045 탈출구 `(또는 명세된 반올림 규칙)` 삭제 후 VZ-8 공식 리터럴 고정, AC-SUX-021 "정적 스캔: rank 재부여 코드 없음"을 실행 명령 + 행동 단언으로, AC-SUX-056 R1/R2 "그런 테스트가 없음을 확인"을 긍정 단언 + grep 부재 확인으로. **(3) 설계서 미수용 요구 3건 수용** — REQ-SUX-055(`01 §2.9` 순위 총수 `7/29` 병기), REQ-SUX-056(`02 §9.1` 섹터 버블 색상 = 기간 수익률 발산형 5단계), REQ-SUX-057(테두리 채널 VZ-0 충돌 단일화 — 섹터 버블=결측 거래대금 / 종목 버블=Stage). **(4) traceability를 REQ 그룹→REQ 단위**로 전개하고, 철회분을 §3.7 묘비 절로 분리 + 신규 REQ를 주제별 도메인 절에 배치(REQ-SUX-055 → §3.3 컨트롤 / REQ-SUX-056·057 → §3.5 시각화). **§3의 REQ 번호는 오름차순이 아니며 의도적으로 그렇다** — 배치 기준은 번호가 아니라 주제다. **(5) §0.1 "탭 전환 4회 이하"** 측정 절차 부재로 삭제 → 자동 검증 3항목으로 대체. **(6) REQ-SUX-054(산업명(중) 필터) 철회** — 사용자 결정으로 미구현, `01 §8.5` 계약을 구현에 맞춰 축소. U36·AC-SUX-057 삭제(결번). **사용자 결정 수용**: O-U1(비활성+툴팁, 잠정) · O-U4(기간별 고정 눈금) · O-U6(스크롤·하이라이트 or 추가, 교체 금지) · O-U7(섹터비중→Vol배→52W고 접기). **O-U8/O-U9 신설**(저커버리지 시각 인코딩 / ②의 O-A7 전파). |
 | 0.3.0 | 2026-08-12 | manager-spec | plan-audit iteration 2 **PASS 0.87**(L, thresh 0.85; MUST-PASS 전항 통과, 단조 개선) 이후 잔여 결함 정리. **(D7) `AC-SUX-061` 고아 해소** — AC는 정의(`acceptance.md`)·E7·DoD·`plan.md` M4·§7 O-U7 해결 행에 모두 존재했으나 **어떤 REQ도 매핑되지 않아** §5 traceability 표에 행이 없었다(정의 60 / 추적 60이지만 **집합이 달랐다**). 열 접기 계약을 소유하는 **`REQ-SUX-058` 신설**(§3.3 컨트롤, `REQ-SUX-029` 기간 3열 상설의 폭 조건 확장) + traceability 행 추가. REQ 부재 상태에서는 구현 중 이 AC가 잘려도 §3의 어떤 항목도 반대하지 않았고, 그것은 Lesson #3(신규 열이 default 진입에서 안 보여 그림자 결함이 된 선례) 게이트를 재현하는 경로였다. **(D8) HISTORY 항목 (4)의 미검증 주장 정정** — "§3 번호 순서 정상화"는 실제로 일어나지 않았다(`REQ-SUX-055`는 `030`↔`031` 사이, `056/057`은 `048`↔`049` 사이에 그대로 있다). 주제별 배치가 **의도된 설계**임을 명시하는 문장으로 재작성하고 §3.7 서문에도 같은 취지를 못 박았다 — 재배열은 하지 않는다. **(D9) `progress.md` 갱신** — `open_questions`에 남아 있던 O-U1/O-U4/O-U6/O-U7(전부 v0.2.0에서 해결)과 `blocking_before_run`의 동일 4건을 정리하고 `resolved_open_questions`로 이력 보존. **`SPEC-SECTOR-AGGREGATION-001 completed`와 O-U9는 실제 차단 항목이므로 유지한다.** `ac_count` 57 → **60** 정정(v0.1.0 값 잔류분). |
+| 0.4.0 | 2026-08-14 | manager-spec | **O-U9 해결 — 착수 차단 항목 전부 해소.** 사용자 결정(2026-08-14): **AG-5(최소 구성수 5)를 Bump에 적용하지 않는다.** ② `SPEC-SECTOR-AGGREGATION-001`은 v0.5.0 `completed`(main `65dfe2d`)로 종료됐고, 그 출하 구현이 이미 미적용이라는 것을 실물 대조로 확인했다 — `/sectors/history` → `compute_sector_history` → `compute_sector_ranking` → `_compute_sector_metrics`(`sector_metrics.py:947-948`이 *"AG-5 제외는 여기에 적용하지 않는다 — 규칙 AG-5는 `data[]`가 소유한다"* 를 명시), `get_sector_history`(`sector_advanced_service.py:218`)는 `SectorHistoryResponse` 생성 3곳 전부에서 `excluded=`를 전달하지 않아 봉투가 항상 빈 배열이다. 따라서 **②의 백엔드 변경은 없으며 amendment도 불필요하다**(② `completed` 유지). ③ 조치 3건: **(1)** `AC-SUX-019` · `AC-SUX-056 R5`의 검증 범위를 **Table · 섹터 Bubble · RRG로 한정**(Bump 제외)하고 §7 O-U9 · plan.md §0 차단 표 · DoD를 해결로 갱신. **(2)** 범위에서 빼기만 하지 않고 **Bump 반대 방향 단언을 신설** — 제외 섹터의 선이 Bump에 남아 있어야 하며, 되돌림 변형 `mut_bump_applies_ag5`(Bump 시계열을 `data[]` 섹터 집합과 교집합)에서 **RED 관측이 필수**다(Lesson #9). 단언 없는 범위 제외는 이후 누군가 Bump에 AG-5를 넣어도 어떤 AC도 반대하지 않는 상태를 만들며, 그것이 Lesson #3의 재현 경로다. **(3)** `REQ-SUX-017`(제외 섹터 가시성)에 적용 범위를 명문화 — Bump에 제외 영역을 렌더하는 구현은 충족이 아니라 **위반**이다. **도입하지 않은 것**: `connectNulls:false` 선 끊김 단언은 "Bump에도 적용" 분기 전용이었으므로 신설하지 않는다(해당 옵션 자체는 §1.2 보존 항목으로 불변). **의도된 귀결(회귀 아님)**: Bump는 전 섹터, Table `data[]`는 AG-5 통과 섹터라는 서로 다른 모집단 위에서 순위를 매기므로 같은 섹터의 rank가 두 화면에서 다를 수 있다. `CT-4`(AC-SUX-021)의 rank 일치는 순위표 내부(rank 열 ↔ 행 순서) 한정이며 Table↔Bump 교차 일치로 확대하지 않는다. `ac_count` 60 불변(신규 AC 없음 — 기존 AC 2건의 범위 한정 + 단언 추가). **plan-audit 캐시 무효화**: 본 개정으로 plan-artifact hash가 바뀌므로 v0.3.0의 PASS 0.87은 skip 근거로 쓸 수 없다 — `/moai run` Phase 1에서 plan-audit **재실행 필수**. |
 
 ---
 
@@ -299,7 +300,9 @@ The market toggle **shall** trigger a server refetch changing 집계 유니버�
 
 Where a sector is excluded for insufficient sample, the ranking table **shall** show it in a bottom `순위 대상 제외 (N)` area with reason and count. 목록에서 숨기는 것을 금지한다 (규칙 CT-2).
 
-- 검증: AC-SUX-019
+**적용 범위 — 순위표 · 섹터 Bubble · RRG 한정.** Bump는 이 요구의 대상이 **아니다**: AG-5는 Bump에 적용되지 않으므로(O-U9 확정, §7) Bump에는 제외 섹터라는 개념 자체가 없고 전 섹터의 선이 그대로 그려진다. Bump에 제외 영역을 렌더하는 구현은 이 요구의 충족이 아니라 **위반**이다.
+
+- 검증: AC-SUX-019 (Bump 반대 방향 단언 + `mut_bump_applies_ag5` 대조 포함)
 
 #### REQ-SUX-018 (When) — 선택 섹터가 제외 대상이 될 때
 
@@ -649,7 +652,7 @@ The regression suite **shall** assert as expected: (a) 기간 변경 시 로딩 
 | REQ-SUX-014 | AC-SUX-016 | |
 | REQ-SUX-015 | AC-SUX-017 | |
 | REQ-SUX-016 | AC-SUX-018 | |
-| REQ-SUX-017 | AC-SUX-019 | **②의 O-A7 의존** (Bump 적용 여부) |
+| REQ-SUX-017 | AC-SUX-019 | 범위 = Table·섹터 Bubble·RRG (**Bump 제외** — O-U9 확정) + Bump 반대 방향 단언 |
 | REQ-SUX-018 | AC-SUX-020 | |
 | REQ-SUX-019 | AC-SUX-021 | |
 | REQ-SUX-020 | AC-SUX-022 | |
@@ -685,7 +688,7 @@ The regression suite **shall** assert as expected: (a) 기간 변경 시 로딩 
 | REQ-SUX-050 | AC-SUX-053 | |
 | REQ-SUX-051 | AC-SUX-054 | |
 | REQ-SUX-052 | AC-SUX-055 | |
-| REQ-SUX-053 | AC-SUX-056 | R5는 **②의 O-A7 의존** |
+| REQ-SUX-053 | AC-SUX-056 | R5 범위 = Table·섹터 Bubble·RRG (**Bump 제외** — O-U9 확정) |
 | ~~REQ-SUX-054~~ | ~~AC-SUX-057~~ | **삭제** — 산업명(중) 필터 미구현 결정 |
 | REQ-SUX-055 | AC-SUX-058 | 신규 — `01 §2.9` 총수 병기 |
 | REQ-SUX-056 | AC-SUX-059 | 신규 — `02 §9.1` 섹터 버블 색상 |
@@ -714,7 +717,7 @@ The regression suite **shall** assert as expected: (a) 기간 변경 시 로딩 
 | **O-U3** | 섹터 선택의 단일성 (SM-5) | 02 §13 O-5 | 사용자가 두 섹터를 나란히 비교하고 싶어할 가능성. 지원하려면 분할 뷰 IA 변경이 필요해 "현행 구조 유지" 제약과 충돌한다. |
 | ~~**O-U4**~~ **해결됨** | 크기 범례의 값 산출 | 02 §13 O-9 | **결정 (2026-08-12): 기간별 고정 눈금(per-period fixed ladder).** 데이터 적응형은 필터마다 눈금이 움직여 크기를 기억할 수 없고, 전 기간 공통 단일 눈금은 ②의 O-A4 결정(거래대금 창 = 기간 연동)과 충돌한다 — 3M 누적은 1W보다 자릿수가 커서 대부분 최대 눈금에 클램프된다. 사다리: **1W = 100억 / 1,000억 / 1조**, **1M = 500억 / 5,000억 / 5조**, **3M = 1,000억 / 1조 / 10조**. 범위 밖 값은 최소·최대로 클램프하고 툴팁에 실제 값을 표기한다. 상세 규약은 `02 §9.2 VZ-2` 개정본. 검증: AC-SUX-039. |
 | **O-U8** | 버블의 저커버리지 시각 인코딩 | 신규 (REQ-SUX-057 채널 단일화 결과) | 테두리 채널이 차트별로 결측 거래대금(섹터 버블) / Stage(종목 버블)에 배정되면서, 저커버리지는 툴팁 `⚠` + 하단 저신뢰 요약으로만 남았다. 버블 위에 별도 시각 채널을 둘 것인가. 투명도는 RRG 궤적 진행도가 이미 쓰고 있어 전 차트 일관 배정이 어렵다. **후속 과제로 유보** — `02 §13 O-11`과 동일 사안. |
-| **O-U9** | ②의 O-A7(최소 구성수 5의 Bump 적용) 미결이 ③에 전파 | 신규 (교차 참조) | **AC-SUX-019**(제외 섹터 가시성)와 **AC-SUX-056 R5**(KOSPI 필터 시 제외 영역 등장)가 "AG-5가 Bump에도 적용된다"를 암묵 전제로 한다. 그런데 그 적용 여부는 ②의 `O-A7`에서 **미결**이다(`01 §5.4 AG-5`는 "순위·버블·RRG"만 명시). ③ 단독으로 결정할 수 없다 — **②의 O-A7 해소가 ③ 착수의 선행 조건**이다. 결정 전에는 두 AC의 검증 범위를 Table·Bubble·RRG로 한정한다. |
+| ~~**O-U9**~~ | ②의 O-A7(최소 구성수 5의 Bump 적용) | **해결 (2026-08-14 사용자 결정)** | **AG-5를 Bump에 적용하지 않는다.** `01 §5.4 AG-5`가 "순위·버블·RRG"만 열거하고 Bump를 뺀 것이 곧 계약이며, ②의 출하 구현도 이미 그렇게 동작한다 — `/sectors/history` → `compute_sector_history` → `compute_sector_ranking` → `_compute_sector_metrics`(`my_chart/analysis/sector_metrics.py:947-948`: *"AG-5 제외는 여기에 적용하지 않는다"*), `get_sector_history`는 `excluded=`를 전달하지 않아 봉투가 항상 빈 배열이다. 따라서 **②의 백엔드 변경 없음**(② `completed` 유지, amendment 불필요). ③ 조치: **AC-SUX-019 / AC-SUX-056 R5의 검증 범위를 Table·섹터 Bubble·RRG로 한정**하고, Bump에는 제외 섹터의 선이 **남아 있어야 한다**는 반대 방향 단언 + `mut_bump_applies_ag5` 대조를 신설(범위에서 빼기만 하면 이후 Bump에 AG-5가 들어와도 어떤 AC도 반대하지 않는다 — Lesson #3 재현 경로). **의도된 귀결**: Bump(전 섹터)와 Table(`data[]`, AG-5 통과분)은 모집단이 달라 같은 섹터의 rank가 두 화면에서 다를 수 있다 — 회귀가 아니다. |
 | **O-U5** | 향후 섹터 워치리스트와 `SelectionContext`의 접점 | 02 §13 O-10 | 섹터 워치리스트 도입 시 `SelectionContext`를 확장할 것인가 별도 컨텍스트로 둘 것인가. 지금 결정하면 §3.3 소유권 표가 흔들리므로 **의도적으로 미결**로 둔다. |
 | ~~**O-U6**~~ **해결됨** | `focusStock`을 받은 차트 그리드의 구체 동작 | 신규 (설계서 미규정) | **결정 (2026-08-12): (c)+(a) 조합 — 이미 있으면 스크롤·하이라이트, 없으면 추가한다.** **(b) 교체는 채택하지 않는다** — 사용자가 구성해 둔 그리드를 파괴하는 동작이며, 되돌릴 방법이 없다. 상세: 그리드에 `focusStock`이 이미 존재하면 해당 셀로 스크롤 + 일시 하이라이트하고 **중복 추가하지 않는다**; 없으면 그리드 끝에 추가한 뒤 스크롤·하이라이트한다. 그리드가 정원(용량 상한)에 도달했으면 추가하지 않고 안내를 표시한다 — 조용히 다른 종목을 밀어내지 않는다. 검증: AC-SUX-014 확장 + E8. |
 | ~~**O-U7**~~ **해결됨** | 와이어프레임과 3열 결정의 불일치 | 신규 (설계서 내부 불일치) | **결정 (2026-08-12): 좁은 화면에서 우선순위 역순으로 접는다 — 섹터비중 → Vol배 → 52W고 순.** 12열(체크박스·Name·Market·섹터비중·Stage·RS·1W·1M·3M·Vol배·52W고·Check)이 좁은 폭에서 넘칠 때 이 순서로 숨긴다. **기간 3열(1W/1M/3M)·Stage·RS·Name은 접지 않는다** — Lesson #3(신규 컬럼이 default 모드에서 안 보여 그림자 결함이 된 선례)의 직접 대상이다. `02 §11.7` 와이어프레임이 `1W%` 한 열만 그린 것은 폭 100자 제약에 따른 축약이며 결정과 충돌하지 않는다. 검증: AC-SUX-061. |
