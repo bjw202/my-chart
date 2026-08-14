@@ -1790,9 +1790,10 @@ sector_history` 시그니처에 `market` 파라미터만 추가했고 기존 호
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: in-progress            # M6 완료(단일 커밋). 다음 = M7(테스트 대체 + 회귀 게이트) — 별도 위임
-milestone_completed: M6            # 라우터 파라미터 + 종목 목록 필드(기계적). RRG/stock_bubble market 실배선·trading_value 정규 원천은 Gap G20/G21
-run_commit_sha: e139067            # M6 단일 커밋
+run_status: implemented            # M7(테스트 대체 + 회귀 게이트) 완료. 1건 Gap(AC-SAG-037) 이월 — sync-phase 대기
+milestone_completed: M7            # 테스트 대체(AC-SAG-044) + 회귀 게이트(AC-SAG-045 R1/R4/R5-a) + as_of 정적 스캔 확장 + F1~F13/050 회귀 재확인
+run_commit_sha: 753a529            # M7 단일 커밋
+prior_run_commit_sha_m6: e139067   # M6 단일 커밋 (M6-gap-closure 는 별도 세션, b337365 이전 커밋)
 prior_run_commit_sha_m5: 98f5809   # M5 #5(RS 평균, 최종 커밋)
 prior_run_commit_sha_m5_1: 9f2318c # M5 #1(MAX52)
 prior_run_commit_sha_m5_2: d17c737 # M5 #2(Stage 단일화)
@@ -1894,6 +1895,15 @@ m5_rs_avg_production_unchanged: true   # #5 RS 평균은 프로덕션 코드 변
 mutation_verification_m5: observed-red-4   # mut_stored_max52(1 RED)·mut_daily_simple_retained(2 RED)·mut_price_sma10_approx(4 RED)·mut_rs_zero_fill(2 RED). 4건 모두 복원 후 GREEN + 바이트 동등 확인(diff /tmp/moai-verify/*.bak). AC-SAG-029 정적 스캔은 개발 중 우발적 RED로 검출력 실증(§E5 참조)
 m5_open_gaps: "G16(trading_value 응답 필드·라우터 배선 미실행 — M6 의존) · G17(AC-SAG-045 R4 골든 baseline 비교 미실행 — M7 소관) · G18(backend/tests/ 디렉토리 일괄 실행 시 사전 존재 test-isolation 결함, SPEC 범위 밖) · G19(커버리지 미측정, G6/G13/G15 연속)"
 m1_to_mN_commit_strategy: "마일스톤별 개별 커밋 후 main 직푸시 (Hybrid Trunk 1인 OSS)"
+# --- M7 (2026-08-14) ----------------------------------------------------------
+m7_new_test_files: "tests/test_ac_sag_044_regression.py(3) · tests/test_ac_sag_045_r1_r4_r5a.py(11) · tests/test_as_of_static_scan_m7.py(13, 1 skip) + tests/test_sector_metrics.py 기존 파일 hasattr→값단언 교체(순증 0, 카운트 불변 12) + scripts/spec_checks/as_of_none_scan.sh(coarse 셸 스캔)"
+m7_full_suite: "8 failed, 900 passed, 69 skipped, 1 xpassed, 25 errors — M6-gap-closure baseline(873 passed) 대비 +27 passed, 실패/에러 집합 동일, 신규 실패 0"
+m7_gate_tests_rerun_idempotent: true   # 227개 게이팅 관련 테스트 2회 연속 실행 동일 결과(§8.4 규약 1)
+m7_fixtures_touched: false             # 집계·날짜축 픽스처 모두 미변경(git status 공백)
+m7_commit_strategy: "단일 커밋(753a529) — main 직푸시(Hybrid Trunk 1인 OSS)"
+m7_coverage_measurement: gap           # pytest-cov 미설치(venv에 부재, pip 바이너리 셸 부재) — 대리 지표: 신규 테스트 14건이 대상 함수 경로 직접 실행
+m7_ac_sag_037_status: gap              # 7-엔드포인트 as_of_date 일치 되돌림 실증 미구현 — 후속 필요(§E.2 M7 §7 참조)
+m7_open_gaps: "AC-SAG-037(7-엔드포인트 as_of_date 일치 되돌림 실증 미구현) · 커버리지 % 미측정(pytest-cov 부재)"
 ```
 
 ### M6 Gap Closure — G16/G20/G21/G22/G23/G25 (2026-08-14)
