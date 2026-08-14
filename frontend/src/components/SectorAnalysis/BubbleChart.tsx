@@ -7,13 +7,7 @@ import { fetchSectorBubble, fetchStockBubble } from '../../api/bubble'
 import type { SectorBubbleItem, StockBubbleItem } from '../../types/bubble'
 import { SectorBubbleChart } from './SectorBubbleChart'
 import { StockBubbleChart } from './StockBubbleChart'
-
-// 지원 기간 및 마켓 타입
-type Period = '1w' | '1m' | '3m'
-type MarketFilter = 'ALL' | 'KOSPI' | 'KOSDAQ'
-
-const PERIOD_LABELS: Record<Period, string> = { '1w': '1W', '1m': '1M', '3m': '3M' }
-const MARKET_LABELS: Record<MarketFilter, string> = { ALL: '전체', KOSPI: 'KOSPI', KOSDAQ: 'KOSDAQ' }
+import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
 
 type ViewMode = 'sector' | 'stock'
 
@@ -23,10 +17,10 @@ interface Props {
 }
 
 export function BubbleChart({ initialSector }: Props): ReactElement {
+  // AC-SUX-008: period·market 는 헤더 단일 인스턴스(AnalysisParamsContext)에서 소비 — 로컬 토글 제거 (X2)
+  const { period, market } = useAnalysisParams()
   const [view, setView] = useState<ViewMode>('sector')
   const [selectedSector, setSelectedSector] = useState<string | null>(initialSector ?? null)
-  const [period, setPeriod] = useState<Period>('1w')
-  const [market, setMarket] = useState<MarketFilter>('ALL')
 
   // 섹터 버블 데이터
   const [sectorData, setSectorData] = useState<SectorBubbleItem[]>([])
@@ -43,7 +37,7 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
     setSectorLoading(true)
     setSectorError(null)
     try {
-      const res = await fetchSectorBubble(period, market === 'ALL' ? null : market)
+      const res = await fetchSectorBubble(period, market === 'all' ? null : market)
       setSectorData(res.sectors)
     } catch (e) {
       setSectorError(e instanceof Error ? e.message : '데이터 로드 실패')
@@ -96,7 +90,7 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
 
   return (
     <div className="bubble-chart-container">
-      {/* 툴바: 뒤로가기 + 기간 토글 + 마켓 필터 */}
+      {/* 툴바: 뒤로가기 + 섹터 라벨 (기간·마켓 토글은 헤더 단일 인스턴스로 이동 — X2 제거) */}
       <div className="bubble-chart-toolbar">
         <div className="bubble-chart-toolbar-left">
           {view === 'stock' && (
@@ -111,36 +105,6 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
           {view === 'stock' && selectedSector && (
             <span className="bubble-sector-label">{selectedSector}</span>
           )}
-        </div>
-
-        <div className="bubble-chart-toolbar-right">
-          {/* 마켓 필터 (섹터 뷰에서만) */}
-          {view === 'sector' && (
-            <div className="bubble-market-toggle">
-              {(['ALL', 'KOSPI', 'KOSDAQ'] as MarketFilter[]).map(m => (
-                <button
-                  key={m}
-                  className={market === m ? 'active' : undefined}
-                  onClick={() => setMarket(m)}
-                >
-                  {MARKET_LABELS[m]}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* 기간 토글 */}
-          <div className="bubble-period-toggle">
-            {(['1w', '1m', '3m'] as Period[]).map(p => (
-              <button
-                key={p}
-                className={period === p ? 'active' : undefined}
-                onClick={() => setPeriod(p)}
-              >
-                {PERIOD_LABELS[p]}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 

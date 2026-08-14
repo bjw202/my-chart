@@ -9,7 +9,12 @@ export async function fetchMarketOverview(): Promise<MarketOverviewResponse> {
   return data
 }
 
-export async function fetchSectorRanking(): Promise<SectorRankingResponse> {
-  const { data } = await client.get<SectorRankingResponse>('/sectors/ranking')
+export async function fetchSectorRanking(market?: string | null): Promise<SectorRankingResponse> {
+  // market 전송 필터 (01-data-contract.md §8) — 'all' 은 파라미터 미전송, kospi/kosdaq 은 전송
+  const params: Record<string, string> = {}
+  if (market && market !== 'all') {
+    params.market = market
+  }
+  const { data } = await client.get<SectorRankingResponse>('/sectors/ranking', { params })
   return data
 }

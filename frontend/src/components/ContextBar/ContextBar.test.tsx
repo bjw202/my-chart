@@ -9,6 +9,7 @@ vi.mock('../../api/market', () => ({
 
 import { fetchMarketOverview, fetchSectorRanking } from '../../api/market'
 import { MarketProvider, RETRY_DELAYS_MS } from '../../contexts/MarketContext'
+import { AnalysisParamsProvider } from '../../contexts/AnalysisParamsContext'
 import { ContextBar } from './ContextBar'
 import type { MarketOverviewResponse, SectorRankingResponse } from '../../types/market'
 
@@ -62,9 +63,11 @@ const mockRankingWithSectors: SectorRankingResponse = {
 
 function renderContextBar() {
   return render(
-    <MarketProvider>
-      <ContextBar />
-    </MarketProvider>
+    <AnalysisParamsProvider>
+      <MarketProvider>
+        <ContextBar />
+      </MarketProvider>
+    </AnalysisParamsProvider>
   )
 }
 

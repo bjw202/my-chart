@@ -58,6 +58,7 @@ vi.mock('../StockExplorer/StockExplorer', () => ({
 }))
 
 import { MarketProvider } from '../../contexts/MarketContext'
+import { AnalysisParamsProvider } from '../../contexts/AnalysisParamsContext'
 import { TabProvider } from '../../contexts/TabContext'
 import { ScreenProvider } from '../../contexts/ScreenContext'
 import { NavigationProvider } from '../../contexts/NavigationContext'
@@ -66,17 +67,19 @@ import { AppContent } from '../../AppContent'
 
 function renderApp() {
   return render(
-    <MarketProvider>
-      <TabProvider>
-        <ScreenProvider>
-          <NavigationProvider>
-            <WatchlistProvider>
-              <AppContent />
-            </WatchlistProvider>
-          </NavigationProvider>
-        </ScreenProvider>
-      </TabProvider>
-    </MarketProvider>
+    <AnalysisParamsProvider>
+      <MarketProvider>
+        <TabProvider>
+          <ScreenProvider>
+            <NavigationProvider>
+              <WatchlistProvider>
+                <AppContent />
+              </WatchlistProvider>
+            </NavigationProvider>
+          </ScreenProvider>
+        </TabProvider>
+      </MarketProvider>
+    </AnalysisParamsProvider>
   )
 }
 

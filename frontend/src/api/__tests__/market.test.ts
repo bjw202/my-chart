@@ -76,12 +76,28 @@ describe('fetchSectorRanking', () => {
     vi.clearAllMocks()
   })
 
-  it('should call GET /sectors/ranking', async () => {
+  it('should call GET /sectors/ranking (market 미전달 → market 파라미터 미전송)', async () => {
     vi.mocked(client.get).mockResolvedValue({ data: mockSectorRanking })
 
     await fetchSectorRanking()
 
-    expect(client.get).toHaveBeenCalledWith('/sectors/ranking')
+    expect(client.get).toHaveBeenCalledWith('/sectors/ranking', { params: {} })
+  })
+
+  it('should send market=kospi param when market is kospi (AC-SUX-018)', async () => {
+    vi.mocked(client.get).mockResolvedValue({ data: mockSectorRanking })
+
+    await fetchSectorRanking('kospi')
+
+    expect(client.get).toHaveBeenCalledWith('/sectors/ranking', { params: { market: 'kospi' } })
+  })
+
+  it('should omit market param when market is all (AC-SUX-018)', async () => {
+    vi.mocked(client.get).mockResolvedValue({ data: mockSectorRanking })
+
+    await fetchSectorRanking('all')
+
+    expect(client.get).toHaveBeenCalledWith('/sectors/ranking', { params: {} })
   })
 
   it('should return SectorRankingResponse data', async () => {

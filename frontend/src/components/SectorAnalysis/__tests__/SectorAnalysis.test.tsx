@@ -1,4 +1,5 @@
 // RED: Specification tests for SectorAnalysis container component
+import type { ReactElement } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -61,6 +62,12 @@ vi.mock('../../../contexts/TabContext', () => ({
 
 // Import after mocks
 import { SectorAnalysis } from '../SectorAnalysis'
+import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+
+// AC-SUX-008/018: SectorAnalysis 는 AnalysisParamsContext(market/period 전역 단일 인스턴스) 를 소비 → Provider 로 감싼다
+function renderWithProviders(ui: ReactElement) {
+  return render(<AnalysisParamsProvider>{ui}</AnalysisParamsProvider>)
+}
 
 describe('SectorAnalysis — initial render', () => {
   beforeEach(() => {
@@ -69,12 +76,12 @@ describe('SectorAnalysis — initial render', () => {
   })
 
   it('renders the sector-analysis container', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     expect(document.querySelector('.sector-analysis')).toBeInTheDocument()
   })
 
   it('renders period toggle buttons', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     // Use getAllByText since '1W', '1M', '3M' also appear as table column headers
     expect(screen.getAllByText('1W').length).toBeGreaterThan(0)
     expect(screen.getAllByText('1M').length).toBeGreaterThan(0)
@@ -85,20 +92,20 @@ describe('SectorAnalysis — initial render', () => {
   })
 
   it('1M period toggle is active by default', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     const buttons = document.querySelectorAll('.period-toggle button')
     const activeButton = Array.from(buttons).find(btn => btn.classList.contains('active'))
     expect(activeButton?.textContent).toBe('1M')
   })
 
   it('renders sector ranking table with sector names', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     expect(screen.getByText('Technology')).toBeInTheDocument()
     expect(screen.getByText('Finance')).toBeInTheDocument()
   })
 
   it('does not render detail panel initially (no sector selected)', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     expect(document.querySelector('.sector-detail-panel')).not.toBeInTheDocument()
   })
 })
@@ -111,14 +118,14 @@ describe('SectorAnalysis — sector selection', () => {
 
   it('shows detail panel when a sector row is clicked', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     await user.click(screen.getByText('Technology'))
     expect(document.querySelector('.sector-detail-panel')).toBeInTheDocument()
   })
 
   it('shows detail panel with correct sector name after click', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     await user.click(screen.getByText('Technology'))
     const panel = document.querySelector('.sector-detail-panel')!
     expect(within(panel as HTMLElement).getByText('Technology')).toBeInTheDocument()
@@ -133,7 +140,7 @@ describe('SectorAnalysis — period toggle', () => {
 
   it('changes active period when 1W button is clicked', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     // Click the button inside .period-toggle, not the table header
     const periodToggle = document.querySelector('.period-toggle')!
     const btn1W = Array.from(periodToggle.querySelectorAll('button')).find(b => b.textContent === '1W')!
@@ -145,7 +152,7 @@ describe('SectorAnalysis — period toggle', () => {
 
   it('changes active period when 3M button is clicked', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     const periodToggle = document.querySelector('.period-toggle')!
     const btn3M = Array.from(periodToggle.querySelectorAll('button')).find(b => b.textContent === '3M')!
     await user.click(btn3M)
@@ -158,14 +165,14 @@ describe('SectorAnalysis — period toggle', () => {
 describe('SectorAnalysis — cross-tab navigation', () => {
   it('auto-selects sector from crossTabParams on mount', () => {
     mockCrossTabParams = { sectorName: 'Technology' }
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     // Detail panel should be shown with the pre-selected sector
     expect(document.querySelector('.sector-detail-panel')).toBeInTheDocument()
   })
 
   it('calls clearCrossTabParams after handling cross-tab navigation', () => {
     mockCrossTabParams = { sectorName: 'Technology' }
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     expect(mockClearCrossTabParams).toHaveBeenCalled()
   })
 })
@@ -178,7 +185,7 @@ describe('SectorAnalysis — sorting', () => {
 
   it('clicking column header changes sort', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     // Click RS Avg column header in the table (the th element)
     const headers = document.querySelectorAll('.sector-ranking-table th')
     const rsAvgHeader = Array.from(headers).find(th => th.textContent?.includes('RS Avg'))
@@ -197,21 +204,21 @@ describe('SectorAnalysis — market filter', () => {
   })
 
   it('renders market toggle buttons', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     expect(screen.getByRole('button', { name: /all/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /kospi/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /kosdaq/i })).toBeInTheDocument()
   })
 
   it('All market button is active by default', () => {
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     const allBtn = screen.getByRole('button', { name: /all/i })
     expect(allBtn.classList.contains('active')).toBe(true)
   })
 
   it('clicking KOSPI button sets it as active', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     const kospiBtn = screen.getByRole('button', { name: /kospi/i })
     await user.click(kospiBtn)
     expect(kospiBtn.classList.contains('active')).toBe(true)
@@ -219,9 +226,27 @@ describe('SectorAnalysis — market filter', () => {
 
   it('clicking KOSDAQ button sets it as active', async () => {
     const user = userEvent.setup()
-    render(<SectorAnalysis />)
+    renderWithProviders(<SectorAnalysis />)
     const kosdaqBtn = screen.getByRole('button', { name: /kosdaq/i })
     await user.click(kosdaqBtn)
     expect(kosdaqBtn.classList.contains('active')).toBe(true)
+  })
+})
+
+// AC-SUX-008: 컨트롤 단일 인스턴스 (SM-7) — sector-analysis 화면당 period/market 토글이 각각 1개
+describe('AC-SUX-008 — 컨트롤 단일 인스턴스', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCrossTabParams = null
+  })
+
+  it('기간 토글 인스턴스가 정확히 1개 (getAllByTestId("period-toggle").length === 1)', () => {
+    renderWithProviders(<SectorAnalysis />)
+    expect(screen.getAllByTestId('period-toggle')).toHaveLength(1)
+  })
+
+  it('시장 토글 인스턴스가 정확히 1개 (getAllByTestId("market-toggle").length === 1)', () => {
+    renderWithProviders(<SectorAnalysis />)
+    expect(screen.getAllByTestId('market-toggle')).toHaveLength(1)
   })
 })

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { fetchMarketOverview, fetchSectorRanking } from '../api/market'
 import type { MarketOverviewResponse, SectorRankingResponse } from '../types/market'
+import { useAnalysisParams } from './AnalysisParamsContext'
 
 // Cache TTL: 1 hour in milliseconds
 const CACHE_TTL_MS = 60 * 60 * 1000
@@ -21,6 +22,10 @@ const MarketContext = createContext<MarketContextValue | null>(null)
 // @MX:REASON: Used by ContextBar and future market tabs; central data source, high fan_in
 
 export function MarketProvider({ children }: { children: React.ReactNode }): React.ReactElement {
+  // AC-SUX-018: market 는 AnalysisParamsContext 에서 소비 (02 §3.3 소유권 — MarketContext 가 소유하지 않음).
+  // fetchAll 은 ref 로 market 을 읽어 안정적([]) 이고, 단일 effect 가 mount + market 변경 시 재조회한다 (ST-4 해소).
+  const { market } = useAnalysisParams()
+  const marketRef = useRef(market)
   const [overview, setOverview] = useState<MarketOverviewResponse | null>(null)
   const [sectorRanking, setSectorRanking] = useState<SectorRankingResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,7 +49,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }): Rea
       // does not block the other from providing data to the UI.
       const [overviewResult, rankingResult] = await Promise.allSettled([
         fetchMarketOverview(),
-        fetchSectorRanking(),
+        fetchSectorRanking(marketRef.current),
       ])
       if (overviewResult.status === 'fulfilled') {
         setOverview(overviewResult.value)
@@ -78,10 +83,12 @@ export function MarketProvider({ children }: { children: React.ReactNode }): Rea
     }
   }, [])
 
-  // Fetch on mount
+  // Fetch on mount + market 변경 시 재조회 (AC-SUX-018). marketRef 동기화 후 fetchAll(true) 강제 재조회.
+  // fetchAll 은 marketRef 를 읽으므로 안정적([]) 이고, 이 effect 의 [market] dep 가 변경을 감지한다.
   useEffect(() => {
+    marketRef.current = market
     void fetchAll(true)
-  }, [fetchAll])
+  }, [fetchAll, market])
 
   const refresh = useCallback(() => {
     void fetchAll(true)
