@@ -70,6 +70,19 @@ export function SectorAnalysis(): ReactElement {
 
   // 서브 탭 상태 (로컬 상태 — context 불필요)
   const [subTab, setSubTab] = useState<SubTab>('table')
+  // AC-SUX-017 (keep-mounted): 한 번 방문한 서브탭은 언마운트하지 않는다(display:none).
+  // RRG(visibleSectors/windowEnd)·Bump(topFilter)·Bubble 로컬 state 가 탭 전환에 보존된다.
+  // 미방문 탭은 마운트 자체를 안 해 AC-SUX-033(M6 lazy fetch)과 양립 — 최초 방문 시에만 fetch.
+  const [mountedTabs, setMountedTabs] = useState<Set<SubTab>>(new Set(['table']))
+  const handleSubTabClick = (tab: SubTab): void => {
+    setSubTab(tab)
+    setMountedTabs(prev => {
+      if (prev.has(tab)) return prev
+      const next = new Set(prev)
+      next.add(tab)
+      return next
+    })
+  }
 
   const [sortField, setSortField] = useState('rank')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -175,16 +188,16 @@ export function SectorAnalysis(): ReactElement {
           <button
             key={tab}
             className={`sector-sub-nav-btn${subTab === tab ? ' active' : ''}`}
-            onClick={() => setSubTab(tab)}
+            onClick={() => handleSubTabClick(tab)}
           >
             {SUB_TAB_LABELS[tab]}
           </button>
         ))}
       </div>
 
-      {/* Table 뷰: 기존 섹터 랭킹 테이블 + 상세 패널 */}
-      {subTab === 'table' && (
-        <>
+      {/* Table 뷰: 기존 섹터 랭킹 테이블 + 상세 패널 (keep-mounted: display 토글) */}
+      {mountedTabs.has('table') && (
+      <div style={{ display: subTab === 'table' ? 'block' : 'none' }}>
           {/* AC-SUX-022 (REQ-SUX-020): 비-rank 정렬 고지 띠 — 현재 정렬 기준·period·market 표기 + [순위순으로] 복귀 */}
           {!isRankSorted && (
             <div className="sort-notice" data-testid="sort-notice">
@@ -230,34 +243,40 @@ export function SectorAnalysis(): ReactElement {
               onViewStocks={() => navigate({ target: 'stock-explorer' })}
             />
           )}
-        </>
+      </div>
       )}
 
-      {/* Bubble 뷰: 섹터/종목 버블 차트 */}
-      {subTab === 'bubble' && (
-        <BubbleChart initialSector={null} />
+      {/* Bubble 뷰: 섹터/종목 버블 차트 (keep-mounted) */}
+      {mountedTabs.has('bubble') && (
+        <div style={{ display: subTab === 'bubble' ? 'block' : 'none' }}>
+          <BubbleChart initialSector={null} />
+        </div>
       )}
 
-      {/* RRG 뷰: Relative Rotation Graph */}
-      {subTab === 'rrg' && (
-        <RRGChart
-          onSectorClick={(name) => {
-            // TR-7: RRG trail click → selectSector + subTab 'table'. 로컬 state(visibleSectors/windowEnd)는 M5 keep-mounted 개편 시 보존.
-            selectSector(name)
-            setSubTab('table')
-          }}
-        />
+      {/* RRG 뷰: Relative Rotation Graph (keep-mounted — visibleSectors/windowEnd 보존, AC-SUX-017) */}
+      {mountedTabs.has('rrg') && (
+        <div style={{ display: subTab === 'rrg' ? 'block' : 'none' }}>
+          <RRGChart
+            onSectorClick={(name) => {
+              // TR-7: RRG trail click → selectSector + table. keep-mounted 로 visibleSectors/windowEnd 보존.
+              selectSector(name)
+              setSubTab('table')
+            }}
+          />
+        </div>
       )}
 
-      {/* Bump 뷰: 섹터 순위 변동 bump chart */}
-      {subTab === 'bump' && (
-        <BumpChart
-          onSectorClick={(name) => {
-            // TR-8: Bump line click → selectSector + subTab 'table'. topFilter 보존은 M5 keep-mounted 개편 시.
-            selectSector(name)
-            setSubTab('table')
-          }}
-        />
+      {/* Bump 뷰: 섹터 순위 변동 bump chart (keep-mounted — topFilter 보존, AC-SUX-017) */}
+      {mountedTabs.has('bump') && (
+        <div style={{ display: subTab === 'bump' ? 'block' : 'none' }}>
+          <BumpChart
+            onSectorClick={(name) => {
+              // TR-8: Bump line click → selectSector + table. keep-mounted 로 topFilter 보존.
+              selectSector(name)
+              setSubTab('table')
+            }}
+          />
+        </div>
       )}
     </div>
   )
