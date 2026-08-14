@@ -46,7 +46,8 @@ const DataLoadContext = createContext<DataLoadContextValue | null>(null)
 // @MX:REASON: 섹터 4탭 + 종목 탐색 + 상세 패널이 모두 useQuery 로 이 계층을 소비한다(fan_in >= 5).
 //   TTL·백오프·기준일 합치 판정이 화면마다 갈리면 SN-3 불변식이 클라이언트에서 깨진다.
 export function DataLoadProvider({ children }: { children: React.ReactNode }): React.ReactElement {
-  const cacheRef = useRef<QueryCache<unknown>>(new QueryCache<unknown>())
+  // 렌더 중(useMemo value 구성)에 읽어야 하므로 ref 가 아니라 lazy state 로 보관한다.
+  const [cache] = useState<QueryCache<unknown>>(() => new QueryCache<unknown>())
   const [refreshTick, setRefreshTick] = useState(0)
   const [asOfMap, setAsOfMap] = useState<Record<string, string>>({})
   const gridVersionRef = useRef<string | null>(null)
@@ -55,9 +56,9 @@ export function DataLoadProvider({ children }: { children: React.ReactNode }): R
   const invalidatedVersionsRef = useRef<Set<string>>(new Set())
 
   const refreshAll = useCallback(() => {
-    cacheRef.current.clear()
+    cache.clear()
     setRefreshTick(t => t + 1)
-  }, [])
+  }, [cache])
 
   const registerAsOf = useCallback((panel: string, date: string | null) => {
     setAsOfMap(prev => {
@@ -86,12 +87,12 @@ export function DataLoadProvider({ children }: { children: React.ReactNode }): R
     if (version == null) return
     const prev = gridVersionRef.current
     gridVersionRef.current = version
-    cacheRef.current.setGridVersion(version)
+    cache.setGridVersion(version)
     if (prev !== null && prev !== version && !invalidatedVersionsRef.current.has(version)) {
       invalidatedVersionsRef.current.add(version)
       setRefreshTick(t => t + 1)
     }
-  }, [])
+  }, [cache])
 
   const asOfEntries = useMemo(
     () => Object.entries(asOfMap).map(([panel, date]) => ({ panel, date })),
@@ -100,7 +101,7 @@ export function DataLoadProvider({ children }: { children: React.ReactNode }): R
 
   const value = useMemo<DataLoadContextValue>(
     () => ({
-      cache: cacheRef.current,
+      cache,
       refreshTick,
       refreshAll,
       registerAsOf,
@@ -108,7 +109,7 @@ export function DataLoadProvider({ children }: { children: React.ReactNode }): R
       asOfEntries,
       noteGridVersion,
     }),
-    [refreshTick, refreshAll, registerAsOf, unregisterAsOf, asOfEntries, noteGridVersion],
+    [cache, refreshTick, refreshAll, registerAsOf, unregisterAsOf, asOfEntries, noteGridVersion],
   )
 
   return <DataLoadContext.Provider value={value}>{children}</DataLoadContext.Provider>
@@ -184,10 +185,6 @@ export function useQuery<T>(
   const { enabled = true, panel, meta, retryDelays = RETRY_DELAYS_MS } = options
   const { cache, refreshTick, registerAsOf, unregisterAsOf, noteGridVersion } = useDataLoad()
   const { recordAsOf } = useAnalysisParamsRecorder()
-  // recordAsOf 는 조회 정체성의 일부가 아니다. effect dep 에 넣으면 recorder 를 매 렌더
-  // 새로 만드는 소비자(테스트 mock 포함)에서 무한 재조회가 된다 — ref 로 최신값만 읽는다.
-  const recordAsOfRef = useRef(recordAsOf)
-  recordAsOfRef.current = recordAsOf
 
   const [state, setState] = useState<InternalState<T>>({
     data: null,
@@ -203,14 +200,21 @@ export function useQuery<T>(
   const [retryTick, setRetryTick] = useState(0)
   const retry = useCallback(() => setRetryTick(t => t + 1), [])
 
-  // 최신 fetcher/meta 를 effect 재실행 없이 읽기 위한 ref (키가 조회 정체성의 단일 출처).
+  // 조회 정체성의 단일 출처는 key 다. fetcher/meta/retryDelays/recordAsOf 는 렌더마다
+  // identity 가 바뀔 수 있어(인라인 화살표·배열 리터럴·테스트 mock) effect dep 에 넣으면
+  // 무한 재조회가 된다. ref 에 최신값만 실어 두고 조회 effect 안에서 읽는다.
+  // 쓰기는 렌더 중이 아니라 commit 후(effect)에 한다 — 아래 조회 effect 보다 먼저 선언되어
+  // 같은 commit 에서 항상 먼저 실행된다.
   const fetcherRef = useRef(fetcher)
-  fetcherRef.current = fetcher
   const metaRef = useRef(meta)
-  metaRef.current = meta
-  // 배열 리터럴로 넘어오면 렌더마다 identity 가 바뀐다 — effect dep 에 넣으면 무한 재조회가 된다.
   const retryDelaysRef = useRef(retryDelays)
-  retryDelaysRef.current = retryDelays
+  const recordAsOfRef = useRef(recordAsOf)
+  useEffect(() => {
+    fetcherRef.current = fetcher
+    metaRef.current = meta
+    retryDelaysRef.current = retryDelays
+    recordAsOfRef.current = recordAsOf
+  })
 
   useEffect(() => {
     if (!enabled || !key) return

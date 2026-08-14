@@ -10,6 +10,15 @@ vi.mock('../../../api/sectors', () => ({
 
 import { fetchSectorDetail } from '../../../api/sectors'
 import { SectorDetailPanel } from '../SectorDetailPanel'
+import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
+
+// M6 (AC-SUX-055): SectorDetailPanel 은 공용 조회 계층(useQuery)을 쓴다 — Provider 로 감싼다.
+function renderPanel(ui: React.ReactElement) {
+  return render(
+    <AnalysisParamsProvider><DataLoadProvider>{ui}</DataLoadProvider></AnalysisParamsProvider>,
+  )
+}
 
 const mockFetchSectorDetail = vi.mocked(fetchSectorDetail)
 
@@ -38,52 +47,52 @@ describe('SectorDetailPanel — rendering', () => {
   })
 
   it('renders sector name as title', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('Technology')).toBeInTheDocument()
   })
 
   it('renders the panel container with correct class', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(document.querySelector('.sector-detail-panel')).toBeInTheDocument()
   })
 
   it('renders RS Avg metric', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('RS Avg')).toBeInTheDocument()
     expect(screen.getByText('75')).toBeInTheDocument()
   })
 
   it('renders RS Top % metric', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('RS Top %')).toBeInTheDocument()
     expect(screen.getByText('30%')).toBeInTheDocument()
   })
 
   it('renders 52W High % metric', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('52W High %')).toBeInTheDocument()
     expect(screen.getByText('20%')).toBeInTheDocument()
   })
 
   it('renders Stage 2 % metric', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('Stage 2 %')).toBeInTheDocument()
     expect(screen.getByText('40%')).toBeInTheDocument()
   })
 
   it('renders Composite Score metric', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('Composite Score')).toBeInTheDocument()
     expect(screen.getByText('80')).toBeInTheDocument()
   })
 
   it('renders sub-sector placeholder text', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText(/sub-sector/i)).toBeInTheDocument()
   })
 
   it('renders returns section with 1W, 1M, 3M labels', () => {
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
     expect(screen.getByText('1W')).toBeInTheDocument()
     expect(screen.getByText('1M')).toBeInTheDocument()
     expect(screen.getByText('3M')).toBeInTheDocument()
@@ -109,7 +118,7 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
       top_stocks: [],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       expect(screen.getByText('RS Avg')).toBeInTheDocument()
@@ -134,7 +143,7 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
       top_stocks: [],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       // 'S2%' 또는 'Stage2%' 형태의 헤더 확인
@@ -161,7 +170,7 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
       top_stocks: [],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       // rs_avg=82이 표시되어야 함
@@ -187,7 +196,7 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
       top_stocks: [],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       // stage2_pct=50이 '50%' 형태로 표시되어야 함
@@ -214,7 +223,7 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
       top_stocks: [],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       // 서브섹터 이름이 나타나면 렌더 완료
@@ -243,7 +252,7 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
       ],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       expect(screen.getByText('1M%')).toBeInTheDocument()
@@ -265,7 +274,7 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
       ],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       // chg_1m=5.3이 '+5.3%' 형태로 표시되어야 함
@@ -288,7 +297,7 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
       ],
     })
 
-    const { container } = render(<SectorDetailPanel sector={mockSector} />)
+    const { container } = renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       expect(screen.getByText('-3.2%')).toBeInTheDocument()
@@ -316,7 +325,7 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
       ],
     })
 
-    render(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()

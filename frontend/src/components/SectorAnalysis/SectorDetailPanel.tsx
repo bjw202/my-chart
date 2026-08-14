@@ -1,10 +1,11 @@
 // @MX:NOTE: [AUTO] SectorDetailPanel shows expanded metrics for a selected sector
 // @MX:SPEC: SPEC-TOPDOWN-001D R2, R3
-import { useState, useEffect } from 'react'
+import { useCallback } from 'react'
 import type { ReactElement } from 'react'
 import type { SectorRankItem } from '../../types/market'
 import type { SectorDetailResponse } from '../../types/sector'
 import { fetchSectorDetail } from '../../api/sectors'
+import { buildQueryKey, useQuery } from '../../contexts/DataLoadContext'
 // D6 / AC-SUX-052: 셀 5상태 공용 컴포넌트.
 import { MetricCell, percent1 } from '../common/MetricCell'
 
@@ -56,24 +57,17 @@ function ReturnBar({ period, excessReturn }: { period: string; excessReturn: num
 }
 
 export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelProps): ReactElement {
-  const [detail, setDetail] = useState<SectorDetailResponse | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-
-  // Fetch sub-sector detail when sector changes
-  useEffect(() => {
-    setDetail(null)
-    setLoadingDetail(true)
-    fetchSectorDetail(sector.name)
-      .then((data) => {
-        setDetail(data)
-      })
-      .catch(() => {
-        // Detail is optional; silently ignore errors
-      })
-      .finally(() => {
-        setLoadingDetail(false)
-      })
-  }, [sector.name])
+  // AC-SUX-055 (§10.2 / LD-7): 상세 조회 실패를 조용히 삼키지 않는다 — 오류 상태 + [다시 시도].
+  // 공용 조회 계층을 쓰므로 2/4/8초 자동 재시도가 먼저 돌고, 소진 후 사용자에게 노출된다.
+  const detailQuery = useQuery<SectorDetailResponse>(
+    buildQueryKey('sector-detail', { sector: sector.name }),
+    useCallback(() => fetchSectorDetail(sector.name), [sector.name]),
+    // panel 미등록: 상세는 보조 패널이라 기준일 합치(SN-3) 판정 대상이 아니다.
+    { panel: `섹터 상세:${sector.name}` },
+  )
+  const detail = detailQuery.data
+  const loadingDetail = detailQuery.loading
+  const detailError = detailQuery.error
 
   return (
     <div className="sector-detail-panel">
@@ -206,10 +200,26 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
         </div>
       )}
 
-      {/* Fallback for when detail is not loaded yet */}
-      {!loadingDetail && !detail && (
-        <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-          Sub-sector breakdown available in future update
+      {/* AC-SUX-055: 상세 조회 실패 — 오류 상태 + [다시 시도]. 거짓 안내 문구(X4)는 삭제됐다. */}
+      {detailError !== null && (
+        <div className="sector-detail-error" data-testid="sector-detail-error" role="alert">
+          <span>세부 구성을 불러오지 못했습니다 — {detailError}</span>
+          <button
+            type="button"
+            className="sector-detail-retry"
+            data-testid="sector-detail-retry"
+            onClick={detailQuery.retry}
+          >
+            [다시 시도]
+          </button>
+        </div>
+      )}
+
+      {/* 성공했지만 내용이 비어 있는 경우 — 없는 것을 있다고 말하지 않는다 */}
+      {detailError === null && !loadingDetail && detail
+        && detail.sub_sectors.length === 0 && detail.top_stocks.length === 0 && (
+        <div className="sector-detail-empty" data-testid="sector-detail-empty">
+          이 섹터에는 표시할 세부 구성이 없습니다
         </div>
       )}
     </div>
