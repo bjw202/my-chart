@@ -487,7 +487,12 @@ M6 는 §1.2 보존 항목을 **한 파일도 수정하지 않았다**(V6 — 5�
 ### §1.2 보존 대상 회귀 확인 (M7 — PRESERVE 10항목) [PASS]
 M7 은 §1.2 보존 소유 파일 중 `BumpChart.tsx` · `RRGChart.tsx` 2개를 **tooltip formatter 의 결측 문자열 경로만** 수정했다(D2). `StockBubbleChart.tsx` · `MarketContext.tsx` · `StageDistributionBar.tsx` 는 **미수정**. 항목별 계약 grep 결과는 위 §1.2 실측 표 10행 전부 잔존이며, 특히 보존 3(색상 결정성 매핑)·4(`기타` 범례)·10(XSS 이스케이프)의 소유 파일 `StockBubbleChart.tsx` 는 `metricText` 미유입 0행으로 D2 범위 밖임을 확인했다. 보존 1(`connectNulls:false`)·2(날짜 합집합)·5(`focus:'series'`)는 수정한 2파일 안에서 그대로 잔존한다.
 
-### 커밋 + push (Route A Hybrid Trunk) — M7
+### 커밋 + push (Route A Hybrid Trunk) — M7 관심사별 3 commit
+- `e5e057f` — M7 (1/3) 캐시 적중 경로의 전역 기준일 누락 수정 (F1) + F2 트레이드오프 주석 (2 files)
+- `4eb5bd5` — M7 (2/3) 지표 텍스트 헬퍼 추출 — 표 셀 ↔ 차트 툴팁 문자열 통일 (D2) (5 files)
+- `ccb9068` — M7 (3/3) 회귀 게이트 + 성능 실측 + run-phase close (5 files)
+- `git show --stat` 3 commit 전수 확인 → `.agency/*` · `.claude/**` · `.moai/config|rules|project|state` migration mass · `frontend/coverage/` · `frontend/test-results/` · 루트 `*.txt` **미유입**(B8/B10 git-add discipline — 명시 경로만 staging).
+- push: `6a941a6..ccb9068  main -> main`. 사후 `git rev-list --count --left-right origin/main...HEAD` → `0	0`.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
@@ -495,7 +500,7 @@ M7 은 §1.2 보존 소유 파일 중 `BumpChart.tsx` · `RRGChart.tsx` 2개를 
 
 ```yaml
 run_complete_at: 2026-08-14
-run_commit_sha: pending-backfill-m7   # M7 commit SHA. M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0 / M6=55720f2,c2f7e38,148b873.
+run_commit_sha: ccb9068          # M7-3(최신). M7=e5e057f(F1/F2),4eb5bd5(D2),ccb9068(게이트+close). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0 / M6=55720f2,c2f7e38,148b873.
 run_status: complete             # M1~M7 GREEN. run-phase 전 구간 완료. 다음은 sync-phase.
 ac_pass_count: 54                # 60 AC 중 PASS. M1-M6 누적 51 + M7 신규 판정 3(056 / 010 미판정분 / 052 debt→PASS) = 54. 052 는 M6 debt 에서 승격, 010 은 M1~M6 미기록분을 M7 에서 판정
 ac_pass_with_debt_count: 6       # AC-SUX-018(M2) / 032(M4) / 042·046·060(M5) / 033(M6, 2026-08-14 사용자 결정으로 유지). M6 의 052 는 D2 로 해소되어 PASS 승격, 017 은 M5 에서 이미 PASS 로 재판정(M4 debt 행은 상위 기록에 보존)
@@ -504,7 +509,7 @@ ac_total_this_segment: 60        # acceptance.md 실측 AC 61개 헤딩 중 057 
 ac_bookkeeping_note: "M7 착수 시 progress 기록 58 AC vs acceptance 60 AC 대사에서 AC-SUX-010(미판정)·AC-SUX-056(M7 대상) 2건 누락을 발견해 둘 다 M7 에서 판정했다. AC-SUX-017 은 M4 PASS-WITH-DEBT 행과 M5 PASS 행이 함께 남아 있으며 후행(M5) 판정이 유효하다."
 preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 계약 유지. M7 은 BumpChart/RRGChart 의 tooltip 결측 문자열 경로만 수정했고 보존 계약 grep 10행 전부 잔존(§E.2 §1.2 실측 표)
 l44_pre_commit_fetch: "synced — git fetch origin main 후 rev-list --left-right origin/main...HEAD → 0 0 (동기 상태, 병렬 세션 race 무)"
-l44_post_push_fetch: "pending-backfill-m7"
+l44_post_push_fetch: "M7 3 commit push 후 git fetch origin main → rev-list --left-right origin/main...HEAD = 0 0 (6a941a6..ccb9068, 병렬 세션 개입 무)"
 new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0. 신규 인스턴스 +3(전부 기존 클래스 react-refresh/only-export-components — MetricCell 신규 export 3종; M6 baseline 42 → M7 45). 작성 중 발생한 신규 클래스 react-hooks/globals 4건 + immutability +3건은 테스트 재구성으로 전부 제거. tsc 수정파일 NEW 0
 cross_platform_build:
   applicable: false              # 프론트엔드 전용 SPEC (Go 빌드 태그 / C-HRA-008 N/A)
