@@ -258,31 +258,119 @@ Tier L이나 `design.md` / `research.md`를 신규 작성하지 않는다 — `d
 - `1dba4b0` — M5 잔여: VZ-4 주석 `axisPointer` 리터럴 제거 (1 file, 주석 2행)
 - `git show --stat` 6 commit 전수 확인 → `.agency/*` · `.claude/**` · `.moai/config|rules` migration mass **미유입**(B8/B10 git-add discipline — 명시 경로만 staging).
 
+### M6 (로딩·오류·빈 상태 — commit 55720f2 / c2f7e38 / 148b873)
+
+**Claim**: M6 의 9 AC(033~037 / 052~055)를 3 commit 으로 구현했고, §1.2 보존 10항목 회귀 0 · tsc 비증가(28) · vitest 회귀 0(603 pass)이다.
+**Evidence(verbatim)**: 아래 AC matrix 각 행의 명령·출력 + 검증 배치 V1~V6(아래 §검증 배치).
+**Baseline-attribution**: M5 종료 baseline(§E.2 M5) tsc **28** / TS2353 **0** / vitest **540 pass** / eslint(src/ 전체) **35 errors**(worktree `1dba4b0` 실측). M6 종료 실측 tsc **28**(비증가) / TS2353 **0** / vitest **603 pass** / eslint **42 errors**.
+**Gaps**:
+- AC-SUX-033 의 "부팅 시 비활성 탭 fetch 0" 은 **useQuery 계층에서만 실증**했다. 앱 최상단 `MarketProvider`(§1.2 보존 6·7·8 대상 — 미수정)는 여전히 boot 시 `/api/sectors/ranking` 을 즉시 호출하므로, 앱 전체 관점의 "부팅 시 섹터 엔드포인트 fetch 0" 은 성립하지 않는다 → **PASS-WITH-DEBT**.
+- 섹터 분석 Table 서브탭은 여전히 MarketContext 소스다(PRESERVE 6 유지). 따라서 Table 의 TTL·백오프·stale-but-showing 은 MarketContext 기존 구현이 담당하고, 신설 조회 계층은 Bubble/종목탐색/상세가 소비한다.
+- RRG/Bump 서브탭은 자체 조회를 소유하며 M6 에서 useQuery 로 전환하지 않았다 — 두 화면의 기준일 배지는 `AnalysisParamsContext` 에 기록된 전역 값으로 폴백한다(SN-4 노출은 충족, 화면별 조회 계약은 미전환).
+- AC-SUX-052 의 "5개 화면 동일 렌더" 는 React DOM 을 가진 3개 화면(순위표·종목표·섹터상세)에서 공용 컴포넌트로 실증했다. 차트 3종(섹터버블·RRG·Bump)의 결측 표기는 ECharts tooltip 문자열이라 MetricCell 이 렌더할 수 없다 → **PASS-WITH-DEBT**.
+**Residual-risk**: `useQuery` 는 렌더 identity 에 민감하다(fetcher/meta/retryDelays/recordAsOf 를 ref 로 읽는 이유). 소비자가 이 계약을 어기고 dep 에 인라인 값을 넣으면 무한 재조회가 재발할 수 있다 — 구현 중 실제로 2회 발생(OOM/18739회 호출)했고 ref + 버전당 1회 무효화로 차단했다. 라이브 브라우저 스모크는 미실시(M7 §6-6 소관).
+
+**AC PASS/FAIL matrix (M6)** — 9 AC
+| AC | Status | Verification (verbatim command + output) |
+|----|--------|------------------------------------------|
+| AC-SUX-033 (쿼리 키·조회 시점) | **PASS-WITH-DEBT** | `vitest DataLoadContext.test` — enabled:false → fetch 0 / 활성화 시 1회 / TTL 내 왕복 추가 0회 / 키 변경 시 활성만 즉시·비활성은 활성화 시점. `vitest BubbleChart.m6` — `active=false` 에서 `fetchSectorBubble`·`fetchStockBubble` **미호출**. **Debt**: 앱 최상단 MarketProvider 는 boot 시 ranking 을 호출(§1.2 보존 6 유지) — 앱 전체 "부팅 시 0 fetch" 는 미성립 |
+| AC-SUX-034 (TTL 1시간) | **PASS** | `vitest DataLoadContext.test` — `Date.now` 스텁으로 59분 → fetch 1회 유지, +2분(총 61분) → fetch 2회. TTL 상수는 `queryCache.ts CACHE_TTL_MS` 단일 위치이며 전 엔드포인트가 이 캐시를 공유 |
+| AC-SUX-035 (stale-but-showing) | **PASS** | `vitest DataLoadContext.test` — 재조회 중 `data` 유지 + `refetching=true` + `loading=false`. `vitest BubbleChart.m6` — **DOM 노드 동일성 단언**(`expect(during).toBe(before)`) 통과 + `refetch-spinner` 렌더. 실패 시 `갱신 실패 — 표시 중인 데이터는 2026-08-07 기준입니다` + `[다시 시도]`. **되돌림 RED 관측**(아래 verbatim) |
+| AC-SUX-036 (재시도·수동 새로고침) | **PASS** | `vitest DataLoadContext.test` — fake timer 로 2s/4s/8s 3회 재시도 후 **정지**(60s 추가 경과에도 4회 유지) + `retryExhausted=true`; 4회째 성공 시 데이터 채워지고 exhausted 미설정. `vitest BubbleChart.m6` — `⟳ 새로고침` 최초 로딩·성공 양쪽에서 상설 렌더 + 클릭 시 TTL 내에도 재조회(1→2회). 워밍업 실패 후 재활성화 자가 복구 1 passed |
+| AC-SUX-037 (기준일 합치) | **PASS** | `vitest DataLoadContext.test` — 다른 날짜 2패널 → `conflict.dates=['2026-08-07','2026-08-11']` + `panels=['섹터 순위','종목 탐색']`; 같은 날짜 → conflict null; grid_version 변경 → 전 캐시 무효 + 타 패널 재조회; 응답 메타가 `AnalysisParams.asOfDate/asOfIsPartialWeek/gridVersion` 에 기록. `vitest asof-screens` — Table/RRG/Bump 3 pane 이 각자 `data-status-bar` + 내부 `as-of-badge` 보유(루프 단언), 충돌 띠에 두 날짜·두 패널명·`[새로고침]`. `vitest BubbleChart.m6` — 배지 텍스트 `'기준일 2026-08-11'` **문자열 동등** + `as_of_is_partial_week` true/false 분기. **되돌림 RED 관측**(아래 verbatim) |
+| AC-SUX-052 (셀 5상태) | **PASS-WITH-DEBT** | `vitest MetricCell.test` 13 passed — `–` / `0.00%` / `계산 불가` / `42 ⚠` / `42 ❗` 5상태 텍스트가 서로 다르고(5종 distinct), 상태별 class 5종 distinct, 계산불가·⚠·❗ 에 title 툴팁. `vitest er2-screens` — 순위표·종목표의 결측 셀이 **같은 텍스트·같은 className**. **Debt**: 차트 3종(섹터버블·RRG·Bump)의 결측 표기는 ECharts tooltip 문자열이라 MetricCell 미적용 |
+| AC-SUX-053 (0/50.0/NaN 금지) | **PASS** | `vitest MetricCell.test` — null/undefined/NaN/`{value:null}` 전부 `–`, `0.0` 은 `0.00%`. `vitest er2-screens` — null 픽스처 렌더에서 DOM 텍스트에 `NaN` 0건 · `50.0` 0건 · 런타임 예외 없음(`expect(...).not.toThrow()`), 결측 7셀 `–` / 실제 0 셀만 `0.0%`. `SectorRankingTable.formatReturn` 의 무조건 `toFixed(1)` 경로 제거(= `percent1` 재export, 결측은 MetricCell 이 선차단). **되돌림 RED 관측 2건**(아래 verbatim) |
+| AC-SUX-054 (빈 상태 원인) | **PASS** | `vitest StockExplorer.m6` 5 passed — 섹터=디스플레이+Stage=2+시장=KOSPI 로 0건일 때 라벨 **3개**(`Stage 2`/`시장 KOSPI`/`섹터 디스플레이`) + 액션 3개(`[Stage 필터 해제]`/`[시장 전체로]`/`[섹터 스코프 해제]`). `[시장 전체로]` 클릭 → 시장만 해제(행 복귀) + `setSectorScopeFollow` **미호출**; `[섹터 스코프 해제]` → `setSectorScopeFollow(false)` **1회만**. 결과가 있으면 빈 상태 미렌더. **되돌림 RED 관측**(아래 verbatim) |
+| AC-SUX-055 (섹터 상세 오류) | **PASS** | `vitest SectorDetailPanel.m6` 3 passed — 실패 시 `sector-detail-error` + `[다시 시도]`, 재시도 성공 시 오류 소멸, 빈 응답은 "이 섹터에는 표시할 세부 구성이 없습니다". 정적 스캔: `grep -n "catch(() => {})" frontend/src/components/SectorAnalysis/SectorDetailPanel.tsx` → **0행**(exit 1), `grep -rn "Sub-sector breakdown available in future update" frontend/src/` → **0행**(exit 1). **되돌림 RED 관측**(아래 verbatim) |
+
+#### Lesson #9 [HARD] 대조 단언 — 되돌림 RED 관측 verbatim (7건)
+
+각 변형은 scratchpad `cp` 백업 → 변형 주입 → RED 관측 → `cp` 복원 → `diff` 빈 결과 + 변형 마커 `grep -c` **0** 순으로 실증했다(`git checkout-index` 미사용 — 미커밋 작업물 보호, feedback_mutation_restore).
+
+1. **`mut_er2_null_to_zero`** (MetricCell.normalize: `null → {value: 0}`)
+   ```
+   AssertionError: expected '0.0%' not to contain '0.0'
+   AssertionError: expected '0.0%' to be '–' // Object.is equality
+   Tests  2 failed | 11 passed (13)
+   ```
+2. **`mut_er2_rs_neutral_fill`** (순위표 rs_avg 를 `(x ?? 50).toFixed(1)` 로 중립값 대체)
+   ```
+   AssertionError: expected 6 to be 7 // Object.is equality
+   AssertionError: expected 'Rank ▲Sector1Wⓦ1Mⓦ3MⓦRS AvgⓔRS Top %ⓔ…' not to contain '50.0'
+   Tests  2 failed | 5 passed (7)
+   ```
+3. **`mut_ld_c_unmount_on_refetch`** (BubbleChart: `refetching` 시 차트 언마운트 — 현행 깜빡임 복원)
+   ```
+   TestingLibraryElementError: Unable to find an element by: [data-testid="sector-bubble"]
+   AssertionError: expected <div …(2)></div> to be <div …(2)></div> // Object.is equality
+   Tests  2 failed | 6 passed (8)
+   ```
+4. **`mut_asof_frontend_reformat`** (배지에서 응답 날짜를 `08/11` 로 가공)
+   ```
+   AssertionError: expected '기준일 08/11' to be '기준일 2026-08-11' // Object.is equality
+   AssertionError: expected '기준일 08/11' to contain '2026-08-11'
+   Tests  2 failed | 13 passed (15)
+   ```
+5. **`mut_ac055_silent_swallow`** (SectorDetailPanel: `detailError` 를 null 고정 — 조용한 삼킴 복원)
+   ```
+   TestingLibraryElementError: Unable to find an element by: [data-testid="sector-detail-error"]
+   TestingLibraryElementError: Unable to find an element by: [data-testid="sector-detail-error"]
+   Tests  2 failed | 3 passed (5)
+   ```
+6. **`mut_ac054_global_clear`** (`[시장 전체로]` 가 Stage·섹터 스코프까지 함께 해제 — 전역 clear)
+   ```
+   AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+   Tests  1 failed | 4 passed (5)
+   ```
+7. **복원 실증(전 7건 공통)**: `diff <scratchpad backup> <file>` → **빈 결과(DIFF_EMPTY)**, `grep -c "<변형 마커>" <file>` → **0**. 복원 후 각 테스트 재실행 GREEN 복귀 확인.
+
+**판정**: 6개 변형 전부에서 GREEN 이 아닌 **RED 를 실제로 관측**했다 → 항진명제 아님 실증(Lesson #9 충족).
+
+#### 검증 배치 (read-only, M6 종료 시점 실측)
+| # | 항목 | 결과 |
+|---|------|------|
+| V1 | `vitest run` 전체 | `Test Files 2 failed \| 66 passed (68)` / `Tests 603 passed (603)` — 실패 2건은 선행 e2e file-load(수집 테스트 0건) 불변 |
+| V2 | `tsc -p tsconfig.app.json --noEmit` | `error TS` **28**(baseline 28, 비증가) / `TS2353` **0** / M6 수정·신규 파일 NEW **0** |
+| V3 | AC-SUX-055 grep 1 | `grep -n "catch(() => {})" .../SectorDetailPanel.tsx` → **0행**(exit 1) |
+| V4 | AC-SUX-055 grep 2 | `grep -rn "Sub-sector breakdown available in future update" frontend/src/` → **0행**(exit 1) |
+| V5 | eslint `src/` 전체 | **42 errors** vs M5 baseline **35**(worktree `1dba4b0` 실측). 클래스별 delta: `react-refresh/only-export-components` 13→**20**(+7). 그 외 전 클래스 불변(`react-hooks/refs` 4=ChartCell 선행분, `set-state-in-effect` 6, `no-unused-vars` 8, `no-explicit-any` 2, `immutability` 2). **신규 error class 0** |
+| V6 | §1.2 PRESERVE 10항목 | `git diff 1dba4b0 -- <file>` 이 BumpChart/StockBubbleChart/RRGChart/MarketContext/StageDistributionBar **전부 0행**. 계약 grep: `connectNulls: false` 1 · `focus: 'series'` RRG 1/Bump 1 · `Promise.allSettled` 1 · `RETRY_DELAYS_MS = [2000, 4000, 8000]` MarketContext 1/StockExplorer 1 · `CACHE_TTL_MS` 2 |
+
+### §1.2 보존 대상 회귀 확인 (M6 — PRESERVE 10항목) [PASS]
+M6 는 §1.2 보존 항목을 **한 파일도 수정하지 않았다**(V6 — 5개 소유 파일 전부 `git diff 1dba4b0` 0행). 항목별:
+1 Bump `connectNulls:false` · 2 Bump 날짜 합집합 축 · 5 RRG/Bump `focus:'series'` → `BumpChart.tsx`/`RRGChart.tsx` 미수정. 3 종목 버블 색상 = 산업명(중) · 4 `기타` 범례 · 10 tooltip XSS 이스케이프 → `StockBubbleChart.tsx` 미수정(AC-SUX-048 가드 5 passed 지속). 6 MarketContext TTL+refresh · 7 `Promise.allSettled` · 8 지수 백오프 2/4/8초 → `MarketContext.tsx` 미수정(StockExplorer 의 `RETRY_DELAYS_MS` 도 값·export 유지, useQuery 에 그대로 주입). 9 Stage 세그먼트 토글 해제 → `StageDistributionBar.tsx` 미수정.
+
+### 커밋 + push (Route A Hybrid Trunk) — M6 관심사별 3 commit
+- `55720f2` — M6 (1/3) MetricCell 공용 5상태 셀 + 0/50.0/NaN 렌더 금지 (8 files)
+- `c2f7e38` — M6 (2/3) 공용 조회 계층 — 쿼리키·TTL·stale-but-showing·재시도·기준일 (22 files)
+- `148b873` — M6 (3/3) 빈 상태 원인 표기 + 섹터 상세 오류 표시 (6 files)
+- `git show --stat` 3 commit 전수 확인 → `.agency/*` · `.claude/**` · `.moai/config|rules|project` migration mass · `frontend/coverage/` · `frontend/test-results/` · 루트 `*.txt` **미유입**(B8/B10 git-add discipline — 명시 경로만 staging).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-> 반자율 progression: **M5 GREEN** (시각화 — 차트별 6 commit 통과). M6~M7 잔여(로딩·오류·빈 상태 / 회귀게이트). 본 신호는 M1~M5 구간 — 전 run-phase 완료 아님.
+> 반자율 progression: **M6 GREEN** (로딩·오류·빈 상태 — 관심사별 3 commit 통과). M7 잔여(회귀 게이트 + 성능 측정). 본 신호는 M1~M6 구간 — 전 run-phase 완료 아님.
 
 ```yaml
 run_complete_at: 2026-08-14
-run_commit_sha: 1dba4b0          # M5 잔여(최신). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0.
-run_status: M5-complete          # M1~M5 GREEN. M6~M7 잔여(반자율 progression). 전 run-phase 아님.
-ac_pass_count: 45                # M1-M3(16) + M4(15) + M5 PASS 14(038/039/040/041/043/044/045/047/048/049/050/051/059/017) = 45
-ac_pass_with_debt_count: 6       # AC-SUX-018(M2) + AC-SUX-032(M4) + M5: 042(벤치마크 절대값 백엔드 미전달) / 046(lookback_weeks·trail_start_date·RRG market 파라미터 미지원) / 060(저커버리지 ⚠ 툴팁+하단 요약 M6 연계). AC-SUX-017 은 M5 에서 PASS 로 승격(M3 debt 해소)
+run_commit_sha: 148b873          # M6-3(최신). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0 / M6=55720f2,c2f7e38,148b873.
+run_status: M6-complete          # M1~M6 GREEN. M7 잔여(회귀 게이트 + 성능 측정). 전 run-phase 아님.
+ac_pass_count: 52                # M1-M3(16) + M4(15) + M5(14) = 45, + M6 PASS 7(034/035/036/037/053/054/055) = 52. M6 의 033·052 는 debt
+ac_pass_with_debt_count: 8       # AC-SUX-018(M2) + 032(M4) + 042·046·060(M5) + M6: 033(앱 최상단 MarketProvider boot fetch 잔존) / 052(차트 3종 tooltip 은 MetricCell 미적용)
 ac_fail_count: 0
-ac_total_this_segment: 51        # M1-M3(18) + M4(16) + M5(17: 038~051/059/060/017). 전 SPEC 60 AC 중 9 잔여(M6: 033~037/052~055, M7: 056)
-preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(M5 항목별 판정표 §E.2 참조, 회귀 0)
-l44_pre_commit_fetch: "synced (단일 세션) — 01120f3 기준 0 0 divergence"
-l44_post_push_fetch: "pending — M5 6 commit push 는 M6 종료 시점에 함께 수행(Route A)"
-new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0(신규 인스턴스 1: SectorBubbleChart.tsx:38, 기존 클래스); tsc 수정파일 NEW 0
+ac_total_this_segment: 60        # M1-M3(18) + M4(16) + M5(17) + M6(9: 033~037/052~055). 전 SPEC 60 AC 중 M7 회귀게이트(AC-SUX-056) 만 잔여
+preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경. M6 는 보존 소유 파일 5종을 한 줄도 수정하지 않음(git diff 1dba4b0 0행 — §E.2 V6)
+l44_pre_commit_fetch: "synced — git fetch origin main 후 rev-list --left-right origin/main...HEAD → 0 5 (로컬 5 commit ahead, 병렬 세션 race 무)"
+l44_post_push_fetch: "M5 6 commit + M6 3 commit + docs 2 commit 일괄 push (Route A, main 직접)"
+new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0. 신규 인스턴스 +7(전부 기존 클래스 react-refresh/only-export-components; M5 baseline 35 → M6 42). tsc 수정파일 NEW 0
 cross_platform_build:
   applicable: false              # 프론트엔드 전용 SPEC (Go 빌드 태그 / C-HRA-008 N/A)
-tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M5 비증가; 수정파일 NEW 0)
+tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M6 비증가; 수정·신규 파일 NEW 0)
 tsc_gate_a_ts2353: 0             # HARD 게이트 (a) 유지(M3 달성 후 불변)
 modified_files_new_tsc_errors: 0
-total_run_phase_files: 72        # M1(8)+M2(9)+M3(20)+M4(24)+M5(11: 6 source + 5 test/new, 중복 제외)
-m1_to_mN_commit_strategy: per-screen   # M5 차트별 6 commit(597eaf0/62ade59/2e23dd2/e23d7a0/01120f3/1dba4b0) + 각 conventional commit + 🗿 MoAI trailer
-regression_tests: "540 pass (M4 종료 490 + M5 신규 50) / 2 e2e file-load baseline 불변 / 기존 490 전량 통과, 신규 회귀 0"
-next_checkpoint: "M6 로딩·오류·빈 상태 — AC-SUX-033~037(쿼리키·TTL·stale-but-showing·재시도/새로고침·기준일 합치) + 052~055(MetricCell 5상태·0/50.0 금지·빈 상태 원인·상세 오류). M1 의 queryCache.ts + AnalysisParamsContext recordAsOf 가 M6 소비자를 기다리는 상태"
+total_run_phase_files: 94        # M1(8)+M2(9)+M3(20)+M4(24)+M5(11)+M6(22: 6 신규 source/context + 6 신규 test + 10 수정, 중복 제외)
+m1_to_mN_commit_strategy: per-concern  # M6 관심사별 3 commit(55720f2 MetricCell / c2f7e38 조회계층 / 148b873 빈상태·상세오류) + 각 conventional commit + 🗿 MoAI trailer
+regression_tests: "603 pass (M5 종료 540 + M6 신규 63) / 2 e2e file-load baseline 불변 / 기존 540 전량 통과, 신규 회귀 0"
+next_checkpoint: "M7 회귀 게이트 + 성능 측정 — AC-SUX-056(R1~R5, R1·R2 는 grep 부재 확인 2단, R5 는 Table·섹터Bubble·RRG 한정) + §0.3 제거목록 X1~X6 grep + §1.2 보존 10항목 회귀 단언 + §0.2 리렌더 범위 Profiler 측정 + 모바일 hover-only 0건. M6 잔여 debt 2건(AC-SUX-033 MarketProvider boot fetch / AC-SUX-052 차트 tooltip)은 M7 판정 시 재확인 필요"
 ```
 
 ## §E.4 Sync-phase Audit-Ready Signal
