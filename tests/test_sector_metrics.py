@@ -193,29 +193,44 @@ class TestComputeSectorRanking:
             assert rank_by_name["전기전자"] < rank_by_name["철강금속"]
 
     def test_sector_rank_has_required_fields(self, sector_db: str) -> None:
-        """SectorRank has all SPEC-required fields."""
+        """AC-SAG-044 — SectorRank 필드가 SPEC이 요구하는 *값*을 갖는다(존재만이 아니라).
+
+        v0.5.0 이전 판은 필드 존재 확인 함수 15건으로 존재만 확인했다(항진명제에
+        가깝다 — 필드가 없으면 애초에 dataclass 생성이 실패해 이전 라인에서 이미
+        예외가 난다). 값 단언으로 대체한다 — 각 필드가 SPEC이 규정한 타입·범위·
+        관계를 실제로 만족하는지 확인한다. 검출력 실증(되돌림 3케이스)은
+        ``tests/test_ac_sag_044_regression.py`` 가 전담한다(§8.4 규약 9/10).
+        """
         from my_chart.analysis.sector_metrics import compute_sector_ranking
 
         results = compute_sector_ranking(sector_db, "2024-01-05")
         assert len(results) > 0
         r = results[0]
 
-        # Per SPEC R7
-        assert hasattr(r, "name")
-        assert hasattr(r, "stock_count")
-        assert hasattr(r, "sector_return_1w")
-        assert hasattr(r, "sector_return_1m")
-        assert hasattr(r, "sector_return_3m")
-        assert hasattr(r, "sector_excess_return_1w")
-        assert hasattr(r, "sector_excess_return_1m")
-        assert hasattr(r, "sector_excess_return_3m")
-        assert hasattr(r, "sector_rs_avg")
-        assert hasattr(r, "sector_rs_top_pct")
-        assert hasattr(r, "sector_nh_pct")
-        assert hasattr(r, "sector_stage2_pct")
-        assert hasattr(r, "composite_score")
-        assert hasattr(r, "rank")
-        assert hasattr(r, "rank_change")
+        # 타입 · 범위 단언(존재가 아니라 값)
+        assert isinstance(r.name, str) and r.name
+        assert isinstance(r.stock_count, int) and r.stock_count > 0
+        for field in (
+            "sector_return_1w", "sector_return_1m", "sector_return_3m",
+            "sector_excess_return_1w", "sector_excess_return_1m", "sector_excess_return_3m",
+        ):
+            assert isinstance(getattr(r, field), float)
+        for field in ("sector_rs_avg", "sector_rs_top_pct", "sector_nh_pct", "sector_stage2_pct"):
+            assert 0.0 <= getattr(r, field) <= 100.0, f"{field} must be a 0-100 pct"
+        assert isinstance(r.composite_score, float)
+        assert isinstance(r.rank, int) and r.rank >= 1
+        assert r.rank_change is None or isinstance(r.rank_change, int)
+
+        # 관계 단언 — 초과수익률 = 섹터수익률 − KOSPI수익률(규칙 EX-2와 동형)
+        # 이 파일의 전기전자 fixture 는 KOSPI(1W=1%)를 상회하므로 excess > 0 이어야 한다.
+        elec = next((x for x in results if x.name == "전기전자"), None)
+        if elec is not None:
+            assert elec.sector_excess_return_1w > 0.0
+            # KOSPI 1W = 0.01(fraction) → _load_kospi_returns 가 %로 환산(×100) = 1.0
+            assert abs(
+                elec.sector_excess_return_1w
+                - (elec.sector_return_1w - 1.0)
+            ) < 1e-9
 
     def test_excess_return_computed_correctly(self, sector_db: str) -> None:
         """sector_excess_return = sector_return - KOSPI_return."""

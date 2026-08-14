@@ -1999,6 +1999,253 @@ MISDIAGNOSED로 분류된 항목은 없다.
    미비를 지적했으므로 그 표면만 확장했다(`/sectors/bubble`의 `SectorBubbleItem`
    — 섹터 단위 버블 — 은 대상 밖으로 해석, 종목 단위 필드 요구가 아니므로).
 
+### M7 — 테스트 대체 + 회귀 게이트 (2026-08-14)
+
+M6 gap closure(`b337365` 이전) 이후 이 SPEC의 종료 마일스톤. plan.md M7 체크리스트
+8개 항목을 아래에 항목별로 보고한다.
+
+#### 1. 프로즌 픽스처 확인 (게이팅 AC 재실행 + `/api/db/update` 등가 재실행)
+
+- 게이팅 열거 7개 파일 전부(`test_sector_aggregation.py` / `test_sector_benchmark_
+  ranking.py` / `test_ac_sag_024_high52.py` / `test_ac_sag_030_rs_avg.py` /
+  `test_sag_m6_router_wiring.py` / `test_golden_baseline.py` /
+  `test_aggregation_fixture.py`) + `test_inv_cap1_scan.py` + `test_weighting.py` +
+  `test_sector_rrg.py`를 함께 2회 연속 실행 — **227 passed, 227 passed**(변화 없음,
+  §8.4 규약 1 "재실행해 붉어지지 않음" 충족).
+  ```
+  $ pytest tests/test_sector_aggregation.py tests/test_sector_benchmark_ranking.py \
+      tests/test_ac_sag_024_high52.py tests/test_ac_sag_030_rs_avg.py \
+      tests/test_sag_m6_router_wiring.py tests/test_golden_baseline.py \
+      tests/test_aggregation_fixture.py tests/test_inv_cap1_scan.py \
+      tests/test_weighting.py tests/test_sector_rrg.py -q
+  227 passed, 1 warning in 9.39s   (1st run)
+  227 passed, 1 warning in 9.32s   (2nd run — idempotency 확인)
+  ```
+- 실제 라이브 `/api/db/update` 를 이 세션에서 실행하지는 않았다(라이브 DB를 건드리면
+  §8.4 규약 3의 "라이브 비게이팅 스모크" 범위를 넘어 픽스처 자체를 변경할 위험이
+  있다) — 대신 **동형의 재실행 등가**로 게이팅 테스트 스위트를 2회 반복해 결정성을
+  확인했다(위). 라이브 `/api/db/update` 자체 실행은 배포 환경 스모크로 별도 관리
+  범위이며, 이 SPEC의 게이팅 계약은 §8.4 규약 3에 따라 애초에 라이브 실행에
+  결속되지 않는다(순수 픽스처 기반).
+
+#### 2. 집계 픽스처 F1~F13 재확인 (AC-SAG-048 회귀)
+
+```
+$ pytest tests/test_aggregation_fixture.py -q
+65 passed, 1 warning in 0.52s
+```
+MANIFEST 실측 기록(F1~F13, `synthetic_bar`, `as_of: "2026-08-11"`, `git_sha:
+"a224593"`)과 실제 픽스처 내용의 일치를 검증하는 65개 테스트 전부 PASS — M1.0-a
+종료 시점(`a000add`) 대비 **드리프트 없음**(NO).
+
+#### 3. `as_of=None` 정적 스캔 (§8 규약 8)
+
+**정직한 기재**: acceptance.md §8.4 규약 8 원문은 스캔 명령의 리터럴 코드 블록을
+담고 있지 않다(산문 서술만: "정적 스캔으로 강제 — 게이팅 테스트 파일에서
+`as_of=None` 리터럴 사용 0건, ... `bash -n` 으로 문법 검증한 뒤 실행"). 따라서
+"명세 블록에서 바이트 동등 추출"은 대상이 없어 수행할 수 없었다 — 대신 이 규약을
+**코드로 최초 구현**했고, 그 사실을 이 항목에 정직하게 기록한다.
+
+구현 2단:
+1. **coarse 셸 스캔**(`scripts/spec_checks/as_of_none_scan.sh`, 신규) — `bash -n`
+   문법 검증 통과 후 실행:
+   ```
+   $ bash -n scripts/spec_checks/as_of_none_scan.sh
+   syntax-check exit=0
+   $ bash scripts/spec_checks/as_of_none_scan.sh
+   PASS: 0 code-level as_of=None literal occurrences in 7 gating test files
+   (coarse grep; AST scan is authoritative).
+   run exit=0
+   ```
+2. **AST 기반 정밀 스캔**(`tests/test_as_of_static_scan_m7.py`, 신규) — 실제 함수
+   호출의 키워드 인자만 매치(docstring/주석/문자열 리터럴 오탐 0):
+   ```
+   $ pytest tests/test_as_of_static_scan_m7.py -v
+   13 passed, 1 skipped in 0.30s
+   ```
+   (`test_golden_baseline.py`는 격자·집계 진입점 호출이 없어 정당하게 skip — 그
+   자체가 baseline 구조 검사 파일이지 as_of 인자를 받는 함수 호출자가 아니다.)
+
+기존에 `tests/test_aggregation_fixture.py::test_gating_test_pins_as_of_explicitly`
+가 **자기 파일 하나만** 정적 스캔하고 있었다 — 이번 M7에서 **7개 게이팅 파일
+전부**로 확장했다(M7 이전에는 나머지 6개 파일이 스캔 커버리지 밖이었다는 뜻이며,
+실측상 이번 확장 검사에서도 위반 0건이었다 — 즉 커버리지 확장 자체가 새 결함을
+발견하지는 않았지만, 그 사실을 검증하는 코드가 M7 이전에는 존재하지 않았다).
+
+#### 4. AC-SAG-044 — 의미 테스트로의 대체
+
+```
+$ grep -c "hasattr" tests/test_sector_metrics.py
+0
+```
+`test_sector_rank_has_required_fields`(구 hasattr 15건, `:195-218`)을 값 단언
+블록으로 교체(`tests/test_sector_metrics.py`) — 타입/범위 단언(0~100 pct 필드,
+float 필드, `rank >= 1` 등) + 관계 단언(`sector_excess_return_1w ==
+sector_return_1w - KOSPI_1w`).
+
+되돌림 검출 3케이스(신규 `tests/test_ac_sag_044_regression.py`):
+```
+$ pytest tests/test_ac_sag_044_regression.py -v
+test_ac_sag_044_mut_a_cap_weight_to_equal_weight_changes_values PASSED
+test_ac_sag_044_mut_b_percentile_norm_to_minmax_changes_composite PASSED
+test_ac_sag_044_mut_c_benchmark_disconnect_changes_excess_return PASSED
+3 passed in 0.74s
+```
+- (a) 시총가중→등가중: `daily_db_path=None`(시총 원천 부재, AG-4 등가중 폴백)으로
+  `compute_sector_ranking`을 재호출 — 18개 공통 섹터 중 값이 갈리는 섹터가 임계
+  `>=3`을 충족.
+- (b) 순위백분위→min-max: **범위 정정** — `compute_sector_ranking`(legacy 호환
+  표면)은 실측 확인 결과 애초부터 `_normalize_list`(min-max)를 무조건 쓰고
+  있어(마이그레이션되지 않은 알려진 단순화, 새로 발견한 사실) 그 표면에서는
+  percentile→min-max 되돌림이 **항등 변환**이 되어 검출력이 0이었다. 실제
+  percentile 정규화(AC-SAG-017/045 R5-a)의 production 경로인
+  `compute_sector_aggregates`/`_rank_sectors`(`norm()`)를 대상으로 교체해
+  검출력을 실증했다.
+- (c) 벤치마크 방법론: `_load_kospi_returns`를 0으로 고정하는 되돌림에서
+  `sector_excess_return_1w == sector_return_1w`가 되는 섹터가 5개 이상 발생함을
+  확인(정상 경로에서는 이 등식이 성립하지 않는 섹터가 5개 이상) — 벤치마크
+  방법론이 실제로 초과수익률에 반영되고 있음을 대조로 실증.
+
+**Gap — 커버리지 측정 불가**: `pytest-cov`가 이 venv에 설치돼 있지 않고(`pip`
+바이너리 자체가 셸에서 사용 불가) 커버리지 % 를 기계적으로 측정하지 못했다. AC-
+SAG-044의 "신규/변경 집계 모듈 라인 커버리지 >= 85%" 절은 **미검증(Gap)** 으로
+남긴다 — 대리 지표로 신규 테스트 14건(ac_sag_044 3 + ac_sag_045_r1_r4_r5a 11)이
+`sector_metrics.py`의 `compute_sector_ranking` / `compute_sector_aggregates` /
+`_rank_sectors` / `norm` / `_normalize_list` / `_load_kospi_returns` 경로를 직접
+실행한다.
+
+#### 5. AC-SAG-045 R1 / R3 / R4 / R5-a / R6 회귀 방지
+
+**정직한 기재 — 신규 발견**: M1.0-b~M6 구간까지 골든 baseline은 **구조만**(파일
+존재·키 존재·`as_of` 일치·엔트리 수, AC-SAG-047) 검사됐고, R1/R4/R5-a의 **값
+비교 단언 자체**는 이번 M7 이전까지 어느 테스트 파일에도 구현돼 있지 않았다.
+`tests/test_ac_sag_045_r1_r4_r5a.py`(신규)로 M7에서 최초 구현:
+
+```
+$ pytest tests/test_ac_sag_045_r1_r4_r5a.py -v
+test_baseline_and_new_share_as_of PASSED
+test_ac_sag_045_r1_composite_rank_moved_set_nonempty_ge5 PASSED
+test_ac_sag_045_r1_mut_service_not_rewired_control PASSED
+test_ac_sag_045_r4_rs_avg_average_and_count_increase PASSED
+test_ac_sag_045_r4_mut_rs_zero_fill_control PASSED
+test_ac_sag_045_r5a_norm_is_evenly_spaced[1w] PASSED
+test_ac_sag_045_r5a_norm_is_evenly_spaced[1m] PASSED
+test_ac_sag_045_r5a_norm_is_evenly_spaced[3m] PASSED
+test_ac_sag_045_r5a_mut_minmax_norm_control[1w] PASSED
+test_ac_sag_045_r5a_mut_minmax_norm_control[1m] PASSED
+test_ac_sag_045_r5a_mut_minmax_norm_control[3m] PASSED
+11 passed in 1.16s
+```
+- **R1**: `composite_rank`(period=None 시 `rank`) 이동 섹터 집합 — golden(18섹터)
+  대비 공통 섹터 18개 중 이동 섹터 `>= 5`(공집합 아님) 확인. 되돌림
+  `mut_service_not_rewired`(구조적 보장 — golden 자기 자신과 비교하면 이동
+  집합이 정확히 공집합이 됨을 직접 확인)로 검출력 실증.
+- **R3**: AC-SAG-024 게이팅 절과 동일 파생 규칙 공유 — `tests/test_ac_sag_024_
+  high52.py`(기존)가 이미 PASS(§E.2 M5 참조), M7에서 별도 재구현 불필요(파생
+  규칙 공유이므로 중복 회피).
+- **R4**: 전 섹터 `rs_avg` 평균이 golden 대비 상승 + 상승 섹터 수 > 하락 섹터
+  수(N=18 >= 10) 확인. 되돌림 `mut_rs_zero_fill`은 AC-SAG-030과 공유 —
+  `test_ac_sag_030_rs_avg.py`의 기존 검출력 실증을 서브프로세스로 재확인.
+- **R5-a**: 3개 기간(1w/1m/3m) 전부 `norm(excess_p)` 정렬 결과가 등간격
+  `[0, 100/(N-1), ...]`과 `1e-6` 이내 일치. 되돌림 `mut_minmax_norm`(min-max로
+  치환)에서 등간격이 깨짐을 3개 기간 전부에서 확인.
+- **R6**: AC-SAG-007과 동일 파생 규칙(F3, `mut_no_ag5_gate`) 공유 — M6
+  `test_sag_m6_router_wiring.py`가 이미 PASS + RED 캡처 완료(§E.2 M6 참조),
+  M7에서 재구현 불필요.
+
+#### 6. AC-SAG-050 정적 스캔 2종 + 음성 검증
+
+```
+$ pytest tests/test_inv_cap1_scan.py -v
+8 passed in 0.40s
+```
+스캔 1(코드) + 스캔 2(SPEC 본문) 둘 다 위반 0건, `mut_reintroduce_cap_literal`
+음성 검증(`test_ac_sag_050_scan2_is_actually_capable_of_firing`)이 스캔 2가 실제로
+위반을 검출할 수 있음을 재확인(M2에서 이미 실증됐고 M7은 회귀 재확인).
+
+#### 7. §9 되돌림 실증 완결 라운드 — mutation 변형 커버리지 테이블
+
+| 변형/AC | 판정 | 근거 |
+| --- | --- | --- |
+| `mut_equal_weight`(AC-SAG-002) | already-verified-in-M2 | `test_sector_aggregation.py::test_ac_sag_002_mut_equal_weight_is_detectable`, progress.md §E.2 M2 |
+| `mut_effective_n_uncapped`(AC-SAG-010) | already-verified-in-M2 | progress.md §E.2 M2 |
+| `mut_benchmark_divergent_cap`(AC-SAG-012) | already-verified-in-M3 | `test_sector_benchmark_ranking.py::test_ac_sag_012_mut_divergent_cap_breaks_four_tuple`, progress.md §E.2 M3 |
+| `mut_benchmark_own_anchor`(AC-SAG-012/014) | already-verified-in-M3 | `test_sector_benchmark_ranking.py::test_ac_sag_014_mut_benchmark_own_anchor_breaks_uniqueness`, progress.md §E.2 M3 |
+| `mut_weight_cap_literal`(AC-SAG-041) | already-verified-in-M6 | progress.md §E.2 M6 |
+| `mut_service_not_rewired`(AC-SAG-045 R1) | **verified-now-in-M7** | 위 §5 — `test_ac_sag_045_r1_r4_r5a.py::test_ac_sag_045_r1_mut_service_not_rewired_control` |
+| `mut_plan31_verbatim`(AC-SAG-049) | already-verified-in-M2 | progress.md §E.2 M2 |
+| `mut_reintroduce_cap_literal`(AC-SAG-050) | already-verified-in-M2, 회귀 재확인-in-M7 | 위 §6 — `test_inv_cap1_scan.py` |
+| `mut_no_ag5_gate`(AC-SAG-007/045 R6) | already-verified-in-M6 | `test_sag_m6_router_wiring.py::test_ac_sag_007_red_when_ag5_gate_removed`, progress.md §E.2 M6 |
+| `mut_benchmark_index_row`(AC-SAG-011/013) | already-verified-in-M3 | progress.md §E.2 M3(`mut_benchmark_index_row 검출 실측: 편차 0.957391 %p`) |
+| `mut_benchmark_own_anchor`(AC-SAG-014, 보조 GREEN 병행) | already-verified-in-M3 | 위와 동일 |
+| `mut_stored_max52`(AC-SAG-024/045 R3) | already-verified-in-M5 | `test_ac_sag_024_high52.py`, progress.md §E.2 M5(`mutation_verification_m5: observed-red-4`) |
+| `_classify_stage_simple` 유지 변형(AC-SAG-025) | already-verified-in-M5 | progress.md §E.2 M5 §E3 |
+| `mut_rs_zero_fill`(AC-SAG-030/045 R4) | already-verified-in-M5, 재확인-in-M7 | `test_ac_sag_030_rs_avg.py`, progress.md §E.2 M5 + 위 §5 |
+| 날짜별 재계산 변형(AC-SAG-033) | already-verified-in-M4 | progress.md §E.2 M4(`test_ac_sag_033_index_chain_no_jump_on_membership_change`) |
+| 엔드포인트별 순진 `MAX(Date)` 7회(AC-SAG-037) | **Gap** | 아래 참조 |
+| AC-SAG-044 (3케이스) | **verified-now-in-M7** | 위 §4 |
+| `mut_minmax_norm`(AC-SAG-045 R5-a) | **verified-now-in-M7** | 위 §5 |
+| 횡단면 z-score 변형(AC-SAG-045 R7) | already-verified-in-M4 | `test_sector_rrg.py` |
+| `mut_label_constant_window` + 금요일 종단 변형(AC-SAG-046) | already-verified-in-M1.1/M3 | `test_sector_benchmark_ranking.py::test_ac_sag_046_lite_mut_label_constant_window_is_detectable`, progress.md §E.2 M1.1(금요일 종단) |
+| 파일 1개 제거 음성 검증(AC-SAG-047) | already-verified-in-M1.0-b | progress.md §E.2 M1.0-b §E3 |
+| F2/F12-a 임계 `>= 999` 음성 검증 + F13-1 상위집합 해제 실증(AC-SAG-048) | already-verified-in-M1.0-a 재빌드 | progress.md §E.2 M1.0-a 재빌드 |
+
+**Gap — AC-SAG-037(전 엔드포인트 as_of_date 일치, SN-3) 되돌림 실증 미이행**:
+plan.md M1.1/M6 RED 목록에 결속됐다고 progress.md N5/D26 항목이 기록했으나,
+실제 코드 검색(`grep -rln "AC-SAG-037" tests/ backend/tests/`)결과 이 AC를 다루는
+테스트 파일이 **존재하지 않는다**. `fixture_max_ne_canonical` 픽스처는 존재하지만
+(SPEC-SECTOR-GRID-001 소관, `tests/test_consumer_dates.py`) 이 SPEC의 7개
+섹터 엔드포인트에 그 픽스처를 주입해 `as_of_date`/`grid_version` 일치 및
+엔드포인트별 되돌림 7회를 실증하는 코드는 M7 시점까지 미작성이다. 이는 §8.4
+규약 6 게이팅 열거(002/007/011/012/013/014/024/030/045/046/047/048)에는
+포함되지 않지만 §9 DoD("AC-SAG-001~050 전부 PASS") 및 mutation 변형 목록에
+명시적으로 결속돼 있어 **완결 라운드의 정직한 Gap**으로 기재한다 — 7개
+엔드포인트 각각에 fixture 주입 + 날짜 해석 배선 확인이 필요한 별도 작업량이며,
+"관측하지 못한 것을 GREEN으로 기재하지 않는다"(Lesson #9)는 원칙에 따라 여기서
+강행 완료를 주장하지 않는다. **후속 조치 필요**: 별도 세션 또는 후속 SPEC에서
+`tests/test_ac_sag_037_endpoint_as_of_consistency.py`(가칭) 신설.
+
+#### 8. 릴리스 노트 초안 (manager-docs 인계용 — CHANGELOG.md 직접 편집 금지)
+
+manager-develop은 sync-phase CHANGELOG.md 편집 권한이 없다(소유권 매트릭스). 아래
+초안을 manager-docs 인계 항목으로 남긴다:
+
+> **섹터 집계 시총가중 재작성 완결(M1~M7)** — 시가총액가중 + 상한 재배분(INV-
+> CAP-1) 집계 코어, 시장별 벤치마크(BM-1~BM-6), 순위 백분위 정규화(AG-8/AG-9),
+> RRG 지수, 52주 신고가/Stage 단일화/RS 평균/거래대금 지표 정정, 라우터
+> `market`/`period` 파라미터 신설. R1~R8 "고장처럼 보이지만 올바른 변화"는
+> INV-CAP-1(축퇴 경계) 신설과 상한 재배분 알고리즘 교체(무한 진동 → 동결형)에서
+> 기인하며, 회귀가 아니라 의도된 결과다(acceptance.md AC-SAG-045 참조). AC-SAG-
+> 037(전 엔드포인트 as_of_date 일치 되돌림 실증)은 후속 작업으로 이월한다.
+
+전체 스위트 델타:
+```
+$ pytest tests/ -q   (M7 착수 전 baseline)
+8 failed, 873 passed, 68 skipped, 1 xpassed, 25 errors in 110.80s
+
+$ pytest tests/ -q   (M7 신규 테스트 4파일 추가 후)
+8 failed, 900 passed, 69 skipped, 1 xpassed, 25 errors in 111.68s
+```
++27 passed(신규 파일 4개 합계: as_of scan 13(12 pass+1 skip) + ac_sag_044 3 +
+ac_sag_045_r1_r4_r5a 11 = 27), failed 8건·error 25건은 baseline과 **동일 집합**
+(전건 SPEC 범위 밖 사전 존재 — 신규 실패 0건). skipped +1은 의도된 skip(§3).
+
+#### Blocker 보고 (manager-spec / manager-docs 대상)
+
+1. **manager-docs 대상** — 위 §8 릴리스 노트 초안을 CHANGELOG.md `[Unreleased]`에
+   반영해 달라(manager-develop은 편집 금지).
+2. **manager-docs 대상** — 이 SPEC의 sync-phase 전환(`in-progress → implemented →
+   completed`)을 진행해 달라. manager-develop은 이 전환을 수행하지 않는다.
+3. **후속 SPEC 또는 재위임 대상** — AC-SAG-037(7-엔드포인트 as_of_date 일치
+   되돌림 실증)이 미구현 상태다(§7 Gap 참조). SPEC 본문(acceptance.md) 수정은
+   필요 없다 — 순수 테스트 코드 작성 작업이므로 acceptance.md 편집 권한 이슈는
+   아니다. 다음 run-phase 위임 시 우선 항목으로 포함을 권고한다.
+4. **acceptance.md §8.4 규약 8 정적 스캔 명령의 리터럴 코드 블록 부재** — 이번
+   M7에서 이 규약을 코드로 최초 구현했다(§3). 향후 SPEC에서 acceptance.md를
+   개정할 기회가 있다면 스캔 명령을 코드 블록으로 명문화해 "명세에서 바이트
+   동등 추출" 절차를 실제로 수행 가능하게 만드는 편이 Lesson #9 원칙에 더
+   부합한다 — 이는 정보성 제안이며 blocker는 아니다.
+
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase>_
