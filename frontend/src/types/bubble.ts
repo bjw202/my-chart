@@ -14,6 +14,10 @@ export interface SectorBubbleResponse {
   period: string
   market: string | null
   sectors: SectorBubbleItem[]
+  // ② 봉투(EnvelopeMixin) 선택 필드 — M6 AC-SUX-037 기준일 배지 / SN-5 격자 버전.
+  as_of_date?: string | null
+  as_of_is_partial_week?: boolean | null
+  grid_version?: string | null
 }
 
 export interface StockBubbleItem {
@@ -34,4 +38,8 @@ export interface StockBubbleResponse {
   sector_name: string
   period: string
   stocks: StockBubbleItem[]
+  // ② 봉투(EnvelopeMixin) 선택 필드 — M6 AC-SUX-037.
+  as_of_date?: string | null
+  as_of_is_partial_week?: boolean | null
+  grid_version?: string | null
 }

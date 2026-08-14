@@ -34,15 +34,16 @@ vi.mock('../../../contexts/TabContext', () => ({
 
 import { SectorAnalysis } from '../SectorAnalysis'
 import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
 import { SelectionProvider } from '../../../contexts/SelectionContext'
 
 function renderSectorAnalysis() {
   return render(
-    <AnalysisParamsProvider>
+    <AnalysisParamsProvider><DataLoadProvider>
       <SelectionProvider>
         <SectorAnalysis />
       </SelectionProvider>
-    </AnalysisParamsProvider>,
+    </DataLoadProvider></AnalysisParamsProvider>,
   )
 }
 

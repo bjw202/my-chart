@@ -1,15 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useTab, useNavIntent } from '../../contexts/TabContext'
 import { useSelection } from '../../contexts/SelectionContext'
+import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
 import { fetchStageOverview } from '../../api/stage'
 import type { StageOverviewResponse, StageDistribution } from '../../types/stage'
 import { StageDistributionBar } from './StageDistributionBar'
 import { StockTable } from './StockTable'
 import { useCollapseLevel } from './useCollapseLevel'
+import { buildQueryKey, useQuery } from '../../contexts/DataLoadContext'
+import { DataStatusBar } from '../common/DataStatusBar'
+import { EmptyStateWithCause } from '../common/EmptyStateWithCause'
 
-// 백엔드 미응답 시 재시도 설정 (2초, 4초, 8초)
+// 백엔드 미응답 시 재시도 설정 (2초, 4초, 8초) — §1.2 보존 8. M6 부터 실제 백오프는
+// DataLoadContext.RETRY_DELAYS_MS 가 수행하며, 이 상수는 같은 값을 유지한다(계약 공유).
 export const RETRY_DELAYS_MS = [2000, 4000, 8000]
+
+// 봉투 → 조회 메타 (AC-SUX-037).
+const stageMeta = (d: StageOverviewResponse) => ({
+  asOfDate: d.as_of_date ?? null,
+  asOfIsPartialWeek: d.as_of_is_partial_week ?? false,
+  gridVersion: d.grid_version ?? null,
+})
 
 // @MX:NOTE: [AUTO] StockExplorer is the container for SPEC-TOPDOWN-001E Stock Explorer tab
 // Fetches /api/stage/overview, manages stage/sector filters, and handles cross-tab navigation
@@ -19,39 +31,23 @@ export function StockExplorer(): ReactElement {
   const { intent, navigate } = useNavIntent()
   // SM-5/SM-6: selectedSector·sectorScopeFollow 는 전역 SelectionContext 소유 (02 §3.3).
   const { selectedSector, sectorScopeFollow, setSectorScopeFollow } = useSelection()
-  const [data, setData] = useState<StageOverviewResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // AC-SUX-018: 시장은 헤더 단일 인스턴스(AnalysisParamsContext) 소유. 종목 표 모집단에 실제로 적용된다.
+  const { market, setMarket } = useAnalysisParams()
+  // AC-SUX-033/034/035/036: 공용 조회 계층(TTL + 2/4/8초 백오프 + stale-but-showing).
+  const query = useQuery<StageOverviewResponse>(
+    buildQueryKey('stage-overview', {}),
+    useCallback(() => fetchStageOverview(), []),
+    // §1.2 보존 8: 백오프 간격은 이 모듈의 RETRY_DELAYS_MS(2/4/8초)를 그대로 쓴다.
+    { enabled: activeTab === 'stock-explorer', panel: '종목 탐색', meta: stageMeta, retryDelays: RETRY_DELAYS_MS },
+  )
+  const data = query.data
+  const loading = query.loading
+  const error = query.error
   // AC-SUX-030: 'unclassified' 세그먼트 클릭 지원을 위해 stageFilter 타입 확장.
   const [stageFilter, setStageFilter] = useState<number | 'unclassified' | null>(null)
   // sectorFilter 는 지역 상태가 아니다 — 스코프 추종 토글이 true 일 때만 전역 selectedSector 로 필터 (AC-SUX-007).
   const sectorFilter = sectorScopeFollow ? selectedSector : null
   const [selectedStocks, setSelectedStocks] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    let cancelled = false
-    const fetchWithRetry = (retryCount: number) => {
-      fetchStageOverview()
-        .then((result) => {
-          if (!cancelled) {
-            setData(result)
-            setLoading(false)
-          }
-        })
-        .catch((e: Error) => {
-          if (cancelled) return
-          // 백엔드 미응답 시 자동 재시도 (최대 3회, 2/4/8초 간격)
-          if (retryCount < RETRY_DELAYS_MS.length) {
-            setTimeout(() => fetchWithRetry(retryCount + 1), RETRY_DELAYS_MS[retryCount])
-            return
-          }
-          setError(e.message)
-          setLoading(false)
-        })
-    }
-    fetchWithRetry(0)
-    return () => { cancelled = true }
-  }, [])
 
   // TR-16 (REQ-SUX-013 / AC-SUX-015): 모집단(selectedSector) 변경 시 selectedStocks 초기화.
   //   render-time adjustment 패턴(React 권장) — effect 내 setState lint 회피.
@@ -154,32 +150,49 @@ export function StockExplorer(): ReactElement {
   const tableWrapperRef = useRef<HTMLDivElement>(null)
   const collapseLevel = useCollapseLevel(tableWrapperRef)
 
-  if (loading) {
-    return (
-      <div className="stock-explorer">
-        <div className="stock-explorer-loading">Loading...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="stock-explorer">
-        <div className="stock-explorer-error">{error}</div>
-      </div>
-    )
-  }
-
+  // AC-SUX-035: 표시할 데이터가 아예 없을 때만 자리 표시자를 렌더한다.
+  // 재조회(refetching) 중에는 아래 본문이 그대로 유지된다 — 표가 사라지지 않는다.
   if (!data) {
     return (
       <div className="stock-explorer">
-        <div className="stock-explorer-empty">No data available</div>
+        <DataStatusBar
+          screen="stock-explorer"
+          asOfDate={query.asOfDate}
+          asOfIsPartialWeek={query.asOfIsPartialWeek}
+          refetching={query.refetching}
+          error={error}
+          staleAsOf={query.staleAsOf}
+          onRetry={query.retry}
+        />
+        {loading
+          ? <div className="stock-explorer-loading">Loading...</div>
+          : <div className="stock-explorer-empty">No data available</div>}
       </div>
     )
   }
 
+  const visibleRows = (data.all_stocks?.length ? data.all_stocks : data.stage2_candidates)
+    .filter(c => {
+      if (sectorFilter && c.sector_major !== sectorFilter) return false
+      if (market !== 'all' && (c.market ?? '').toLowerCase() !== market) return false
+      if (stageFilter === 'unclassified') return c.stage == null
+      if (stageFilter !== null) return c.stage === stageFilter
+      return true
+    })
+
   return (
     <div className="stock-explorer">
+      {/* SN-4: 기준일 배지 + ⟳ 새로고침 상설 (AC-SUX-037) */}
+      <DataStatusBar
+        screen="stock-explorer"
+        asOfDate={query.asOfDate}
+        asOfIsPartialWeek={query.asOfIsPartialWeek}
+        refetching={query.refetching}
+        error={error}
+        staleAsOf={query.staleAsOf}
+        onRetry={query.retry}
+      />
+
       {/* Toolbar */}
       <div className="stock-explorer-toolbar">
         <div className="stock-explorer-toolbar-left">
@@ -229,12 +242,30 @@ export function StockExplorer(): ReactElement {
         }
       />
 
+      {/* AC-SUX-054 (ER-3): 결과 0건이면 원인(활성 필터 3개)과 해제 액션을 함께 보여준다 */}
+      {visibleRows.length === 0 && (
+        <EmptyStateWithCause
+          filters={[
+            stageFilter !== null
+              ? { label: `Stage ${stageFilter === 'unclassified' ? '미분류' : stageFilter}`, actionLabel: '[Stage 필터 해제]', onClear: () => setStageFilter(null) }
+              : null,
+            market !== 'all'
+              ? { label: `시장 ${market.toUpperCase()}`, actionLabel: '[시장 전체로]', onClear: () => setMarket('all') }
+              : null,
+            sectorFilter
+              ? { label: `섹터 ${sectorFilter}`, actionLabel: '[섹터 스코프 해제]', onClear: () => setSectorScopeFollow(false) }
+              : null,
+          ]}
+        />
+      )}
+
       {/* Stock table — use all_stocks for full stage coverage, fallback to stage2_candidates */}
       <div ref={tableWrapperRef}>
         <StockTable
           candidates={data.all_stocks?.length ? data.all_stocks : data.stage2_candidates}
           stageFilter={stageFilter}
           sectorFilter={sectorFilter}
+          marketFilter={market}
           onStockSelect={handleStockSelect}
           onSelectAll={handleSelectAll}
           selectedStocks={selectedStocks}

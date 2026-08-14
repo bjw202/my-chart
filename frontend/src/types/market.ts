@@ -116,4 +116,5 @@ export interface SectorRankingResponse {
   baseline_date?: string | null   // AC-SUX-025: rank_change 기준일 헤더
   as_of_date?: string | null      // AC-SUX-037 기준일 배지 (M6 정식 소비)
   as_of_is_partial_week?: boolean | null
+  grid_version?: string | null   // SN-5: 격자 규칙 버전 — 변경 시 전 캐시 무효화
 }

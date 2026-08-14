@@ -29,6 +29,7 @@ vi.mock('../StockBubbleChart', () => ({
   },
 }))
 
+const stableRecorder = { recordAsOf: () => {} }
 const mockNavigate = vi.fn()
 const mockSelectSector = vi.fn()
 vi.mock('../../../contexts/TabContext', () => ({
@@ -38,10 +39,19 @@ vi.mock('../../../contexts/SelectionContext', () => ({
   useSelection: () => ({ selectSector: mockSelectSector }),
 }))
 vi.mock('../../../contexts/AnalysisParamsContext', () => ({
-  useAnalysisParams: () => ({ period: '1m', market: 'all' }),
+  useAnalysisParams: () => ({ period: '1m', market: 'all', asOfDate: null, asOfIsPartialWeek: false }),
+  // M6: DataLoadProvider/useQuery 가 recordAsOf 를 소비하므로 recorder 도 모킹한다.
+  useAnalysisParamsRecorder: () => stableRecorder,
+  AnalysisParamsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 import { BubbleChart } from '../BubbleChart'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
+
+// M6: BubbleChart 는 공용 조회 계층(DataLoadProvider)을 소비한다.
+function renderBC(ui: React.ReactElement) {
+  return render(<DataLoadProvider>{ui}</DataLoadProvider>)
+}
 
 describe('AC-SUX-013 — TR-9 stock bubble click (ST-8 onStockClick wiring)', () => {
   beforeEach(() => {
@@ -51,7 +61,7 @@ describe('AC-SUX-013 — TR-9 stock bubble click (ST-8 onStockClick wiring)', ()
   })
 
   it('BubbleChart passes onStockClick to StockBubbleChart (props 단언)', async () => {
-    render(<BubbleChart initialSector={null} />)
+    renderBC(<BubbleChart initialSector={null} />)
     // sector data 비동기 로드 대기 → SectorBubbleChart 마운트
     await waitFor(() => expect(screen.getByText('enter 반도체')).toBeInTheDocument())
     fireEvent.click(screen.getByText('enter 반도체'))
@@ -62,7 +72,7 @@ describe('AC-SUX-013 — TR-9 stock bubble click (ST-8 onStockClick wiring)', ()
   })
 
   it('stock bubble click → navigate stock-explorer with focusStock + sync sector', async () => {
-    render(<BubbleChart initialSector={null} />)
+    renderBC(<BubbleChart initialSector={null} />)
     await waitFor(() => expect(screen.getByText('enter 반도체')).toBeInTheDocument())
     fireEvent.click(screen.getByText('enter 반도체'))
     await waitFor(() => expect(screen.getByTestId('stock-bubble')).toBeInTheDocument())
@@ -82,7 +92,7 @@ describe('AC-SUX-016 — TR-6 bubble-back preserves selectedSector', () => {
   })
 
   it('← 섹터 목록 클릭 시 stock view → sector view 전환, stockData 초기화', async () => {
-    render(<BubbleChart initialSector={null} />)
+    renderBC(<BubbleChart initialSector={null} />)
     await waitFor(() => expect(screen.getByText('enter 반도체')).toBeInTheDocument())
     fireEvent.click(screen.getByText('enter 반도체'))
     await waitFor(() => expect(screen.getByTestId('stock-bubble')).toBeInTheDocument())

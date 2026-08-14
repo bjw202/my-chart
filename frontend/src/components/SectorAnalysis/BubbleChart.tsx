@@ -1,24 +1,35 @@
 // 버블 차트 컨테이너 - 섹터/종목 뷰 토글, 기간·마켓 필터 관리
 // @MX:ANCHOR: [AUTO] BubbleChart는 섹터↔종목 버블 뷰 전환을 담당하는 컨테이너
 // @MX:REASON: SectorAnalysis에서 마운트되며 SectorBubbleChart, StockBubbleChart 오케스트레이션
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import type { ReactElement } from 'react'
 import { fetchSectorBubble, fetchStockBubble } from '../../api/bubble'
-import type { SectorBubbleItem, StockBubbleItem } from '../../types/bubble'
+import type { SectorBubbleResponse, StockBubbleResponse } from '../../types/bubble'
 import { SectorBubbleChart } from './SectorBubbleChart'
 import { StockBubbleChart } from './StockBubbleChart'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
 import { useNavIntent } from '../../contexts/TabContext'
 import { useSelection } from '../../contexts/SelectionContext'
+import { buildQueryKey, useQuery } from '../../contexts/DataLoadContext'
+import { DataStatusBar } from '../common/DataStatusBar'
 
 type ViewMode = 'sector' | 'stock'
 
 interface Props {
   // 외부에서 초기 섹터를 지정할 수 있음 (cross-tab 연동용)
   initialSector?: string | null
+  // AC-SUX-033: 이 화면이 활성일 때만 조회한다. 비활성 서브탭은 fetch 하지 않는다.
+  active?: boolean
 }
 
-export function BubbleChart({ initialSector }: Props): ReactElement {
+// 봉투 → 조회 메타 (AC-SUX-037). 백엔드가 안 주면 null 로 우아하게 결손 처리한다.
+const bubbleMeta = (d: SectorBubbleResponse | StockBubbleResponse) => ({
+  asOfDate: d.as_of_date ?? d.date ?? null,
+  asOfIsPartialWeek: d.as_of_is_partial_week ?? false,
+  gridVersion: d.grid_version ?? null,
+})
+
+export function BubbleChart({ initialSector, active = true }: Props): ReactElement {
   // AC-SUX-008: period·market 는 헤더 단일 인스턴스(AnalysisParamsContext)에서 소비 — 로컬 토글 제거 (X2)
   const { period, market } = useAnalysisParams()
   const { navigate } = useNavIntent()
@@ -26,57 +37,29 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
   const [view, setView] = useState<ViewMode>('sector')
   const [selectedSector, setSelectedSector] = useState<string | null>(initialSector ?? null)
 
-  // 섹터 버블 데이터
-  const [sectorData, setSectorData] = useState<SectorBubbleItem[]>([])
-  const [sectorLoading, setSectorLoading] = useState(false)
-  const [sectorError, setSectorError] = useState<string | null>(null)
+  const marketParam = market === 'all' ? null : market
 
-  // 종목 버블 데이터
-  const [stockData, setStockData] = useState<StockBubbleItem[]>([])
-  const [stockLoading, setStockLoading] = useState(false)
-  const [stockError, setStockError] = useState<string | null>(null)
+  // AC-SUX-033/034: 쿼리 키 = 엔드포인트 + 파라미터. TTL 내 재활성화는 추가 fetch 없음.
+  const sectorKey = buildQueryKey('sector-bubble', { period, market })
+  const sectorQuery = useQuery<SectorBubbleResponse>(
+    sectorKey,
+    useCallback(() => fetchSectorBubble(period, marketParam), [period, marketParam]),
+    { enabled: active && view === 'sector', panel: '섹터 버블', meta: bubbleMeta },
+  )
 
-  // 섹터 버블 데이터 로드
-  const loadSectorData = useCallback(async () => {
-    setSectorLoading(true)
-    setSectorError(null)
-    try {
-      const res = await fetchSectorBubble(period, market === 'all' ? null : market)
-      setSectorData(res.sectors)
-    } catch (e) {
-      setSectorError(e instanceof Error ? e.message : '데이터 로드 실패')
-    } finally {
-      setSectorLoading(false)
-    }
-  }, [period, market])
+  const stockKey = selectedSector ? buildQueryKey('stock-bubble', { sector: selectedSector, period }) : null
+  const stockQuery = useQuery<StockBubbleResponse>(
+    stockKey,
+    useCallback(
+      () => fetchStockBubble(selectedSector ?? '', period),
+      [selectedSector, period],
+    ),
+    { enabled: active && view === 'stock' && selectedSector !== null, panel: '종목 버블', meta: bubbleMeta },
+  )
 
-  // 종목 버블 데이터 로드
-  const loadStockData = useCallback(async (sectorName: string) => {
-    setStockLoading(true)
-    setStockError(null)
-    try {
-      const res = await fetchStockBubble(sectorName, period)
-      setStockData(res.stocks)
-    } catch (e) {
-      setStockError(e instanceof Error ? e.message : '데이터 로드 실패')
-    } finally {
-      setStockLoading(false)
-    }
-  }, [period])
-
-  // 섹터 뷰 초기 로드 및 필터 변경 시 리로드
-  useEffect(() => {
-    if (view === 'sector') {
-      void loadSectorData()
-    }
-  }, [view, period, market, loadSectorData])
-
-  // 종목 뷰 진입 시 해당 섹터 종목 로드
-  useEffect(() => {
-    if (view === 'stock' && selectedSector) {
-      void loadStockData(selectedSector)
-    }
-  }, [view, selectedSector, loadStockData])
+  // AC-SUX-035 (LD-C): 재조회 중에도 직전 데이터를 그대로 넘긴다 — 차트가 언마운트되지 않는다.
+  const sectorData = useMemo(() => sectorQuery.data?.sectors ?? [], [sectorQuery.data])
+  const stockData = useMemo(() => stockQuery.data?.stocks ?? [], [stockQuery.data])
 
   // 섹터 클릭 → 종목 버블 뷰로 전환
   const handleSectorClick = useCallback((sectorName: string) => {
@@ -93,15 +76,25 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
   }, [selectedSector, selectSectorGlobal, navigate])
 
   // 섹터 뷰로 돌아가기 — TR-6 (AC-SUX-016): selectedSector 유지(현행 null 삭제 결함 수정).
-  //   stockData/stockError만 초기화한다.
   const handleBack = useCallback(() => {
     setView('sector')
-    setStockData([])
-    setStockError(null)
   }, [])
+
+  const activeQuery = view === 'sector' ? sectorQuery : stockQuery
 
   return (
     <div className="bubble-chart-container">
+      {/* SN-4: 기준일 배지 + ⟳ 새로고침 상설. LD-C: 재조회 인디케이터는 배지 옆. */}
+      <DataStatusBar
+        screen={view === 'sector' ? 'sector-bubble' : 'stock-bubble'}
+        asOfDate={activeQuery.asOfDate}
+        asOfIsPartialWeek={activeQuery.asOfIsPartialWeek}
+        refetching={activeQuery.refetching}
+        error={activeQuery.error}
+        staleAsOf={activeQuery.staleAsOf}
+        onRetry={activeQuery.retry}
+      />
+
       {/* 툴바: 뒤로가기 + 섹터 라벨 (기간·마켓 토글은 헤더 단일 인스턴스로 이동 — X2 제거) */}
       <div className="bubble-chart-toolbar">
         <div className="bubble-chart-toolbar-left">
@@ -120,44 +113,33 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
         </div>
       </div>
 
-      {/* 차트 영역 */}
+      {/* 차트 영역 — AC-SUX-035: 재조회(refetching) 동안 차트를 언마운트하지 않는다.
+          최초 로딩(표시할 데이터 없음)일 때만 자리 표시자를 렌더한다. */}
       <div className="bubble-chart-body">
         {view === 'sector' && (
-          <>
-            {sectorLoading && (
-              <div className="bubble-loading">섹터 버블 데이터 로딩 중...</div>
-            )}
-            {sectorError && (
-              <div className="bubble-error">오류: {sectorError}</div>
-            )}
-            {!sectorLoading && !sectorError && (
-              <SectorBubbleChart
-                sectors={sectorData}
-                onSectorClick={handleSectorClick}
-                period={period}
-                market={market === 'all' ? null : market}
-              />
-            )}
-          </>
+          sectorQuery.loading && sectorData.length === 0 ? (
+            <div className="bubble-loading">섹터 버블 데이터 로딩 중...</div>
+          ) : (
+            <SectorBubbleChart
+              sectors={sectorData}
+              onSectorClick={handleSectorClick}
+              period={period}
+              market={marketParam}
+            />
+          )
         )}
 
         {view === 'stock' && selectedSector && (
-          <>
-            {stockLoading && (
-              <div className="bubble-loading">종목 버블 데이터 로딩 중...</div>
-            )}
-            {stockError && (
-              <div className="bubble-error">오류: {stockError}</div>
-            )}
-            {!stockLoading && !stockError && (
-              <StockBubbleChart
-                stocks={stockData}
-                sectorName={selectedSector}
-                onStockClick={handleStockClick}
-                period={period}
-              />
-            )}
-          </>
+          stockQuery.loading && stockData.length === 0 ? (
+            <div className="bubble-loading">종목 버블 데이터 로딩 중...</div>
+          ) : (
+            <StockBubbleChart
+              stocks={stockData}
+              sectorName={selectedSector}
+              onStockClick={handleStockClick}
+              period={period}
+            />
+          )
         )}
       </div>
     </div>

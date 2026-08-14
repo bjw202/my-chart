@@ -10,6 +10,8 @@ interface StockTableProps {
   // number = stage 1-4 필터; 'unclassified' = 분류 불가 종목만(AC-SUX-030); null = 전체
   stageFilter: number | 'unclassified' | null
   sectorFilter: string | null
+  // AC-SUX-018/054: 헤더 시장 토글(all/kospi/kosdaq) — 'all' 이면 필터하지 않는다.
+  marketFilter?: 'all' | 'kospi' | 'kosdaq'
   onStockSelect: (code: string) => void
   onSelectAll?: (codes: string[]) => void
   selectedStocks: Set<string>
@@ -77,6 +79,7 @@ export function StockTable({
   candidates,
   stageFilter,
   sectorFilter,
+  marketFilter = 'all',
   onStockSelect,
   onSelectAll,
   selectedStocks,
@@ -103,6 +106,7 @@ export function StockTable({
       return false
     }
     if (sectorFilter && c.sector_major !== sectorFilter) return false
+    if (marketFilter !== 'all' && (c.market ?? '').toLowerCase() !== marketFilter) return false
     return true
   })
 

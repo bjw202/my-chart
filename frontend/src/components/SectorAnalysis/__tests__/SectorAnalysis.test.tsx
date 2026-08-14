@@ -56,15 +56,16 @@ vi.mock('../../../contexts/TabContext', () => ({
 // Import after mocks
 import { SectorAnalysis } from '../SectorAnalysis'
 import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
 import { SelectionProvider } from '../../../contexts/SelectionContext'
 
 // AC-SUX-008/018 + M3: SectorAnalysis 는 AnalysisParamsContext(market/period) + SelectionContext(selectedSector) 소비.
 // 실제 SelectionProvider 로 감싸 selectSector/clearSector 가 상태를 갱신하도록 한다 (TR-3/3b 검증).
 function renderWithProviders(ui: ReactElement) {
   return render(
-    <AnalysisParamsProvider>
+    <AnalysisParamsProvider><DataLoadProvider>
       <SelectionProvider>{ui}</SelectionProvider>
-    </AnalysisParamsProvider>,
+    </DataLoadProvider></AnalysisParamsProvider>,
   )
 }
 

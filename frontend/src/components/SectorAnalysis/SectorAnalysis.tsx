@@ -15,6 +15,7 @@ import { SectorDetailPanel } from './SectorDetailPanel'
 import { BubbleChart } from './BubbleChart'
 import { BumpChart } from './BumpChart'
 import { RRGChart } from './RRGChart'
+import { DataStatusBar } from '../common/DataStatusBar'
 
 // 서브 탭 타입 정의
 type SubTab = 'table' | 'bubble' | 'rrg' | 'bump'
@@ -61,7 +62,7 @@ function periodDisabledTooltip(subTab: SubTab): string {
 }
 
 export function SectorAnalysis(): ReactElement {
-  const { sectorRanking } = useMarket()
+  const { sectorRanking, loading: rankingLoading, error: rankingError, refresh: refreshRanking } = useMarket()
   // SM-4: selectedSector 는 SelectionContext 전역 단일 슬롯 (02 §3.3 소유권 표).
   const { selectedSector, selectSector, clearSector } = useSelection()
   const { navigate } = useNavIntent()
@@ -198,6 +199,18 @@ export function SectorAnalysis(): ReactElement {
       {/* Table 뷰: 기존 섹터 랭킹 테이블 + 상세 패널 (keep-mounted: display 토글) */}
       {mountedTabs.has('table') && (
       <div style={{ display: subTab === 'table' ? 'block' : 'none' }}>
+          {/* SN-4 (AC-SUX-037): 기준일 배지 + ⟳ 새로고침 상설. Table 은 MarketContext 소스이므로
+              해당 Provider 의 refresh() 를 재시도 액션으로 연결한다 (§1.2 보존 6 — MarketContext 미수정). */}
+          <DataStatusBar
+            screen="sector-table"
+            asOfDate={sectorRanking?.as_of_date ?? sectorRanking?.date ?? null}
+            asOfIsPartialWeek={sectorRanking?.as_of_is_partial_week ?? false}
+            refetching={rankingLoading && sectorRanking !== null}
+            error={rankingError}
+            staleAsOf={rankingError !== null && sectorRanking !== null ? (sectorRanking.as_of_date ?? sectorRanking.date ?? null) : null}
+            onRetry={refreshRanking}
+          />
+
           {/* AC-SUX-022 (REQ-SUX-020): 비-rank 정렬 고지 띠 — 현재 정렬 기준·period·market 표기 + [순위순으로] 복귀 */}
           {!isRankSorted && (
             <div className="sort-notice" data-testid="sort-notice">
@@ -249,13 +262,16 @@ export function SectorAnalysis(): ReactElement {
       {/* Bubble 뷰: 섹터/종목 버블 차트 (keep-mounted) */}
       {mountedTabs.has('bubble') && (
         <div style={{ display: subTab === 'bubble' ? 'block' : 'none' }}>
-          <BubbleChart initialSector={null} />
+          {/* AC-SUX-033: 활성 서브탭일 때만 조회한다 */}
+          <BubbleChart initialSector={null} active={subTab === 'bubble'} />
         </div>
       )}
 
       {/* RRG 뷰: Relative Rotation Graph (keep-mounted — visibleSectors/windowEnd 보존, AC-SUX-017) */}
       {mountedTabs.has('rrg') && (
         <div style={{ display: subTab === 'rrg' ? 'block' : 'none' }}>
+          {/* SN-4: RRG 는 자체 조회를 소유하므로 배지는 전역 기록값(AnalysisParams)으로 폴백한다 */}
+          <DataStatusBar screen="sector-rrg" />
           <RRGChart
             onSectorClick={(name) => {
               // TR-7: RRG trail click → selectSector + table. keep-mounted 로 visibleSectors/windowEnd 보존.
@@ -269,6 +285,7 @@ export function SectorAnalysis(): ReactElement {
       {/* Bump 뷰: 섹터 순위 변동 bump chart (keep-mounted — topFilter 보존, AC-SUX-017) */}
       {mountedTabs.has('bump') && (
         <div style={{ display: subTab === 'bump' ? 'block' : 'none' }}>
+          <DataStatusBar screen="sector-bump" />
           <BumpChart
             onSectorClick={(name) => {
               // TR-8: Bump line click → selectSector + table. keep-mounted 로 topFilter 보존.

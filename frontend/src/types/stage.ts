@@ -52,4 +52,8 @@ export interface StageOverviewResponse {
   by_sector: StageBySector[]
   stage2_candidates: Stage2Candidate[]
   all_stocks: Stage2Candidate[]
+  // ② 봉투(EnvelopeMixin) 선택 필드 — M6 AC-SUX-037 기준일 배지 / SN-5.
+  as_of_date?: string | null
+  as_of_is_partial_week?: boolean | null
+  grid_version?: string | null
 }

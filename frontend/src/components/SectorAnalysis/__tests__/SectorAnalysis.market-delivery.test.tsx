@@ -26,6 +26,7 @@ vi.mock('../../../contexts/SelectionContext', () => ({
 }))
 
 import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
 import { MarketProvider } from '../../../contexts/MarketContext'
 import { SectorAnalysis } from '../SectorAnalysis'
 
@@ -44,11 +45,11 @@ describe('AC-SUX-018 — 시장 토글 실동작 (market=kospi 파라미터 전�
   it('KOSPI 토글 클릭 시 fetchSectorRanking 가 market="kospi" 인자로 호출된다', async () => {
     const user = userEvent.setup()
     render(
-      <AnalysisParamsProvider>
+      <AnalysisParamsProvider><DataLoadProvider>
         <MarketProvider>
           <SectorAnalysis />
         </MarketProvider>
-      </AnalysisParamsProvider>,
+      </DataLoadProvider></AnalysisParamsProvider>,
     )
     // 마운트 시 최초 조회 (market=all)
     await waitFor(() => expect(mockFetchSectorRanking).toHaveBeenCalled())
@@ -67,11 +68,11 @@ describe('AC-SUX-018 — 시장 토글 실동작 (market=kospi 파라미터 전�
   it('KOSDAQ 토글 클릭 시 fetchSectorRanking 가 market="kosdaq" 인자로 호출된다', async () => {
     const user = userEvent.setup()
     render(
-      <AnalysisParamsProvider>
+      <AnalysisParamsProvider><DataLoadProvider>
         <MarketProvider>
           <SectorAnalysis />
         </MarketProvider>
-      </AnalysisParamsProvider>,
+      </DataLoadProvider></AnalysisParamsProvider>,
     )
     await waitFor(() => expect(mockFetchSectorRanking).toHaveBeenCalled())
     const kosdaqBtn = screen.getByRole('button', { name: /kosdaq/i })

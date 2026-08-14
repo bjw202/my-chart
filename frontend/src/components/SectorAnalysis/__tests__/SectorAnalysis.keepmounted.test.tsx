@@ -36,11 +36,12 @@ vi.mock('../BubbleChart', () => ({
 
 import { SectorAnalysis } from '../SectorAnalysis'
 import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
 import { SelectionProvider } from '../../../contexts/SelectionContext'
 
 function renderSA() {
   return render(
-    <AnalysisParamsProvider><SelectionProvider><SectorAnalysis /></SelectionProvider></AnalysisParamsProvider>,
+    <AnalysisParamsProvider><DataLoadProvider><SelectionProvider><SectorAnalysis /></SelectionProvider></DataLoadProvider></AnalysisParamsProvider>,
   )
 }
 

@@ -3,6 +3,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { StageOverviewResponse } from '../../../types/stage'
+import { AnalysisParamsProvider } from '../../../contexts/AnalysisParamsContext'
+import { DataLoadProvider } from '../../../contexts/DataLoadContext'
+
+// M6: StockExplorer 는 공용 조회 계층(DataLoadProvider)과 헤더 파라미터(AnalysisParamsProvider)를 소비한다.
+// 매 호출마다 새 element 를 만든다 — 동일 element 를 rerender 하면 React 가 bail-out 한다.
+const SE = () => (
+  <AnalysisParamsProvider><DataLoadProvider><StockExplorer /></DataLoadProvider></AnalysisParamsProvider>
+)
+function renderSE() {
+  return render(SE())
+}
 
 // Mock stage API
 vi.mock('../../../api/stage', () => ({
@@ -83,7 +94,7 @@ describe('StockExplorer', () => {
   })
 
   it('should fetch stage overview on mount', async () => {
-    render(<StockExplorer />)
+    renderSE()
 
     await waitFor(() => {
       expect(fetchStageOverview).toHaveBeenCalledTimes(1)
@@ -93,13 +104,13 @@ describe('StockExplorer', () => {
   it('should show loading state initially', () => {
     vi.mocked(fetchStageOverview).mockReturnValue(new Promise(() => {})) // never resolves
 
-    render(<StockExplorer />)
+    renderSE()
 
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
   })
 
   it('should show stage distribution bar after data loads', async () => {
-    render(<StockExplorer />)
+    renderSE()
 
     await waitFor(() => {
       // Stage distribution bar should be visible
@@ -108,7 +119,7 @@ describe('StockExplorer', () => {
   })
 
   it('should show stock table after data loads', async () => {
-    render(<StockExplorer />)
+    renderSE()
 
     await waitFor(() => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
@@ -119,7 +130,7 @@ describe('StockExplorer', () => {
   it('should show error message if fetch fails after retries', async () => {
     vi.mocked(fetchStageOverview).mockRejectedValue(new Error('Failed to fetch'))
 
-    render(<StockExplorer />)
+    renderSE()
 
     // 재시도 지연 0ms이므로 빠르게 완료됨
     await waitFor(() => {
@@ -134,7 +145,7 @@ describe('StockExplorer', () => {
     mockSelectedSector = 'Healthcare'
     mockSectorScopeFollow = true
 
-    render(<StockExplorer />)
+    renderSE()
 
     // Sector filter chip should be shown
     await waitFor(() => {
@@ -144,7 +155,7 @@ describe('StockExplorer', () => {
 
   it('should enable View Charts button when stocks are selected', async () => {
     const user = userEvent.setup()
-    render(<StockExplorer />)
+    renderSE()
 
     await waitFor(() => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
@@ -164,7 +175,7 @@ describe('StockExplorer', () => {
 
   it('should navigate to chart-grid with selected stock codes on View Charts click', async () => {
     const user = userEvent.setup()
-    render(<StockExplorer />)
+    renderSE()
 
     await waitFor(() => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
@@ -185,7 +196,7 @@ describe('StockExplorer', () => {
 
   it('AC-SUX-015 / TR-16: selectedSector change resets selectedStocks (no stale count)', async () => {
     const user = userEvent.setup()
-    const { rerender } = render(<StockExplorer />)
+    const { rerender } = renderSE()
     await waitFor(() => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
     })
@@ -198,7 +209,7 @@ describe('StockExplorer', () => {
     // 모집단 변경: selectedSector 전환 → selectedStocks 초기화 (TR-16).
     mockSelectedSector = 'Healthcare'
     mockSectorScopeFollow = true
-    rerender(<StockExplorer />)
+    rerender(SE())
 
     await waitFor(() => {
       expect(screen.queryByText(/selected/i)).not.toBeInTheDocument()
@@ -207,7 +218,7 @@ describe('StockExplorer', () => {
 
   it('should filter table by stage when distribution bar segment is clicked', async () => {
     const user = userEvent.setup()
-    render(<StockExplorer />)
+    renderSE()
 
     await waitFor(() => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
