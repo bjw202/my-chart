@@ -236,8 +236,11 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
   return (
     <div className="bubble-chart-wrapper">
       <ColorLegend />
+      {/* notMerge 필수 — 사유는 StockBubbleChart 의 @MX:NOTE 참조(섹터/모집단 변경 시
+          series 인덱스 병합으로 이전 데이터가 잔존한다). */}
       <ReactECharts
         option={option}
+        notMerge={true}
         style={{ height: '500px', width: '100%' }}
         onEvents={handleEvents}
         opts={{ renderer: 'svg' }}

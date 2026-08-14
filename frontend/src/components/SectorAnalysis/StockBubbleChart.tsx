@@ -356,8 +356,14 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
 
   return (
     <div className="bubble-chart-wrapper">
+      {/* @MX:NOTE: [AUTO] notMerge 필수 — 없으면 setOption 이 기존 option 에 병합되고 series 는
+          인덱스로 병합된다. 섹터를 바꿔 series 수가 줄면 이전 섹터의 남는 series 가 그대로
+          살아남아, 새 섹터 차트에 이전 섹터 종목 버블이 섞여 나온다(범례에는 없는 종목).
+          이 컴포넌트는 섹터 변경 시 언마운트되지 않고(AC-SUX-017 keep-mounted) ECharts
+          인스턴스가 유지되므로 병합 잔존이 그대로 화면에 남는다. 제거 금지. */}
       <ReactECharts
         option={option}
+        notMerge={true}
         style={{ height: '500px', width: '100%' }}
         onEvents={handleEvents}
         opts={{ renderer: 'svg' }}
