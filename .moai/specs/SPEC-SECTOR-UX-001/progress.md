@@ -199,31 +199,90 @@ Tier L이나 `design.md` / `research.md`를 신규 작성하지 않는다 — `d
   ```
   변형 직후 즉시 되돌림(revert) — `git diff frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` → **빈 diff**(byte-identical 복원 확인). 이로써 가드가 색상 배열 변화를 실제로 포착함(항진명제 아님)을 실증. REQ-SUX-056 섹터 버블 색상 구현이 종목 버블 색상 배열에 영향을 주지 않음을 본 가드가 지속 단언한다.
 
+### M5 (시각화 — 차트별 commit 597eaf0 / 62ade59 / 2e23dd2 / e23d7a0 / 01120f3 / 1dba4b0)
+
+**Claim**: M5 시각화 규약(AC-SUX-038~051 + 059 + 060 + 017)을 6 commit 으로 구현했고, §1.2 보존 10항목 회귀 0 · tsc 비증가 · vitest 회귀 0 이다.
+**Evidence(verbatim)**: 아래 AC matrix 각 행의 명령·출력. M5 테스트 파일 6종 일괄 실행 → `Test Files 6 passed (6) / Tests 50 passed (50)`.
+**Baseline-attribution**: M5 착수 baseline(§E.2 "M5 Baseline") tsc 28 / TS2353 0 / vitest 490. M5 종료 실측 tsc **28**(비증가) / TS2353 **0** / vitest **540 passed**(490 + M5 신규 50).
+**Gaps**: AC-SUX-042(벤치마크 절대값) · AC-SUX-046(lookback_weeks/trail_start_date/market 파라미터) · AC-SUX-060(저커버리지 툴팁 ⚠ + 하단 저신뢰 요약) 3건은 백엔드 응답 필드 부재 또는 M6 소관으로 PASS-WITH-DEBT. 상세는 matrix 참조.
+**Residual-risk**: 선행 결함 28건(tsc) + e2e file-load 2 파일은 M5 범위 밖으로 불변. ECharts option 단언 기반이므로 실제 캔버스 렌더 결과(색 대비 시각 확인)는 라이브 스모크(M7 §6-6)에서 확인 필요.
+
+**AC PASS/FAIL matrix (M5)** — 17 AC(038~051 / 059 / 060 / 017)
+| AC | Status | Verification (verbatim command + output) |
+|----|--------|------------------------------------------|
+| AC-SUX-038 (버블 크기 면적비례+로그) | **PASS** | `vitest bubbleRadius.test.ts` → 10 passed. 공식 `2×sqrt(rMin²+u×(rMax²−rMin²))` 리터럴 단언 + 섹터[14,68]/종목[10,52] 범위 + `v_max===v_min → u=0.5` + **선형 정규화 대조 단언**(중간값이 최소 근처에 뭉치지 않음) + 기간별 고정눈금 클램프 |
+| AC-SUX-039 (크기 범례 의무) | **PASS** | `vitest SectorBubbleChart.m5.test` — SizeLegend 3 참조버블 실제값 + 기간 병기 렌더 단언 |
+| AC-SUX-040 (결측 거래대금) | **PASS** | 섹터: `SectorBubbleChart.m5.test` 점선 테두리(REQ-SUX-057 섹터). 종목: `StockBubbleChart.m5.test` `symbolSize=10(=2×rMin)` + 툴팁 `거래대금: 데이터 없음` + 테두리 Stage 불변 |
+| AC-SUX-041 (axisPointer 삭제) | **PASS** | `SectorBubbleChart.m5.test` — option 에 `axisPointer` 키 부재 단언. 정적 스캔: `grep -c "axisPointer" frontend/src/components/SectorAnalysis/SectorBubbleChart.tsx` → **0행**(주석 표기까지 1dba4b0 에서 제거) |
+| AC-SUX-042 (기준선 의미 표기) | **PASS-WITH-DEBT** | 섹터: X=0 markLine 벤치마크 **이름** 라벨 렌더(15 passed 중). 종목: cap-weighted 섹터 집계 수익률 라인 + 라벨 + 0선 보조. **Debt**: 벤치마크 **절대값**(+1.88%)은 백엔드 미전달 — 이름만 표기 |
+| AC-SUX-043 (축 범위) | **PASS** | `SectorBubbleChart.m5.test` — X축 `min <= 0` 보장 단언(음수 초과수익률 픽스처 포함) |
+| AC-SUX-044 (RRG 사분면 의미 표기) | **PASS** | `vitest RRGChart.m5.test` — 4사분면 라벨에 벤치마크 대비 의미 병기 + 100 기준선 상설 + ② O-A1 롤링정규화 미적용 고지 렌더 |
+| AC-SUX-045 (RRG 축 자동 대칭) | **PASS** | `RRGChart.m5.test` — `rrgHalf(maxDev)` 순수함수 리터럴 4케이스(`half=max(5,ceil(dev×1.1))`) + **대조 단언**(기존 75/125 하드코딩과 다름) 9 passed |
+| AC-SUX-046 (궤적 시작·벤치마크 추종) | **PASS-WITH-DEBT** | 스파크라인 헤더 lookback(8주) + 궤적 시작일 렌더. **Debt**: `lookback_weeks`/`trail_start_date` 응답 필드 및 RRG API `market` 파라미터 백엔드 미지원 — client 파생값(TRAIL_WINDOW + 첫 trail 날짜) 사용, 데이터 시리즈의 market-follow 미구현 |
+| AC-SUX-047 (Stage 테두리 채널) | **PASS** | `StockBubbleChart.m5.test` AC-SUX-047 — stage 2/1/3/4/null → `{#ffffff,2,solid}`/`width 0`/`width 0`/`{#4b5563,1,solid}`/`{#9CA3AF,1,dashed}` 전수 단언 |
+| AC-SUX-048 (색상 채널 회귀 금지) | **PASS** | `vitest StockBubbleChart.ac048-guard.test.tsx` → 5 passed. **RED 실증(Lesson #9)**: M5 착수 전 `SECTOR_MINOR_PALETTE[0]` `#4E79A7→#000000` 변형 시 RED 관측(§E.2 M5 Baseline 항 verbatim), 즉시 byte-identical 복원 |
+| AC-SUX-049 (다크 배경 대비) | **PASS** | `StockBubbleChart.m5.test` — 팔레트 10색 + `#9CA3AF` 전부 배경 `#1a1a2e` 대비 `>= 3.0`. 대비비 계산 함수 포함. `#4E79A7 ≈ 3.76:1` 측정 → 교체 불필요 |
+| AC-SUX-050 (기타 범례 개수 병기) | **PASS** | `StockBubbleChart.m5.test` — `legend.formatter` 가 `기타 (N개 산업)` 형태 산출 단언 |
+| AC-SUX-051 (hover 강조 범위) | **PASS** | `StockBubbleChart.m5.test` — 산점도 `emphasis.focus === 'none'`. **회귀 단언**: `RRGChart.tsx` / `BumpChart.tsx` 의 `focus:'series'` 불변(§1.2 PRESERVE 항 참조) |
+| AC-SUX-059 (섹터 버블 색상 채널) | **PASS** | `SectorBubbleChart.m5.test` — 발산형 5단계 서로 다른 5색 매핑 + 기준점 **0%**(벤치마크 +1.88% 픽스처에서도 0% 버블이 중립색) + 경계 상수 단일 위치 + ColorLegend 구간 텍스트 + **채널 독립 대조 단언**(초과수익률만 바꾸면 색 불변 / 기간수익률만 바꾸면 색 변화) |
+| AC-SUX-060 (테두리 채널 단일화) | **PASS-WITH-DEBT** | 종목 `{stage:2, trading_value:null}` → 흰 2px 실선(결측이 테두리를 덮지 않음) 구분가능성 단언 PASS. 정적 스캔 `grep -rnE "coverage.*border\|border.*coverage\|low_confidence.*border" frontend/src/components/SectorAnalysis/` → **0행** PASS. **Debt**: `coverage_ratio` 저커버리지의 툴팁 `⚠` + 하단 저신뢰 요약 목록 미구현 — `low_confidence`/`coverage_ratio` 가 소스 전역 0건(`grep -rn` → 0행). M6 AC-SUX-052 `MetricCell` ⚠ 상태와 함께 구현 예정 |
+| AC-SUX-017 (RRG/Bump 요소 클릭 + state 보존) | **PASS** | `vitest SectorAnalysis.keepmounted.test` → 4 passed. mountedTabs lazy-mount + `display:none` keep-mounted — 마운트 카운터 목으로 탭 왕복 remount **0** 실증(M3/M4 deferred debt 해소). 미방문 탭 미마운트로 AC-SUX-033(M6 lazy fetch) 양립 |
+
+### §1.2 보존 대상 회귀 확인 (M5 — PRESERVE 10항목) [PASS]
+| # | 보존 항목 | 판정 |
+|---|-----------|------|
+| 1 | Bump `connectNulls:false` | **불변** — M5 는 `BumpChart.tsx` 미수정(`git log --oneline 5e3ff65..1dba4b0 -- BumpChart.tsx` → 0 commit) |
+| 2 | Bump 날짜 합집합 축 | **불변** — 동일(미수정) |
+| 3 | 종목 버블 색상 = 산업명(중) | **불변** — AC-SUX-048 가드 5 passed 지속. `SECTOR_MINOR_PALETTE` + `buildSectorMinorColorMap` 리터럴 고정 |
+| 4 | 종목 버블 `기타` 범례 처리 | **불변** — AC-SUX-050 이 개수 병기만 **추가**(그룹핑 로직 자체는 미변경) |
+| 5 | RRG/Bump `focus:'series'` | **불변** — AC-SUX-051 회귀 단언이 명시적으로 검사. 변경 대상은 StockBubbleChart 산점도뿐 |
+| 6 | `MarketContext` TTL + `refresh()` | **불변** — M5 는 `MarketContext.tsx` 미수정 |
+| 7 | `Promise.allSettled` 독립 실패 | **불변** — 동일(미수정) |
+| 8 | 지수 백오프 2/4/8초 | **불변** — `RETRY_DELAYS_MS` 미수정 |
+| 9 | Stage 세그먼트 토글 해제 | **불변** — M5 는 `StageDistributionBar.tsx` 미수정 |
+| 10 | tooltip XSS 이스케이프 | **불변** — `StockBubbleChart.tsx` tooltip formatter 의 escape 경로 유지(M5 는 markLine·테두리·크기만 수정) |
+
+### 회귀 (기존 프론트엔드 테스트) [PASS — 회귀 0건]
+- 최종 `vitest run` → **540 tests passed (540)** (M4 종료 490 + M5 신규 50), `Test Files 2 failed | 59 passed (61)` — 실패 2건은 선행 e2e file-load(수집 테스트 0건) 불변.
+
+### eslint (M5 수정 파일) [신규 error class 0]
+- `eslint src/components/SectorAnalysis/` → **6 errors**. 클래스별: `react-refresh/only-export-components` 2 · setState-in-effect 3 · `@typescript-eslint/no-unused-vars` 1.
+- **신규 error class 0**. 신규 *인스턴스* 1건(`SectorBubbleChart.tsx:38` — `sectorReturnColor`/상수 export 로 인한 `react-refresh/only-export-components`)은 `RRGChart.tsx:38` 과 동일한 기존 baseline 클래스.
+
+### 커밋 + push (Route A Hybrid Trunk) — M5 차트별 6 commit
+- `597eaf0` — M5 (1/6) AC-SUX-048 색상 회귀 가드 + `bubbleRadius` 공용 유틸 (4 files)
+- `62ade59` — M5 (2/5) SectorBubbleChart 시각화 규약 (3 files)
+- `2e23dd2` — M5 (3/5) StockBubbleChart 시각화 규약 (4 files)
+- `e23d7a0` — M5 (4/5) RRG 시각화 규약 (2 files)
+- `01120f3` — M5 (5/5) AC-SUX-017 keep-mounted 서브탭 (2 files)
+- `1dba4b0` — M5 잔여: VZ-4 주석 `axisPointer` 리터럴 제거 (1 file, 주석 2행)
+- `git show --stat` 6 commit 전수 확인 → `.agency/*` · `.claude/**` · `.moai/config|rules` migration mass **미유입**(B8/B10 git-add discipline — 명시 경로만 staging).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-> 반자율 progression: **M4 GREEN** (표·컨트롤 규약 — 화면별 3 commit 통과). M5~M7 잔여(시각화 / 로딩상태 / 회귀게이트). 본 신호는 M1+M2+M3+M4 구간 — 전 run-phase 완료 아님. **M5 착수 전 STOP(반자율 checkpoint 대기)**.
+> 반자율 progression: **M5 GREEN** (시각화 — 차트별 6 commit 통과). M6~M7 잔여(로딩·오류·빈 상태 / 회귀게이트). 본 신호는 M1~M5 구간 — 전 run-phase 완료 아님.
 
 ```yaml
 run_complete_at: 2026-08-14
-run_commit_sha: cfdb87a          # M4-3(최신). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a.
-run_status: M4-complete          # M1+M2+M3+M4 GREEN. M5~M7 잔여(반자율 progression). 전 run-phase 아님. M5 착수 전 STOP.
-ac_pass_count: 31                # M1-M3(16) + M4 PASS 15(019/020/021/022/023/024/025/026/027/028/029/030/031/058/061) = 31
-ac_pass_with_debt_count: 3       # AC-SUX-018(M2) + AC-SUX-017(M3) + AC-SUX-032(M4: columns·미분류 default 가시 PASS, 기준일/진행중 배지 M6 AC-SUX-037 연계 debt)
+run_commit_sha: 1dba4b0          # M5 잔여(최신). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0.
+run_status: M5-complete          # M1~M5 GREEN. M6~M7 잔여(반자율 progression). 전 run-phase 아님.
+ac_pass_count: 45                # M1-M3(16) + M4(15) + M5 PASS 14(038/039/040/041/043/044/045/047/048/049/050/051/059/017) = 45
+ac_pass_with_debt_count: 6       # AC-SUX-018(M2) + AC-SUX-032(M4) + M5: 042(벤치마크 절대값 백엔드 미전달) / 046(lookback_weeks·trail_start_date·RRG market 파라미터 미지원) / 060(저커버리지 ⚠ 툴팁+하단 요약 M6 연계). AC-SUX-017 은 M5 에서 PASS 로 승격(M3 debt 해소)
 ac_fail_count: 0
-ac_total_this_segment: 34        # M1-M3(18) + M4(16: 019~032/058/061, 057 결번 skip). 전 SPEC 60 AC 중 26 잔여(M5-M7)
-preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(StockBubbleChart 색상 채널·BumpChart connectNulls 포함, 회귀 0)
-l44_pre_commit_fetch: "synced (단일 세션) — a18417f 기준 0 0 divergence"
-l44_post_push_fetch: "synced — a18417f..cfdb87a fast-forward, 병렬 세션 race 무"
-new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0; tsc 수정파일 NEW 0
+ac_total_this_segment: 51        # M1-M3(18) + M4(16) + M5(17: 038~051/059/060/017). 전 SPEC 60 AC 중 9 잔여(M6: 033~037/052~055, M7: 056)
+preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(M5 항목별 판정표 §E.2 참조, 회귀 0)
+l44_pre_commit_fetch: "synced (단일 세션) — 01120f3 기준 0 0 divergence"
+l44_post_push_fetch: "pending — M5 6 commit push 는 M6 종료 시점에 함께 수행(Route A)"
+new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0(신규 인스턴스 1: SectorBubbleChart.tsx:38, 기존 클래스); tsc 수정파일 NEW 0
 cross_platform_build:
   applicable: false              # 프론트엔드 전용 SPEC (Go 빌드 태그 / C-HRA-008 N/A)
-tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M4 비증가; 수정파일 NEW 0)
+tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M5 비증가; 수정파일 NEW 0)
 tsc_gate_a_ts2353: 0             # HARD 게이트 (a) 유지(M3 달성 후 불변)
 modified_files_new_tsc_errors: 0
-total_run_phase_files: 61        # M1(8)+M2(9)+M3(20)+M4(24: 13 source + 11 test/new) — 겹침 없음
-m1_to_mN_commit_strategy: per-screen   # M4 화면별 3 commit(dc4ad26/d28d505/cfdb87a) + 각 conventional commit + 🗯 MoAI trailer; push at end
-regression_tests: "490 pass (430 baseline + M4 신규 60) / 2 e2e file-load baseline 불변 / 기존 430 전량 통과, 신규 회귀 0"
-next_checkpoint: "M5 시각화(차트별 개별 commit) — 반자율 progression checkpoint 대기. AC-SUX-048 색상 채널 회귀 금지 테스트 M5 착수 전 선행 작성(PLAN M5). M4 는 표·컨트롤 규약 완료"
+total_run_phase_files: 72        # M1(8)+M2(9)+M3(20)+M4(24)+M5(11: 6 source + 5 test/new, 중복 제외)
+m1_to_mN_commit_strategy: per-screen   # M5 차트별 6 commit(597eaf0/62ade59/2e23dd2/e23d7a0/01120f3/1dba4b0) + 각 conventional commit + 🗿 MoAI trailer
+regression_tests: "540 pass (M4 종료 490 + M5 신규 50) / 2 e2e file-load baseline 불변 / 기존 490 전량 통과, 신규 회귀 0"
+next_checkpoint: "M6 로딩·오류·빈 상태 — AC-SUX-033~037(쿼리키·TTL·stale-but-showing·재시도/새로고침·기준일 합치) + 052~055(MetricCell 5상태·0/50.0 금지·빈 상태 원인·상세 오류). M1 의 queryCache.ts + AnalysisParamsContext recordAsOf 가 M6 소비자를 기다리는 상태"
 ```
 
 ## §E.4 Sync-phase Audit-Ready Signal
