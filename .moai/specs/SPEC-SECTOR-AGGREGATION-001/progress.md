@@ -2364,7 +2364,7 @@ ac_sag_045_r1_r4_r5a 11 = 27), failed 8건·error 25건은 baseline과 **동일 
 ```yaml
 sync_status: completed
 sync_complete_at: 2026-08-14
-sync_commit_sha: pending-backfill-sync   # 자기참조 해저드 — 후속 커밋에서 실제 SHA로 백필
+sync_commit_sha: 13d74d0                 # 백필 완료 — sync-phase artifacts + 3-phase close 커밋
 changelog_entry_position: "CHANGELOG.md [Unreleased] 최상단 (### Added SPEC-SECTOR-AGGREGATION-001 v0.5.0)"
 readme_updated: false                    # README.md 에 섹터 집계 관련 참조 0건(grep 확인) — 갱신 대상 없음
 frontmatter_status_transitions:
