@@ -3,9 +3,10 @@ import type { ReactElement } from 'react'
 import { useTab, useNavIntent } from '../../contexts/TabContext'
 import { useSelection } from '../../contexts/SelectionContext'
 import { fetchStageOverview } from '../../api/stage'
-import type { StageOverviewResponse } from '../../types/stage'
+import type { StageOverviewResponse, StageDistribution } from '../../types/stage'
 import { StageDistributionBar } from './StageDistributionBar'
 import { StockTable } from './StockTable'
+import { useCollapseLevel } from './useCollapseLevel'
 
 // 백엔드 미응답 시 재시도 설정 (2초, 4초, 8초)
 export const RETRY_DELAYS_MS = [2000, 4000, 8000]
@@ -21,7 +22,8 @@ export function StockExplorer(): ReactElement {
   const [data, setData] = useState<StageOverviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [stageFilter, setStageFilter] = useState<number | null>(null)
+  // AC-SUX-030: 'unclassified' 세그먼트 클릭 지원을 위해 stageFilter 타입 확장.
+  const [stageFilter, setStageFilter] = useState<number | 'unclassified' | null>(null)
   // sectorFilter 는 지역 상태가 아니다 — 스코프 추종 토글이 true 일 때만 전역 selectedSector 로 필터 (AC-SUX-007).
   const sectorFilter = sectorScopeFollow ? selectedSector : null
   const [selectedStocks, setSelectedStocks] = useState<Set<string>>(new Set())
@@ -100,9 +102,14 @@ export function StockExplorer(): ReactElement {
   }
 
   const handleStageClick = (stage: string | null) => {
-    // Map segment key (stage1/stage2/...) to stage string used in candidates
+    // Map segment key (stage1/stage2/.../unclassified) to stageFilter value
     if (stage === null) {
       setStageFilter(null)
+      return
+    }
+    // AC-SUX-030: 미분류 세그먼트 → 'unclassified'
+    if (stage === 'unclassified') {
+      setStageFilter('unclassified')
       return
     }
     // Map distribution bar keys to API stage integer values
@@ -116,14 +123,36 @@ export function StockExplorer(): ReactElement {
   }
 
   // Derive activeStage key from current stageFilter
-  const activeStageKey = stageFilter !== null
-    ? Object.entries({
-        stage1: 1,
-        stage2: 2,
-        stage3: 3,
-        stage4: 4,
-      } as Record<string, number>).find(([, v]) => v === stageFilter)?.[0] ?? null
-    : null
+  const activeStageKey = stageFilter === 'unclassified'
+    ? 'unclassified'
+    : stageFilter !== null
+      ? Object.entries({
+          stage1: 1,
+          stage2: 2,
+          stage3: 3,
+          stage4: 4,
+        } as Record<string, number>).find(([, v]) => v === stageFilter)?.[0] ?? null
+      : null
+
+  // AC-SUX-029 (REQ-SUX-027): sectorScopeFollow 시 선택 섹터의 by_sector 분포를 사용 —
+  // 헤더에 섹터명·종목수 표기, 세그먼트 합 = 표 행 수(모집단 일치).
+  const sectorDistribution: StageDistribution | null = (() => {
+    if (!data || !sectorFilter) return null
+    const entry = data.by_sector?.find((s) => s.sector === sectorFilter)
+    if (!entry) return null
+    return {
+      stage1: entry.stage1,
+      stage2: entry.stage2,
+      stage3: entry.stage3,
+      stage4: entry.stage4,
+      unclassified_count: entry.unclassified_count,
+      total: entry.total ?? entry.stage1 + entry.stage2 + entry.stage3 + entry.stage4 + (entry.unclassified_count ?? 0),
+    }
+  })()
+
+  // AC-SUX-061 (REQ-SUX-058): 종목 표 폭 측정 → 열 접기 단계.
+  const tableWrapperRef = useRef<HTMLDivElement>(null)
+  const collapseLevel = useCollapseLevel(tableWrapperRef)
 
   if (loading) {
     return (
@@ -188,22 +217,30 @@ export function StockExplorer(): ReactElement {
         </div>
       </div>
 
-      {/* Stage distribution bar */}
+      {/* Stage distribution bar — AC-SUX-029: sectorScopeFollow 시 선택 섹터 분포(by_sector) 사용 */}
       <StageDistributionBar
-        distribution={data.distribution}
+        distribution={sectorDistribution ?? data.distribution}
         activeStage={activeStageKey}
         onStageClick={handleStageClick}
+        headerLabel={
+          sectorDistribution
+            ? `${sectorFilter} · ${sectorDistribution.total}종목`
+            : undefined
+        }
       />
 
       {/* Stock table — use all_stocks for full stage coverage, fallback to stage2_candidates */}
-      <StockTable
-        candidates={data.all_stocks?.length ? data.all_stocks : data.stage2_candidates}
-        stageFilter={stageFilter}
-        sectorFilter={sectorFilter}
-        onStockSelect={handleStockSelect}
-        onSelectAll={handleSelectAll}
-        selectedStocks={selectedStocks}
-      />
+      <div ref={tableWrapperRef}>
+        <StockTable
+          candidates={data.all_stocks?.length ? data.all_stocks : data.stage2_candidates}
+          stageFilter={stageFilter}
+          sectorFilter={sectorFilter}
+          onStockSelect={handleStockSelect}
+          onSelectAll={handleSelectAll}
+          selectedStocks={selectedStocks}
+          collapseLevel={collapseLevel}
+        />
+      </div>
     </div>
   )
 }

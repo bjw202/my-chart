@@ -43,6 +43,8 @@ export interface Stage2Candidate {
   // ⊤ 마커 — 상한 적용(capped) 종목. ② 가 별도 플래그를 내리지 않으므로, weight_in_sector 가
   // 상한선(WEIGHT_CAP=0.1)에 근접해 clipped 된 경우를 표현. 백엔드 확장 전까지 optional.
   weight_capped?: boolean
+  // 52W고 열 — ② StageStock.near_52w_high. 52주 고가 근접 여부.
+  near_52w_high?: boolean | null
 }
 
 export interface StageOverviewResponse {
