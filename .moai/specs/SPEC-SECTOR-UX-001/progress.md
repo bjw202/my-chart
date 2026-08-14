@@ -346,31 +346,177 @@ M6 는 §1.2 보존 항목을 **한 파일도 수정하지 않았다**(V6 — 5�
 - `148b873` — M6 (3/3) 빈 상태 원인 표기 + 섹터 상세 오류 표시 (6 files)
 - `git show --stat` 3 commit 전수 확인 → `.agency/*` · `.claude/**` · `.moai/config|rules|project` migration mass · `frontend/coverage/` · `frontend/test-results/` · 루트 `*.txt` **미유입**(B8/B10 git-add discipline — 명시 경로만 staging).
 
+### M7 (회귀 게이트 + 성능 측정 + F1 수정 + D2 해소)
+
+**Claim**: AC-SUX-056(R1~R5)을 구현하고, F1(캐시 적중 경로의 전역 기준일 누락)을 수정했으며, D2(텍스트 헬퍼 추출)로 AC-SUX-052 의 텍스트 병행을 해소했다. §0.3 X1~X6 제거·§1.2 보존 10항목·§0.2 성능·모바일 hover-only 를 기계적으로 실측했다. 미판정으로 남아 있던 AC-SUX-010 을 함께 판정했다.
+**Evidence(verbatim)**: 아래 AC matrix 각 행 + 검증 배치 W1~W5 + Lesson #9 되돌림 RED 8건.
+**Baseline-attribution**: M6 종료 baseline(`6a941a6` 실측) — tsc **28** / TS2353 **0** / vitest **603 pass** + e2e file-load 실패 2 file / eslint(src/) **42 errors**. M7 종료 실측 — tsc **28**(비증가) / TS2353 **0** / vitest **655 pass**(+52) / e2e 실패 2 file **불변** / eslint **45 errors**.
+**Gaps**:
+- **§0.2 "종목 표 500행 +20% 이내"는 판정 불가** — 비교 기준인 *3열 추가 이전* baseline 이 M4 착수 전에 측정되지 않았다. 현재 코드에는 기간 3열을 끌 수 있는 스위치가 없어 사후 재현도 불가능하다. 절대 실측값과 비교 가능한 대리 지표(접기 3단계 = 다른 3열 제거 시 델타)만 기록한다. **수치를 지어내지 않는다.**
+- **§0.2 INP P95 / FCP / 기간·시장 토글 P95 지연은 미측정** — 실브라우저 계측이 필요하며 jsdom 에서 산출할 수 없다. 헤드리스 대리 측정으로 갈음하지 않는다.
+- **AC-SUX-052 의 스타일 병행은 범위 밖(N/A)** — debt 가 아니라 물리적 불가다. ECharts tooltip 은 formatter 가 만드는 **문자열**이며 스타일시트가 닿는 DOM 이 아니다. 본 SPEC 이 통일한 것은 텍스트다.
+- **§0.2 리렌더 가드의 한 방향은 구조적으로 보장되어 변형 불가** — `selectedSector` 변경 → Params 소비자 리렌더 0 은 Provider 중첩 순서(AnalysisParams 가 Selection 의 조상)로 React 가 보장한다. 두 파일 안에서 이를 falsify 하는 변형을 만들지 못했다. 반대 방향(period → Selection 소비자 0)은 Context 병합 변형으로 RED 를 관측했다.
+- **AC-SUX-056 R1 의 원문 grep 은 0행이 아니라 1행** — 아래 R1 행에 실측과 명시 제외 근거를 그대로 남긴다.
+**Residual-risk**: 정적 스캔(X1~X6 · 보존 10항목)은 **문자열 계약**을 고정한다. 구현이 같은 의미를 유지한 채 표현만 바꾸면(예: `connectNulls: false` 를 변수로 추출) 스캔이 거짓 실패한다 — 그때는 스캔을 갱신할 것이지 계약을 바꾸지 말 것. 라이브 브라우저 스모크는 여전히 미실시다.
+
+**AC PASS/FAIL matrix (M7)**
+
+| AC | Status | Verification (verbatim command + output) |
+|----|--------|------------------------------------------|
+| AC-SUX-056 R1 (기간 변경 → 로딩) | **PASS** | 긍정: `vitest M7.regression-gate` — period `1m→3m` 후 `findByTestId('refetch-spinner')` 렌더 + `closest('[data-testid="data-status-bar"]')` 비-null(기준일 배지와 같은 상태 바). 부재 확인 **원문 grep = 1행**: `BubbleChart.m6.test.tsx:88 expect(screen.queryByTestId('refetch-spinner')).not.toBeInTheDocument()`. 이 1건은 재조회 **완료 후 소멸** 단언이며(같은 파일 78행이 등장을 긍정 단언) R1 이 막는 '기간 변경 **시점**의 로딩 부재 요구'와 다른 경로다 → R2 가 규정한 "라인 주석 표시" 방식을 라인 단위로 적용해 `AC-SUX-056-R1-ALLOW` 마커로 명시 제외. **제외 후 0행**. 원문 1행이 2행으로 늘면 테스트가 먼저 실패한다(`toHaveLength(1)` 고정) |
+| AC-SUX-056 R2 (정렬 변경 → 고지 띠) | **PASS** | 긍정: AC-SUX-022 와 동일 대상 — `SectorAnalysis.m4.test` 가 `getByTestId('sort-notice')` 렌더를 실증(M7 이 해당 단언의 실재를 재확인). 부재 확인 grep(allowlist=`SectorAnalysis.m4.test.tsx`) → **0행**. allowlist 근거: rank 정렬 상태의 띠 부재 단언은 고지 띠 계약 자체의 일부(acceptance.md R2 명시 조항) |
+| AC-SUX-056 R3 (버블 크기 분포) | **PASS** | `vitest M7.regression-gate` — 거래대금 15종(1.2e10~8.2e12) 기준 로그 매핑 표준편차 > 선형 매핑 표준편차, 최소밴드(하위 2px) 뭉침 개수 선형 > 로그. **대조군 설계 정정**: 최초 작성한 대조군은 구현과 두 군데(로그 u + 면적 sqrt)가 달라 구현을 선형화해도 RED 가 나지 않았다 — **항진명제였다.** 대조군을 "면적 sqrt 는 동일, u 만 선형"으로 좁힌 뒤 되돌림 RED 관측(아래 변형 3) |
+| AC-SUX-056 R4 (RRG 궤적 단축) | **PASS** | `vitest M7.regression-gate` — 응답 trail 20주 픽스처에서 그려진 점 수 **8** < 20. "짧다"가 아니라 `toBe(8)`(TRAIL_WINDOW 계약)로 고정 |
+| AC-SUX-056 R5 (KOSPI 필터 행 감소 + 제외 영역) | **PASS** | **검증 범위 = Table · 섹터 Bubble · RRG 한정**(O-U9). Table: `tbody tr` 3→2 감소 + `excluded-sectors` 텍스트 `순위 대상 제외 (1)` → `(2)`, 제외 섹터명 본문 노출. 섹터 Bubble: 응답 `sectors[]` 밖 섹터의 데이터 포인트 미생성(`['반도체','은행']`). RRG: 시리즈 이름 `['반도체']`(`__bg__` 제외). **Bump 는 대상 아님** — 반대 방향 단언(제외 섹터 선이 Bump 에 남는다)은 `BumpChart.m4.test.tsx` 의 AC-SUX-019 describe 가 M4 부터 담당하며 M7 에서 중복 추가하지 않았다 |
+| AC-SUX-010 (탭 왕복 컨텍스트 보존) | **PASS** | **M1~M6 에서 미판정으로 누락**되어 있던 AC 를 M7 에서 판정했다(M7 착수 시 progress 기록 58 AC vs acceptance 60 AC 대사로 발견). `vitest M7.static-scan` — `AppContent.tsx` 의 상단 5탭이 전부 `display: activeTab === '…' ? 'flex' : 'none'` keep-mounted(조건부 언마운트 `activeTab === '…' && <` 패턴 0건) → subTab·sortField·stageFilter·체크 등 로컬 상태가 탭 왕복에 소멸하지 않는다. 서브탭도 `mountedTabs` + `display: subTab ===` keep-mounted(M5 AC-SUX-017). `period`·`selectedSector` 는 탭 위 Provider 소유(AppContent 로컬 state 아님). 탭 내비게이션 전용 뒤로가기 부재: `history.back|goBack|<BackButton` 소스 전량 **0행**. **주의**: `BubbleChart` 의 `← 섹터 목록` 은 Bubble 서브탭 **내부 드릴다운 복귀**이며 탭 내비게이션용이 아니다 — AC-SUX-010 금지 대상 아님 |
+| AC-SUX-037 (기준일 합치) | **PASS** (F1 적합성 결함 수정 포함) | M6 판정 유지 + **F1 수정**: `DataLoadContext.useQuery` 의 **캐시 적중 분기**가 `registerAsOf` 만 호출하고 `recordAsOf`(전역 `AnalysisParams.asOfDate`)를 건너뛰었다. 전역 값은 `asOfDate` prop 을 넘기지 않는 화면(**RRG·Bump**)의 `DataStatusBar` 폴백 소스라 자기 배지와 전역 배지가 어긋나고, `registerAsOf` 는 갱신되므로 **합치 경고 띠도 뜨지 않는 조용한 불일치**였다. 재현 테스트(키 A→B→A 캐시 적중) 선행 RED verbatim: `AssertionError: expected '2026-08-11' to be '2026-08-01' // Object.is equality`. 수정 후 GREEN(`contexts/__tests__` 49 passed). `noteGridVersion` 은 적중 경로에서 호출하지 않는다 — `QueryCache.setGridVersion` 이 버전 변경 시 Map 을 통째로 비우므로(queryCache.ts:27) 살아남은 엔트리는 반드시 현재 버전이며 재통지는 `prev === version` 무동작이다(코드 주석에 근거 기록) |
+| AC-SUX-052 (셀 5상태 화면 간 동일) | **PASS** (M6 PASS-WITH-DEBT → 해소) | **D2 해소**: `MetricCell` 에서 상태 해석 + 표시 문자열 생성을 순수 함수 `metricDisplay` / `metricText` 로 추출하고, `MetricCell`(표 DOM)과 `SectorBubbleChart`·`RRGChart`·`BumpChart` 의 ECharts tooltip formatter 가 **같은 함수**를 호출한다. `vitest MetricTextParity.m7` 12 passed — 동일 픽스처 7종(null/undefined/NaN/표본부족/저신뢰/경고/실제0)에서 표 셀 렌더 텍스트 == `metricText` 출력. 섹터버블 결측 3지표 전부 `–`(NaN 누출 0), RRG 결측 좌표 `–`, Bump 결측 종합점수 `–`(종전 ASCII `-` 이탈 제거). 값이 있을 때의 포맷은 종전 유지(`초과수익률: 2.50%` / `RS 평균: 60.0` / `기간수익률: +4.00%` / `RS-Ratio: 108.12` / `종합점수: 80.00`). **스타일 병행은 범위 밖 N/A**(위 Gaps — ECharts tooltip 은 DOM 이 아님). 구현 중 `Number(null) === 0` 으로 결측이 실제 0 으로 둔갑하는 경로를 테스트가 잡아내 `toMetricValue`(null 보존 변환)를 추가했다 |
+| AC-SUX-033 (쿼리 키·조회 시점) | **PASS-WITH-DEBT** (유지) | M6 판정 유지. **2026-08-14 사용자 결정 — MarketProvider 현행 유지, 부팅 시 sector fetch 1회 잔존은 후속 SPEC 항목.** 따라서 M7 에서 `MarketContext.tsx` / MarketProvider 마운트 시점을 수정하지 않았다(파일 변경 0). useQuery 계층의 비활성 탭 fetch 0 은 M6 실증 그대로 유효하며, 앱 전체 관점의 "부팅 시 섹터 엔드포인트 fetch 0" 은 미성립 상태로 남는다 |
+
+#### §0.2 성능 실측 (기계적 측정 — Profiler 미사용 근거는 위 Gaps)
+
+| 측정 지점 | 실측 | 판정 |
+|---|---|---|
+| `selectedSector` 변경 시 무관 컴포넌트 리렌더 수 | **0** (AnalysisParams 만 소비하는 컴포넌트 리렌더 델타 0, Selection 소비자는 정확히 1) | 목표(0) **충족** |
+| `period` 변경 시 Selection 만 소비하는 컴포넌트 리렌더 수 | **0** (Params 소비자는 정확히 1) | Context 분리 목적 **충족** — 병합 변형 시 RED |
+| 부팅 시 비활성 탭 fetch 수 | **0** (`BubbleChart` `active=false` 에서 `fetchSectorBubble`·`fetchStockBubble` 미호출 — M6 실증 유지) | 활성 탭만 조회 **충족**. 단 MarketProvider 잔존분은 AC-SUX-033 debt |
+| 종목 표 500행 렌더 (12열, collapseLevel 0) | median **104.9ms** (5회: 119.7 / 104.9 / 99.7 / 97.9 / 146.1) | 절대 실측 기록 |
+| 종목 표 500행 렌더 (9열, collapseLevel 3) | median **101.2ms** (5회: 115.0 / 102.2 / 101.2 / 96.6 / 99.9) | 3열 델타 **+3.6%** — 대리 지표 |
+| 종목 표 3열 추가 전후 +20% 이내 | **판정 불가 (Gap)** | 비교 기준 baseline 부재 — 위 Gaps 참조 |
+| INP P95 / FCP / 토글 P95 지연 | **미측정 (Gap)** | 실브라우저 계측 필요 |
+
+#### §0.3 제거 목록 X1~X6 실측 (`vitest M7.static-scan` — 소스 전량 173파일, `__tests__` 제외)
+
+| # | 대상 | 실측 |
+|---|---|---|
+| X1 | Table 툴바 별도 기간 토글 | `data-testid="period-toggle"` 소스 전량 **1곳**(SectorAnalysis 헤더 단일 인스턴스) |
+| X2 | Bubble 툴바 별도 기간·시장 토글 | `BubbleChart.tsx` 에 `(period\|market)-toggle` **0행** + `useAnalysisParams()` 소비 확인 |
+| X3 | 섹터 버블 `axisPointer` 값 라벨 상자 | 주석행 제외 실코드 **0행**(`@MX:NOTE` 재도입 금지 주석만 잔존) |
+| X4 | `Sub-sector breakdown available in future update` | 소스 전량 **0행** |
+| X5 | `crossTabParams` / `CrossTabParams` | 소스 전량 **0행** |
+| X6 | RRG 축 하드코딩 `min:75` / `max:125` | 소스 전량 **0행** + 대체 구현 `rrgHalf` 실재 확인. **오탐 처리**: `RRGChart.m5.test.tsx:35` 의 `/min: 75\|max: 125/` 는 부재를 단언하는 정규식 리터럴이므로 스캔 대상에서 구조적으로 제외(테스트 파일 미포함) |
+
+#### §1.2 보존 대상 10항목 실측 (`vitest M7.static-scan`)
+
+| # | 항목 | 실측 |
+|---|---|---|
+| 1 | Bump `connectNulls: false` | `connectNulls:\s*false` **1건**, `true` **0건** |
+| 2 | Bump 날짜 합집합 축 | `const dateSet = new Set<string>()` + `sector.history.forEach(w => dateSet.add(w.date))` + `Array.from(dateSet).sort()` 3구조 전부 잔존 |
+| 3 | 종목 버블 색상 = 산업명(중) | `@MX:ANCHOR: [AUTO] 색상 결정성 매핑` + `sector_minor` 잔존, Stage 재배정 패턴 **0행** |
+| 4 | 종목 버블 `기타` 범례 처리 | `'기타'` + `legendFormatter` 잔존 |
+| 5 | RRG/Bump `focus: 'series'` | RRG **1건** / Bump **1건** |
+| 6 | MarketContext TTL + `refresh()` | `CACHE_TTL_MS` + `refresh` 잔존 (파일 미수정 — AC-SUX-033 사용자 결정) |
+| 7 | `Promise.allSettled` 독립 실패 | **1건** |
+| 8 | 지수 백오프 2/4/8초 | MarketContext **1건** + StockExplorer **1건** |
+| 9 | Stage 세그먼트 토글 해제 | `if (activeStage === stageKey) { onStageClick(null)` 잔존 |
+| 10 | tooltip XSS 이스케이프 | `function escapeHtml` 정의 + 호출 **2건 초과**. **D2 는 `StockBubbleChart.tsx` 를 수정하지 않았다** — `metricText` 미유입(**0행**) + `const name = escapeHtml(` 경로 그대로 |
+
+> D2 대상 3파일(섹터버블·RRG·Bump)의 tooltip 은 사용자 입력을 싣지 않으며 `metricText` 출력은 숫자 포맷 문자열 또는 상수(`–` / `계산 불가` / `⚠` / `❗`)뿐이라 HTML 메타문자를 만들지 않는다. 3파일 모두 `innerHTML` **0행**.
+
+#### 모바일 폭(E6 / A5) — hover-only 정보 0건
+
+- 순위표(제외 영역 포함): `title` 을 가졌으나 본문 텍스트가 빈 요소 **0건**. 제외 섹터의 섹터명·종목 수가 본문 텍스트로 노출.
+- 종목 표 접기 3단계(가장 좁은 폭): `title` 전용 요소 **0건**.
+- 접기 전후 행 수 동일(30 = 30) — 열이 접혀도 행 정보가 소실되지 않는다.
+- **기간 3열(1W/1M/3M)은 접기 0~3 전 단계에서 헤더에 잔존**(AC-SUX-061 Lesson #3 게이트).
+- 한정: `title` 에 담긴 **부연 설명**(예: `표본이 부족해 계산할 수 없습니다`)은 여전히 hover 로만 읽힌다. 본 단언이 보장하는 것은 "값 자체가 hover 뒤에만 숨지 않는다"이다.
+
+#### Lesson #9 [HARD] 대조 단언 — 되돌림 RED 관측 verbatim (8건)
+
+각 변형은 scratchpad `cp` 백업 → 변형 주입(마커 삽입 확인) → RED 관측 → `cp` 복원 → `diff` **0행** + 마커 `grep -c` **0** 순으로 실증했다(`git checkout-index` 미사용 — 미커밋 작업물 보호).
+
+1. **F1 (수정 전 상태 자체가 RED)** — 캐시 적중 분기의 `recordAsOf` 부재
+   ```
+   AssertionError: expected '2026-08-11' to be '2026-08-01' // Object.is equality
+   Expected: "2026-08-01"  Received: "2026-08-11"
+   Tests  1 failed | 20 passed (21)
+   ```
+2. **`mut_d2_bypass_metrictext`** (섹터버블 tooltip 이 `metricText` 를 우회해 `Number(d[0]).toFixed(2)` 로 복귀)
+   ```
+   AssertionError: expected '<b>결측섹터</b><br/>초과수익률: 0.00%<br/>RS 평…' to contain '초과수익률: –'
+   Tests  1 failed | 11 passed (12)
+   ```
+3. **`mut_r3_linear_size`** (`bubbleRadius` 의 로그 u 를 선형 u 로 치환)
+   ```
+   AssertionError: expected 15.354038008892609 to be greater than 15.354038008892609
+   AssertionError: expected 7 to be greater than 7
+   Tests  2 failed | 8 passed (10)
+   ```
+   → 두 값이 **정확히 같아진다**. 이것이 대조군을 "u 만 다르게" 좁힌 뒤에야 관측된 RED다(좁히기 전에는 GREEN — 항진명제였음을 실측으로 확인하고 정정).
+4. **`mut_r4_full_trail`** (`winStart = Math.max(0, windowEnd - TRAIL_WINDOW)` → `0`)
+   ```
+   AssertionError: expected 20 to be less than 20
+   Tests  1 failed | 9 passed (10)
+   ```
+5. **`mut_r5_no_excluded_area`** (`excluded && excluded.length > 0 &&` → `false &&`)
+   ```
+   Tests  1 failed | 9 passed (10)   ("행 수가 줄고(3→2) 하단 제외 영역이 커진다(1→2)" 실패)
+   ```
+6. **`mut_preserve1_connectnulls_true`** (`connectNulls: false` → `true`)
+   ```
+   AssertionError: expected +0 to be 1 // Object.is equality
+   Tests  1 failed | 17 passed (18)
+   ```
+7. **`mut_ctx_merge`** (SelectionContext 가 `useAnalysisParams().period` 를 value 의존성에 포함 — 두 Context 병합 효과)
+   ```
+   AssertionError: expected 1 to be +0 // Object.is equality
+   Tests  1 failed | 6 passed (7)   ("period 변경 → Selection 만 소비하는 컴포넌트 리렌더 0" 실패)
+   ```
+8. **`mut_a010_conditional_unmount`** (AppContent 섹터분석 탭을 `display` 토글 → 조건부 언마운트로 치환)
+   ```
+   AssertionError: expected 4 to be greater than or equal to 5
+   Tests  1 failed | 21 passed (22)
+   ```
+
+**무효 변형 2건도 함께 기록한다** (RED 미관측 = 항진명제 아님):
+- `Math.log10` 치환 시도 → 대상 문자열 부재(`bubbleRadius.ts` 는 `Math.log` 사용)로 **replace 무동작**. GREEN 은 테스트의 문제가 아니라 변형의 문제였고, 대상을 정정해 위 변형 3에서 RED 를 관측했다.
+- AnalysisParamsProvider 에 미사용 `selectedSector` state 추가 → 아무 것도 그 state 를 쓰지 않아 **결합이 발생하지 않음**. 실제 결합 변형(위 변형 7)으로 대체해 RED 를 관측했다.
+
+**판정**: 8개 변형 전부에서 **RED 를 실제로 관측**했다 → 항진명제 아님 실증(Lesson #9 충족). 무효 변형 2건은 "테스트가 약하다"가 아니라 "변형이 안 걸렸다"임을 구분해 기록한다.
+
+#### 검증 배치 (read-only, M7 종료 시점 실측 — 증거: `.moai/state/verify/m7/`)
+
+| # | 항목 | 결과 |
+|---|------|------|
+| W1 | `npx vitest run` 전체 | `Test Files 2 failed \| 70 passed (72)` / `Tests 655 passed (655)` — 실패 2건은 선행 e2e file-load(`e2e/ai-report-deep.spec.ts` · `e2e/preset-flow.spec.ts`, 수집 테스트 0건) **불변**. M6 종료 603 → **+52**(M7 신규), 기존 603 전량 통과 = **회귀 0** |
+| W2 | `npx tsc -p tsconfig.app.json --noEmit` | `error TS` **28**(baseline 28, 비증가) / `TS2353` **0**(HARD 게이트 (a) 유지) / M7 수정·신규 파일 NEW **0**. 중간에 신규 5건(M7 테스트 2파일)이 발생했으나 prop 명 오류(`sortKey`/`sortDir` → 실제는 `sortField`/`sortDirection`/`selectedSector`)와 타입 미사용을 정정해 0으로 되돌림 |
+| W3 | `npx eslint src/` | **45 errors / 2 warnings** vs M6 baseline **42 errors**. 클래스별: `react-refresh/only-export-components` 20→**23**(+3 — `MetricCell.tsx` 의 신규 export 3종 `metricDisplay`/`metricText`/`toMetricValue`). 그 외 전 클래스 baseline 불변(`no-unused-vars` 8 · `set-state-in-effect` 6 · `react-hooks/refs` 4 · `immutability` 2 · `no-explicit-any` 2). **신규 error class 0** — 작성 중 발생한 신규 클래스 `react-hooks/globals` 4건과 `immutability` +3건은 테스트를 콜백 기반으로 재구성해 **전부 제거**했다 |
+| W4 | 정적 스캔 공허통과 방지 | `M7.static-scan` 이 글롭 대상 **173파일** 미만(<50)이면 즉시 throw — `toEqual([])` 단언이 빈 글롭으로 무의미하게 통과하는 경로를 구조적으로 차단(작성 중 실제로 경로 정규화 때문에 빈 결과가 나온 사례가 있어 가드 추가) |
+| W5 | pre-commit fetch (L44) | `git fetch origin main` 후 `git rev-list --count --left-right origin/main...HEAD` → `0	0`(동기 상태, 병렬 세션 race 무) |
+
+### §1.2 보존 대상 회귀 확인 (M7 — PRESERVE 10항목) [PASS]
+M7 은 §1.2 보존 소유 파일 중 `BumpChart.tsx` · `RRGChart.tsx` 2개를 **tooltip formatter 의 결측 문자열 경로만** 수정했다(D2). `StockBubbleChart.tsx` · `MarketContext.tsx` · `StageDistributionBar.tsx` 는 **미수정**. 항목별 계약 grep 결과는 위 §1.2 실측 표 10행 전부 잔존이며, 특히 보존 3(색상 결정성 매핑)·4(`기타` 범례)·10(XSS 이스케이프)의 소유 파일 `StockBubbleChart.tsx` 는 `metricText` 미유입 0행으로 D2 범위 밖임을 확인했다. 보존 1(`connectNulls:false`)·2(날짜 합집합)·5(`focus:'series'`)는 수정한 2파일 안에서 그대로 잔존한다.
+
+### 커밋 + push (Route A Hybrid Trunk) — M7
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-> 반자율 progression: **M6 GREEN** (로딩·오류·빈 상태 — 관심사별 3 commit 통과). M7 잔여(회귀 게이트 + 성능 측정). 본 신호는 M1~M6 구간 — 전 run-phase 완료 아님.
+> **run-phase 완료** — M1~M7 GREEN. M7(회귀 게이트 + 성능 측정 + F1 수정 + D2 해소)까지 포함한 전 구간 신호다.
 
 ```yaml
 run_complete_at: 2026-08-14
-run_commit_sha: 148b873          # M6-3(최신). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0 / M6=55720f2,c2f7e38,148b873.
-run_status: M6-complete          # M1~M6 GREEN. M7 잔여(회귀 게이트 + 성능 측정). 전 run-phase 아님.
-ac_pass_count: 52                # M1-M3(16) + M4(15) + M5(14) = 45, + M6 PASS 7(034/035/036/037/053/054/055) = 52. M6 의 033·052 는 debt
-ac_pass_with_debt_count: 8       # AC-SUX-018(M2) + 032(M4) + 042·046·060(M5) + M6: 033(앱 최상단 MarketProvider boot fetch 잔존) / 052(차트 3종 tooltip 은 MetricCell 미적용)
+run_commit_sha: pending-backfill-m7   # M7 commit SHA. M1=c27a050 / M2=fc3dfc1 / M3=7975c7c / M4=dc4ad26,d28d505,cfdb87a / M5=597eaf0,62ade59,2e23dd2,e23d7a0,01120f3,1dba4b0 / M6=55720f2,c2f7e38,148b873.
+run_status: complete             # M1~M7 GREEN. run-phase 전 구간 완료. 다음은 sync-phase.
+ac_pass_count: 54                # 60 AC 중 PASS. M1-M6 누적 51 + M7 신규 판정 3(056 / 010 미판정분 / 052 debt→PASS) = 54. 052 는 M6 debt 에서 승격, 010 은 M1~M6 미기록분을 M7 에서 판정
+ac_pass_with_debt_count: 6       # AC-SUX-018(M2) / 032(M4) / 042·046·060(M5) / 033(M6, 2026-08-14 사용자 결정으로 유지). M6 의 052 는 D2 로 해소되어 PASS 승격, 017 은 M5 에서 이미 PASS 로 재판정(M4 debt 행은 상위 기록에 보존)
 ac_fail_count: 0
-ac_total_this_segment: 60        # M1-M3(18) + M4(16) + M5(17) + M6(9: 033~037/052~055). 전 SPEC 60 AC 중 M7 회귀게이트(AC-SUX-056) 만 잔여
-preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경. M6 는 보존 소유 파일 5종을 한 줄도 수정하지 않음(git diff 1dba4b0 0행 — §E.2 V6)
-l44_pre_commit_fetch: "synced — git fetch origin main 후 rev-list --left-right origin/main...HEAD → 0 5 (로컬 5 commit ahead, 병렬 세션 race 무)"
-l44_post_push_fetch: "M5 6 commit + M6 3 commit + docs 2 commit 일괄 push (Route A, main 직접)"
-new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0. 신규 인스턴스 +7(전부 기존 클래스 react-refresh/only-export-components; M5 baseline 35 → M6 42). tsc 수정파일 NEW 0
+ac_total_this_segment: 60        # acceptance.md 실측 AC 61개 헤딩 중 057 은 결번(묘비) → 실 AC 60개. 54 PASS + 6 PASS-WITH-DEBT = 60, FAIL 0
+ac_bookkeeping_note: "M7 착수 시 progress 기록 58 AC vs acceptance 60 AC 대사에서 AC-SUX-010(미판정)·AC-SUX-056(M7 대상) 2건 누락을 발견해 둘 다 M7 에서 판정했다. AC-SUX-017 은 M4 PASS-WITH-DEBT 행과 M5 PASS 행이 함께 남아 있으며 후행(M5) 판정이 유효하다."
+preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 계약 유지. M7 은 BumpChart/RRGChart 의 tooltip 결측 문자열 경로만 수정했고 보존 계약 grep 10행 전부 잔존(§E.2 §1.2 실측 표)
+l44_pre_commit_fetch: "synced — git fetch origin main 후 rev-list --left-right origin/main...HEAD → 0 0 (동기 상태, 병렬 세션 race 무)"
+l44_post_push_fetch: "pending-backfill-m7"
+new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0. 신규 인스턴스 +3(전부 기존 클래스 react-refresh/only-export-components — MetricCell 신규 export 3종; M6 baseline 42 → M7 45). 작성 중 발생한 신규 클래스 react-hooks/globals 4건 + immutability +3건은 테스트 재구성으로 전부 제거. tsc 수정파일 NEW 0
 cross_platform_build:
   applicable: false              # 프론트엔드 전용 SPEC (Go 빌드 태그 / C-HRA-008 N/A)
-tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M6 비증가; 수정·신규 파일 NEW 0)
+tsc_gate_b_total: 28             # baseline 28 == 최종 28 (M7 비증가; 수정·신규 파일 NEW 0)
 tsc_gate_a_ts2353: 0             # HARD 게이트 (a) 유지(M3 달성 후 불변)
 modified_files_new_tsc_errors: 0
-total_run_phase_files: 94        # M1(8)+M2(9)+M3(20)+M4(24)+M5(11)+M6(22: 6 신규 source/context + 6 신규 test + 10 수정, 중복 제외)
-m1_to_mN_commit_strategy: per-concern  # M6 관심사별 3 commit(55720f2 MetricCell / c2f7e38 조회계층 / 148b873 빈상태·상세오류) + 각 conventional commit + 🗿 MoAI trailer
-regression_tests: "603 pass (M5 종료 540 + M6 신규 63) / 2 e2e file-load baseline 불변 / 기존 540 전량 통과, 신규 회귀 0"
-next_checkpoint: "M7 회귀 게이트 + 성능 측정 — AC-SUX-056(R1~R5, R1·R2 는 grep 부재 확인 2단, R5 는 Table·섹터Bubble·RRG 한정) + §0.3 제거목록 X1~X6 grep + §1.2 보존 10항목 회귀 단언 + §0.2 리렌더 범위 Profiler 측정 + 모바일 hover-only 0건. M6 잔여 debt 2건(AC-SUX-033 MarketProvider boot fetch / AC-SUX-052 차트 tooltip)은 M7 판정 시 재확인 필요"
+total_run_phase_files: 101       # M1(8)+M2(9)+M3(20)+M4(24)+M5(11)+M6(22)+M7(7: 신규 test 3 + 수정 4 = MetricCell/DataLoadContext/SectorBubbleChart/RRGChart/BumpChart/BubbleChart.m6.test/DataLoadContext.test, 중복 제외)
+m1_to_mN_commit_strategy: per-concern  # M7 관심사별 커밋(F1+F2 / D2 / M7 게이트 / progress) + 각 conventional commit + 🗿 MoAI trailer
+regression_tests: "655 pass (M6 종료 603 + M7 신규 52) / 2 e2e file-load baseline 불변 / 기존 603 전량 통과, 신규 회귀 0"
+perf_measurement_status: "부분 실측 — 리렌더 범위(0/0) · 비활성 탭 fetch(0) · 500행 렌더(median 104.9ms) 실측 완료. '3열 추가 +20% 이내'와 INP/FCP/토글 P95 는 측정 불가로 §E.2 Gap 기록(수치 미생성)"
+lesson9_mutation_count: 8        # 되돌림 RED 8건 관측 + 무효 변형 2건도 구분 기록. R3 는 최초 대조군이 항진명제였음을 변형으로 적발해 대조군을 정정한 뒤 RED 확보
+next_checkpoint: "/moai sync SPEC-SECTOR-UX-001"
 ```
 
 ## §E.4 Sync-phase Audit-Ready Signal

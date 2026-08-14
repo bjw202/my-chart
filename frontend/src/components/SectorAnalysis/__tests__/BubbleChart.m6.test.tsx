@@ -85,6 +85,9 @@ describe('AC-SUX-035 — 재조회 중 차트가 언마운트되지 않는다 (L
 
     resolveSecond!(sectorEnv({ sectors: [{ name: '반도체' }] }))
     await waitFor(() => expect(screen.getByTestId('sector-bubble').getAttribute('data-count')).toBe('1'))
+    // AC-SUX-056-R1-ALLOW — 재조회 '완료 후' 인디케이터 소멸 단언. R1 이 막으려는 것은
+    // 기간 변경 '시점'에 로딩 부재를 요구하는 단언이며(같은 테스트 78행이 그 등장을 긍정 단언한다),
+    // 완료 후 소멸은 로딩 계약 자체의 일부다. R2 의 allowlist 와 같은 기준·같은 표기 방식.
     expect(screen.queryByTestId('refetch-spinner')).not.toBeInTheDocument()
   })
 
