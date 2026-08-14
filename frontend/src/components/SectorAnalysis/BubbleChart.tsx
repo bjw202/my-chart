@@ -37,22 +37,23 @@ export function BubbleChart({ initialSector, active = true }: Props): ReactEleme
   const [view, setView] = useState<ViewMode>('sector')
   const [selectedSector, setSelectedSector] = useState<string | null>(initialSector ?? null)
 
-  const marketParam = market === 'all' ? null : market
-
   // AC-SUX-033/034: 쿼리 키 = 엔드포인트 + 파라미터. TTL 내 재활성화는 추가 fetch 없음.
   const sectorKey = buildQueryKey('sector-bubble', { period, market })
   const sectorQuery = useQuery<SectorBubbleResponse>(
     sectorKey,
-    useCallback(() => fetchSectorBubble(period, marketParam), [period, marketParam]),
+    useCallback(() => fetchSectorBubble(period, market), [period, market]),
     { enabled: active && view === 'sector', panel: '섹터 버블', meta: bubbleMeta },
   )
 
-  const stockKey = selectedSector ? buildQueryKey('stock-bubble', { sector: selectedSector, period }) : null
+  // market 이 키에 없으면 드릴다운 상태에서 시장을 바꿔도 재조회가 일어나지 않는다(무동작 결함).
+  const stockKey = selectedSector
+    ? buildQueryKey('stock-bubble', { sector: selectedSector, period, market })
+    : null
   const stockQuery = useQuery<StockBubbleResponse>(
     stockKey,
     useCallback(
-      () => fetchStockBubble(selectedSector ?? '', period),
-      [selectedSector, period],
+      () => fetchStockBubble(selectedSector ?? '', period, market),
+      [selectedSector, period, market],
     ),
     { enabled: active && view === 'stock' && selectedSector !== null, panel: '종목 버블', meta: bubbleMeta },
   )
@@ -124,7 +125,7 @@ export function BubbleChart({ initialSector, active = true }: Props): ReactEleme
               sectors={sectorData}
               onSectorClick={handleSectorClick}
               period={period}
-              market={marketParam}
+              market={market}
             />
           )
         )}
