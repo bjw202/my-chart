@@ -134,6 +134,8 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
               <SectorBubbleChart
                 sectors={sectorData}
                 onSectorClick={handleSectorClick}
+                period={period}
+                market={market === 'all' ? null : market}
               />
             )}
           </>
