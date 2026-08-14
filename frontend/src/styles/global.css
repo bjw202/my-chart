@@ -2278,7 +2278,11 @@ html, body, #root {
 .stage2-count-label { color: var(--text-muted); }
 
 /* Stock table */
-.stock-table-wrapper { flex: 1; overflow-y: auto; }
+/* 표 영역: 잔여 높이를 차지하는 flex 열 컨테이너 + 그 안에서 스크롤하는 래퍼.
+   min-height:0 이 없으면 flex 아이템의 기본 min-height:auto 때문에 내용 높이만큼
+   부풀어 스크롤이 생기지 않는다. */
+.stock-table-fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.stock-table-wrapper { flex: 1; min-height: 0; overflow-y: auto; }
 .stock-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .stock-table th { text-align: left; padding: 6px 8px; color: var(--text-muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-primary); z-index: 1; }
 .stock-table td { padding: 5px 8px; border-bottom: 1px solid rgba(45,45,68,0.3); }

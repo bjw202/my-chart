@@ -271,7 +271,10 @@ export function StockExplorer(): ReactElement {
       )}
 
       {/* Stock table — use all_stocks for full stage coverage, fallback to stage2_candidates */}
-      <div ref={tableWrapperRef}>
+      {/* 표 래퍼는 flex 열의 잔여 높이를 차지해야 한다 — 이 div 가 블록으로 남으면
+          안쪽 .stock-table-wrapper 의 flex:1 이 무효가 되어 표가 전체 높이로 펼쳐지고
+          .stock-explorer 의 overflow:hidden 에 잘려 스크롤이 사라진다. */}
+      <div ref={tableWrapperRef} className="stock-table-fill">
         <StockTable
           candidates={data.all_stocks?.length ? data.all_stocks : data.stage2_candidates}
           stageFilter={stageFilter}
