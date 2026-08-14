@@ -544,11 +544,15 @@ def compute_sector_bubble(
     Args:
         db_path: weekly SQLite DB 경로
         period: 수익률 계산 기간 ("1w", "1m", "3m")
-        market: 시장 필터 (None=전체, "KOSPI", "KOSDAQ")
+        market: 시장 필터 — ``None``/``"all"``=전체, ``"kospi"``/``"kosdaq"``
+            (대소문자 무관). ``stock_meta.시장구분`` 원천은 대문자이므로
+            ``_normalize_market_filter`` 를 거쳐야 한다 —
+            ``compute_stock_bubble``/``compute_sector_price_index`` 와 같은 관용.
 
     Returns:
         SectorBubble 리스트
     """
+    market_filter = _normalize_market_filter(market)
     conn = _connect(db_path)
     try:
         dates = _get_dates(db_path, 1)  # 최신 날짜만 필요
@@ -557,7 +561,7 @@ def compute_sector_bubble(
         latest_date = dates[-1]
 
         stock_meta = _get_stock_meta(db_path)
-        sector_map = _build_sector_stock_map(stock_meta, market_filter=market)
+        sector_map = _build_sector_stock_map(stock_meta, market_filter=market_filter)
         price_data = _get_price_on_date(conn, latest_date)
         rs_data = _get_rs_on_date(conn, latest_date)
 

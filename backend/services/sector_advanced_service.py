@@ -41,14 +41,16 @@ logger = logging.getLogger(__name__)
 def get_sector_bubble(
     weekly_db_path: str,
     period: str = "1w",
-    market: str | None = None,
+    market: str | None = "all",
 ) -> SectorBubbleResponse:
     """섹터 버블 차트 API 응답을 반환한다.
 
     Args:
         weekly_db_path: weekly SQLite DB 경로
         period: 수익률 기간 ("1w", "1m", "3m")
-        market: 시장 필터 (None=전체, "KOSPI", "KOSDAQ")
+        market: ``all``/``None``=전체, ``kospi``/``kosdaq`` (대소문자 무관).
+            형제 엔드포인트와 같은 계약이며 ``compute_sector_bubble`` 의
+            섹터 유니버스 필터에 실배선된다(get_stock_bubble 관용과 동일).
 
     Returns:
         SectorBubbleResponse

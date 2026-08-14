@@ -71,12 +71,17 @@ async def sector_ranking(
 @router.get("/sectors/bubble", response_model=SectorBubbleResponse)
 async def sector_bubble(
     period: str = Query(default="1w", pattern="^(1w|1m|3m)$"),
-    market: str | None = Query(default=None, pattern="^(KOSPI|KOSDAQ)$"),
+    market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
 ) -> SectorBubbleResponse:
     """섹터 버블 차트 데이터를 반환한다.
 
     각 섹터의 초과수익률, RS 평균, 거래대금을 계산한다.
     Returns 503 if weekly DB is not available.
+
+    ``market`` 은 형제 엔드포인트(/sectors/ranking·rrg·history, /stage/overview)와
+    같은 소문자 3값 계약을 쓴다. 이 엔드포인트만 대문자 전용(``^(KOSPI|KOSDAQ)$``)
+    이던 시절에는 프론트엔드 표준값(소문자)이 422 로 거부돼 버블 탭에서 시장을
+    고르면 차트가 렌더되지 않았다.
     """
     from backend.services.sector_advanced_service import get_sector_bubble
 
