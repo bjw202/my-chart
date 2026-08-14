@@ -20,6 +20,8 @@ export interface SectorHistoryItem {
 // API 응답 타입
 export interface SectorHistoryResponse {
   weeks: number
+  // AC-SUX-028 (REQ-SUX-026): 축 하단에 weeks 와 span_days 를 병기. ② 봉투가 제공.
+  span_days?: number | null
   sectors: SectorHistoryItem[]
 }
 

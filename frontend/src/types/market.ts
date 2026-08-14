@@ -82,7 +82,11 @@ export interface SectorAlertsData {
   weakening_sectors: SectorAlertItem[]
 }
 
-// Sector ranking API response types (matching GET /api/sector/ranking)
+// Sector ranking API response types (matching GET /api/sectors/ranking).
+// backend/schemas/sector.py 의 SectorRankingResponse(EnvelopeMixin) 가 제공하는
+// 봉투 필드(excluded / baseline_date / as_of_date 등)를 추가로 선언한다 — 기존
+// {date, sectors} 에 더해 ② SPEC-SECTOR-AGGREGATION-001 봉투가 내려주는 값들.
+// 전부 optional: 백엔드가 값을 주지 않으면 undefined 로 우아하게 결손 처리한다.
 export interface SectorRankItem {
   name: string
   stock_count: number
@@ -94,10 +98,22 @@ export interface SectorRankItem {
   stage2_pct: number
   composite_score: number
   rank: number
-  rank_change: number
+  rank_change: number | null   // AC-SUX-025: null = 신규 진입. 기존 number 호환
+}
+
+// 순위 대상 제외 섹터 (② 봉투 ExcludedSectorModel: sector/reason/count).
+export interface ExcludedSector {
+  sector: string
+  reason: string
+  count: number
 }
 
 export interface SectorRankingResponse {
   date: string
   sectors: SectorRankItem[]
+  // ② 봉투(EnvelopeMixin) 선택 필드 — M4 AC-SUX-019/025/058 소비.
+  excluded?: ExcludedSector[]
+  baseline_date?: string | null   // AC-SUX-025: rank_change 기준일 헤더
+  as_of_date?: string | null      // AC-SUX-037 기준일 배지 (M6 정식 소비)
+  as_of_is_partial_week?: boolean | null
 }

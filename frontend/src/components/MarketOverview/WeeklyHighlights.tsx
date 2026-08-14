@@ -11,7 +11,8 @@ const PHASE_CONFIG = {
 export interface WeeklyHighlightsProps {
   phase: 'bull' | 'sideways' | 'bear'
   choppy: boolean
-  sectors: Array<{ name: string; rank_change: number }>
+  // rank_change 는 신규 섹터(AC-SUX-025)에서 null 일 수 있다 — movers 계산 시 제외.
+  sectors: Array<{ name: string; rank_change: number | null }>
   // R7: Stage 2 stock count; null means not yet loaded
   stage2Count?: number | null
   // SPEC-TOPDOWN-002E: 섹터 전환 알림
@@ -29,8 +30,9 @@ function formatRankChange(change: number): string {
 export function WeeklyHighlights({ phase, choppy, sectors, stage2Count, sectorAlerts }: WeeklyHighlightsProps): ReactElement {
   const phaseConfig = PHASE_CONFIG[phase]
 
-  // Top 3 sectors by absolute rank change
+  // Top 3 sectors by absolute rank change (rank_change 가 null 인 신규 섹터는 제외)
   const topMovers = [...sectors]
+    .filter((s): s is typeof s & { rank_change: number } => s.rank_change != null)
     .sort((a, b) => Math.abs(b.rank_change) - Math.abs(a.rank_change))
     .slice(0, 3)
 

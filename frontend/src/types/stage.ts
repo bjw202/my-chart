@@ -5,6 +5,8 @@ export interface StageDistribution {
   stage2: number
   stage3: number
   stage4: number
+  // AC-SUX-030 (REQ-SUX-028): SMA40/10 결측 분류 불가 종목 수 (② unclassified_count).
+  unclassified_count?: number
   total: number
 }
 
@@ -14,6 +16,9 @@ export interface StageBySector {
   stage2: number
   stage3: number
   stage4: number
+  // AC-SUX-029 (REQ-SUX-027): by_sector 항목도 분포와 동일 불변식. ② unclassified_count.
+  unclassified_count?: number
+  total?: number
 }
 
 export interface Stage2Candidate {
@@ -31,6 +36,13 @@ export interface Stage2Candidate {
   close: number
   sma50: number
   sma200: number
+  // M4 (AC-SUX-031, REQ-SUX-029/030): 종목 표 3열 확장 + 섹터비중. ② StageStock 추가 필드.
+  chg_1w?: number | null        // 1W% 열
+  chg_3m?: number | null        // 3M% 열
+  weight_in_sector?: number | null  // 섹터비중 열
+  // ⊤ 마커 — 상한 적용(capped) 종목. ② 가 별도 플래그를 내리지 않으므로, weight_in_sector 가
+  // 상한선(WEIGHT_CAP=0.1)에 근접해 clipped 된 경우를 표현. 백엔드 확장 전까지 optional.
+  weight_capped?: boolean
 }
 
 export interface StageOverviewResponse {
