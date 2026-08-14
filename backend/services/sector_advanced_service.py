@@ -72,6 +72,7 @@ def get_sector_bubble(
         period=period,
         market=market,
         sectors=items,
+        as_of_date=date or None,
     )
 
 
@@ -146,6 +147,7 @@ def get_stock_bubble(
         stocks=items,
         sector_aggregate=sector_aggregate,
         market_filter=(market or "all").lower(),
+        as_of_date=date or None,
     )
 
 
@@ -205,7 +207,8 @@ def get_rrg_data(weekly_db_path: str, market: str = "all") -> RRGResponse:
 
     return RRGResponse(
         date=date, sectors=items, kospi=kospi_points,
-        market_filter=(market or "all").lower())
+        market_filter=(market or "all").lower(),
+        as_of_date=date or None)
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +238,11 @@ def get_sector_history(
     """
     from my_chart.analysis.sector_metrics import compute_sector_history
 
+    # AC-SAG-037(SN-3) — 공통 봉투 as_of_date 는 dates[-1](진행 중인 주 제외 가능성이
+    # 있는 history SSOT)이 아니라, 다른 6개 엔드포인트와 동일한 공유 헬퍼를 직접
+    # 호출해 정규 대표 바로 고정한다.
+    as_of_date = _get_latest_valid_date(weekly_db_path)
+
     # SSOT: 부분 데이터 날짜가 제외된 (dates, rankings) 튜플
     dates, history_by_week = compute_sector_history(
         weekly_db_path, weeks=weeks, daily_db_path=daily_db_path, market=market)
@@ -242,7 +250,8 @@ def get_sector_history(
     if not history_by_week:
         return SectorHistoryResponse(
             weeks=weeks, sectors=[], dates=[], span_days=None,
-            rankings={}, market_filter=(market or "all").lower())
+            rankings={}, market_filter=(market or "all").lower(),
+            as_of_date=as_of_date)
 
     # 섹터별 히스토리 데이터 수집 (하위 호환 — ``sectors[]``)
     sector_history: dict[str, list[SectorHistoryWeek]] = {}
@@ -286,7 +295,8 @@ def get_sector_history(
 
     return SectorHistoryResponse(
         weeks=weeks, sectors=sector_items, dates=dates, span_days=span_days,
-        rankings=rankings, market_filter=(market or "all").lower())
+        rankings=rankings, market_filter=(market or "all").lower(),
+        as_of_date=as_of_date)
 
 
 # ---------------------------------------------------------------------------

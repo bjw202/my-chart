@@ -1787,10 +1787,113 @@ sector_history` 시그니처에 `market` 파라미터만 추가했고 기존 호
 
 ---
 
+#### 9. AC-SAG-037 Closure (post-M7, 2026-08-14) — cycle_type=tdd
+
+M7이 §7에서 기록한 유일한 미해소 Gap("전 엔드포인트 as_of_date 일치, SN-3
+되돌림 실증 미이행")을 닫는 후속 세션. M7 본문(§1~§8)은 수정하지 않는다 —
+이 절이 그 뒤를 잇는다.
+
+**착수 전 실측 확인** — 프로덕션 코드를 실제로 조사한 결과, Gap 기록이
+정확했을 뿐 아니라 **당초 우려보다 근본적**이었다: `EnvelopeMixin.as_of_date`
+필드는 존재했지만, 실제로 값을 채우는 배선은 `/sectors/ranking`
+(`sector_ranking_service.get_sector_ranking` → `envelope_fields(as_of_date=date, ...)`)
+**단 1개 엔드포인트뿐**이었다. 나머지 6개(`/sectors/bubble`,
+`/sectors/{name}/bubble`, `/sectors/rrg`, `/sectors/history`,
+`/stage/overview`, `/sectors/{name}/detail`)는 응답 모델이
+`EnvelopeMixin`을 상속해 키는 존재했으나(AC-SAG-036 통과) 값은 필드
+기본값 `None`이었다 — "서로 다르다"가 아니라 "6곳이 애초에 채우지 않는다"
+상태였다. `grid_version`은 `EnvelopeMixin`의 클래스 기본값(`GRID_VERSION =
+"canonical-v1"`)이 모든 엔드포인트에서 오버라이드 없이 그대로 쓰여
+이미 7개 전부 일치했다(변경 불필요).
+
+**프로덕션 코드 수정** (6개 서비스 함수, 3개 파일 — 각 함수는 이미 canonical
+헬퍼(`_get_latest_valid_date` 직접 또는 로컬 `_get_latest_date` 래퍼 경유)로
+지역 변수 `date`를 계산하고 있었으나 응답 생성자에 전달하지 않았다):
+
+- `backend/services/sector_advanced_service.py` — `get_sector_bubble` /
+  `get_stock_bubble` / `get_rrg_data`에 `as_of_date=date or None` 추가.
+  `get_sector_history`는 `dates[-1]`(history SSOT)이 진행 중인 주 배제
+  시맨틱상 canonical latest와 다를 수 있어(±`is_partial` 분기, `weekly_grid.py`
+  `_compute_cached`) 별도로 `_get_latest_valid_date(weekly_db_path)`를
+  직접 호출해 `as_of_date`를 채운다(다른 6개와 동일한 공유 헬퍼 직접 경유).
+- `backend/services/stage_service.py` — `get_stage_overview`의 두 반환
+  분기(빈 DB 조기 반환 + 정상 반환) 모두에 `as_of_date=date` 추가.
+- `backend/services/sector_detail_service.py` — 함수 시작부에
+  `as_of_date = _get_latest_valid_date(weekly_db_path) if weekly_db_path
+  else None`을 신설(기존에는 지역 `date` 변수 자체가 없었다 — 이 파일은
+  `_load_weekly_classification` 내부에서만 `compute_weekly_grid(...).latest.date`를
+  쓰고 상위로 노출하지 않았다)하고, 두 반환 분기에 전달.
+
+**신규 테스트** — `tests/test_ac_sag_037_endpoint_date_consistency.py`(신설,
+10 테스트): ①이 소유한 `tests/test_consumer_dates.py`의
+`_build_fixture_max_ne_canonical`/`WEEKLY_FULL_DATE`/`WEEKLY_PARTIAL_DATE`를
+**import 로만 재사용**(해당 파일 미수정). 서비스 함수를 라우터 경유 없이
+직접 호출하는 방식을 택했다(TestClient 전체 스택 대신 — 프로덕션
+`fixture_max_ne_canonical`은 weekly DB만 채우므로 라우터 경유 시 daily
+DB/레지스트리 스키마를 함께 맞춰야 하는 부수 비용이 컸다; 대신 최소
+`stock_meta` 빈 테이블 하나만 신설):
+
+1. `test_ac_sag_037_all_seven_endpoints_converge_to_canonical_date` — 7개
+   서비스 함수 호출 결과 `as_of_date`가 전부 canonical(`WEEKLY_FULL_DATE`,
+   2024-01-12)과 같고 naive(`WEEKLY_PARTIAL_DATE`, 2024-01-15)와는 다름을
+   양쪽 단언.
+2. `test_ac_sag_037_all_seven_endpoints_share_grid_version` — 7개
+   `grid_version`이 전부 `canonical-v1`.
+3. `test_ac_sag_037_naive_max_date_revert_fails_for_each_endpoint`
+   (parametrize 7종, id=엔드포인트 경로) — 각 엔드포인트가 의존하는
+   공유 헬퍼(4개는 `sector_advanced_service._get_latest_valid_date` 공용
+   import, 나머지 3개는 각 모듈 고유의 `_get_latest_date`/
+   `_get_latest_valid_date`)를 naive `SELECT MAX(Date) ... WHERE Name NOT
+   IN ('KOSPI','KOSDAQ')` 구현으로 개별 monkeypatch한 뒤 **그 엔드포인트만**
+   호출해 `as_of_date == WEEKLY_PARTIAL_DATE`(naive) 및 `!=
+   WEEKLY_FULL_DATE`(canonical)를 단언 — acceptance.md §9 DoD의 "엔드포인트별
+   순진 MAX(Date) 7회" 대조 단언을 충족한다.
+4. `test_ac_sag_037_live_smoke_as_of_date_matches_across_endpoints` —
+   라이브 `backend.deps.WEEKLY_DB_PATH`/`DAILY_DB_PATH` 존재 시에만 실행,
+   불일치는 `warnings.warn`으로만 강등(assert 없음) — acceptance.md 지시
+   "정보성 검사로 표시" 그대로 non-gating.
+
+**엔드포인트 개수 해석 메모** — plan.md/acceptance.md의 "7개 엔드포인트"
+가정은 M7 시점(2026-08-14) 현재 라우터 표면(`backend/routers/sectors.py`
+6개 + `backend/routers/stage.py` 1개 = `/sectors/ranking`,
+`/sectors/bubble`, `/sectors/rrg`, `/sectors/history`,
+`/sectors/{name}/detail`, `/sectors/{name}/bubble`, `/stage/overview`)과
+정확히 일치했다 — M6/gap-closure 이후에도 개수 불일치는 없었다. 재해석
+불필요.
+
+**대조 단언 공유-헬퍼 그룹 메모** — `sector_advanced_service.py`의 4개
+함수(`get_sector_bubble`/`get_stock_bubble`/`get_rrg_data`/
+`get_sector_history`)는 물리적으로 동일한 모듈 import 심볼
+(`_get_latest_valid_date`)을 공유한다. 되돌림 대조 7변형은 "엔드포인트를
+1곳씩 되돌렸을 때 그 엔드포인트만 호출해 관측"하는 방식으로 구현했으므로
+— 4개가 물리적으로 같은 헬퍼를 공유한다는 사실 자체가 각 엔드포인트의
+배선이 (개별 하드코딩이 아니라) 정말 그 헬퍼를 경유함을 증명하는 데는
+지장이 없다. 다만 "1곳만 배선하고 나머지 3곳이 우연히 일치"하는 시나리오는
+이 4개 사이에서는 원천적으로 발생할 수 없다(코드가 물리적으로 하나이므로) —
+이 그룹 내부의 상호 독립성 검증은 이 AC의 범위를 벗어난다(생성자 kwargs
+누락 여부는 정판정 테스트 ①이 개별적으로 검출한다).
+
+**전체 스위트 델타**:
+```
+$ pytest tests/ -q   (본 세션 착수 전 baseline, M7 종료 시점과 동일)
+8 failed, 900 passed, 69 skipped, 1 xpassed, 25 errors in 111.68s
+
+$ pytest tests/ -q   (AC-SAG-037 테스트 파일 추가 후)
+8 failed, 910 passed, 69 skipped, 1 xpassed, 25 errors in 128.37s
+```
++10 passed(신규 파일 1개: 정판정 2 + 되돌림 대조 7(parametrize) + 라이브
+스모크 1). failed 8건·error 25건은 baseline과 **동일 집합**(`test_api.py`
+`TestScreenEndpoint::test_too_many_patterns_rejected`,
+`test_meta_service.py` `TestRebuild::*` 2건,
+`test_rs_line.py::TestRsLineCalculation` 2건, `test_screen_service.py`
+3건, `fnguide/` 25 error — 전건 SPEC 범위 밖 사전 존재, 신규 실패 0건).
+
+**Blocker**: 없음.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
-run_status: implemented            # M7(테스트 대체 + 회귀 게이트) 완료. 1건 Gap(AC-SAG-037) 이월 — sync-phase 대기
+run_status: implemented            # M7(테스트 대체 + 회귀 게이트) 완료 + post-M7 세션에서 AC-SAG-037 Gap 종결(§E.2 §9). 미이월 Gap 없음 — sync-phase 대기
 milestone_completed: M7            # 테스트 대체(AC-SAG-044) + 회귀 게이트(AC-SAG-045 R1/R4/R5-a) + as_of 정적 스캔 확장 + F1~F13/050 회귀 재확인
 run_commit_sha: 753a529            # M7 단일 커밋
 prior_run_commit_sha_m6: e139067   # M6 단일 커밋 (M6-gap-closure 는 별도 세션, b337365 이전 커밋)

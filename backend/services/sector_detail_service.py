@@ -14,7 +14,7 @@ from my_chart.analysis.stage_classifier import (
     _load_stocks_for_classification,
     classify_stage_or_none,
 )
-from my_chart.analysis.weekly_grid import compute_weekly_grid
+from my_chart.analysis.weekly_grid import _get_latest_valid_date, compute_weekly_grid
 
 # 섹터당 반환할 상위 종목 수
 _TOP_STOCKS_LIMIT = 5
@@ -67,6 +67,8 @@ def get_sector_detail(
     """
     stage_map = _load_weekly_classification(weekly_db_path) if weekly_db_path else {}
     market_key = (market or "all").lower()
+    # AC-SAG-037(SN-3) — 다른 6개 엔드포인트와 동일한 공유 헬퍼로 as_of_date 를 고정한다.
+    as_of_date = _get_latest_valid_date(weekly_db_path) if weekly_db_path else None
 
     conn = _connect(daily_db_path)
     try:
@@ -104,6 +106,7 @@ def get_sector_detail(
             sub_sectors=[],
             top_stocks=[],
             market_filter=market_key or "all",
+            as_of_date=as_of_date,
         )
 
     # 소그룹별 종목 그룹화
@@ -184,4 +187,5 @@ def get_sector_detail(
         sub_sectors=sub_sectors,
         top_stocks=top_stocks,
         market_filter=market_key or "all",
+        as_of_date=as_of_date,
     )

@@ -147,6 +147,7 @@ def get_stage_overview(
             by_sector=[],
             stage2_candidates=[],
             market_filter=market_key or "all",
+            as_of_date=date,
         )
 
     # Build sector map from registry
@@ -315,4 +316,5 @@ def get_stage_overview(
         stage2_candidates=candidates,
         all_stocks=all_stocks_list,
         market_filter=market_key or "all",
+        as_of_date=date,
     )
