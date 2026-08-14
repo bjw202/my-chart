@@ -528,7 +528,7 @@ next_checkpoint: "/moai sync SPEC-SECTOR-UX-001"
 
 ```yaml
 sync_complete_at: 2026-08-14
-sync_commit_sha: pending-backfill-sync   # 커밋 자신의 SHA는 커밋 시점에 알 수 없음 — 후속 커밋에서 backfill
+sync_commit_sha: 9c7096c   # docs(SPEC-SECTOR-UX-001): sync-phase artifacts
 changelog:
   status: added
   duplicate_guard_pre_count: 0           # grep -c 'SPEC-SECTOR-UX-001' CHANGELOG.md (작성 전)
