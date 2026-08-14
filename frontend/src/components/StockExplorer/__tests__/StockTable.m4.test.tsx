@@ -1,6 +1,6 @@
 // AC-SUX-031 / 061 / 030 — StockTable M4 행동 단언 (SPEC-SECTOR-UX-001 M4).
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import type { Stage2Candidate } from '../../../types/stage'
 import { StockTable } from '../StockTable'
 
