@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-SECTOR-AGGREGATION-001 v0.5.0, 2026-08-13~14)
+
+- **섹터 집계 계층 — 시총가중·벤치마크·순위·RRG 지수·응답 공통 스키마** (M1~M7 + AC-SAG-037 closure, `run_commit_sha` `753a529`, closure `b703dc2`)
+  - 신규 모듈 `my_chart/analysis/weighting.py`: 시가총액가중 집계 코어 — 섹터별 상한(`weight_cap = 0.10`) 재배분을 **동결형 알고리즘**으로 구현(상한 종목을 매 회 `frozen` 진부분집합으로 영구 제외해 `<= min(n,20)`회 내 종료를 증명). `INV-CAP-1` 불변식(`cap_eff(n) = max(0.10, 1/n)` — `n <= 10` 섹터는 시총가중이 등가중과 정확히 동일해지는 축퇴 경계) 신설·기계 집행(정적 스캔 2종)
+  - 벤치마크 계산 — 섹터 집계와 동일한 집계 헬퍼를 재사용해 시장별(KOSPI/KOSDAQ/전체) 벤치마크 산출, 참조 구현 대조로 초과수익률 정합 검증
+  - 순위 백분위 정규화(평균-동순위 처리, 결정적 tie-break) + `rank_change`(1단 재귀 가드)
+  - 신규 모듈 `my_chart/analysis/rrg.py`: RRG(Relative Rotation Graph) 수익률 연쇄 지수 — 구성종목 변동 시점의 naive 방식 점프(비율 이탈 0.0099)를 체인 방식으로 제거
+  - 지표 정정 5건(독립 커밋): 52주 신고가 판정(MAX52), Stage 분류기 단일화(레거시 일봉 분류기 삭제), `volume_ratio`(weekly VolumeSMA10 정정), `trading_value`(daily VolumeWon 원천 정정), RS 평균(등가중 + 결측 제외 게이팅 실증)
+  - 라우터 `market`/`period` 쿼리 파라미터를 7개 엔드포인트(`/sectors/ranking`, `/sectors/bubble`, `/sectors/{name}/bubble`, `/sectors/rrg`, `/sectors/history`, `/sectors/{name}/detail`, `/stage/overview`)에 전면 배선(하위 호환 유지) + 응답 공통 스키마(`EnvelopeMixin.as_of_date`/`grid_version`) 전 엔드포인트 정합(AC-SAG-037, SN-3)
+  - **AC-SAG-001~050 전항 PASS (50/50)** — acceptance.md §0 `INV-CAP-1`에 결속된 축퇴 계열 AC 11건 포함, 대조 단언(falsification/mutation) 전항 관측된 RED 확인 후 GREEN 복원
+  - 검증: `tests/` 회귀 스위트 `900 → 910 passed`(AC-SAG-037 closure 기준), `8 failed`/`25 errors`는 SPEC 범위 밖 사전 존재 결함과 동일 집합(신규 실패 0건). 집계 프로즌 픽스처(`tests/fixtures/frozen/aggregation-2026-08-11/`) F1~F13 + AC-SAG-048/049/050 게이트 전항 PASS
+  - **회귀처럼 보이지만 올바른 변화** (acceptance.md AC-SAG-045 R1~R8 참조): 순위 이동, 시총가중-등가중 괴리 등은 `INV-CAP-1` 축퇴 경계 신설과 상한 재배분 알고리즘 교체(무한 진동 → 동결형)에서 기인하며 되돌림 금지
+  - Gap: 커버리지 % 미측정(pytest-cov 미설치, venv 부재) — 대리 지표로 신규 테스트가 대상 함수 경로를 직접 실행함을 확인
+
 ### Added (SPEC-SECTOR-GRID-001 v0.2.2, 2026-08-12)
 
 - **섹터 분석 기반 계층 — 정규 주간 격자·유니버스·적재 보호** (M0~M6, `run_commit_sha` `1f62beb`)

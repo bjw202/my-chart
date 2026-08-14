@@ -2,9 +2,9 @@
 id: SPEC-SECTOR-AGGREGATION-001
 title: "섹터 집계 계층 — 시총가중·벤치마크·순위·RRG 지수·응답 공통 스키마"
 version: "0.5.0"
-status: in-progress
+status: completed
 created: 2026-08-12
-updated: 2026-08-13
+updated: 2026-08-14
 author: manager-spec
 priority: P0
 phase: "sector-ux v1"
