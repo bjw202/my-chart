@@ -2811,3 +2811,12 @@ html, body, #root {
 .ai-report-history-date { font-weight: 600; color: var(--text-primary); min-width: 100px; }
 .ai-report-history-time { color: var(--text-muted); font-size: 12px; min-width: 140px; }
 .ai-report-history-file { color: var(--text-secondary); font-size: 12px; }
+
+/* ── 공용 지표 셀 (SPEC-SECTOR-UX-001 M6 / D6 / AC-SUX-052 ER-1) ──
+   5상태가 화면(순위표·버블·RRG·Bump·종목탐색)과 무관하게 같은 스타일을 갖는다. */
+.metric-cell { white-space: nowrap; }
+.metric-cell--missing { color: var(--text-muted); }
+.metric-cell--insufficient { color: var(--text-muted); font-style: italic; font-size: 0.92em; }
+.metric-cell--ok { color: inherit; }
+.metric-cell--low-confidence { color: var(--text-secondary); }
+.metric-cell--warning { color: var(--negative); }

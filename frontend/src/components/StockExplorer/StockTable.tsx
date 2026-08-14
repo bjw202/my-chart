@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { Stage2Candidate } from '../../types/stage'
 import { COLLAPSE_ORDER, hiddenColumnKeys, INVARIANT_COLUMN_KEYS } from './stockTableColumns'
+// D6 / AC-SUX-052: 셀 5상태는 공용 MetricCell 이 전담한다 (화면별 표기 발산 방지).
+import { MetricCell, percent1, percent2 } from '../common/MetricCell'
 
 interface StockTableProps {
   candidates: Stage2Candidate[]
@@ -195,24 +197,22 @@ export function StockTable({
           {sorted.map((c) => {
             const badgeClass = getStageBadgeClass(c)
             const isEntry = c.stage_detail.toLowerCase().includes('entry')
-            const rsRounded = Math.round(c.rs_12m)
-            const chgColor = c.chg_1m >= 0 ? 'positive' : 'negative'
-            const chgDisplay = `${c.chg_1m >= 0 ? '+' : ''}${c.chg_1m.toFixed(2)}%`
+            // AC-SUX-053 (ER-2): 결측을 0 으로 대체하지 않는다 — 색·바 폭 채널도 결측이면 중립.
+            const chgMissing = c.chg_1m == null || Number.isNaN(c.chg_1m)
+            const chgColor = chgMissing ? 'neutral' : c.chg_1m >= 0 ? 'positive' : 'negative'
             // R4: Trend bar — width proportional to |chg_1m|, capped at 100% at 20%
-            const trendBarWidth = Math.min(Math.abs(c.chg_1m) / 20 * 100, 100)
-            const trendBarClass = c.chg_1m >= 0 ? 'trend-bar--positive' : 'trend-bar--negative'
+            const trendBarWidth = chgMissing ? 0 : Math.min(Math.abs(c.chg_1m) / 20 * 100, 100)
+            const trendBarClass = chgMissing ? 'trend-bar--neutral' : c.chg_1m >= 0 ? 'trend-bar--positive' : 'trend-bar--negative'
 
             const checklist = computeChecklist(c)
 
-            const fmtPct = (v: number | null | undefined): string =>
-              v == null ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
 
             // 접힌 열의 값을 행 툴팁으로 노출(AC-SUX-061 — 정보 소실 방지)
             const collapsedSummary: string[] = []
             if (colHidden('weight_in_sector') && c.weight_in_sector != null) {
               collapsedSummary.push(`섹터비중 ${(c.weight_in_sector * 100).toFixed(1)}%${c.weight_capped ? ' ⊤' : ''}`)
             }
-            if (colHidden('volume_ratio')) collapsedSummary.push(`Vol배 ${c.volume_ratio.toFixed(2)}`)
+            if (colHidden('volume_ratio') && c.volume_ratio != null) collapsedSummary.push(`Vol배 ${c.volume_ratio.toFixed(2)}`)
             if (colHidden('near_52w_high')) collapsedSummary.push(`52W고 ${c.near_52w_high ? '근접' : '–'}`)
 
             return (
@@ -236,11 +236,11 @@ export function StockTable({
                   </span>
                   {isEntry && <span className="entry-star">★</span>}
                 </td>
-                <td data-col-key="rs_12m">{rsRounded}</td>
-                <td data-col-key="chg_1w">{fmtPct(c.chg_1w)}</td>
+                <td data-col-key="rs_12m"><MetricCell value={c.rs_12m} format={(n) => String(Math.round(n))} /></td>
+                <td data-col-key="chg_1w"><MetricCell value={c.chg_1w} format={percent1} /></td>
                 <td data-col-key="chg_1m" className={`chg-cell ${chgColor}`}>
                   <div className="chg-cell-inner">
-                    <span>{chgDisplay}</span>
+                    <MetricCell value={c.chg_1m} format={percent2} />
                     <div
                       className={`trend-bar ${trendBarClass}`}
                       style={{ width: `${trendBarWidth}%` }}
@@ -248,17 +248,15 @@ export function StockTable({
                     />
                   </div>
                 </td>
-                <td data-col-key="chg_3m">{fmtPct(c.chg_3m)}</td>
+                <td data-col-key="chg_3m"><MetricCell value={c.chg_3m} format={percent1} /></td>
                 <td data-col-key="volume_ratio" data-collapsed={colHidden('volume_ratio') || undefined}>
-                  {c.volume_ratio.toFixed(2)}
+                  <MetricCell value={c.volume_ratio} format={(n) => n.toFixed(2)} />
                 </td>
                 <td data-col-key="near_52w_high" data-collapsed={colHidden('near_52w_high') || undefined}>
                   {c.near_52w_high ? '●' : '–'}
                 </td>
                 <td data-col-key="weight_in_sector" data-collapsed={colHidden('weight_in_sector') || undefined}>
-                  {c.weight_in_sector == null
-                    ? '–'
-                    : `${(c.weight_in_sector * 100).toFixed(1)}%`}
+                  <MetricCell value={c.weight_in_sector} format={(n) => `${(n * 100).toFixed(1)}%`} />
                   {/* AC-SUX-031 (REQ-SUX-030): 상한 적용 종목 ⊤ 마커 (본문 상설) */}
                   {c.weight_capped && <span className="weight-cap-marker" aria-label="시총 상한 적용">⊤</span>}
                 </td>

@@ -5,6 +5,8 @@ import type { ReactElement } from 'react'
 import type { SectorRankItem } from '../../types/market'
 import type { SectorDetailResponse } from '../../types/sector'
 import { fetchSectorDetail } from '../../api/sectors'
+// D6 / AC-SUX-052: 셀 5상태 공용 컴포넌트.
+import { MetricCell, percent1 } from '../common/MetricCell'
 
 interface SectorDetailPanelProps {
   sector: SectorRankItem
@@ -26,10 +28,12 @@ function MetricCard({ label, value }: MetricCardProps): ReactElement {
   )
 }
 
-function ReturnBar({ period, excessReturn }: { period: string; excessReturn: number }): ReactElement {
-  const isPositive = excessReturn >= 0
-  const barWidth = Math.min(Math.abs(excessReturn) * 10, 100)
-  const color = isPositive ? 'var(--positive)' : 'var(--negative)'
+function ReturnBar({ period, excessReturn }: { period: string; excessReturn: number | null }): ReactElement {
+  // AC-SUX-053 (ER-2): 결측이면 바 폭 0 + 중립색 — 0% 와 같은 모습으로 렌더하지 않는다.
+  const missing = excessReturn == null || Number.isNaN(excessReturn)
+  const isPositive = !missing && excessReturn >= 0
+  const barWidth = missing ? 0 : Math.min(Math.abs(excessReturn) * 10, 100)
+  const color = missing ? 'var(--text-muted)' : isPositive ? 'var(--positive)' : 'var(--negative)'
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -45,7 +49,7 @@ function ReturnBar({ period, excessReturn }: { period: string; excessReturn: num
         />
       </div>
       <span style={{ width: 50, textAlign: 'right', fontSize: 11, color, flexShrink: 0 }}>
-        {excessReturn >= 0 ? '+' : ''}{excessReturn.toFixed(1)}%
+        <MetricCell value={excessReturn} format={percent1} />
       </span>
     </div>
   )
@@ -138,10 +142,10 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
                         {sub.stock_count}
                       </td>
                       <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px' }}>
-                        {sub.rs_avg != null ? Math.round(sub.rs_avg) : '-'}
+                        <MetricCell value={sub.rs_avg} format={(n) => String(Math.round(n))} />
                       </td>
                       <td style={{ textAlign: 'right', padding: '5px 0', color: sub.stage2_pct != null && sub.stage2_pct >= 50 ? 'var(--positive)' : 'var(--text-secondary)' }}>
-                        {sub.stage2_pct != null ? `${Math.round(sub.stage2_pct)}%` : '-'}
+                        <MetricCell value={sub.stage2_pct} format={(n) => `${Math.round(n)}%`} />
                       </td>
                     </tr>
                   ))}
@@ -172,11 +176,6 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
                       : stock.chg_1m >= 0
                         ? 'var(--positive)'
                         : 'var(--negative)'
-                    const chgText = stock.chg_1m == null
-                      ? '-'
-                      : stock.chg_1m >= 0
-                        ? `+${stock.chg_1m.toFixed(1)}%`
-                        : `${stock.chg_1m.toFixed(1)}%`
 
                     return (
                       <tr key={stock.code} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
@@ -185,10 +184,10 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
                           <span style={{ color: 'var(--text-muted)', marginLeft: 4, fontSize: 11 }}>{stock.code}</span>
                         </td>
                         <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px', fontWeight: 600 }}>
-                          {Math.round(stock.rs_12m)}
+                          <MetricCell value={stock.rs_12m} format={(n) => String(Math.round(n))} />
                         </td>
                         <td style={{ textAlign: 'right', color: chgColor, padding: '5px 6px', fontWeight: 500 }}>
-                          {chgText}
+                          <MetricCell value={stock.chg_1m} format={percent1} />
                         </td>
                         <td style={{ textAlign: 'right', padding: '5px 0' }}>
                           {stock.stage !== null ? (

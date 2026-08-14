@@ -195,7 +195,9 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
     })
   })
 
-  it('rs_avg가 없는 경우 하이픈(-) 표시되어야 함', async () => {
+  // 의도된 변화 (SPEC-SECTOR-UX-001 M6 / AC-SUX-052 ER-1): 결측 표기가 ASCII '-' 에서
+  // 공용 MetricCell 의 en-dash '–' 로 통일됐다. 화면마다 다른 결측 글리프를 쓰지 않는다.
+  it('rs_avg가 없는 경우 결측 글리프(–) 표시되어야 함 [ER-1 통일]', async () => {
     mockFetchSectorDetail.mockResolvedValue({
       sector_name: 'Technology',
       sub_sectors: [
@@ -218,9 +220,10 @@ describe('SectorDetailPanel — sub-sector table with rs_avg and stage2_pct (R3)
       // 서브섹터 이름이 나타나면 렌더 완료
       expect(screen.getByText('반도체')).toBeInTheDocument()
     })
-    // rs_avg 없을 때 '-' 표시
-    const dashes = screen.getAllByText('-')
+    // rs_avg 없을 때 MetricCell 결측 상태 — en-dash '–' + metric-cell--missing
+    const dashes = screen.getAllByText('–')
     expect(dashes.length).toBeGreaterThanOrEqual(1)
+    expect(dashes[0].className).toContain('metric-cell--missing')
   })
 })
 
@@ -297,7 +300,8 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
     expect(screen.getByText('-3.2%')).toBeInTheDocument()
   })
 
-  it('chg_1m이 null인 경우 하이픈(-) 표시되어야 함', async () => {
+  // 의도된 변화 (AC-SUX-052 ER-1): 결측 표기 '-' → '–' 통일.
+  it('chg_1m이 null인 경우 결측 글리프(–) 표시되어야 함 [ER-1 통일]', async () => {
     mockFetchSectorDetail.mockResolvedValue({
       sector_name: 'Technology',
       sub_sectors: [],
@@ -318,8 +322,9 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
       expect(screen.getByText('삼성전자')).toBeInTheDocument()
     })
 
-    // chg_1m=null이면 '-' 표시
-    const dashes = screen.getAllByText('-')
+    // chg_1m=null 이면 MetricCell 결측 상태 — en-dash '–'
+    const dashes = screen.getAllByText('–')
     expect(dashes.length).toBeGreaterThanOrEqual(1)
+    expect(dashes[0].className).toContain('metric-cell--missing')
   })
 })

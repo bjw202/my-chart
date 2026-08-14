@@ -4,6 +4,8 @@
 // @MX:SPEC: SPEC-TOPDOWN-001D R1, SPEC-SECTOR-UX-001 M4
 import type { ReactElement } from 'react'
 import type { SectorRankItem, ExcludedSector } from '../../types/market'
+// D6 / AC-SUX-052: 셀 5상태는 공용 MetricCell 이 전담한다 (화면별 표기 발산 방지).
+import { MetricCell, percent1 } from '../common/MetricCell'
 
 interface SectorRankingTableProps {
   sectors: SectorRankItem[]
@@ -48,7 +50,9 @@ const BADGE_TITLE: Record<NonNullable<WeightBadge>, string> = {
   E: '등가중',
 }
 
-function getCellColor(value: number, type: 'return' | 'percentage'): string {
+// AC-SUX-053 (ER-2): 결측은 배경색 채널에서도 0 으로 취급하지 않는다 — 색 없음.
+function getCellColor(value: number | null | undefined, type: 'return' | 'percentage'): string {
+  if (value == null || Number.isNaN(value)) return 'transparent'
   if (type === 'return') {
     // Clamp to ±15 to handle large sector returns (API returns up to 16%+)
     if (value > 0) return `rgba(38, 166, 154, ${Math.min(Math.abs(value) / 15, 0.4)})`
@@ -59,10 +63,9 @@ function getCellColor(value: number, type: 'return' | 'percentage'): string {
   return `rgba(59, 130, 246, ${Math.min(value / 100, 0.3)})`
 }
 
-function formatReturn(value: number): string {
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(1)}%`
-}
+// AC-SUX-053 (ER-2): 무조건 toFixed(1) 경로는 제거되었다.
+// 결측 처리는 MetricCell 이 담당하고, 이 포맷터는 유한 숫자만 받는다 (percent1 재export).
+const formatReturn = percent1
 
 // AC-SUX-025 (REQ-SUX-023): rank_change 4상태 — >0 ▲n / <0 ▼n / ==0 –(muted) / null 신규(muted+툴팁).
 // 0(유지) 과 null(신규) 은 서로 다른 텍스트로 구분된다 (현행 둘 다 '-' 였던 결함 해소).
@@ -155,7 +158,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.excess_returns.w1, 'return'),
                 }}
               >
-                {formatReturn(sector.excess_returns.w1)}
+                <MetricCell value={sector.excess_returns.w1} format={formatReturn} />
               </td>
               {/* 1M excess return */}
               <td
@@ -164,7 +167,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.excess_returns.m1, 'return'),
                 }}
               >
-                {formatReturn(sector.excess_returns.m1)}
+                <MetricCell value={sector.excess_returns.m1} format={formatReturn} />
               </td>
               {/* 3M excess return */}
               <td
@@ -173,7 +176,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.excess_returns.m3, 'return'),
                 }}
               >
-                {formatReturn(sector.excess_returns.m3)}
+                <MetricCell value={sector.excess_returns.m3} format={formatReturn} />
               </td>
               {/* RS Avg */}
               <td
@@ -182,7 +185,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.rs_avg, 'percentage'),
                 }}
               >
-                {sector.rs_avg}
+                <MetricCell value={sector.rs_avg} />
               </td>
               {/* RS Top % */}
               <td
@@ -191,7 +194,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.rs_top_pct, 'percentage'),
                 }}
               >
-                {sector.rs_top_pct}%
+                <MetricCell value={sector.rs_top_pct} format={(n) => `${n}%`} />
               </td>
               {/* 52W High % */}
               <td
@@ -200,7 +203,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.nh_pct, 'percentage'),
                 }}
               >
-                {sector.nh_pct}%
+                <MetricCell value={sector.nh_pct} format={(n) => `${n}%`} />
               </td>
               {/* Stage 2 % */}
               <td
@@ -209,10 +212,10 @@ export function SectorRankingTable({
                   background: getCellColor(sector.stage2_pct, 'percentage'),
                 }}
               >
-                {sector.stage2_pct}%
+                <MetricCell value={sector.stage2_pct} format={(n) => `${n}%`} />
               </td>
               {/* Composite score (plan M4) */}
-              <td style={{ textAlign: 'right' }}>{sector.composite_score.toFixed(2)}</td>
+              <td style={{ textAlign: 'right' }}><MetricCell value={sector.composite_score} format={(n) => n.toFixed(2)} /></td>
             </tr>
           ))}
         </tbody>
