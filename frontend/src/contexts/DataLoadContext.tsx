@@ -53,6 +53,14 @@ export function DataLoadProvider({ children }: { children: React.ReactNode }): R
   const gridVersionRef = useRef<string | null>(null)
   // 이미 무효화를 수행한 버전 집합 — 두 패널이 서로 다른 grid_version 을 번갈아 보고할 때
   // 무한 재조회 핑퐁이 생기지 않도록 버전당 1회로 무효화를 제한한다.
+  // @MX:NOTE: [AUTO] 이 Set 은 영구 누적이며 비우지 않는다 — 의도된 트레이드오프다.
+  //   방어 대상: 두 패널이 g1/g2 를 번갈아 보고하는 핑퐁. 매번 무효화하면 g1→g2→g1→…
+  //   무한 재조회가 된다(구현 중 실제로 관측된 폭주 경로).
+  //   수용한 비용: 진짜 격자 롤백(g2 → 이미 무효화한 g1 로 복귀)은 재무효화되지 않는다.
+  //   TTL(1h) 만료 또는 ⟳ 새로고침으로 회수된다.
+  // @MX:REASON: 버전 식별자만으로는 정당한 롤백과 핑퐁을 구분할 수 없다. 두 위험 중
+  //   무한 재조회(브라우저 폭주)가 stale 데이터 1주기보다 무겁다고 판단해 Set 을 유지한다.
+  //   누락이 아니라 선택이므로, 이 로직을 "고치기" 전에 위 두 위험을 다시 저울질할 것.
   const invalidatedVersionsRef = useRef<Set<string>>(new Set())
 
   const refreshAll = useCallback(() => {
@@ -234,7 +242,16 @@ export function useQuery<T>(
     const cached = cache.get(key) as T | undefined
     if (cached !== undefined) {
       const m = metaRef.current?.(cached)
-      if (m) registerAsOf(panel, m.asOfDate)
+      if (m) {
+        registerAsOf(panel, m.asOfDate)
+        // 적중 경로도 전역 기준일을 기록한다 — 이 값은 asOfDate prop 을 넘기지 않는
+        // 화면(RRG·Bump)의 DataStatusBar 폴백 소스다. 여기서 빠뜨리면 registerAsOf 만
+        // 갱신되어 합치 경고 띠도 뜨지 않는 조용한 불일치가 된다.
+        recordAsOfRef.current(m.asOfDate, m.asOfIsPartialWeek, m.gridVersion)
+        // noteGridVersion 은 부르지 않는다. QueryCache.setGridVersion 이 버전 변경 시
+        // Map 을 통째로 비우므로(queryCache.ts), 살아남은 엔트리는 반드시 현재 버전에서
+        // 기록된 것이다 — 적중 시 재통지는 prev === version 인 무동작이다.
+      }
       setState(prev => ({
         ...prev,
         data: cached,

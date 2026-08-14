@@ -335,6 +335,40 @@ describe('AC-SUX-037 — 기준일 합치 + grid_version 무효화 (LD-E / SN-3 
     render(<AnalysisParamsProvider><DataLoadProvider><Probe /></DataLoadProvider></AnalysisParamsProvider>)
     await waitFor(() => expect(screen.getByTestId('asof').textContent).toBe('2026-08-11'))
   })
+
+  // F1 회귀 — 캐시 적중 경로도 전역 기준일(AnalysisParams.asOfDate)을 기록해야 한다.
+  // 전역 값은 asOfDate prop 을 넘기지 않는 화면(RRG·Bump)의 DataStatusBar 폴백 소스다.
+  // 적중 분기가 registerAsOf 만 호출하고 recordAsOf 를 건너뛰면 자기 배지와 전역 배지가
+  // 어긋나는데, registerAsOf 는 갱신되므로 합치 경고 띠도 뜨지 않는다(조용한 불일치).
+  it('캐시 적중 경로도 전역 기준일을 갱신한다 — 키 A→B→A 재방문 후 전역이 A 의 날짜로 복귀한다', async () => {
+    function Host({ qkey, date }: { qkey: string; date: string }) {
+      const q = useQuery(qkey, () => Promise.resolve(env({ as_of_date: date })), {
+        enabled: true, panel: 'A', meta: META, retryDelays: [],
+      })
+      const params = useAnalysisParams()
+      return (
+        <>
+          <span data-testid="own">{q.asOfDate ?? '-'}</span>
+          <span data-testid="global">{params.asOfDate ?? '-'}</span>
+        </>
+      )
+    }
+    const tree =(p: { qkey: string; date: string }) => (
+      <AnalysisParamsProvider><DataLoadProvider><Host {...p} /></DataLoadProvider></AnalysisParamsProvider>
+    )
+    const { rerender } = render(tree({ qkey: 'kA', date: '2026-08-01' }))
+    await waitFor(() => expect(screen.getByTestId('own').textContent).toBe('2026-08-01'))
+    expect(screen.getByTestId('global').textContent).toBe('2026-08-01')
+
+    rerender(tree({ qkey: 'kB', date: '2026-08-11' }))
+    await waitFor(() => expect(screen.getByTestId('own').textContent).toBe('2026-08-11'))
+    expect(screen.getByTestId('global').textContent).toBe('2026-08-11')
+
+    // TTL(1h) 내 키 A 재방문 → 캐시 적중(fetch 없음). 전역도 A 의 날짜로 돌아와야 한다.
+    rerender(tree({ qkey: 'kA', date: '2026-08-01' }))
+    await waitFor(() => expect(screen.getByTestId('own').textContent).toBe('2026-08-01'))
+    expect(screen.getByTestId('global').textContent).toBe('2026-08-01')
+  })
 })
 
 describe('AC-SUX-036 — 백엔드 워밍업 실패 후 탭 재활성화 자가 복구', () => {
