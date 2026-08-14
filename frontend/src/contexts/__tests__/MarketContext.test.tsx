@@ -9,6 +9,7 @@ vi.mock('../../api/market', () => ({
 
 import { fetchMarketOverview, fetchSectorRanking } from '../../api/market'
 import { MarketProvider, useMarket, RETRY_DELAYS_MS } from '../MarketContext'
+import { AnalysisParamsProvider } from '../AnalysisParamsContext'
 import type { MarketOverviewResponse, SectorRankingResponse } from '../../types/market'
 
 const mockOverview: MarketOverviewResponse = {
@@ -43,6 +44,17 @@ function TestConsumer(): React.ReactElement {
 // 테스트에서 재시도 지연을 0으로 설정
 const originalDelays = [...RETRY_DELAYS_MS]
 
+// MarketProvider 는 AnalysisParamsContext(market) 를 소비하므로 상위에 AnalysisParamsProvider 배치
+function renderWithMarket() {
+  return render(
+    <AnalysisParamsProvider>
+      <MarketProvider>
+        <TestConsumer />
+      </MarketProvider>
+    </AnalysisParamsProvider>,
+  )
+}
+
 describe('MarketProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -58,11 +70,7 @@ describe('MarketProvider', () => {
     vi.mocked(fetchMarketOverview).mockResolvedValue(mockOverview)
     vi.mocked(fetchSectorRanking).mockResolvedValue(mockRanking)
 
-    render(
-      <MarketProvider>
-        <TestConsumer />
-      </MarketProvider>
-    )
+    renderWithMarket()
 
     await waitFor(() => {
       expect(screen.getByTestId('overview-phase').textContent).toBe('bull')
@@ -76,11 +84,7 @@ describe('MarketProvider', () => {
     vi.mocked(fetchMarketOverview).mockResolvedValue(mockOverview)
     vi.mocked(fetchSectorRanking).mockResolvedValue(mockRanking)
 
-    render(
-      <MarketProvider>
-        <TestConsumer />
-      </MarketProvider>
-    )
+    renderWithMarket()
 
     // Initially loading should be true
     expect(screen.getByTestId('loading').textContent).toBe('true')
@@ -90,11 +94,7 @@ describe('MarketProvider', () => {
     vi.mocked(fetchMarketOverview).mockRejectedValue(new Error('API error'))
     vi.mocked(fetchSectorRanking).mockRejectedValue(new Error('API error'))
 
-    render(
-      <MarketProvider>
-        <TestConsumer />
-      </MarketProvider>
-    )
+    renderWithMarket()
 
     // 재시도 지연 0ms이므로 빠르게 완료됨
     await waitFor(() => {
@@ -110,11 +110,7 @@ describe('MarketProvider', () => {
     vi.mocked(fetchMarketOverview).mockResolvedValue(mockOverview)
     vi.mocked(fetchSectorRanking).mockResolvedValue(mockRanking)
 
-    render(
-      <MarketProvider>
-        <TestConsumer />
-      </MarketProvider>
-    )
+    renderWithMarket()
 
     await waitFor(() => {
       expect(screen.getByTestId('overview-phase').textContent).toBe('bull')
@@ -149,11 +145,7 @@ describe('MarketProvider', () => {
     vi.mocked(fetchMarketOverview).mockResolvedValue(mockOverview)
     vi.mocked(fetchSectorRanking).mockResolvedValue(rankingWithData)
 
-    render(
-      <MarketProvider>
-        <TestConsumer />
-      </MarketProvider>
-    )
+    renderWithMarket()
 
     await waitFor(() => {
       expect(screen.getByTestId('ranking-date').textContent).toBe('2025-03-01')
