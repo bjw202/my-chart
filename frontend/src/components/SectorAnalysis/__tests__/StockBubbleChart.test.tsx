@@ -327,10 +327,12 @@ describe('AC-6: 범례 선택 상태가 series 데이터에 반영된다', () =>
 })
 
 // ==============================================================
-// AC-7: series.emphasis.focus === 'series' (데스크탑 hover 강조)
+// AC-7 / AC-SUX-051 (VZ-13): 종목 버블 산점도 series.emphasis.focus === 'none'
+// (개별 버블 hover 시 해당 버블만 강조 — 다른 series 블러 없음. M5 의도 변경: 기존 'series' → 'none')
+// RRG/Bump 의 focus:'series' 는 유지(선 차트 궤적 추적). 본 단언은 종목 버블 산점도 한정.
 // ==============================================================
-describe('AC-7: hover emphasis는 series 단위로 강조된다', () => {
-  it('모든 series의 emphasis.focus가 "series"로 설정된다 (multi-series)', () => {
+describe('AC-7/AC-SUX-051: 종목 버블 hover emphasis.focus === "none" (VZ-13)', () => {
+  it('모든 series의 emphasis.focus가 "none"으로 설정된다 (multi-series)', () => {
     const stocks = makeStocks([
       { sector_minor: '반도체', count: 2 },
       { sector_minor: '디스플레이', count: 1 },
@@ -344,9 +346,9 @@ describe('AC-7: hover emphasis는 series 단위로 강조된다', () => {
     expect(series).toBeDefined()
     expect(series.length).toBeGreaterThanOrEqual(1)
 
-    // 모든 series에 emphasis.focus === 'series' 적용 확인
+    // 모든 series에 emphasis.focus === 'none' 적용 확인 (VZ-13 의도 변경)
     series.forEach((s) => {
-      expect(s.emphasis?.focus).toBe('series')
+      expect(s.emphasis?.focus).toBe('none')
     })
   })
 })

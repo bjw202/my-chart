@@ -154,6 +154,7 @@ export function BubbleChart({ initialSector }: Props): ReactElement {
                 stocks={stockData}
                 sectorName={selectedSector}
                 onStockClick={handleStockClick}
+                period={period}
               />
             )}
           </>

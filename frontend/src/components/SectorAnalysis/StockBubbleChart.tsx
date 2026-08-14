@@ -6,11 +6,20 @@ import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
 import type { StockBubbleItem } from '../../types/bubble'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
+import {
+  bubbleSymbolSize,
+  PERIOD_SIZE_LADDER,
+  STOCK_BUBBLE_R_MIN,
+  STOCK_BUBBLE_R_MAX,
+} from './bubbleRadius'
+import type { SizePeriod } from './bubbleRadius'
 
 interface Props {
   stocks: StockBubbleItem[]
   sectorName: string
   onStockClick?: (stockName: string) => void
+  /** 기간 — 버블 크기 고정눈금 사다리 선택 (O-U4). */
+  period?: SizePeriod
 }
 
 // SPEC-SECTOR-MINOR-COLOR-001: 산업명(중) 기반 색상 매핑 — Tableau 10 변형
@@ -60,10 +69,27 @@ function buildSectorMinorColorMap(stocks: StockBubbleItem[]): Map<string, string
   return colorMap
 }
 
-// 거래대금을 버블 픽셀 크기(15~70)로 정규화
-function normalizeBubbleSize(value: number, min: number, max: number): number {
-  if (max === min) return 35
-  return 15 + ((value - min) / (max - min)) * 55
+// REQ-SUX-045 (VZ-0): Stage 테두리 채널 — 색상(산업명(중))과 독립. 종목 버블 테두리는 Stage 전용.
+// 결측 거래대금은 테두리를 건드리지 않는다 (REQ-SUX-057 — stage===null 점선과 구분 불가 방지).
+// @MX:NOTE: [AUTO] Stage→테두리 매핑. Stage2=흰2px실선 / 1·3=없음 / 4=어두운회색1px / null=회색1px점선.
+function stageBorderStyle(stage: number | null): { borderColor: string; borderWidth: number; borderType: 'solid' | 'dashed' } {
+  if (stage === 2) return { borderColor: '#ffffff', borderWidth: 2, borderType: 'solid' }
+  if (stage === 4) return { borderColor: '#4b5563', borderWidth: 1, borderType: 'solid' }
+  if (stage === 1 || stage === 3) return { borderColor: 'transparent', borderWidth: 0, borderType: 'solid' }
+  return { borderColor: '#9CA3AF', borderWidth: 1, borderType: 'dashed' } // 분류불가(null)
+}
+
+// 섹터 집계 수익률 — 시가총액 가중 평균 (VZ-5 종목 기준선). backend 필드 없어 client 연산.
+function sectorAggregateReturn(stocks: StockBubbleItem[]): number | null {
+  let weighted = 0
+  let totalCap = 0
+  for (const s of stocks) {
+    if (s.market_cap > 0 && Number.isFinite(s.price_change)) {
+      weighted += s.price_change * s.market_cap
+      totalCap += s.market_cap
+    }
+  }
+  return totalCap > 0 ? weighted / totalCap : null
 }
 
 // 거래대금을 억원 단위로 포맷
@@ -84,9 +110,11 @@ function escapeHtml(s: string): string {
   return s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] ?? c))
 }
 
-export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): ReactElement {
+export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1w' }: Props): ReactElement {
   // 모바일 분기 (max-width: 767px)
   const isMobile = useMediaQuery('(max-width: 767px)')
+  // O-U4: 기간별 고정눈금 사다리 (데이터 기반 X). 종목 버블 크기 [10,52].
+  const ladder = PERIOD_SIZE_LADDER[period]
 
   // sector_minor 색상 맵 (결정성: stocks 변경 시만 재계산)
   const colorMap = useMemo(() => buildSectorMinorColorMap(stocks), [stocks])
@@ -115,11 +143,10 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
       }
     }
 
-    const tradingValues = stocks.map(s => s.trading_value)
-    const minTV = Math.min(...tradingValues)
-    const maxTV = Math.max(...tradingValues)
     // 거래대금 상위 20개 종목만 라벨 표시
     const topNSet = getTopNByTradingValue(stocks, 20)
+    // VZ-5 종목: X 기준선 = 섹터 집계 수익률 (시가총액 가중). 0 선은 보조(더 연한 색).
+    const sectorAgg = sectorAggregateReturn(stocks)
 
     // colorMap 순서(legendData)에 따라 sector_minor 그룹별 series 배열 구성
     // series[i].name === legend.data[i].name 일치 → ECharts 범례 토글·hover emphasis 표준 동작
@@ -128,28 +155,39 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
       return {
         name: groupName,
         type: 'scatter' as const,
-        data: groupItems.map(({ s, i }) => ({
-          value: [
-            s.price_change,
-            s.rs_12m,
-            normalizeBubbleSize(s.trading_value, minTV, maxTV),
-            s.stage ?? 0,
-            s.name,
-            s.trading_value,
-            s.stage_detail ?? '',
-            i, // 인덱스 (라벨 표시 여부 판단용)
-          ],
-          // tooltip formatter에서 sector_minor, product 접근을 위한 보존
-          sector_minor: s.sector_minor ?? null,
-          product: s.product ?? null,  // SPEC-STOCK-TOOLTIP-PRODUCT-001
-          label: {
-            show: topNSet.has(i),
-            formatter: s.name,
-            position: 'top' as const,
-            fontSize: 9,
-            color: '#e5e7eb',
-          },
-        })),
+        data: groupItems.map(({ s, i }) => {
+          const tvMissing = s.trading_value == null || Number.isNaN(s.trading_value)
+          return {
+            value: [
+              s.price_change,
+              s.rs_12m,
+              // VZ-1: bubbleSymbolSize (로그 면적비례, 기간별 고정눈금 클램프). 결측 → 2×rMin.
+              bubbleSymbolSize(
+                tvMissing ? null : s.trading_value,
+                ladder.vMin, ladder.vMax, STOCK_BUBBLE_R_MIN, STOCK_BUBBLE_R_MAX,
+              ),
+              s.stage ?? 0,
+              s.name,
+              s.trading_value,
+              s.stage_detail ?? '',
+              i, // 인덱스 (라벨 표시 여부 판단용)
+              tvMissing ? 1 : 0, // 결측 거래대금 플래그 (툴팁용)
+            ],
+            // REQ-SUX-045 (VZ-0): Stage 테두리 — 색상(series.itemStyle.color)과 독립.
+            // 결측 거래대금은 테두리를 건드리지 않는다 (REQ-SUX-057).
+            itemStyle: stageBorderStyle(s.stage),
+            // tooltip formatter에서 sector_minor, product 접근을 위한 보존
+            sector_minor: s.sector_minor ?? null,
+            product: s.product ?? null,  // SPEC-STOCK-TOOLTIP-PRODUCT-001
+            label: {
+              show: topNSet.has(i),
+              formatter: s.name,
+              position: 'top' as const,
+              fontSize: 9,
+              color: '#e5e7eb',
+            },
+          }
+        }),
         symbolSize: (val: number[]) => val[2],
         // 그룹 색상을 series 레벨에 설정 (data 레벨에서 제거)
         itemStyle: {
@@ -157,7 +195,8 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
           opacity: 0.85,
         },
         emphasis: {
-          focus: 'series' as const,
+          // VZ-13: 개별 버블 hover 시 해당 버블만 강조 (다른 series 블러 없음).
+          focus: 'none' as const,
           itemStyle: { shadowBlur: 10, shadowColor: 'rgba(255,255,255,0.3)' },
         },
         // 참조선: 첫 번째 series에만 (중복 렌더 방지)
@@ -165,9 +204,17 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
           markLine: {
             silent: true,
             symbol: 'none',
-            lineStyle: { color: '#6b7280', type: 'dashed' as const, width: 1 },
-            data: [{ xAxis: 0 }, { yAxis: 50 }],
-            label: { show: false },
+            data: [
+              // VZ-5 종목: X 기준선 = 섹터 집계 수익률 (강조) — 있을 때만.
+              ...(sectorAgg != null ? [{
+                xAxis: sectorAgg,
+                lineStyle: { color: '#e5e7eb', type: 'solid' as const, width: 1.5 },
+                label: { show: true, formatter: `${sectorName} 섹터 평균 ${sectorAgg >= 0 ? '+' : ''}${sectorAgg.toFixed(2)}%`, color: '#e5e7eb', fontSize: 10, position: 'insideEndTop' as const },
+              }] : []),
+              // 0선은 보조로 남기되 더 연한 색 (VZ-5).
+              { xAxis: 0, lineStyle: { color: '#3a3a4e', type: 'dashed' as const, width: 1 }, label: { show: false } },
+              { yAxis: 50, lineStyle: { color: '#6b7280', type: 'dashed' as const, width: 1 }, label: { show: false } },
+            ],
           },
         } : {}),
       }
@@ -179,6 +226,26 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
       icon: 'circle',
       itemStyle: { color },
     }))
+
+    // VZ-12 (AC-SUX-050): "기타" 범례 항목에 구성 산업 개수 병기.
+    // legend.data[].name 은 '기타' 그대로(series.name 연동 보존) — formatter 로 표시 텍스트만 변환.
+    const etcConstituentCount = (() => {
+      const distinct = new Set<string>()
+      let nullExists = false
+      for (const s of stocks) {
+        if (s.sector_minor && s.sector_minor.trim()) distinct.add(s.sector_minor)
+        else nullExists = true
+      }
+      const overflow = Math.max(0, distinct.size - SECTOR_MINOR_PALETTE.length)
+      return overflow + (nullExists ? 1 : 0)
+    })()
+    const hasEtc = colorMap.has(ETC_LABEL)
+    const legendFormatter = (name: string): string => {
+      if (name === ETC_LABEL && hasEtc && etcConstituentCount >= 1) {
+        return `${ETC_LABEL} (${etcConstituentCount}개 산업)`
+      }
+      return name
+    }
 
 
     return {
@@ -227,6 +294,7 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
             bottom: 10,
             type: 'scroll' as const,
             textStyle: { color: '#9ca3af', fontSize: 11 },
+            formatter: legendFormatter,
             data: legendData,
           }
         : {
@@ -234,6 +302,7 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
             right: 10,
             top: 'middle',
             textStyle: { color: '#9ca3af', fontSize: 11 },
+            formatter: legendFormatter,
             data: legendData,
           },
       series,
@@ -252,7 +321,8 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
           const rs = (val[1] as number).toFixed(1)
           const stage = val[3] as number
           const stageDetail = val[6] as unknown as string
-          const tv = formatTradingValue(val[5] as number)
+          const tvMissing = val[8] === 1
+          const tv = tvMissing ? '데이터 없음' : formatTradingValue(val[5] as number)
           const sign = (val[0] as number) >= 0 ? '+' : ''
           const stageLabel = stage ? `S${stage}${stageDetail ? ` (${escapeHtml(stageDetail)})` : ''}` : '미분류'
           // sector_minor 라인 (null/빈 문자열은 ETC_LABEL 표시, XSS 방어)
@@ -273,7 +343,7 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick }: Props): R
         },
       },
     }
-  }, [stocks, sectorName, isMobile, colorMap, groupedData])
+  }, [stocks, sectorName, isMobile, colorMap, groupedData, ladder])
 
   const handleEvents = {
     click: (params: { data: { value: number[] } }) => {
