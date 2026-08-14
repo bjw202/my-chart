@@ -73,31 +73,76 @@ Tier L이나 `design.md` / `research.md`를 신규 작성하지 않는다 — `d
 - `git push origin main` → `3a87855..fc3dfc1 main -> main` (fast-forward, 병렬 세션 race 무).
 - `git show --stat` 로 양 커밋 파일 집합 확인 → `.agency/*`·`expert-*.md` 선행 deletion 미유입(B-CRITICAL git-add discipline 준수 — 명시적 경로만 staging).
 
+### M3 (NavIntent 교체 — 전면 rollback 경계 단일 commit `7975c7c`)
+
+> Baseline 재확인 (run 착수 시점): tsc 총 33 / TS2353 1 (`MarketOverview.tsx:46 stockName`). vitest 419 pass + e2e 2 file-load 선행 결함. CrossTabParams 참조 14 파일(grep `crossTabParams|CrossTabParams` src/).
+
+**tsc 게이트 (a) HARD — TS2353 == 0 [PASS]**
+- **Claim**: `CrossTabParams` 타입 자체 삭제로 `MarketOverview.tsx:46` stockName TS2353 근본 소멸.
+- **Evidence (verbatim)**: `npx tsc -p tsconfig.app.json --noEmit 2>&1 | grep -c "TS2353"` → **0** (baseline 1 → 0).
+
+**tsc 게이트 (b) — 총량 비증가 + ③ 수정 파일 NEW 0건 [PASS]**
+- **Claim**: 총량 ≤ N(33) + M3 수정 파일 NEW tsc 오류 0건.
+- **Evidence (verbatim)**: `grep -c "error TS"` → **28** (baseline 33 → 28, −5: MarketOverview TS2353 1 + ChartGrid test군 setCrossTabParams TS2741×3 + 기타 1). file#code baseline-vs-final diff → **NEW 0건** (`comm -13 base final` empty). `NavIntent['payload']` 필드: `subTab`/`stockCodes`/`focusStock` 정의.
+- **Baseline-attribution**: run 착수 시점 baseline 33(위 §E.2 Baseline). `setCrossTabParams is missing` 계열(TS2741)은 X5 타입 삭제로 필연 감소 — 손대는 이상 남겨 둘 수 없다(acceptance.md:52).
+- **Gaps**: 없음. **Residual-risk**: 선행 결함 28건(StockBubbleChart.test node:fs/__dirname 9건 등)은 범위 밖(감소 미요구).
+
+**AC PASS/FAIL matrix (M3)**
+| AC | Status | Verification (verbatim command + output) |
+|----|--------|------------------------------------------|
+| AC-SUX-003 (NavIntent 주소 지정) | **PASS** | `vitest run src/contexts/__tests__/TabContext.test.tsx` → 9 passed. target routing(주소 탭만 처리) + 재전송 id 증가(2회 처리) + 동일 id 리렌더 1회(dedup) + activeTab 가드 |
+| AC-SUX-004 (타입 계약 (a)HARD+(b)) | **PASS** | (a) `grep -c TS2353` → **0**. (b) 총량 28 ≤ 33 + NEW-0. `NavIntentPayload` = {subTab,stockCodes,focusStock} (market.test.ts 4 passed) |
+| AC-SUX-005 (전역 clear 부재) | **PASS** | `grep -rn "clearCrossTabParams\|crossTabParams\|CrossTabParams" src/` → **0행**. 각 소비자 `lastHandled` ref 로컬 중복제거(전역 clear 호출 無) |
+| AC-SUX-006 (sectorName payload 제외) | **PASS** | NavIntentPayload 타입에 sectorName 無(`@ts-expect-error` type-level 단언). 전 navigate() 호출부 sectorName 無. 섹터 선택은 SelectionContext 직접 쓰기 |
+| AC-SUX-007 (스코프 추종 토글) | **PASS** | StockExplorer `sectorFilter = sectorScopeFollow ? selectedSector : null`; 칩 × → setSectorScopeFollow(false)(selectedSector 유지) |
+| AC-SUX-011 (TR-3/3b 행 클릭) | **PASS** | SectorAnalysis.test TR-3(행 클릭 → 패널 오픈, navigate 0회) + TR-3b(재클릭 → clearSector, 패널 닫힘) |
+| AC-SUX-012 (TR-4 상세패널 진입) | **PASS** | SectorDetailPanel `[이 섹터 종목 보기 →]` 버튼 렌더 + 클릭 시 navigate({target:'stock-explorer'}) (SectorAnalysis.test TR-4) |
+| AC-SUX-013 (TR-9 종목 버블 클릭) | **PASS** | BubbleChart.nav.test: onStockClick prop 전달(props 단언) + 클릭 → navigate({target:'stock-explorer',payload:{focusStock}}) + selectSector 동기화 |
+| AC-SUX-014 (TR-2 트리맵 종목 클릭) | **PASS** | `grep -c "MarketOverview.tsx.*TS2353"` → **0**. ChartGrid.integration.test: focusStock intent → present 종목 data-focus-target marker 부착 / absent 시 marker 無(중복추가 無) |
+| AC-SUX-015 (TR-16 종목 체크 초기화) | **PASS** | StockExplorer.test: selectedSector 변경 → selectedStocks reset("N selected" 소멸). Stage 필터는 별도 state(초기화 無) |
+| AC-SUX-016 (TR-6 버블 뒤로가기) | **PASS** | BubbleChart.nav.test: `← 섹터 목록` → sector view 복귀, selectedSector 보존(handleBack setSelectedSector(null) 제거) |
+| AC-SUX-017 (TR-7/8 RRG·Bump 클릭) | **PASS-WITH-DEBT** | SectorAnalysis RRG/Bump onSectorClick → selectSector + subTab 'table'. **Debt**: visibleSectors/windowEnd/topFilter 보존은 조건부 렌더(unmount) 구조상 미구현 — M5 keep-mounted 개편 시 보존(현재架构에서는 동일 미구현, 회귀 아님) |
+
+### §1.2 보존 대상 회귀 확인 (PRESERVE 10항목) [PASS]
+- `git diff 7975c7c^ 7975c7c -- frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` → **빈 diff**(색상 채널 @MX:ANCHOR 미수정). BumpChart.tsx(baseline dates-union)·나머지 보존 항목 전부 M3 미수정.
+
+### 회귀 (기존 프론트엔드 테스트) [PASS — 회귀 0건]
+- 최종 `vitest run` → **430 tests passed (430)** (baseline 419 + M3 신규 11), 2 e2e file-load failures(선행 결함 불변). 기존 419 전량 통과, 신규 회귀 0건.
+- M3 로 일시 깨진 기존 테스트 43건(AppContent 5 / SectorAnalysis 12 / SectorAnalysis.market-delivery 2 / StockExplorer / MarketOverview)은 NavIntent/useSelection mock 전환 + SelectionProvider 래핑으로 복구 → 전량 GREEN.
+
+### eslint (M3 수정 파일) [신규 error class 0]
+- M3 신규 도입 eslint error class: **0**. 잔여는 전부 선행 baseline 패턴 — `react-refresh/only-export-components`(TabContext useNavIntent 2번째 hook export 추가, MarketContext/ScreenContext/SelectionContext 와 동일 패턴), `react-hooks/set-state-in-effect`(StockExplorer NavIntent consumer 1건 — 이벤트 응답 effect, 정당; SectorAnalysis crossTab effect 1건 제거로 상쇄). selectedSector reset 은 render-time adjustment 패턴으로 전환(effect 내 setState lint 회피).
+
+### 커밋 + push (Route A Hybrid Trunk) — M3 단일 commit
+- M3 `7975c7c` — `feat(SPEC-SECTOR-UX-001): M3 NavIntent 교체 ...` (20 files: 9 source + 11 test, +691/−198). 전면 rollback 경계 — 단일 commit(부분 revert 불가).
+- `git push origin main` → `b9dc448..7975c7c main -> main` (fast-forward, 병렬 세션 race 무).
+- `git show --stat 7975c7c` → 20 M3 파일 정확; `.agency/*`·`expert-*.md`·`BumpChart.tsx`(선행 변경)·`MarketContext.test.tsx`(선행 변경) 전부 **미유입**(B-CRITICAL git-add discipline — 명시적 경로만 staging, pre-existing uncommitted 변경 2건 제외).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-> 반자율 progression: **M1·M2 GREEN, pre-M3 checkpoint 대기** (M3~M7 잔여). 본 신호는 M1+M2 구간 한정 — 전 run-phase 완료 아님.
+> 반자율 progression: **M3 GREEN** (NavIntent 교체 — 전면 rollback 경계 통과). M4~M7 잔여(표·컨트롤 / 시각화 / 로딩상태 / 회귀게이트). 본 신호는 M1+M2+M3 구간 — 전 run-phase 완료 아님.
 
 ```yaml
 run_complete_at: 2026-08-14
-run_commit_sha: fc3dfc1          # M2 (M1+M2 구간의 M-final). M1=c27a050. (placeholder-backfill 불필요 — push 후 SHA 확정)
-run_status: M1-M2-complete-pre-M3-checkpoint   # 전 run-phase 아님 — M3~M7 잔여, 사용자 pre-M3 checkpoint 대기(반자율)
-ac_pass_count: 5                 # AC-SUX-001/002/034(M1) + AC-SUX-008/009(M2)
-ac_pass_with_debt_count: 1       # AC-SUX-018 (Table+Bubble 경로 전달; RRG/Bump/StockExplorer 3경로 잔여)
+run_commit_sha: 7975c7c          # M3 (전면 rollback 경계 단일 commit). M1=c27a050 / M2=fc3dfc1 / M3=7975c7c.
+run_status: M3-complete          # M1+M2+M3 GREEN. M4~M7 잔여(반자율 progression). 전 run-phase 아님.
+ac_pass_count: 16                # M1(001/002/034)+M2(008/009)+M3(003/004/005/006/007/011/012/013/014/015/016) = 16
+ac_pass_with_debt_count: 2       # AC-SUX-018(M2, RRG/Bump/StockExplorer 경로 잔여) + AC-SUX-017(M3, RRG/Bump 로컬 state 보존 미구현 — M5 keep-mounted)
 ac_fail_count: 0
-ac_total_this_segment: 6         # M1(3)+M2(3). 전 SPEC 60 AC 중 54 잔여(M3-M7)
-preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(회귀 0)
-l44_pre_commit_fetch: "local ahead (M1+M2 미푸시) — 병렬 세션 race 무(단일 세션)"
-l44_post_push_fetch: "synced — 3a87855..fc3dfc1 fast-forward, race 무"
+ac_total_this_segment: 18        # M1(3)+M2(3)+M3(12). 전 SPEC 60 AC 중 42 잔여(M4-M7)
+preserve_list_post_run_count: 10 # §1.2 보존 10항목 전부 미변경(StockBubbleChart 색상 채널 포함, 회귀 0)
+l44_pre_commit_fetch: "synced (단일 세션) — b9dc448 기준 0 0 divergence"
+l44_post_push_fetch: "synced — b9dc448..7975c7c fast-forward, 병렬 세션 race 무"
 new_warnings_or_lints_introduced: 0   # 신규 eslint error class 0; tsc 수정파일 NEW 0
 cross_platform_build:
   applicable: false              # 프론트엔드 전용 SPEC (Go 빌드 태그 / C-HRA-008 N/A)
-tsc_gate_b_total: 33             # baseline N=33 불변(비증가)
-tsc_gate_a_ts2353: 1             # 불변 — M3 소관(MarketOverview.tsx:46 stockName)
+tsc_gate_b_total: 28             # baseline N=33 → 28 (비증가; X5 타입 삭제로 필연 −5)
+tsc_gate_a_ts2353: 0             # M3 HARD 게이트 (a) 달성 — MarketOverview.tsx:46 TS2353 근본 소멸(CrossTabParams 타입 삭제)
 modified_files_new_tsc_errors: 0
-total_run_phase_files: 17        # M1(8: spec.md + App.tsx + 3 ctx + 3 test) + M2(9: 4 source + 5 test), 겹침 없음
-m1_to_mN_commit_strategy: per-milestone   # M1 c27a050 / M2 fc3dfc1 각 conventional commit + 🗿 MoAI trailer; push at end
-regression_tests: "419 pass / 2 e2e file-load baseline 불변 / 기존 400 전량 통과"
-next_checkpoint: "pre-M3 사용자 checkpoint (반자율 progression). M3 NavIntent 교체는 전면 rollback 경계(단일 commit, 부분 revert 불가) — 사용자 승인 후 착수"
+total_run_phase_files: 37        # M1(8)+M2(9)+M3(20) — 겹침 없음(각 마일스톤 독립 파일)
+m1_to_mN_commit_strategy: per-milestone   # M1 c27a050 / M2 fc3dfc1 / M3 7975c7c 각 conventional commit + 🗿 MoAI trailer; push at end
+regression_tests: "430 pass (419 baseline + M3 신규 11) / 2 e2e file-load baseline 불변 / 기존 419 전량 통과, 신규 회귀 0"
+next_checkpoint: "M4 표·컨트롤 규약 (반자율 progression). M3 는 전면 rollback 경계 통과(단일 commit 7975c7c). M4~M7 순차 진행"
 ```
 
 ## §E.4 Sync-phase Audit-Ready Signal
