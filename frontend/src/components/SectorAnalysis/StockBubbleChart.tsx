@@ -300,6 +300,21 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
         minSpan: 20,   // 퍼센트 단위(0~100) — 최소 창 20% (REQ-BZ-001c). 분율 0.2가 아님에 주의
         maxSpan: 100,  // 최대 창 100% = 전체 범위
       }],
+      // SPEC-BUBBLE-ZOOM-001 REQ-BZ-007: 영역 선택 줌 (툴박스 내장) — 버튼 클릭 후 드래그로 박스 선택.
+      // 박스의 가로 범위만 X축 창에 적용 (yAxisIndex: false = Y축 제어 비활성, 공식 문서 방식) — Y는 RS 0-100 고정.
+      toolbox: {
+        right: 10,
+        top: 10,
+        iconStyle: { borderColor: '#9ca3af' },
+        feature: {
+          dataZoom: {
+            xAxisIndex: [0],
+            yAxisIndex: false,
+            filterMode: 'none',
+          },
+          restore: {},
+        },
+      },
       // sector_minor 기반 동적 범례 (모바일/데스크탑 배치 분기)
       legend: isMobile
         ? {

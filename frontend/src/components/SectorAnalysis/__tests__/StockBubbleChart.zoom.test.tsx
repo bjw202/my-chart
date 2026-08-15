@@ -125,4 +125,20 @@ describe('StockBubbleChart X축 줌 (SPEC-BUBBLE-ZOOM-001)', () => {
     h.zrHandlers['dblclick']!({ target: {} }) // 그래픽 요소 위
     expect(h.dispatchAction).not.toHaveBeenCalled()
   })
+
+  it('REQ-BZ-007: 툴박스 영역 선택 줌(X축만) 설정이 존재한다', () => {
+    render(<StockBubbleChart stocks={makeStocks(5)} sectorName="테스트" />)
+    const tb = h.option!.toolbox as {
+      feature: { dataZoom: { xAxisIndex: unknown; yAxisIndex: unknown }; restore: unknown }
+    } | undefined
+    expect(tb).toBeDefined()
+    expect(tb!.feature.dataZoom.xAxisIndex).toEqual([0])
+    expect(tb!.feature.dataZoom.yAxisIndex).toBe(false) // false = Y축 제어 비활성 (공식 문서 방식)
+    expect(tb!.feature.restore).toBeDefined()
+  })
+
+  it('REQ-BZ-007-1: 빈 데이터에서는 toolbox도 없다', () => {
+    render(<StockBubbleChart stocks={[]} sectorName="테스트" />)
+    expect(h.option!.toolbox).toBeUndefined()
+  })
 })
