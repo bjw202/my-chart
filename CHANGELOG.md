@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Bump 차트 Top-N 필터, 2026-08-16)
+
+- **섹터 분석 Bump 탭 Top 5 / Top 10 필터가 사실상 무력했던 결함** — 종전 구현은 `history.some(w => w.rank <= n)`("기간 중 한 번이라도 N위에 진입" 시맨틱스)이라 순위 변동이 큰 29개 섹터에서 Top 5 를 눌러도 20개 이상, Top 10 은 28개가 통과해 필터와 무관하게 라인이 그대로 다 그려졌다. 기준일(전체 history 중 가장 늦은 날짜 — 화면 상단 `기준일` 표기와 동일 기준) 순위가 N위 이내인 섹터만 남기도록 수정: Top 5 = 정확히 5개 라인, Top 10 = 10개. `latestDate` 는 필터 결과(`filteredSectors`)가 아니라 원본 `sectors` 에서 계산한다(필터 결과 의존 시 순환 발생)
+  - **신설된 회귀 가드**: `__tests__/BumpChart.topfilter.test.tsx` 4건 — 전체 선택 시 7개 섹터 불변, Top 5 선택 시 기준일 1~5위 정확히 5개(A/B/D/E/F), 과거 상위 섹터 제외(직전 주 2위·기준일 9위 섹터는 Top 5 에 남지 않음 — 되돌림 방지), Top 10 선택 시 기준일 1~10위만 포함
+  - **검증**: frontend vitest SectorAnalysis 스코프 **25 files / 250 tests passed**(직전 24 files / 246 tests, 신규 4) · `npx tsc --noEmit` exit 0 · 되돌림 대조 — 옛 `some()` 로직 복원 시 신규 테스트 3건 RED 실제 관측 후 복구 GREEN
+
 ### Added (SPEC-BUBBLE-ZOOM-001 v0.2.0, 2026-08-15~16)
 
 - **종목·섹터 버블 차트 X축 줌·팬·영역 선택 줌** — 수익률 아웃라이어 종목(예: 화장품 OEMODM +350%)이 X축 스케일을 독점하면 나머지 종목이 0% 부근에 뭉쳐 구분되지 않는 문제 해소. Y축(RS 0-100)은 고정해 해석 일관성 유지 (M1~M4, `run_commit_sha` `e61d89d`)

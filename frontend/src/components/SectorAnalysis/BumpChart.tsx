@@ -63,15 +63,26 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
     void loadData()
   }, [loadData])
 
-  // Top-N 필터 적용: 12주 중 한 번이라도 Top-N에 들어간 섹터만 표시
+  // 기준일 = 전체 섹터 history 중 가장 늦은 날짜 (툴바 상단 "기준일" 표기와 동일 기준)
+  // filteredSectors 가 아닌 sectors 기반으로 계산한다 — 필터 결과에 의존하면 순환이 된다.
+  const latestDate = useMemo((): string | null => {
+    const allDates = sectors.flatMap(s => s.history.map(w => w.date))
+    return allDates.length > 0 ? allDates.reduce((a, b) => (b > a ? b : a)) : null
+  }, [sectors])
+
+  // Top-N 필터 적용: 기준일(최신 날짜) 순위가 N위 이내인 섹터만 표시 → 정확히 N개 라인.
+  // 종전의 `history.some(w => w.rank <= n)` 은 "기간 중 한 번이라도 Top-N 진입"이라
+  // 순위 변동이 큰 29개 섹터에서 Top 5 가 20개 이상 통과해 필터가 사실상 무력화됐다.
   const filteredSectors = useMemo((): SectorHistoryItem[] => {
     if (topFilter === 'all') return sectors
+    if (latestDate === null) return sectors
 
     const n = topFilter as number
-    return sectors.filter(sector =>
-      sector.history.some(week => week.rank <= n)
-    )
-  }, [sectors, topFilter])
+    return sectors.filter(sector => {
+      const rank = sector.history.find(w => w.date === latestDate)?.rank
+      return rank !== undefined && rank <= n
+    })
+  }, [sectors, topFilter, latestDate])
 
   // X축 날짜 레이블: 모든 섹터 history 날짜의 합집합 (정렬·중복제거)
   // 단일 섹터 기반이 아닌 합집합을 쓰면 섹터별 history 차이가 있어도
