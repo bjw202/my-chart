@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-BUBBLE-ZOOM-001 v0.2.0, 2026-08-15~16)
+
+- **종목·섹터 버블 차트 X축 줌·팬·영역 선택 줌** — 수익률 아웃라이어 종목(예: 화장품 OEMODM +350%)이 X축 스케일을 독점하면 나머지 종목이 0% 부근에 뭉쳐 구분되지 않는 문제 해소. Y축(RS 0-100)은 고정해 해석 일관성 유지 (M1~M4, `run_commit_sha` `e61d89d`)
+  - **`e61d89d` — 휠 줌·드래그 팬·빈 공간 더블클릭 리셋**: ECharts `dataZoom type:'inside'` X축 전용(`yAxisIndex` 키 생략이 X축만 제어하는 관용구 — 음수 인덱스 비활성화 관용구는 존재하지 않음을 감사에서 확인), `filterMode:'none'`(줌 창 밖 버블도 클리핑 표시해 분포 맥락 유지), `minSpan:20/maxSpan:100`(퍼센트 단위 — 분율 0.2/1.0 오용 시 초기 창 클램프로 버블이 사라지는 회귀를 기존 sectorSwitch 테스트가 포착해 수정). 더블클릭 리셋은 zrender `dblclick`에서 `e.target` 부재(빈 공간)일 때만 `dispatchAction` — 버블 위 더블클릭은 기존 `onStockClick`/`onSectorClick` 반응속도 무손실(디바운스 없음)
+  - **`b9c0e4f` — 줌 계약 테스트**: 기존 `echarts-for-react` 모킹 관례(option 캡처)를 ref(`getEchartsInstance`/`getZr`) 노출형으로 확장 — dataZoom 계약, 빈 공간/버블 위 더블클릭 분기, 빈 데이터 부재, `notMerge` 불변 단언
+  - **`2827b5c` — 툴박스 영역 선택 줌 (REQ-BZ-007, v0.2.0)**: 수동 확인 후 "확대 후 이동" 2단계 조작 개선 요청으로 추가. 박스 드래그의 가로 범위만 X축 창에 적용(`toolbox.feature.dataZoom.yAxisIndex: false` — 공식 문서의 축 제외 방식), restore 버튼으로 전체 범위 즉시 복귀(더블클릭 리셋과 동등)
+  - **`a93a21e` — 상단 마진 확보**: 최대 버블 반지름(종목 26px·섹터 34px)+상단 라벨이 `grid.top`(50/40)을 넘어 제목/toolbox 영역을 침범하던 결함 수정(종목 70·섹터 48) — 수동 확인 중 사용자 보고, RED→GREEN 마진 계약 테스트로 고정
+  - **줌 중 Y축 순간 사선 현상**: ECharts가 dataZoom 창 변화 시 축 눈금/라벨도 update 애니메이션하는 부산물(공식 체인지로그에 명시된 동작)로 판명 — 최종 상태는 항상 올바르게 수렴하므로 사용자 결정으로 유지(무해)
+  - **검증**: frontend vitest **690 passed**(직전 672, 신규 18) · `npx tsc --noEmit` exit 0. 선행 실패 집합 불변 — e2e 로드 실패 2파일(`e2e/ai-report-deep.spec.ts`, `e2e/preset-flow.spec.ts`, 0 tests collected)은 SPEC 범위 밖 기존 결함
+  - **신설된 회귀 가드**: dataZoom 계약(inside/X축 전용/`yAxisIndex` 부재/`filterMode`/`min·maxSpan`), 빈 공간 더블클릭 `dispatchAction`·버블 위 미호출(REQ-BZ-003d), 빈 데이터 시 dataZoom·toolbox 부재, `notMerge` 불변, toolbox X축 전용 계약, 상단 마진 계약(종목 ≥70·섹터 ≥48)
+
 ### Fixed (post-release — 종목 탐색·섹터 버블 버그 수정 5건, 2026-08-14~15)
 
 - **사용자 라이브 사용 중 발견된 SPEC 범위 밖 결함 5건** — SPEC-SECTOR-UX-001 close(`9c7096c`/`14356ac`) 이후 보고. 4건은 해당 SPEC의 선언 범위 밖(백엔드 API 계약, `StatusBar` 푸터, 스크롤 레이아웃, `bubble.ts` 전송 계층)이라 SPEC frontmatter/HISTORY 변경 없이 post-release 수정으로 처리
