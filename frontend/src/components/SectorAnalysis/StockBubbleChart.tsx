@@ -1,6 +1,6 @@
 // 종목 버블 차트 컴포넌트 - ECharts scatter를 이용한 종목별 버블 시각화
 // X축: 가격변동률, Y축: RS Rating, 버블 크기: 거래대금, 색상: 산업명(중) sector_minor
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
@@ -287,6 +287,19 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
         axisLabel: { color: '#9ca3af' },
         splitLine: { lineStyle: { color: '#2d2d44', type: 'dashed' } },
       },
+      // SPEC-BUBBLE-ZOOM-001 REQ-BZ-001/002: X축 전용 dataZoom — 휠 줌 + 드래그 팬.
+      // yAxisIndex 키 생략이 X축만 제어하는 관용구다(음수 인덱스 비활성화 관용구는 없음 — 감사 D1).
+      // filterMode 'none': 줌 창 밖 버블도 클리핑되어 표시(제거하지 않음 — 분포 맥락 유지).
+      dataZoom: [{
+        type: 'inside',
+        xAxisIndex: 0,
+        zoomOnMouseWheel: true,
+        moveOnMouseMove: true,
+        moveOnMouseWheel: false,
+        filterMode: 'none',
+        minSpan: 20,   // 퍼센트 단위(0~100) — 최소 창 20% (REQ-BZ-001c). 분율 0.2가 아님에 주의
+        maxSpan: 100,  // 최대 창 100% = 전체 범위
+      }],
       // sector_minor 기반 동적 범례 (모바일/데스크탑 배치 분기)
       legend: isMobile
         ? {
@@ -345,6 +358,25 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
     }
   }, [stocks, sectorName, isMobile, colorMap, groupedData, ladder])
 
+  // SPEC-BUBBLE-ZOOM-001 REQ-BZ-003: 빈 공간 더블클릭 → X축 전체 범위 복원.
+  // REQ-BZ-003d: e.target 부재(빈 공간)에서만 동작 — 버블 위 더블클릭은 기존 click(onStockClick)을
+  // 그대로 유지한다(디바운스 없이 클릭 반응속도 무손실). 컴포넌트는 keep-mounted라 인스턴스가 유지되므로
+  // 이펙트는 마운트 시 1회만 등록하면 충분하다.
+  const chartRef = useRef<ReactECharts | null>(null)
+  useEffect(() => {
+    const chart = chartRef.current?.getEchartsInstance()
+    if (!chart) return
+    const zr = chart.getZr()
+    const handleDblClick = (e: { target?: unknown }) => {
+      if (e.target) return // 그래픽 요소(버블 등) 위 → 리셋하지 않음
+      chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
+    }
+    zr.on('dblclick', handleDblClick)
+    return () => {
+      zr.off('dblclick', handleDblClick)
+    }
+  }, [])
+
   const handleEvents = {
     click: (params: { data: { value: number[] } }) => {
       if (params?.data?.value) {
@@ -362,6 +394,7 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
           이 컴포넌트는 섹터 변경 시 언마운트되지 않고(AC-SUX-017 keep-mounted) ECharts
           인스턴스가 유지되므로 병합 잔존이 그대로 화면에 남는다. 제거 금지. */}
       <ReactECharts
+        ref={chartRef}
         option={option}
         notMerge={true}
         style={{ height: '500px', width: '100%' }}

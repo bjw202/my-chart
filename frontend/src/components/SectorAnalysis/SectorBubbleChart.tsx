@@ -1,7 +1,7 @@
 // 섹터 버블 차트 컴포넌트 - ECharts scatter를 이용한 섹터별 버블 시각화
 // X축: 초과수익률, Y축: RS 평균, 버블 크기: 거래대금(로그 고정눈금), 색상: 기간 수익률(발산형 5단계)
 // SPEC-SECTOR-UX-001 M5: VZ-1(크기)·VZ-2(범례)·VZ-3(결측 점선)·VZ-4(축 포인터 삭제)·VZ-5(기준선 라벨)·VZ-6(축 범위)·REQ-SUX-056(발산형 색상)
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
@@ -162,6 +162,18 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
         axisLabel: { color: '#9ca3af' },
         splitLine: { lineStyle: { color: '#2d2d44', type: 'dashed' } },
       },
+      // SPEC-BUBBLE-ZOOM-001 REQ-BZ-001/002: X축 전용 dataZoom — 휠 줌 + 드래그 팬 (StockBubbleChart와 동일 계약).
+      // yAxisIndex 키 생략이 X축만 제어하는 관용구다(감사 D1). filterMode 'none': 줌 창 밖 버블도 클리핑 표시.
+      dataZoom: [{
+        type: 'inside',
+        xAxisIndex: 0,
+        zoomOnMouseWheel: true,
+        moveOnMouseMove: true,
+        moveOnMouseWheel: false,
+        filterMode: 'none',
+        minSpan: 20,   // 퍼센트 단위(0~100) — 최소 창 20% (REQ-BZ-001c). 분율 0.2가 아님에 주의
+        maxSpan: 100,  // 최대 창 100% = 전체 범위
+      }],
       series: [
         {
           type: 'scatter' as const,
@@ -222,6 +234,23 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
     }
   }, [sectors, ladder, benchmarkLabel])
 
+  // SPEC-BUBBLE-ZOOM-001 REQ-BZ-003: 빈 공간 더블클릭 → X축 전체 범위 복원 (StockBubbleChart와 동일 계약).
+  // REQ-BZ-003d: e.target 부재(빈 공간)에서만 동작 — 버블 위 더블클릭은 기존 click(onSectorClick) 유지.
+  const chartRef = useRef<ReactECharts | null>(null)
+  useEffect(() => {
+    const chart = chartRef.current?.getEchartsInstance()
+    if (!chart) return
+    const zr = chart.getZr()
+    const handleDblClick = (e: { target?: unknown }) => {
+      if (e.target) return // 그래픽 요소(버블 등) 위 → 리셋하지 않음
+      chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
+    }
+    zr.on('dblclick', handleDblClick)
+    return () => {
+      zr.off('dblclick', handleDblClick)
+    }
+  }, [])
+
   // 섹터 클릭 핸들러
   const handleEvents = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -239,6 +268,7 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
       {/* notMerge 필수 — 사유는 StockBubbleChart 의 @MX:NOTE 참조(섹터/모집단 변경 시
           series 인덱스 병합으로 이전 데이터가 잔존한다). */}
       <ReactECharts
+        ref={chartRef}
         option={option}
         notMerge={true}
         style={{ height: '500px', width: '100%' }}
