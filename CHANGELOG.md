@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (post-release — 종목 탐색·섹터 버블 버그 수정 5건, 2026-08-14~15)
+
+- **사용자 라이브 사용 중 발견된 SPEC 범위 밖 결함 5건** — SPEC-SECTOR-UX-001 close(`9c7096c`/`14356ac`) 이후 보고. 4건은 해당 SPEC의 선언 범위 밖(백엔드 API 계약, `StatusBar` 푸터, 스크롤 레이아웃, `bubble.ts` 전송 계층)이라 SPEC frontmatter/HISTORY 변경 없이 post-release 수정으로 처리
+  - **`eb93f7a` — 푸터 종목 수가 필터 결과와 불일치**: `StatusBar`가 `useScreen()`의 전역 스크리닝 총계(`results.total`)만 읽어, 섹터 필터가 걸린 종목 탐색 화면에서 헤더·Stage 분포 바·표는 44종목을 가리키는데 푸터만 52개로 표시됐다. 필터 술어를 `frontend/src/components/StockExplorer/stockFilter.ts`(신규)로 추출해 `StockTable`·`StockExplorer`가 동일 함수를 호출하도록 하고, `ScreenContext`에 표시 중인 모집단을 게시하는 `visibleCount` 채널을 추가(`frontend/src/contexts/ScreenContext.tsx`)해 게시자가 있으면 푸터가 그 값을 따르도록 배선(`frontend/src/components/StatusBar/StatusBar.tsx`). 부수적으로 `StockExplorer`/`StockTable`이 서로 다르게 판정하던 미분류 조건(`stage == null` vs `1~4` 범위 밖)도 단일 술어로 해소
+  - **`bfeeaf4` — 종목 표 세로 스크롤 부재**: `StockExplorer`의 클래스 없는 래퍼 `<div>`가 flex 컬럼의 일반 block 자식이라 콘텐츠 높이(Playwright 실측 75,239px)로 팽창, 안쪽 `.stock-table-wrapper`의 `flex:1`이 무효화되어 스크롤 컨테이너가 성립하지 않았다. `.stock-table-fill`(`flex:1; min-height:0`, `frontend/src/styles/global.css`) 부여 + `.stock-table-wrapper`에 `min-height:0` 추가로 복구(실측 client 75,239→634, scrollable false→true)
+  - **`1405bb3` — 섹터 전환 시 이전 섹터 버블 잔존**: `echarts-for-react`는 `notMerge` 없이 `setOption`을 호출하면 series를 **인덱스 단위로 병합**한다. 섹터 분석 서브탭이 keep-mounted(AC-SUX-017)라 언마운트되지 않아, 기계(3계열)→스마트폰(2계열) 전환 시 인덱스 2(농기계)가 생존해 건설기계 종목(혜인·대동)이 스마트폰 버블에 표시됐다. `StockBubbleChart.tsx`·`SectorBubbleChart.tsx`에 `notMerge={true}` 추가(`RRGChart`/`BumpChart`/`TreemapHeatmap`은 이미 보유)
+  - **`5629972` — `/sectors/bubble` market 파라미터 계약 불일치**: 7개 섹터 엔드포인트(`backend/routers/sectors.py`) 중 이 하나만 `^(KOSPI|KOSDAQ)$`(대문자, `all` 불가)를 요구해, 소문자로 표준화된 프론트가 KOSPI/KOSDAQ 선택 시 422를 받았다. 패턴을 형제 6개와 동일한 `^(all|kospi|kosdaq)$`로 정렬. 패턴만으로는 부족했다 — `my_chart/analysis/sector_advanced.py`의 `compute_sector_bubble`이 `_normalize_market_filter` 없이 market을 raw로 `backend/services/sector_advanced_service.py`에 넘기던 유일한 호출부라, 정규화를 배선하지 않으면 `market_filter="all"`이 (대문자 원천인) `stock_meta.시장구분`과 매칭되지 않아 **빈 섹터 목록에 HTTP 200**을 반환했을 것(실측 확인)
+  - **`33b404b` — 종목 버블 뷰 시장 토글 무동작**: 원인 2건이 겹쳐 있었다 — `frontend/src/api/bubble.ts`의 `fetchStockBubble`이 `market` 파라미터를 아예 받지 않았고, stock 쿼리 키에도 `market`이 없어 `useQuery`가 재조회하지 않았다(각각 독립 변형으로 실증 — 하나만 고치면 여전히 무동작). 섹터 목록 뷰는 정상(키·인자 모두 배선됨)이었고 드릴다운 뷰만 고장. `frontend/src/components/SectorAnalysis/BubbleChart.tsx` 배선과 함께, `market='all'` → `null` 매핑·`!== 'ALL'` 대문자 비교 등 옛 규약 잔재를 제거하고 소문자 3값(`all`/`kospi`/`kosdaq`) 단일 규약으로 통일
+- **검증**: frontend vitest **672 passed**(직전 661) · tsc 28건(비증가) · `TS2353` 0건 · backend pytest **917 passed**(직전 910), 회귀 0건. 선행 실패 집합 불변 — 프론트 e2e 로드 실패 2파일(`e2e/ai-report-deep.spec.ts`, `e2e/preset-flow.spec.ts`, 0 tests collected), 백엔드 8 failed(`test_screen_service`×3, `test_rs_line`×2, `test_meta_service`×2, `test_api`×1) + `tests/fnguide/` 25 errors — 전부 SPEC 범위 밖 기존 결함, 이번 5건과 무관
+- **신설된 회귀 가드**: 푸터 표시 카운트(3경로), 스크롤 계약(부모 클래스 + CSS 선언), 섹터 전환 시 잔존 series(실 ECharts SVG 판독), `/sectors/bubble` market 계약(소문자 3값 수용 + 상태코드 일치 + 거래대금 분할 불변식 `kospi + kosdaq == all`), 종목 버블 market 배선(쿼리 키 + fetch 인자)
+- **동작 변경 고지**: `/sectors/bubble`에 대문자 `KOSPI`/`KOSDAQ`을 보내면 이제 422다(형제 6개 엔드포인트와 동일해진 결과 — 저장소 내 대문자 호출자·테스트 없음을 grep으로 확인). `market` 파라미터 생략 시 응답 `market` 에코가 `null` → `"all"`로 변경
+
 ### Added (SPEC-SECTOR-UX-001 v0.4.0, 2026-08-14)
 
 - **섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약** (M1~M7, `run_commit_sha` `ccb9068`)
