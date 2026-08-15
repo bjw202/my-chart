@@ -131,7 +131,8 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
 
     return {
       backgroundColor: '#1a1a2e',
-      grid: { left: 60, right: 40, top: 40, bottom: 60 },
+      // top: 48 — 최대 버블 반지름(34)의 상단 돌출이 toolbox 밴드(10~30px)를 과도히 침범하지 않게 하는 여백
+      grid: { left: 60, right: 40, top: 48, bottom: 60 },
       xAxis: {
         type: 'value',
         name: `${benchmarkLabel} 대비 초과수익률 %`,

@@ -132,4 +132,10 @@ describe('SectorBubbleChart X축 줌 (SPEC-BUBBLE-ZOOM-001)', () => {
     render(<SectorBubbleChart sectors={[]} onSectorClick={vi.fn()} period="1w" />)
     expect(h.option!.toolbox).toBeUndefined()
   })
+
+  it('상단 마진 계약: grid.top ≥ 48 — 최대 버블 반지름(34)이 toolbox 밴드(10~30px)를 과도히 침범하지 않는다', () => {
+    render(<SectorBubbleChart sectors={makeSectors(5)} onSectorClick={vi.fn()} period="1w" />)
+    const grid = h.option!.grid as { top: number }
+    expect(grid.top).toBeGreaterThanOrEqual(48)
+  })
 })

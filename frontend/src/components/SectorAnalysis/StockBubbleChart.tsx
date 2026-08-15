@@ -257,9 +257,11 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
         textStyle: { color: '#9ca3af', fontSize: 13, fontWeight: 'normal' },
       },
       // 모바일/데스크탑 grid 분기
+      // top: 70 — 최대 버블 반지름(26)+상단 라벨(~13)이 제목(하단 ~24px)을 침범하지 않는 최소 여백
+      // (수동 확인 중 "종목 버블이 제목 영역 침범" 버그로 확정 — 2026-08-15)
       grid: isMobile
-        ? { left: 60, right: 60, top: 50, bottom: 80 }
-        : { left: 60, right: 120, top: 50, bottom: 60 },
+        ? { left: 60, right: 60, top: 70, bottom: 80 }
+        : { left: 60, right: 120, top: 70, bottom: 60 },
       xAxis: {
         type: 'value',
         name: '가격 변동률 %',

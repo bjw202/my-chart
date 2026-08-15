@@ -141,4 +141,10 @@ describe('StockBubbleChart X축 줌 (SPEC-BUBBLE-ZOOM-001)', () => {
     render(<StockBubbleChart stocks={[]} sectorName="테스트" />)
     expect(h.option!.toolbox).toBeUndefined()
   })
+
+  it('상단 마진 계약: grid.top ≥ 70 — 최대 버블 반지름(26)+라벨(13)이 제목(하단 ~24px)을 침범하지 않는다', () => {
+    render(<StockBubbleChart stocks={makeStocks(5)} sectorName="테스트" />)
+    const grid = h.option!.grid as { top: number }
+    expect(grid.top).toBeGreaterThanOrEqual(70)
+  })
 })
