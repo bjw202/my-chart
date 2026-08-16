@@ -165,6 +165,9 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
       },
       // SPEC-BUBBLE-ZOOM-001 REQ-BZ-001/002: X축 전용 dataZoom — 휠 줌 + 드래그 팬 (StockBubbleChart와 동일 계약).
       // yAxisIndex 키 생략이 X축만 제어하는 관용구다(감사 D1). filterMode 'none': 줌 창 밖 버블도 클리핑 표시.
+      // @MX:WARN: [AUTO] minSpan/maxSpan 은 퍼센트 단위(0~100)다. 분율(0.2/1.0)로 쓰지 말 것.
+      // @MX:REASON: 분율로 넣으면 초기 창이 0.2%로 클램프되어 버블이 전부 사라진다(실제 회귀 발생).
+      // @MX:SPEC: SPEC-BUBBLE-ZOOM-001 REQ-BZ-001c
       dataZoom: [{
         type: 'inside',
         xAxisIndex: 0,

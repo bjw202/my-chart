@@ -1,4 +1,4 @@
-// @MX:ANCHOR: [AUTO] BumpChart는 섹터 순위 변동을 12주 bump chart(ranked line chart)로 시각화
+// @MX:ANCHOR: [AUTO] BumpChart는 섹터 순위 변동을 가변 구간(8/12/26주, 기본 12주) bump chart(ranked line chart)로 시각화
 // @MX:REASON: SectorAnalysis에서 bump 서브탭 활성화 시 마운트; onSectorClick 통해 Table 탭 연동
 // @MX:SPEC: SPEC-TOPDOWN-002D
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -63,8 +63,11 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
     void loadData()
   }, [loadData])
 
-  // 기준일 = 전체 섹터 history 중 가장 늦은 날짜 (툴바 상단 "기준일" 표기와 동일 기준)
-  // filteredSectors 가 아닌 sectors 기반으로 계산한다 — 필터 결과에 의존하면 순환이 된다.
+  // @MX:ANCHOR: [AUTO] Top-N 필터 기준선 — latestDate 는 반드시 원본 sectors 에서 도출한다.
+  // @MX:REASON: filteredSectors 로 바꾸면 latestDate → filteredSectors → latestDate 순환 의존이 되고,
+  //   Top-N 판정 기준일이 필터 결과에 따라 흔들려 라인 수가 비결정적으로 변한다.
+  //   기준일 = 전체 섹터 history 중 가장 늦은 날짜(툴바 상단 "기준일" 표기와 동일 기준).
+  // @MX:TEST: __tests__/BumpChart.topfilter.test.tsx
   const latestDate = useMemo((): string | null => {
     const allDates = sectors.flatMap(s => s.history.map(w => w.date))
     return allDates.length > 0 ? allDates.reduce((a, b) => (b > a ? b : a)) : null
