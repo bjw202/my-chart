@@ -150,12 +150,35 @@ Test Files  2 failed | 81 passed (83)
 
 9/9 되돌림 RED(또는 스캔 변화) 관측 — 항진명제 없음.
 
+### review 결함 수정 (접힘 키 잔존, AC-008/REQ-CSG-006 보강)
+
+- **결함**: 체크 그룹 소멸 시 `collapsedCheckedSectors`의 접힘 키가 잔존 — 재체크로 그룹이 재등장해도 `aria-expanded="false"`로 시작해 새로 체크한 행이 보이지 않음 (review t1 실증, 사용자 승인 수정)
+- **RED** (`npx vitest run src/components/StockList/__tests__/StockList.grouping.test.tsx -t "재등장"`):
+
+```text
+Test Files  1 failed (1)
+     Tests  1 failed | 14 skipped (15)
+AssertionError: expected 'false' to be 'true'
+ ❯ src/components/StockList/__tests__/StockList.grouping.test.tsx:426:53
+```
+
+- **수정**: `StockList.tsx`에 prune `useEffect` 추가 (+10행) — `buildCheckedGroups`로 살아있는 키 산출, 잔존 키 존재 시에만 조건부 setter 호출. 전체 탭 경로(`flatItems`/`collapsedSectors`)·두 Set 분리 원칙 불변
+- **GREEN** (동일 명령):
+
+```text
+Test Files  1 passed (1)
+     Tests  1 passed | 14 skipped (15)
+```
+
+- **회귀**: StockList 스위트 `Test Files 3 passed (3) / Tests 27 passed (27)` · `tsc --noEmit` exit 0 · 전체 `npx vitest run` `Test Files 2 failed | 81 passed (83) / Tests 721 passed (721)` (2 failed = 사전 존재 e2e Playwright 기준선 노이즈, M4b와 동일)
+- **커밋**: `e620657` `fix(SPEC-CHECKED-SECTOR-GROUP-001): 접힘 키 그룹 소멸 정리 — 재등장 그룹 펼침 보장` (2 files, +39 · pre-commit pytest 타임아웃으로 `SKIP_MOAI_PRECOMMIT=1` 문서화 오버라이드 사용 — `--no-verify` 아님)
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 - run_status: audit-ready
 - run_complete_at: 2026-08-17
-- baseline_commits (Hybrid Trunk main-direct, 미push 상태에서 검증): M0 `3acf05a` (characterization, 단독) · M1 `aeb249f` (+`status: draft → in-progress`) · plan산출물 `31c8fb6` · M2 `06d251f` (StockList.tsx +33/−11) · M3 `f819deb` + lint `e8b5a74` · evidence commit (본 §E.2/§E.3 기록)
-- ac_matrix: **15/15 PASS** — BLOCKER 9 (001·002·003·005·006·008·011·015·016) / MAJOR 5 (004·007·009·010·014) / MINOR 1 (013). AC-012 결번 (철회).
+- baseline_commits (Hybrid Trunk main-direct): M0 `3acf05a` (characterization, 단독) · M1 `aeb249f` (+`status: draft → in-progress`) · plan산출물 `31c8fb6` · M2 `06d251f` (StockList.tsx +33/−11) · M3 `f819deb` + lint `e8b5a74` · evidence `ac907b9` · **review 결함 수정 `e620657` (접힘 키 prune + AC-008 보강 재등장 테스트 — §E.2 최신 서브섹션)**
+- ac_matrix: **15/15 PASS + 결함 보강 1건 PASS** — BLOCKER 9 (001·002·003·005·006·008·011·015·016) / MAJOR 5 (004·007·009·010·014) / MINOR 1 (013) · review 실증 결함(접힘 키 잔존) AC-008/REQ-CSG-006 보강 단언 추가. AC-012 결번 (철회).
 - 되돌림 실증: **16/16 RED 관측** (M4a AC-001~007 + M4b AC-008~016, AC-013 2-leg 포함) — 항진명제 0건. AC-004 localeCompare('ko') 보조축은 실측 결과 **게이팅**으로 승격 (ICU collation이 한글을 Latin 선행 — REQ-CSG-003 근거 실증).
 - coverage (v8, `npx vitest run src/components/StockList --coverage`): `sectorKey.ts` lines 100% · `StockList.tsx` lines 86.66% — 게이트 ≥85% 충족 (attribution: this run, tree e8b5a74).
 - regression: 전체 스위트 `npx vitest run` → **Tests 720/720 passed**. Test Files 2 failed = e2e 2종(ai-report-deep·preset-flow)의 Playwright/vitest harness mismatch — **사전 존재 기준선 노이즈, 본 SPEC 무관 실증**: 커밋 범위 e9c049b..HEAD에서 e2e/vite.config 변경 0건 (마지막 터처 b775612 = SPEC-PRESET-001). Gap으로 기록, 조작하지 않음.
@@ -163,7 +186,7 @@ Test Files  2 failed | 81 passed (83)
 - deps: `git diff e9c049b --stat -- frontend/package*.json` → 0 changed lines.
 - static scan 3-leg (bash 재실행으로 독립 관측): (a) EMPTY exit 1 ✓ (b) 정확히 1 line `StockList.tsx:234` exit 0 ✓ (c) 0 lines ✓.
 - gaps: ① §0.2 성능 사전-구현 baseline 미포착 (M2 선행 스폰 누락 — post-implementation 단일 jsdom 샘플만 기록: 탭 전환 46.08ms · uncheck 3.94ms). ② StockList.tsx branch coverage 80.76% (lines 게이트는 충족).
-- disclosures: pre-commit moai gate가 TS-only 변경에 pytest 타임아웃으로 4회 실패 → hook의 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드로 커밋 (전 건 대체 증거 tsc+eslint+vitest 수집, `--no-verify` 미사용). 스폰 실패 2건(초기 통합 스폰·M3) autocompact thrashing → 마일스톤 분할 재스폰(사용자 승인)으로 회복; M3은 스폰이 남긴 95% 완성본을 orchestrator가 마무리(exportText 리터럴 실측 확정·stale 참조 3건·시나리오 순서 1건·lint 정합).
+- disclosures: pre-commit moai gate가 TS-only 변경에 pytest 타임아웃으로 5회 실패 → hook의 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드로 커밋 (전 건 대체 증거 tsc+eslint+vitest 수집, `--no-verify` 미사용). 스폰 실패 3건(초기 통합 스폰·M3·결함 수정 fix1) autocompact thrashing → 마일스톤 분할 재스폰(사용자 승인)으로 회복; M3·fix1은 스폰이 남긴 완성본(95%·100% — fix1은 커밋까지 완료 상태로 사망)을 orchestrator가 검증·마무리(exportText 리터럴 실측 확정·stale 참조 3건·시나리오 순서 1건·lint 정합·§E.3 갱신).
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
