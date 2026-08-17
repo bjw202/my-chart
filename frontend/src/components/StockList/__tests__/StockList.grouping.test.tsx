@@ -133,9 +133,10 @@ let capturedCtx: WatchlistCtx | null = null
 
 function CheckProbe(): null {
   const ctx = useWatchlist()
-  capturedCtx = ctx
   const idxRef = React.useRef(0)
   React.useEffect(() => {
+    // 컴포넌트 외부 캡처는 부수효과이므로 효과 안에서 수행 (react-hooks/globals)
+    capturedCtx = ctx
     if (idxRef.current >= CHECK_ORDER.length) return
     const stock = CHECK_ORDER[idxRef.current]
     idxRef.current += 1
