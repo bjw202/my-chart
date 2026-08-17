@@ -407,14 +407,19 @@ describe('StockList 체크 탭 그룹핑 통합 (SPEC-CHECKED-SECTOR-GROUP-001 M
     expect(finHeader).toBeDefined()
     fireEvent.click(finHeader!)
     expect(findHeader(container, '금융')?.getAttribute('aria-expanded')).toBe('false')
-    // 접힘 → 행이 렌더 트리에 부재하므로 x 버튼 경로 불가 (아래 해제는 컨텍스트 API 사용)
-    expect(findCheckedRow(container, '105560')).toBeUndefined()
+    // 접힘 → 체크 탭에서는 행이 렌더에 부재해 x 경로 불가.
+    // 실제 UI 도달 경로는 전체 탭 체크박스 해제다 (이벤트 경로 prune 커버 대상)
 
-    // (2) 마지막 체크 종목 해제 — x 버튼과 동일한 컨텍스트 함수(uncheckStock)로 호출
-    act(() => {
-      capturedCtx!.uncheckStock('105560')
-    })
-    // 그룹 소멸 — AC-008과 동일 관측
+    // (2) 마지막 체크 종목 해제 — 전체 탭 체크박스(.stock-item-check) 클릭 = 진입점 2
+    fireEvent.click(getTabButton(container, 'all'))
+    const kbCheck = Array.from(container.querySelectorAll('.stock-item-check')).find(
+      el => el.closest('.stock-item')?.querySelector('.stock-item-code')?.textContent === '105560',
+    )
+    expect(kbCheck).toBeDefined()
+    fireEvent.click(kbCheck!)
+
+    // 체크 탭 복귀 → 그룹 소멸 (AC-008과 동일 관측)
+    fireEvent.click(getTabButton(container, 'checked'))
     expect(findHeader(container, '금융')).toBeUndefined()
 
     // (3) 재체크 → 그룹 재등장: 펼침(▼) 상태로 시작해야 하고 새로 체크한 행이 보여야 한다
@@ -426,6 +431,46 @@ describe('StockList 체크 탭 그룹핑 통합 (SPEC-CHECKED-SECTOR-GROUP-001 M
     expect(reHeader?.getAttribute('aria-expanded')).toBe('true')
     expect(reHeader?.querySelector('.sector-header-arrow')?.textContent).toBe('▼')
     expect(findCheckedRow(container, '105560')).toBeDefined()
+  })
+
+  it('AC-CSG-008 보강(과잉정리 방지·경계 불변): 부분 해제는 접힘을 유지하고 전체 탭 접힘은 영향받지 않는다', () => {
+    const { container } = renderCheckedTab()
+
+    // (i) 전체 탭에서 AI 접기 (전체 탭 접힘 상태 — 경계 불변 관찰 대상)
+    fireEvent.click(getTabButton(container, 'all'))
+    const allAiHeader = findHeader(container, 'AI')
+    expect(allAiHeader).toBeDefined()
+    fireEvent.click(allAiHeader!)
+    expect(findHeader(container, 'AI')?.getAttribute('aria-expanded')).toBe('false')
+
+    // (ii) 체크 탭에서 내수 > 리조트(4종목) 접기
+    fireEvent.click(getTabButton(container, 'checked'))
+    const resortHeader = findHeader(container, '내수 > 리조트')
+    expect(resortHeader).toBeDefined()
+    fireEvent.click(resortHeader!)
+    expect(findHeader(container, '내수 > 리조트')?.getAttribute('aria-expanded')).toBe('false')
+
+    // (iii) 전체 탭 체크박스로 강원랜드 해제 — 부분 해제(그룹에 3종목 잔존)
+    fireEvent.click(getTabButton(container, 'all'))
+    const gangwonCheck = Array.from(container.querySelectorAll('.stock-item-check')).find(
+      el => el.closest('.stock-item')?.querySelector('.stock-item-code')?.textContent === '035250',
+    )
+    expect(gangwonCheck).toBeDefined()
+    fireEvent.click(gangwonCheck!)
+
+    // (iv) 체크 탭: 그룹 잔존 + 접힘 유지 (과잉정리 방지) + 잔여 3종목 행 미렌더
+    fireEvent.click(getTabButton(container, 'checked'))
+    const afterHeader = findHeader(container, '내수 > 리조트')
+    expect(afterHeader).toBeDefined()
+    expect(afterHeader?.getAttribute('aria-expanded')).toBe('false')
+    expect(afterHeader?.querySelector('.sector-header-count')?.textContent).toBe('3')
+    expect(findCheckedRow(container, '035250')).toBeUndefined() // 접힘 + 해제된 행 모두 부재
+    expect(container.querySelector('.stock-list-tab')?.textContent !== null).toBe(true)
+    expect(getTabButton(container, 'checked').textContent).toBe('체크(6)')
+
+    // (v) 전체 탭: AI 접힘 상태 불변 (체크 해제가 전체 탭 접힘 Set에 영향 없음)
+    fireEvent.click(getTabButton(container, 'all'))
+    expect(findHeader(container, 'AI')?.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('AC-CSG-009: 전체 탭에서 접은 섹터가 체크 탭에서는 펼침 상태다 (전파 없음 →)', () => {

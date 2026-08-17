@@ -9,7 +9,7 @@ import { useScrollSync } from '../../hooks/useScrollSync'
 import type { StockItem as StockItemData, SectorGroup as SectorGroupData } from '../../types/stock'
 import { SectorGroupHeader } from './SectorGroup'
 import { StockItemRow } from './StockItem'
-import { buildCheckedGroups } from './sectorKey'
+import { buildCheckedGroups, sectorKeyOf } from './sectorKey'
 
 // Virtual list item types
 type ListItem =
@@ -110,15 +110,36 @@ export function StockList(): React.ReactElement {
     listRef.current?.resetAfterIndex(0)
   }, [viewMode])
 
-  // 소멸한 체크 그룹의 접힘 키 정리 — 체크 목록에서 그룹이 사라지면 해당 키를 제거해
-  // 재등장하는 그룹이 펼침 상태로 시작하게 한다 (접힘 키 잔존 결함, AC-008 보강)
-  useEffect(() => {
-    const liveKeys = new Set(
-      buildCheckedGroups(Array.from(checkedStocks.values())).map((g) => g.sectorName),
+  // 소멸한 체크 그룹의 접힘 키 정리 — 해제 이벤트 경로에서 수행한다 (이펙트 내 setState
+  // lint 회귀 대신 이벤트 핸들러에서 제거). 해제 직전 상태(클로저 checkedStocks) 기준으로
+  // 그 종목이 그룹의 마지막 체크였을 때만 키를 지운다 — 부분 해제는 접힘 상태를 유지한다.
+  const pruneCollapseKeyAfterUncheck = useCallback((code: string): void => {
+    const stock = checkedStocks.get(code)
+    if (!stock) return
+    const key = sectorKeyOf(stock)
+    const groupStillAlive = Array.from(checkedStocks.values()).some(
+      (s) => s.code !== code && sectorKeyOf(s) === key,
     )
-    if (!Array.from(collapsedCheckedSectors).some((key) => !liveKeys.has(key))) return
-    setCollapsedCheckedSectors((prev) => new Set(Array.from(prev).filter((key) => liveKeys.has(key))))
+    if (groupStillAlive || !collapsedCheckedSectors.has(key)) return
+    setCollapsedCheckedSectors((prev) => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
   }, [checkedStocks, collapsedCheckedSectors])
+
+  // 해제 진입점 1 — 체크 탭 행의 x 버튼
+  const handleUncheckFromCheckedTab = useCallback((code: string): void => {
+    uncheckStock(code)
+    pruneCollapseKeyAfterUncheck(code)
+  }, [uncheckStock, pruneCollapseKeyAfterUncheck])
+
+  // 해제 진입점 2 — 전체 탭 행의 체크박스 (해제 방향일 때만 정리)
+  const handleToggleCheckFromAllTab = useCallback((stock: StockItemData): void => {
+    const wasChecked = isChecked(stock.code)
+    toggleStock(stock)
+    if (wasChecked) pruneCollapseKeyAfterUncheck(stock.code)
+  }, [isChecked, toggleStock, pruneCollapseKeyAfterUncheck])
 
   // Reset list size cache when items change
   useEffect(() => {
@@ -181,7 +202,7 @@ export function StockList(): React.ReactElement {
             </div>
             <button
               className="watchlist-remove-btn"
-              onClick={() => uncheckStock(item.stock.code)}
+              onClick={() => handleUncheckFromCheckedTab(item.stock.code)}
               title="해제"
             >
               x
@@ -197,11 +218,11 @@ export function StockList(): React.ReactElement {
           isChecked={isChecked(item.stock.code)}
           style={style}
           onClick={() => onStockSelect(item.globalIndex)}
-          onToggleCheck={() => toggleStock(item.stock)}
+          onToggleCheck={() => handleToggleCheckFromAllTab(item.stock)}
         />
       )
     },
-    [displayItems, collapsedSectors, collapsedCheckedSectors, selectedIndex, onStockSelect, toggleSector, isChecked, toggleStock, uncheckStock, viewMode]
+    [displayItems, collapsedSectors, collapsedCheckedSectors, selectedIndex, onStockSelect, toggleSector, isChecked, handleUncheckFromCheckedTab, handleToggleCheckFromAllTab, viewMode]
   )
 
   if (viewMode === 'all' && flatItems.length === 0) {

@@ -173,6 +173,15 @@ Test Files  1 passed (1)
 - **회귀**: StockList 스위트 `Test Files 3 passed (3) / Tests 27 passed (27)` · `tsc --noEmit` exit 0 · 전체 `npx vitest run` `Test Files 2 failed | 81 passed (83) / Tests 721 passed (721)` (2 failed = 사전 존재 e2e Playwright 기준선 노이즈, M4b와 동일)
 - **커밋**: `e620657` `fix(SPEC-CHECKED-SECTOR-GROUP-001): 접힘 키 그룹 소멸 정리 — 재등장 그룹 펼침 보장` (2 files, +39 · pre-commit pytest 타임아웃으로 `SKIP_MOAI_PRECOMMIT=1` 문서화 오버라이드 사용 — `--no-verify` 아님)
 
+### review 결함 수정 2차 — lint 회귀 (이벤트 경로 전환, 사용자 승인·review 권장안)
+
+- **lint 회귀**: `e620657`의 prune `useEffect`가 `react-hooks/set-state-in-effect` 위반 — review 대조 실증: `ac907b9` eslint exit 0 → `0234112` exit 1 (`StockList.tsx:120`).
+- **전환**: useEffect prune 제거 → 이벤트 경로. `pruneCollapseKeyAfterUncheck` 헬퍼(해제 직전 클로저 상태 기준, 그 종목이 그룹 마지막 체크일 때만 키 제거)를 두 진입점 래퍼에서 호출 — ① 체크 탭 x 버튼 `handleUncheckFromCheckedTab`, ② 전체 탭 체크박스 `handleToggleCheckFromAllTab`(해제 방향만). 이펙트 내 setState 소거로 lint clean.
+- **테스트 교정 (실제 UI 경로)**: 재등장 it의 해제가 `capturedCtx.uncheckStock` 직접 호출이었으나 이벤트 방식 하에서 래퍼를 통과하지 않음 → **전체 탭 체크박스(`.stock-item-check`) 클릭 경로로 교정**. 근거: 접힘 키가 존재하는 상태에서 그룹 소멸의 실제 UI 도달 경로는 전체 탭 체크박스뿐 — 체크 탭 x는 그룹이 펼쳐 보여야 누를 수 있고 그 순간 접힘 키는 이미 소멸해 prune이 no-op다(안전망으로 유지).
+- **신규 it (review probe 시나리오 보강)**: 과잉정리 방지(부분 해제 시 그룹 잔존 + 접힘 유지 + 카운트 4→3 + 해제 행 부재) + 전체 탭 접힘 경계 불변(체크 해제가 `collapsedSectors`에 무영향).
+- **검증 (orchestrator 직접 관측, this run this tree)**: `npx eslint src/components/StockList --max-warnings=0` → **exit 0 (파일 리다이렉트 측정)** · StockList `Tests 28 passed (28)` · 전체 `npx vitest run` `Tests 722 passed (722)` (e2e 2파일 사전 노이즈 불변) · `npx tsc --noEmit` exit 0.
+- **범위 공개 — 제3 진입점**: `ChartGrid/ChartCell.tsx:55,358`이 `useWatchlist()`의 `toggleStock`을 StockList 밖에서 직접 소비한다(실측). 이벤트 래퍼 방식은 컴포넌트 경계 밖 경로를 커버하지 못하므로 **ChartCell에서 마지막 체크 해제 시 동일 잔존 결함이 이론적으로 재발** 가능 — 본 수정은 lead 지시 범위(두 진입점)를 준수했고, 제3 경로 처분(커버 확장 여부)은 review/lead 판단으로 남긴다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 - run_status: audit-ready
@@ -186,7 +195,7 @@ Test Files  1 passed (1)
 - deps: `git diff e9c049b --stat -- frontend/package*.json` → 0 changed lines.
 - static scan 3-leg (bash 재실행으로 독립 관측): (a) EMPTY exit 1 ✓ (b) 정확히 1 line `StockList.tsx:234` exit 0 ✓ (c) 0 lines ✓.
 - gaps: ① §0.2 성능 사전-구현 baseline 미포착 (M2 선행 스폰 누락 — post-implementation 단일 jsdom 샘플만 기록: 탭 전환 46.08ms · uncheck 3.94ms). ② StockList.tsx branch coverage 80.76% (lines 게이트는 충족).
-- disclosures: pre-commit moai gate가 TS-only 변경에 pytest 타임아웃으로 5회 실패 → hook의 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드로 커밋 (전 건 대체 증거 tsc+eslint+vitest 수집, `--no-verify` 미사용). 스폰 실패 3건(초기 통합 스폰·M3·결함 수정 fix1) autocompact thrashing → 마일스톤 분할 재스폰(사용자 승인)으로 회복; M3·fix1은 스폰이 남긴 완성본(95%·100% — fix1은 커밋까지 완료 상태로 사망)을 orchestrator가 검증·마무리(exportText 리터럴 실측 확정·stale 참조 3건·시나리오 순서 1건·lint 정합·§E.3 갱신).
+- disclosures: pre-commit moai gate가 TS-only 변경에 pytest 타임아웃으로 6회 실패 → hook의 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드로 커밋 (전 건 대체 증거 tsc+eslint+vitest 수집, `--no-verify` 미사용). 스폰 실패 3건(초기 통합 스폰·M3·결함 수정 fix1) autocompact thrashing → 마일스톤 분할 재스폰(사용자 승인)으로 회복; M3·fix1은 스폰이 남긴 완성본을 orchestrator가 검증·마무리. **2차 lint 회귀 수정(`react-hooks/set-state-in-effect`)은 사용자 승인 하에 orchestrator가 직접 수행** — 3연속 스폰 실패 패턴에 대한 합리적 대응, 검증 전항 orchestrator 직접 관측.
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
