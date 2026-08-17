@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-CHECKED-SECTOR-GROUP-001 v0.3.0, 2026-08-17)
+
+- **차트 그리드 종목 목록 체크 탭 섹터 그룹핑** — `체크(N)` 탭이 평면 목록에서 섹터 헤더 + 체크 종목 행 구조로 전환. 헤더는 섹터명과 **그 섹터의 체크 수**(유니버스 `stock_count` 아님)를 표시하고 모든 행은 어떤 헤더 아래에 위치한다. 그룹 키는 백엔드 규칙의 정확한 재현(`major = sector_major || '기타'`, `minor ? `${major} > ${minor}` : major` — `backend/services/screen_service.py:221-223`), 정렬은 코드포인트 오름차순(백엔드 `sorted()` 파리티 — `localeCompare('ko')`는 ICU collation이 한글을 Latin 앞에 두어 두 탭 순서가 어긋나므로 기각, 되돌림 보조축으로 실증). 접기 상태는 체크 탭 전용 `Set`으로 분리(전체 탭 `flatItems`/`collapsedSectors` 경로 무변경)
+  - **커밋 하이라이트**: M0 characterization `3acf05a`(손대지 않은 트리 GREEN 단독 커밋 — rollback 이분 탐색 기준점) · M1 `aeb249f` `sectorKey.ts` 그룹 키 헬퍼(소비자 0 신설) · M2 `06d251f` `StockList.tsx` 그룹 경로 전환 · M3 `f819deb` + lint 정합 `e8b5a74` · review 결함 수정 `e620657`(접힘 키 그룹 소멸 정리 — 그룹 재등장 시 펼침 보장) + `fe7c73a`(prune를 useEffect → 이벤트 경로 전환, `react-hooks/set-state-in-effect` 해소)
+  - **신설된 회귀 가드**: 테스트 3종 신설(`sectorKey.test.ts` · `StockList.grouping.test.tsx` · `StockList.alltab.characterization.test.tsx` — StockList 스코프 `Test Files 3 / Tests 28 passed`) — AC별 되돌림 16/16 RED 실측(항진명제 0), localeCompare('ko') 보조축 게이팅 실증, 과잉정리 방지(부분 해제 시 그룹 잔존·접힘 유지)·전체 탭 접힘 경계 불변 단언 포함
+  - **검증**: AC 15/15 PASS(AC-CSG-012 철회 결번, review 보강 단언 1건 포함) · 되돌림 16/16 RED · 전체 vitest `Tests 722 passed (722)`(2 e2e 파일 로드 실패 = 사전 존재 기준선 노이즈, 동일 집합) · `npx tsc --noEmit` exit 0 · eslint StockList 스코프 exit 0 · 커버리지 `sectorKey.ts` 100% / `StockList.tsx` lines 89.81%(≥85% 게이트) · 의존성 변동 0줄. sync-phase 품질 심사: 4차원(기능성 0.9/보안성 1.0/공정성 0.9/일관성 0.9, 조화평균 **0.923** ≥ 0.85) binding PASS — 결함 7건 전부 미차
+  - **Gap**: §0.2 성능 사전 baseline 미포착(사후 단일 jsdom 샘플만: 탭 전환 46.08ms · uncheck 3.94ms) · `StockList.tsx` branch coverage 80.64%(lines 게이트는 충족)
+  - **알려진 제약 (사용자 결정, 본 SPEC 미수정)** — 재발 보고 추적용 기록:
+    - 재현: 체크 탭에서 섹터 그룹 접기 → 차트 그리드(ChartCell)에서 그 그룹의 마지막 체크 종목 해제 → 같은 종목 재체크
+    - 증상: 그룹이 접힌 상태로 재등장(`aria-expanded="false"`)하여 방금 체크한 종목 행이 보이지 않음 (탭 라벨 카운트는 증가)
+    - 원인: `ChartCell.tsx:358`이 `useWatchlist().toggleStock`을 StockList 컴포넌트 경계 밖에서 직접 소비 — 이벤트 래퍼 prune 경로(`pruneCollapseKeyAfterUncheck`)가 2개 진입점(체크 탭 x 버튼·전체 탭 체크박스)만 커버
+    - 참고: `clearAll`은 UI 소비처 0건 — 네 번째 진입점 없음 (review grep 확인)
+    - 처분: 사용자 결정으로 본 SPEC에서 수정하지 않음. 재등장-펼침 보장의 정식 AC는 ChartCell 경로를 커버하는 후속 SPEC이 3개 진입점 전체 대상으로 소유
+
 ### Fixed (Bump 차트 Top-N 필터, 2026-08-16)
 
 - **섹터 분석 Bump 탭 Top 5 / Top 10 필터가 사실상 무력했던 결함** — 종전 구현은 `history.some(w => w.rank <= n)`("기간 중 한 번이라도 N위에 진입" 시맨틱스)이라 순위 변동이 큰 29개 섹터에서 Top 5 를 눌러도 20개 이상, Top 10 은 28개가 통과해 필터와 무관하게 라인이 그대로 다 그려졌다. 기준일(전체 history 중 가장 늦은 날짜 — 화면 상단 `기준일` 표기와 동일 기준) 순위가 N위 이내인 섹터만 남기도록 수정: Top 5 = 정확히 5개 라인, Top 10 = 10개. `latestDate` 는 필터 결과(`filteredSectors`)가 아니라 원본 `sectors` 에서 계산한다(필터 결과 의존 시 순환 발생)

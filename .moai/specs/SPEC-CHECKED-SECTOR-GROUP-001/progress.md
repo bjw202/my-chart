@@ -2,7 +2,7 @@
 
 - spec_id: SPEC-CHECKED-SECTOR-GROUP-001
 - tier: M
-- status: draft
+- status: completed
 - req_count: 14   # REQ-CSG-010 철회 결번
 - ac_count: 15    # AC-CSG-012 철회 결번
 - open_questions: [O-C1, O-C2]  # 둘 다 의도적 미결 — 착수를 막지 않는다
@@ -199,4 +199,14 @@ Test Files  1 passed (1)
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+- sync_status: audit-ready
+- sync_complete_at: 2026-08-17
+- sync_commit_sha: pending-backfill   # sync 커밋은 자기 SHA를 알 수 없다 — backfill 커밋에서 실측 주입 (선례: SPEC-SECTOR-UX-001 9c7096c → 14356ac, D3 SHA-placeholder 면제)
+- changelog: CHANGELOG.md `[Unreleased]` 항목 기록 — 알려진 제약(ChartCell 제3 진입점) 포함
+- quality_gate:
+  - gate-sync-1 신규 실행 (this run, tree fe7c73a — 증거 `.moai/state/verify/d68da0f0/`): `npx eslint src/components/StockList --max-warnings=0` exit 0 · `npx tsc --noEmit` exit 0 · 전체 `npx vitest run` Tests 722/722 (Test Files 2 failed = 사전 존재 e2e 노이즈 동일 집합) · 커버리지 sectorKey.ts 100% / StockList.tsx lines 89.81% (≥85%) · MX P1/P2 = 0 (buildCheckedGroups·sectorKeyOf 프로덕션 호출자 StockList.tsx 1곳, fan_in < 3 실측)
+  - 4dim 심사 (FO-SYNC-1, run wf_5797bac9-058): PASS 0.923 (기능성 0.9 / 보안성 1.0 / 공정성 0.9 / 일관성 0.9 · threshold 0.85 · Tier M) — 0점 차원 없음·경합 0건 → binding 판정, cold sync-auditor 미스폰. 결함 7건 전부 미차(제3 진입점·AC-013(b) 증거 서술점·BMP 한정 동치·npm audit 선존 4건 lockfile 무변경 실증·죽은 단언 1건·클로저 불변식·픽스처 중복)
+  - gate-sync-2: 사용자 승인 (전체 범위 — CHANGELOG + §E.4 + completed 전이, 단일 sync 커밋 main 직접 push)
+- known_constraints: ChartCell 제3 진입점 잔존 — 재현(체크 탭 그룹 접기 → ChartCell 마지막 체크 해제 → 재체크) · 증상(접힌 채 재등장 aria-expanded="false", 행 미표시, 탭 라벨 카운트는 증가) · 원인(ChartCell.tsx:358 경계 밖 toggleStock 직접 소비) · clearAll UI 소비처 0건(제4 진입점 없음). 사용자 결정으로 미수정 기록. AC 정식화 판단: 보강 유지 — AC-CSG-017로 승격하지 않는다(3개 진입점 중 2개만 커버된 부분 전달 상태에서 행위 범위 정식 AC는 본 제약과 모순; 후속 ChartCell 수정 SPEC이 3개 진입점 전체 대상으로 소유)
+- disclosures: manager-docs 스폰 2연속 사망(하위 컨텍스트 한계 — 1차 저술형 프롬프트, 2차 경량 apply형; 2차가 백업 sync-20260817-193935 + CHANGELOG 삽입까지 완료 후 §E.4 직전 사망, 잔여 부작용 0건 실측). 사용자 승인 하에 orchestrator가 잔여 적용·커밋·push 직접 수행 (run-phase 동일 패턴 선례). §E.4·CHANGELOG 원문은 §E.2/E.3 verbatim 인용 + gate 실측에 귀속 작성.
+- gaps: §E.3 대비 신규 없음

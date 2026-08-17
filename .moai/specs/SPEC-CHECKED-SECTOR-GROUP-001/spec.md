@@ -2,7 +2,7 @@
 id: SPEC-CHECKED-SECTOR-GROUP-001
 title: "Chart Grid 종목 목록 — 체크 탭 섹터 그룹핑"
 version: "0.3.0"
-status: in-progress
+status: completed
 created: 2026-08-17
 updated: 2026-08-17
 author: manager-spec
