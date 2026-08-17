@@ -399,6 +399,35 @@ describe('StockList 체크 탭 그룹핑 통합 (SPEC-CHECKED-SECTOR-GROUP-001 M
     expect(container.querySelectorAll('.stock-item--checked').length).toBe(CHECKED_COUNT - 1) // 6
   })
 
+  it('AC-CSG-008 보강(재등장): 접힌 그룹 소멸 후 재체크로 재등장하면 펼침으로 시작한다 (접힘 키 잔존 결함)', () => {
+    const { container } = renderCheckedTab()
+
+    // (1) 금융 그룹 접기 — 클릭 후 재조회한 요소로 단언 (stale 참조 방지)
+    const finHeader = findHeader(container, '금융')
+    expect(finHeader).toBeDefined()
+    fireEvent.click(finHeader!)
+    expect(findHeader(container, '금융')?.getAttribute('aria-expanded')).toBe('false')
+    // 접힘 → 행이 렌더 트리에 부재하므로 x 버튼 경로 불가 (아래 해제는 컨텍스트 API 사용)
+    expect(findCheckedRow(container, '105560')).toBeUndefined()
+
+    // (2) 마지막 체크 종목 해제 — x 버튼과 동일한 컨텍스트 함수(uncheckStock)로 호출
+    act(() => {
+      capturedCtx!.uncheckStock('105560')
+    })
+    // 그룹 소멸 — AC-008과 동일 관측
+    expect(findHeader(container, '금융')).toBeUndefined()
+
+    // (3) 재체크 → 그룹 재등장: 펼침(▼) 상태로 시작해야 하고 새로 체크한 행이 보여야 한다
+    act(() => {
+      capturedCtx!.toggleStock(KB)
+    })
+    const reHeader = findHeader(container, '금융')
+    expect(reHeader).toBeDefined()
+    expect(reHeader?.getAttribute('aria-expanded')).toBe('true')
+    expect(reHeader?.querySelector('.sector-header-arrow')?.textContent).toBe('▼')
+    expect(findCheckedRow(container, '105560')).toBeDefined()
+  })
+
   it('AC-CSG-009: 전체 탭에서 접은 섹터가 체크 탭에서는 펼침 상태다 (전파 없음 →)', () => {
     const { container } = render(
       <WatchlistProvider>

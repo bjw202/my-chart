@@ -110,6 +110,16 @@ export function StockList(): React.ReactElement {
     listRef.current?.resetAfterIndex(0)
   }, [viewMode])
 
+  // 소멸한 체크 그룹의 접힘 키 정리 — 체크 목록에서 그룹이 사라지면 해당 키를 제거해
+  // 재등장하는 그룹이 펼침 상태로 시작하게 한다 (접힘 키 잔존 결함, AC-008 보강)
+  useEffect(() => {
+    const liveKeys = new Set(
+      buildCheckedGroups(Array.from(checkedStocks.values())).map((g) => g.sectorName),
+    )
+    if (!Array.from(collapsedCheckedSectors).some((key) => !liveKeys.has(key))) return
+    setCollapsedCheckedSectors((prev) => new Set(Array.from(prev).filter((key) => liveKeys.has(key))))
+  }, [checkedStocks, collapsedCheckedSectors])
+
   // Reset list size cache when items change
   useEffect(() => {
     listRef.current?.resetAfterIndex(0)
