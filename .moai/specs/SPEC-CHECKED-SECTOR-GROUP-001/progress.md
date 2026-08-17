@@ -201,7 +201,7 @@ Test Files  1 passed (1)
 
 - sync_status: audit-ready
 - sync_complete_at: 2026-08-17
-- sync_commit_sha: pending-backfill   # sync 커밋은 자기 SHA를 알 수 없다 — backfill 커밋에서 실측 주입 (선례: SPEC-SECTOR-UX-001 9c7096c → 14356ac, D3 SHA-placeholder 면제)
+- sync_commit_sha: a4ecea8   # docs(SPEC-CHECKED-SECTOR-GROUP-001): sync-phase — CHANGELOG 기록·3-phase close
 - changelog: CHANGELOG.md `[Unreleased]` 항목 기록 — 알려진 제약(ChartCell 제3 진입점) 포함
 - quality_gate:
   - gate-sync-1 신규 실행 (this run, tree fe7c73a — 증거 `.moai/state/verify/d68da0f0/`): `npx eslint src/components/StockList --max-warnings=0` exit 0 · `npx tsc --noEmit` exit 0 · 전체 `npx vitest run` Tests 722/722 (Test Files 2 failed = 사전 존재 e2e 노이즈 동일 집합) · 커버리지 sectorKey.ts 100% / StockList.tsx lines 89.81% (≥85%) · MX P1/P2 = 0 (buildCheckedGroups·sectorKeyOf 프로덕션 호출자 StockList.tsx 1곳, fan_in < 3 실측)
