@@ -9,6 +9,7 @@ import { useScrollSync } from '../../hooks/useScrollSync'
 import type { StockItem as StockItemData, SectorGroup as SectorGroupData } from '../../types/stock'
 import { SectorGroupHeader } from './SectorGroup'
 import { StockItemRow } from './StockItem'
+import { buildCheckedGroups } from './sectorKey'
 
 // Virtual list item types
 type ListItem =
@@ -23,6 +24,8 @@ export function StockList(): React.ReactElement {
   const { selectedIndex } = useNavigation()
   const { isChecked, toggleStock, uncheckStock, checkedStocks, checkedCount, exportText } = useWatchlist()
   const [collapsedSectors, setCollapsedSectors] = useState<Set<string>>(new Set())
+  // 체크 탭 전용 접힘 상태 — 전체 탭 collapsedSectors와 독립 (탭별 분리, M2)
+  const [collapsedCheckedSectors, setCollapsedCheckedSectors] = useState<Set<string>>(new Set())
   const [listHeight, setListHeight] = useState(600)
   const [viewMode, setViewMode] = useState<'all' | 'checked'>('all')
   const [copied, setCopied] = useState(false)
@@ -60,12 +63,27 @@ export function StockList(): React.ReactElement {
     }
   }
 
-  // Build checked items list for "checked" mode
-  const checkedItems: ListItem[] = Array.from(checkedStocks.values()).map((stock, i) => ({
-    type: 'stock' as const,
-    stock,
-    globalIndex: -1 - i,
-  }))
+  // Build checked items list for "checked" mode — 섹터 헤더 + 종목 행 구조 (M2)
+  const checkedItems: ListItem[] = []
+  let checkedIndex = 0
+  for (const group of buildCheckedGroups(Array.from(checkedStocks.values()))) {
+    checkedItems.push({
+      type: 'sector',
+      sector: {
+        sector_name: group.sectorName,
+        stock_count: group.stocks.length, // 그룹의 체크 종목 수 (유니버스 stock_count 아님)
+        stocks: group.stocks,
+      },
+    })
+    if (!collapsedCheckedSectors.has(group.sectorName)) {
+      for (const stock of group.stocks) {
+        checkedItems.push({ type: 'stock', stock, globalIndex: -1 - checkedIndex })
+        checkedIndex++
+      }
+    } else {
+      checkedIndex += group.stocks.length
+    }
+  }
 
   const displayItems = viewMode === 'all' ? flatItems : checkedItems
 
@@ -77,8 +95,10 @@ export function StockList(): React.ReactElement {
     return item?.type === 'sector' ? SECTOR_HEIGHT : STOCK_ITEM_HEIGHT
   }
 
+  // 접기 토글은 활성 탭의 Set만 변경 — 두 Set은 병합/공유되지 않음 (M2)
   const toggleSector = useCallback((sectorName: string): void => {
-    setCollapsedSectors((prev) => {
+    const setter = viewMode === 'checked' ? setCollapsedCheckedSectors : setCollapsedSectors
+    setter((prev) => {
       const next = new Set(prev)
       if (next.has(sectorName)) {
         next.delete(sectorName)
@@ -88,12 +108,12 @@ export function StockList(): React.ReactElement {
       return next
     })
     listRef.current?.resetAfterIndex(0)
-  }, [])
+  }, [viewMode])
 
   // Reset list size cache when items change
   useEffect(() => {
     listRef.current?.resetAfterIndex(0)
-  }, [results, collapsedSectors, viewMode, checkedCount])
+  }, [results, collapsedSectors, collapsedCheckedSectors, viewMode, checkedCount])
 
   // Scroll to selected item (only in "all" mode)
   useEffect(() => {
@@ -127,11 +147,13 @@ export function StockList(): React.ReactElement {
       if (!item) return null
 
       if (item.type === 'sector') {
+        // 활성 탭의 접힘 Set 참조 — 전체는 collapsedSectors, 체크는 collapsedCheckedSectors (M2)
+        const collapsedSet = viewMode === 'checked' ? collapsedCheckedSectors : collapsedSectors
         return (
           <SectorGroupHeader
             sectorName={item.sector.sector_name}
             stockCount={item.sector.stock_count}
-            collapsed={collapsedSectors.has(item.sector.sector_name)}
+            collapsed={collapsedSet.has(item.sector.sector_name)}
             style={style}
             onToggle={() => toggleSector(item.sector.sector_name)}
           />
@@ -169,7 +191,7 @@ export function StockList(): React.ReactElement {
         />
       )
     },
-    [displayItems, collapsedSectors, selectedIndex, onStockSelect, toggleSector, isChecked, toggleStock, uncheckStock, viewMode]
+    [displayItems, collapsedSectors, collapsedCheckedSectors, selectedIndex, onStockSelect, toggleSector, isChecked, toggleStock, uncheckStock, viewMode]
   )
 
   if (viewMode === 'all' && flatItems.length === 0) {
