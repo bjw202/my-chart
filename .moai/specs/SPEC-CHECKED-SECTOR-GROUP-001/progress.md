@@ -68,11 +68,102 @@ Mode 6 confirmation: N/A (Mode 5 선택 — Implementation Kickoff Approval은 l
 
 ## §E.2 Run-phase Evidence
 
-_<pending run-phase>_
+### M4a 되돌림 실증 (AC-001~007)
+
+방법: 대상 파일 주입 → 해당 AC 테스트만 실행 → RED tail 확보 → 스크래치패드 백업(`cp`)으로 복원 → `git status --short` 클린 확인. 복원에 `git checkout --` 미사용 (mutation-restore 교훈; HEAD e8b5a74 기준 바이트 동등 복원을 `diff -q`로 매번 확인).
+
+공통 명령 — V = `frontend/node_modules/.bin/vitest run --root <repo>/frontend` (절대경로):
+`$V src/components/StockList/__tests__/StockList.grouping.test.tsx -t "AC-CSG-00X"`
+
+| AC | 되돌림 (1줄) | 관측된 RED tail |
+|----|--------------|-----------------|
+| 001 | StockList.tsx checked 브랜치를 평면 리스트로 교체 (섹터 헤더 미생성) | `AssertionError: expected +0 to be 4` (`.sector-header` 0≠4) |
+| 002 | sectorKey.ts 조인 `' > '`→`' - '` | `AssertionError: expected undefined to be defined` ('내수 > 리조트' 헤더 미발견) |
+| 003 | `stock.sector_major \|\| '기타'` → `as string` (null 폴백 제거) | `AssertionError: expected undefined to deeply equal [ '132890' ]` ('기타' 그룹 실종) |
+| 004 | `.sort()` 제거 (Map 삽입 순 반환) | `AssertionError: expected [ '내수 > 리조트', 'AI', '기타', '금융' ] to deeply equal [ 'AI', '금융', '기타', '내수 > 리조트' ]` |
+| 005 | `stock_count`를 유니버스 값(`results.sectors` 조회)으로 교체 | `AssertionError: expected '3' to be '1'` ('금융' 헤더 카운트 3≠1) |
+| 006 | buildCheckedGroups 루프에 `if (!s.sector_major) continue` 주입 | (DOM) `AssertionError: expected [ 'true', 'true', 'true' ] to deeply equal [ 'true', 'true', 'true', 'true' ]` + (모델) `AssertionError: expected 6 to be 7` — 두 테스트 모두 RED |
+| 007 | `if (!collapsedCheckedSectors.has(...))` 행 렌더 가드 제거 | `AssertionError: expected <span class="stock-item-name"></span> to be null` (접힌 'AI' 그룹 케이아이엔엠 행 잔존) |
+
+**AC-004 보조 관측 (R4b)** — `.sort((a,b)=>a.localeCompare(b,'ko'))` 재주입 후 AC-004 재실행: RED.
+`AssertionError: expected [ '금융', '기타', '내수 > 리조트', 'AI' ] to deeply equal [ 'AI', '금융', '기타', '내수 > 리조트' ]`
+→ localeCompare('ko') 축은 코드포인트 축과 순서 상이 (ICU 한국어 collation: 한글이 Latin 선행). `node -e` 교차확인: `["금융","기타","내수 > 리조트","AI"]` ≠ codepoint `["AI","금융","기타","내수 > 리조트"]`. 분류: **게이팅** — no-sort 축·localeCompare 축 모두 코드포인트 기대값과 어긋나 AC-004가 양 축을 구분함.
+
+**복원 실증**
+
+```text
+$ $V src/components/StockList          # 풀스코프 재실행
+Test Files  3 passed (3)
+     Tests  26 passed (26)
+$ git status --short -- frontend/src/components/StockList/
+(빈 출력 — 수정된 추적 파일 0개)
+```
+
+`?? frontend/src/.moai/` (state/config-cache.json, 세션 시작 전 생성된 hook 산물)는 본 작업 무관 기존 항목. 7/7 되돌림 RED 관측 — 항진명제(되돌려도 GREEN) 없음.
+
+### M4b 되돌림 실증 (AC-008~016) + 정적 스캔 + 커버리지
+
+방법: M4a와 동일 — 주입 → 대상 AC 테스트만 실행 → RED tail 확보 → 스크래치패드 `cp` 복원 → `diff -q` 바이트 동등 + `git status --short` 확인. 기준선 GREEN 선행: grouping 스위트 14/14 passed. 전 되돌림 복원 `diff -q` 무출력 · StockList 디렉토리 `git status --short` 빈 출력.
+
+| AC | 되돌림 (1줄) | 관측된 RED tail |
+|----|--------------|-----------------|
+| 008 | checked 리스트를 useState 스냅샷으로 동결 (최초 1회 파생 후 재계산 없음) | L390 `AssertionError: expected HTMLElement to be undefined` — KB금융 uncheck 후에도 '금융' 헤더 잔존 |
+| 009 | 접기 상태를 공유 Set으로 재병합 (checked Row가 `collapsedSectors` 참조) | L419 `AssertionError: expected 'false' to be 'true'` — 전체 탭 접힘 → 체크 탭 전파 |
+| 010 | `toggleSector`가 항상 `setCollapsedSectors` 타깃 | L442 `AssertionError: expected 'false' to be 'true'` — 체크 탭 접힘 → 전체 탭 전파 (역방향) |
+| 011 | sectorKey.ts가 minor 무시 (`return major`) | L454 `AssertionError: expected '내수' to be '내수 > 리조트'` |
+| 013a | (정적, 테스트 없음) 인라인 `<div className="sector-header">` 주입 | 스캔(a) EMPTY/exit 1 → 2 lines/exit 0 (MATCH ≥1 관측) |
+| 013b | (정적, 2차) 두 번째 `<VariableSizeList />` JSX 주입 | 스캔(b) 1 line → 2 lines (정확히 1 위반 관측) |
+| 014 | checkedItems 파생 안에 transient `fetch('sector-keys')` 주입 | L475 `AssertionError: expected "fetch" to not be called` — fetchMock 1회 호출 관측 |
+| 015 | flatItems(전체 탭) 헤더 카운트를 CHECKED count로 교체 | alltab L131 `AssertionError: expected [ '0', '0', '0' ] to deeply equal [ '27', '2', '5' ]` |
+| 016 | 빈 상태 분기 제거 → 빈 checked 리스트가 가상 목록으로 흐름 | L512 `TestingLibraryElementError: Unable to find an element with the text: 체크된 종목이 없습니다.` |
+
+**클린 트리 정적 스캔 3-leg** (`bash -c`로 실행·exit code 캡처; HEAD e8b5a74):
+
+```text
+(a) grep -rn 'sector-header' src/components/StockList/StockList.tsx src/components/StockList/sectorKey.ts
+    → (빈 출력) EXIT:1            [기대: EMPTY — 인라인 정의 0건]
+(b) grep -n 'VariableSizeList\|FixedSizeList' src/components/StockList/StockList.tsx src/components/StockList/sectorKey.ts
+    → StockList.tsx:234: <VariableSizeList  EXIT:0   [기대: 정확히 1 line]
+(c) git diff e9c049b --stat -- frontend/package.json frontend/package-lock.json
+    → (빈 출력) EXIT:0            [기대: 0 changed lines — 의존성 변동 없음]
+```
+
+**커버리지** (`npx vitest run src/components/StockList --coverage`, v8 provider):
+
+```text
+sectorKey.ts   — stmts 100% / branch 100% / funcs 100% / lines 100%
+StockList.tsx  — stmts 83.83% / branch 80.76% / funcs 77.27% / lines 86.66%
+```
+
+**전체 스위트 회귀** (`npx vitest run`):
+
+```text
+Test Files  2 failed | 81 passed (83)
+     Tests  720 passed (720)
+```
+
+2 failed files = `e2e/ai-report-deep.spec.ts` / `e2e/preset-flow.spec.ts` — "Playwright Test did not expect test.describe() to be called here". Playwright 스펙이 vitest 기본 include에 걸리는 사전 존재 harness mismatch (SPEC-PRESET-001 b775612 도입, `frontend/vite.config.ts` test 섹션에 include/exclude 없음, 클린 트리에서 측정 — 본 SPEC 무관 기준선 노이즈). 테스트 본체는 720/720 전부 통과.
+
+**성능 노트 (§0.2)** — 사전 구현 baseline은 M2 전에 캡처되지 않음 (known process gap — 조작하지 않음). post-implementation only 단일 샘플 (jsdom, 임시 스크래치 파일로 측정 후 삭제): 탭 전환 렌더 46.08ms · uncheck 렌더 3.94ms. 영구 테스트 파일 신규 생성 없음.
+
+**Gaps** — (1) 성능 사전 baseline 부재 (위) · (2) 전체 스위트 2 e2e 파일 실패는 기준선 노이즈로 본 SPEC 범위 밖 · (3) 커버리지는 StockList 스코프 측정값.
+
+9/9 되돌림 RED(또는 스캔 변화) 관측 — 항진명제 없음.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+- run_status: audit-ready
+- run_complete_at: 2026-08-17
+- baseline_commits (Hybrid Trunk main-direct, 미push 상태에서 검증): M0 `3acf05a` (characterization, 단독) · M1 `aeb249f` (+`status: draft → in-progress`) · plan산출물 `31c8fb6` · M2 `06d251f` (StockList.tsx +33/−11) · M3 `f819deb` + lint `e8b5a74` · evidence commit (본 §E.2/§E.3 기록)
+- ac_matrix: **15/15 PASS** — BLOCKER 9 (001·002·003·005·006·008·011·015·016) / MAJOR 5 (004·007·009·010·014) / MINOR 1 (013). AC-012 결번 (철회).
+- 되돌림 실증: **16/16 RED 관측** (M4a AC-001~007 + M4b AC-008~016, AC-013 2-leg 포함) — 항진명제 0건. AC-004 localeCompare('ko') 보조축은 실측 결과 **게이팅**으로 승격 (ICU collation이 한글을 Latin 선행 — REQ-CSG-003 근거 실증).
+- coverage (v8, `npx vitest run src/components/StockList --coverage`): `sectorKey.ts` lines 100% · `StockList.tsx` lines 86.66% — 게이트 ≥85% 충족 (attribution: this run, tree e8b5a74).
+- regression: 전체 스위트 `npx vitest run` → **Tests 720/720 passed**. Test Files 2 failed = e2e 2종(ai-report-deep·preset-flow)의 Playwright/vitest harness mismatch — **사전 존재 기준선 노이즈, 본 SPEC 무관 실증**: 커밋 범위 e9c049b..HEAD에서 e2e/vite.config 변경 0건 (마지막 터처 b775612 = SPEC-PRESET-001). Gap으로 기록, 조작하지 않음.
+- tsc: `npx tsc --noEmit` exit 0 (신규 오류 0).
+- deps: `git diff e9c049b --stat -- frontend/package*.json` → 0 changed lines.
+- static scan 3-leg (bash 재실행으로 독립 관측): (a) EMPTY exit 1 ✓ (b) 정확히 1 line `StockList.tsx:234` exit 0 ✓ (c) 0 lines ✓.
+- gaps: ① §0.2 성능 사전-구현 baseline 미포착 (M2 선행 스폰 누락 — post-implementation 단일 jsdom 샘플만 기록: 탭 전환 46.08ms · uncheck 3.94ms). ② StockList.tsx branch coverage 80.76% (lines 게이트는 충족).
+- disclosures: pre-commit moai gate가 TS-only 변경에 pytest 타임아웃으로 4회 실패 → hook의 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드로 커밋 (전 건 대체 증거 tsc+eslint+vitest 수집, `--no-verify` 미사용). 스폰 실패 2건(초기 통합 스폰·M3) autocompact thrashing → 마일스톤 분할 재스폰(사용자 승인)으로 회복; M3은 스폰이 남긴 95% 완성본을 orchestrator가 마무리(exportText 리터럴 실측 확정·stale 참조 3건·시나리오 순서 1건·lint 정합).
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
