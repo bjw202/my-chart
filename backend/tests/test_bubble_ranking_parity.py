@@ -87,9 +87,18 @@ def _equal(a: float | None, b: float | None) -> bool:
 @pytest.mark.parametrize("market", MARKETS)
 @pytest.mark.parametrize("period", PERIODS)
 def test_envelope_contract(client: Any, period: str, market: str) -> None:
-    """봉투 기본 계약: market_filter echo(009), benchmark non-null·기간 키 구비, data 비휘발(010)."""
-    ranking = _get_ranking(client, period, market)
+    """봉투 기본 계약: market_filter echo(009), benchmark non-null·기간 키 구비, data 비휘발(010).
 
+    AC-SMU-009의 관측 대상은 **버블 응답**(좌변)이다 — 랭킹만 검사하면 버블이
+    "all"로 거짓말해도 통과하는 항진명제가 된다(2026-08-18 되돌림에서 폭로,
+    버블 market_filter 단언 추가).
+    """
+    bubble = _get_bubble(client, period, market)
+    assert bubble["market_filter"] == market, (
+        f"버블 market_filter={bubble['market_filter']!r} != 요청 market={market!r} (AC-SMU-009)"
+    )
+
+    ranking = _get_ranking(client, period, market)
     assert ranking["market_filter"] == market, (
         f"market_filter={ranking['market_filter']!r} != 요청 market={market!r}"
     )

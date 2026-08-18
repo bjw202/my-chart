@@ -212,10 +212,45 @@ period  min         p5          p50         p95         max          | 기존 �
 - m5.test(AC-SUX-039) 참조 리터럴 갱신 (1W 1,000억/3조/100조 · 3M 1조/30조/1,000조) + §D 런타임 등재.
 - 유의: refs 표기 스케일(3m 최대 참조 1,000조)은 frozen fixture(대형종목 편중 샘플, 하루 총합이 라이브의 ~50%) 기준 — 라이브 배포 후 첫 주에 실측 분포 대비 재확인 권고.
 
+### 되돌림 실증 배치 (AC 22종 판정, 2026-08-18, orchestrator 직접 관측)
+
+방법: 주입(임시 편집/M3 파일 교체) → 대상 테스트만 실행 → RED tail 확보 → cp 백업 복원 → `diff -q` 바이트 동등 확인. 전 사이클 복원 증명 완료.
+
+| AC | 되돌림 | 관측된 RED |
+|---|---|---|
+| 001 | service를 M3(d16cb65) 상태로 교체 | 파리티 9조합 전부 FAILED — **N=18 재현** |
+| 002a/007 | sector_metrics L450 결측 제외 → 0-대체 | exclusion 2 failed (분모 10 복귀·전원결측 0.0) |
+| 006 | L529 `rs_avg or 0.0` 주입 | all_missing 1 failed |
+| 003 | rs_avg 투영 → `a.excess_returns[p].value` 오염 | period_invariance 3 failed |
+| **009** | `market_filter="all"` 하드코딩 | **보강 후 6 failed** — 최초 관측 시 9 passed로 **관측자 결함 폭로**: envelope_contract가 랭킹(우변)만 검사하고 버블(AC 대상) 미검사 → 버블 market_filter 단언 추가(영구 보강) 후 RED 확보 (kospi/kosdaq 6조합) |
+| 010 | M3 상태 | 스캔 `envelope_fields` = 0 |
+| 011 | 스키마에서 market 필드 제거 | `test_backward_compatible_legacy_keys_preserved` 1 failed |
+| 012 | M3 상태 | 스캔 `compute_sector_bubble` = 3 |
+| 013 | `compute_sector_bubble` 함수명 삭제 | test_sector_advanced 7 failed (transitions/overview 경로 붕괴) |
+| 014 | `daily_db_path` 위치 필수화 | sag_037+consumer_dates 8 failed |
+| 015 | `MIN_SECTOR_MEMBERS` 5→20 | characterization 12 failed (소형 섹터 소실·집합 붕괴) |
+| 018 | SECTOR ladder vMax→1e3 | 반지름 고유값 **1종 [24.5]** (u=0.5 상수 분기) — 게이트 ≥3 위반 관측 |
+| 022 | 컴프리헨션에 null rs_avg 드롭 조건 | all_missing(not-dropped) 1 failed |
+| 028 | `rs_avg=a.rs_avg`(객체) 주입 | `test_live_response_fields_are_scalars` 1 failed |
+| **029** | TS `number`로 되돌림 | **Gaps — tsc exit 0 (RED 미관측)**: strict 하에서도 프로덕션에 null→number 할당 경로가 없어 컴파일 오류가 발생하지 않음. 타입 증명 파일 시도 후 철회. 대체 방어선: M3 백엔드 관측자 6종(GREEN) + M5.5 프론트 722 테스트(null 렌더 E-2 포함) |
+| 025 | G-7 술어 실행 | `merge-base --is-ancestor 6aabf81 8f0a0c7` exit 0 ✓ · M0 경로 필터 후 프로덕션 **0줄** ✓ |
+| 026 | 마일스톤별 관측 기록 소비 | M1/M2/M3 시점 특성화 21 GREEN(각 보고) · **M4 커밋에서만 뒤집힘**(flipped 22 GREEN 관측) — 국소성 성립 |
+| 027 | plan §F 전 구간 | root `-k` 스위프 **254 passed** · 프론트 전체 **81 files / 722 tests GREEN** · `cd backend && pytest tests/ -k …` 컬렉션 오류 2건 — `db_service.py` import 실패로 **본 SPEC 무관 pre-existing** (커밋 범위 내 db_service/weekly 변경 0건 · 오류 파일 최종 터처 = SPEC-SECTOR-AGGREGATION-001/GRID-001) |
+
+**커버리지 (G-5): Gaps** — 라이브 venv(`/Users/byunjungwon/Dev/my_chart/.venv`)에 `coverage` 미설치 (`No module named coverage`). 무단 설치 대신 미측정 사유 명시. 측정 형태는 lessons #9 동작 형태로 확정돼 있음 — 도구 설치 후 sync 단계 보측 가능.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+- run_status: audit-ready
+- run_complete_at: 2026-08-18
+- baseline_commits (Hybrid Trunk main-direct): M0 `6aabf81` (특성화+N=18, 단독) · M1 `3cb3828` (RED 11, +`status: draft→in-progress`) · plan산출물 `6c82d0b` · M2 `d96ade6` (배선 +4/−1) · M3 `d16cb65` (nullable) · **M4 `8f0a0c7` (전환 — N=18→0, 유일 수치 변경)** · M5 `3d06d9d` (봉투) · M5.5 `d6d1083` (섹터 사다리+0억 회귀 해소) · evidence/관측자 보강 커밋 (본 §E.2/§E.3)
+- ac_matrix: **21/22 PASS + 1 Gaps(AC-029)** — AC-001~011, 013~015, 018, 022, 025~028 전부 되돌림 RED 관측. AC-016/017/019~021/023/024는 형제 SPEC tombstone.
+- 관측자 결함 1건 발견·보강(영구 반영): AC-009 envelope_contract가 버블 market_filter 미검사(항진명제) → 단언 추가 후 되돌림 RED 확보.
+- g8: 분기 A 확정(status 관측량) — §E.2 기록. g3: VIOLATION 측정 → 섹터 전용 사다리 재산출(사용자 승인) + M4 숨은 0억 표시 회귀 해소.
+- regression: root 스위프 254 passed · 프론트 722/722 · 본 SPEC 백엔드 스위트 33+22+21+46+계약(파티션 포함). backend `-k` 컬렉션 오류 2건은 무관 pre-existing(실증).
+- tsc: exit 0 · eslint: SectorAnalysis L39 react-refresh 1건 pre-existing(변경 전 동일 에러 실측).
+- gaps: ① AC-029 되돌림 관측자 부재 ② 커버리지 미측정(coverage 미설치) ③ 사다리 refs 스케일의 라이브 검증 미실시(배포 후 첫 주 권고)
+- disclosures: pre-commit pytest 2m 타임아웃으로 `SKIP_MOAI_PRECOMMIT=1` 문서화 오버라이드 다수(전 건 대체 증거 수집·공개, `--no-verify` 미사용). 스폰 사망 대응 — orchestrator 직접 마무리 4건(M4 파티션 재기술·M5.5 사다리·되돌림 배치·검증 배치 — 사용자 승인 3건: 파티션 재기술+§D 등재 / 사다리 분리 / m5.test 갱신+§D 등재). plan 산출물 지연 커밋 1건(6c82d0b — lead 누락).
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
