@@ -303,7 +303,7 @@ period  min         p5          p50         p95         max          | 기존 �
 
 - sync_status: audit-ready
 - sync_complete_at: 2026-08-18
-- sync_commit_sha: pending-backfill-sync (후속 backfill 커밋에서 실제 SHA 기입 — 선례 a4ecea8 → 777f044)
+- sync_commit_sha: 86d4af8 (docs(SPEC-SECTOR-METRIC-UNIFY-001): sync-phase — CHANGELOG 기록·3-phase close — backfill 커밋 선례 a4ecea8 → 777f044)
 - 실행 방식: **orchestrator-direct (사용자 승인, 2026-08-18)** — gate-sync-1·gate-sync-2·실행 방식 3문항 1회 AskUserQuestion 통합 승인. 근거: GLM 세션 manager-docs 스폰 하위 컨텍스트 한계 연쇄 사망 선례(어제 sync 2회·본 SPEC run 4회, memory `project_glm_subagent_ctx_death`) + 검증·커버리지는 이미 본 세션이 직접 완료
 - **sync 검증 배치 (관측 주체: sync-tjvce8 세션, HEAD 6cb3735, 이번 실행 — 리드 재현 및 §E.3 기준선과 독립 대조)**:
   | 검증 | 관측 출력 | 증거 파일(절대 경로) |
@@ -321,6 +321,7 @@ period  min         p5          p50         p95         max          | 기존 �
 - MX 관찰: 변경 코드 파일 내 `@MX` 태그 27개(SectorBubbleChart 9 · sector_advanced 7 · bubbleRadius 4 · schemas 4 · routers 2 · types 1). `sector_advanced_service.py` 0개는 변경 전 기준선과 동일(실측 `git show 777f044 | grep -c @MX` = 0 — 회귀 아님)
 - CHANGELOG: `[Unreleased]`에 `Fixed (SPEC-SECTOR-METRIC-UNIFY-001 v0.5.0)` 항목 1건 기록. 사전 중복 검사 `grep -c 'SPEC-SECTOR-METRIC-UNIFY-001' CHANGELOG.md` = 0(B12). AC 수는 acceptance.md SSOT 기준(22 AC = 21 PASS + 1 Gap)으로 기록
 - disclosures: docs-only diff + pre-commit 게이트의 pytest 2m 타임아웃(§E.3·전 SPEC sync 선례와 동일 기제) → 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드 사용. 대체 증거: 동일 HEAD 6cb3735에서 pytest 157 · vitest 290/290 · tsc 귀속 0 커버리지 실측(`…/sync-tjvce8-smu001/`). 스펙 상 no-verify 플래그 미사용
+- **커밋 직후 인용 경로 재검증 (절대 경로 ls, 리드 지시 이행)**: sync 커밋 `86d4af8` 랜딩·push(`1f0c304..86d4af8`, 이후 origin/main...HEAD `0 0`) 직후 관측 — `/Users/byunjungwon/Dev/my-project-01/my_chart/.moai/state/verify/sync-tjvce8-smu001/` 4파일(coverage-pytest.txt · coverage-report.txt · tsc-b.txt · vitest-lane.txt) · `run-tjvce8-smu001/` 8파일 · `review-tjvce8-smu001/` 2파일 전부 해석됨. §E.4가 인용한 경로에 죽은 링크 없음
 
 ## §E.5 Review-phase Signal (review-tjvce8, 2026-08-18)
 
