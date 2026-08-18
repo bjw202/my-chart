@@ -158,7 +158,7 @@ class TestRsLineCalculation:
 
     def test_rs_line_formula_close_divided_by_kospi(self, monkeypatch):
         """RS_Line = 주가 종가 / KOSPI 종가 공식 검증."""
-        from my_chart.db.daily import _fetch_daily_stock
+        from my_chart.db.daily import _DAILY_COLS, _fetch_daily_stock
 
         stock_closes = [70000.0, 71000.0, 72000.0]
         kospi_closes = [2500.0, 2510.0, 2520.0]
@@ -172,17 +172,18 @@ class TestRsLineCalculation:
         _, rows = _fetch_daily_stock("테스트", "20240101", kospi_close=kospi_series)
 
         assert len(rows) == 3
-        # RS_Line은 마지막 컬럼(-1)
+        # RS_Line은 마지막 컬럼이 아니다 — _DAILY_COLS에서 이름으로 위치를 찾는다
+        rs_idx = _DAILY_COLS.index("RS_Line")
         for i, row in enumerate(rows):
             expected = stock_closes[i] / kospi_closes[i]
-            assert row[-1] is not None
-            assert abs(row[-1] - expected) < 1e-6, (
-                f"행 {i}: RS_Line={row[-1]}, 기대값={expected}"
+            assert row[rs_idx] is not None
+            assert abs(row[rs_idx] - expected) < 1e-6, (
+                f"행 {i}: RS_Line={row[rs_idx]}, 기대값={expected}"
             )
 
     def test_rs_line_none_when_kospi_none(self, monkeypatch):
         """kospi_close=None 이면 RS_Line은 NULL(None)이어야 한다."""
-        from my_chart.db.daily import _fetch_daily_stock
+        from my_chart.db.daily import _DAILY_COLS, _fetch_daily_stock
 
         stock_df = self._make_stock_df([70000.0, 71000.0])
         monkeypatch.setattr("my_chart.db.daily.price_naver", lambda *a, **kw: stock_df)
@@ -191,12 +192,13 @@ class TestRsLineCalculation:
         _, rows = _fetch_daily_stock("테스트", "20240101", kospi_close=None)
 
         assert len(rows) == 2
+        rs_idx = _DAILY_COLS.index("RS_Line")
         for row in rows:
-            assert row[-1] is None, f"RS_Line이 None이어야 하나 {row[-1]} 반환됨"
+            assert row[rs_idx] is None, f"RS_Line이 None이어야 하나 {row[rs_idx]} 반환됨"
 
     def test_rs_line_none_on_missing_kospi_date(self, monkeypatch):
         """주가 날짜에 해당하는 KOSPI 데이터가 없으면 RS_Line은 None이어야 한다."""
-        from my_chart.db.daily import _fetch_daily_stock
+        from my_chart.db.daily import _DAILY_COLS, _fetch_daily_stock
 
         # 주가: 2024-01-02 ~ 2024-01-04
         stock_df = self._make_stock_df([70000.0, 71000.0, 72000.0])
@@ -210,8 +212,11 @@ class TestRsLineCalculation:
         _, rows = _fetch_daily_stock("테스트", "20240101", kospi_close=kospi_series)
 
         # KOSPI 날짜 불일치 → reindex → NaN → None
+        rs_idx = _DAILY_COLS.index("RS_Line")
         for row in rows:
-            assert row[-1] is None, f"날짜 불일치 시 RS_Line은 None이어야 하나 {row[-1]} 반환됨"
+            assert row[rs_idx] is None, (
+                f"날짜 불일치 시 RS_Line은 None이어야 하나 {row[rs_idx]} 반환됨"
+            )
 
     def test_rs_line_in_daily_cols(self):
         """_DAILY_COLS에 'RS_Line'이 포함되어야 한다."""
@@ -219,11 +224,34 @@ class TestRsLineCalculation:
 
         assert "RS_Line" in _DAILY_COLS
 
-    def test_rs_line_is_last_in_daily_cols(self):
-        """RS_Line은 _DAILY_COLS의 마지막 컬럼이어야 한다."""
-        from my_chart.db.daily import _DAILY_COLS
+    def test_rs_line_is_addressable_by_name_in_daily_cols(self, monkeypatch):
+        """row 튜플은 _DAILY_COLS와 폭이 같아 RS_Line을 이름으로 인덱싱할 수 있다.
 
-        assert _DAILY_COLS[-1] == "RS_Line"
+        구 테스트명은 test_rs_line_is_last_in_daily_cols 였다. SPEC-MINERVINI가
+        RS_Line 뒤에 SMA150/LOW_52W/SMA200_20D_AGO를 덧붙이면서 '마지막 컬럼'은
+        더 이상 불변식이 아니다. 실제 불변식은 daily.py:267 @MX:ANCHOR가 말하는
+        column-name 기반 INSERT — 즉 row 튜플과 _DAILY_COLS가 같은 길이/순서라
+        이름으로 얻은 인덱스가 항상 유효하다는 것이다.
+        """
+        from my_chart.db.daily import _DAILY_COLS, _fetch_daily_stock
+
+        assert "RS_Line" in _DAILY_COLS
+        # 이름 조회가 모호하지 않아야 인덱싱이 성립한다
+        assert len(set(_DAILY_COLS)) == len(_DAILY_COLS), "중복 컬럼명 존재"
+
+        stock_df = self._make_stock_df([70000.0, 71000.0, 72000.0])
+        kospi_series = self._make_kospi_series([2500.0, 2510.0, 2520.0])
+        monkeypatch.setattr("my_chart.db.daily.price_naver", lambda *a, **kw: stock_df)
+        monkeypatch.setattr("my_chart.db.daily.time.sleep", lambda _: None)
+
+        _, rows = _fetch_daily_stock("테스트", "20240101", kospi_close=kospi_series)
+
+        assert rows
+        for row in rows:
+            assert len(row) == len(_DAILY_COLS), (
+                f"row 폭({len(row)})이 _DAILY_COLS({len(_DAILY_COLS)})와 다르다 — "
+                "이름 기반 인덱싱이 무음으로 어긋난다"
+            )
 
 
 # ---------------------------------------------------------------------------

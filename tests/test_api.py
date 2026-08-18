@@ -172,14 +172,20 @@ class TestScreenEndpoint:
         assert resp.status_code == 200
 
     def test_too_many_patterns_rejected(self, client, patch_db):
-        """More than 3 patterns should return 422."""
-        payload = {
-            "patterns": [
-                {"indicator_a": "Close", "operator": "gt", "indicator_b": "SMA50", "multiplier": 1.0}
-            ] * 4
-        }
-        resp = client.post("/api/screen", json=payload)
-        assert resp.status_code == 422
+        """patterns는 5개까지 허용(200), 6개부터 거부(422).
+
+        SPEC-MINERVINI-001이 상한을 3 → 5로 올렸다. 경계를 양쪽으로 단언해
+        상한값 자체를 고정한다.
+        """
+        cond = {"indicator_a": "Close", "operator": "gt", "indicator_b": "SMA50", "multiplier": 1.0}
+
+        # 경계 이하: 5개는 수용
+        accepted = client.post("/api/screen", json={"patterns": [cond] * 5})
+        assert accepted.status_code == 200
+
+        # 경계 초과: 6개는 거부
+        rejected = client.post("/api/screen", json={"patterns": [cond] * 6})
+        assert rejected.status_code == 422
 
     def test_market_filter_kospi(self, client, patch_db):
         resp = client.post("/api/screen", json={"markets": ["KOSPI"]})

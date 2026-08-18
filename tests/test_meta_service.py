@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -71,6 +72,33 @@ def _mock_sector_df() -> pd.DataFrame:
         "산업명(중)": ["반도체", "반도체"],
         "주요제품": ["메모리", "D램"],
     })
+
+
+def _stub_basic_data(monkeypatch, shares: dict[str, int] | None) -> list[str]:
+    """Input/basic_data.xlsx 의존을 끊고 테스트가 상장주식수를 직접 공급한다.
+
+    shares=None 이면 파일이 없는 상황(소스 unavailable)을 재현한다.
+    반환값은 read_excel 호출 기록으로, 목이 실제로 먹혔는지 확인하는 데 쓴다.
+    """
+    calls: list[str] = []
+    orig_exists = Path.exists
+
+    def _fake_exists(self: Path) -> bool:
+        if self.name == "basic_data.xlsx":
+            return shares is not None
+        return orig_exists(self)
+
+    def _fake_read_excel(path, *args, **kwargs):
+        calls.append(str(path))
+        assert shares is not None, "소스 부재 시나리오에서는 read_excel이 호출되면 안 된다"
+        return pd.DataFrame({
+            "단축코드": list(shares.keys()),
+            "상장주식수": list(shares.values()),
+        })
+
+    monkeypatch.setattr(Path, "exists", _fake_exists)
+    monkeypatch.setattr(pd, "read_excel", _fake_read_excel)
+    return calls
 
 
 # ---------------------------------------------------------------------------
@@ -260,35 +288,33 @@ class TestRebuild:
         except sqlite3.OperationalError:
             pass  # table might not exist if _rebuild returned early before CREATE TABLE
 
-    def test_market_cap_stored_from_pykrx(self, monkeypatch, tmp_path):
-        """market_cap values from pykrx should be stored in stock_meta (억원 unit)."""
+    def test_market_cap_computed_from_basic_data(self, monkeypatch, tmp_path):
+        """market_cap = basic_data.xlsx의 상장주식수 × 종가 (원 단위 저장).
+
+        구 테스트명은 test_market_cap_stored_from_pykrx 였다. 프로덕션이 pykrx를
+        더 이상 쓰지 않고 Input/basic_data.xlsx에서 시가총액을 계산하도록 바뀌었다
+        (meta_service.py: 상장주식수 × 종가, 원 단위).
+        """
         weekly_path = str(tmp_path / "weekly.db")
         _create_weekly_db(weekly_path, self._DEFAULT_WEEKLY_STOCKS)
 
         conn = self._make_conn(self._DEFAULT_DAILY_STOCKS, weekly_path, monkeypatch)
 
-        # Patch pykrx inside sys.modules so the dynamic import in _rebuild picks it up
-        import sys
-        import types
-        fake_pykrx_pkg = types.ModuleType("pykrx")
-        fake_stock = types.ModuleType("pykrx.stock")
-        mc_data = pd.DataFrame(
-            {"시가총액": [500_000_000_000_000, 200_000_000_000_000]},
-            index=pd.Index(["005930", "000660"]),
-        )
-        setattr(fake_stock, "get_market_cap", lambda *_: mc_data)
-        setattr(fake_pykrx_pkg, "stock", fake_stock)
-        monkeypatch.setitem(sys.modules, "pykrx", fake_pykrx_pkg)
-        monkeypatch.setitem(sys.modules, "pykrx.stock", fake_stock)
+        # 레포의 실제 xlsx를 읽지 않고 테스트가 상장주식수를 공급한다
+        shares = {"005930": 5_969_782_550, "000660": 728_002_365}
+        calls = _stub_basic_data(monkeypatch, shares)
 
         _rebuild(conn, weekly_path)
+
+        assert calls, "read_excel 목이 실제로 호출되어야 한다(레포 xlsx를 읽으면 안 됨)"
 
         row = conn.execute(
             "SELECT market_cap FROM stock_meta WHERE code = '005930'"
         ).fetchone()
         assert row is not None
-        # 500_000_000_000_000 원 / 100_000_000 = 5_000_000 억원
-        assert row[0] == 5_000_000
+        # 삼성전자 종가 70000.0 × 상장주식수 = 시가총액(원)
+        close_price = 70000.0
+        assert row[0] == int(close_price * shares["005930"])
 
     def test_sma5_column_exists_and_value_copied(self, monkeypatch, tmp_path):
         """SPEC-SMA5-FILTER-001 AC-4/REQ-SMA5-003: rebuild 후 stock_meta에 sma5가 존재하고
@@ -479,35 +505,30 @@ class TestRebuild:
         finally:
             conn.close()
 
-    def test_market_cap_is_null_when_pykrx_fails_and_no_dday_column(self, monkeypatch, tmp_path):
-        """Regression: when pykrx fails and sectormap has no D-day column,
-        market_cap should be NULL (not cause a crash).
-        This documents the current behavior when the fallback has no data."""
+    def test_market_cap_is_null_when_basic_data_unavailable(self, monkeypatch, tmp_path):
+        """회귀: basic_data.xlsx를 읽을 수 없으면 crash 없이 market_cap = NULL.
+
+        구 테스트명은 test_market_cap_is_null_when_pykrx_fails_and_no_dday_column
+        이었다. 프로덕션에서 pykrx 폴백 경로가 사라지고 시가총액 소스가
+        Input/basic_data.xlsx 하나로 바뀌었으므로, NULL 조건도 '그 소스의 부재'다.
+        """
         weekly_path = str(tmp_path / "weekly.db")
         _create_weekly_db(weekly_path, self._DEFAULT_WEEKLY_STOCKS)
 
         conn = self._make_conn(self._DEFAULT_DAILY_STOCKS, weekly_path, monkeypatch)
 
-        # Patch pykrx to raise an exception (simulating network/auth failure)
-        import sys
-        import types
-        fake_pykrx_pkg = types.ModuleType("pykrx")
-        fake_stock = types.ModuleType("pykrx.stock")
-        setattr(fake_stock, "get_market_cap", lambda *_: (_ for _ in ()).throw(
-            Exception("KRX network error")
-        ))
-        setattr(fake_pykrx_pkg, "stock", fake_stock)
-        monkeypatch.setitem(sys.modules, "pykrx", fake_pykrx_pkg)
-        monkeypatch.setitem(sys.modules, "pykrx.stock", fake_stock)
+        # basic_data.xlsx 부재 재현 (shares=None)
+        calls = _stub_basic_data(monkeypatch, None)
 
-        # sectormap has no D-day column (the current production state)
         _rebuild(conn, weekly_path)
 
-        # Stocks should still be inserted, but market_cap will be NULL
+        assert not calls, "소스가 없으면 read_excel에 진입하지 않아야 한다"
+
+        # 소스가 없어도 종목 자체는 삽입되고, market_cap만 NULL이어야 한다
         row = conn.execute(
             "SELECT code, market_cap FROM stock_meta WHERE code = '005930'"
         ).fetchone()
-        assert row is not None, "Stock should be inserted even when pykrx fails"
+        assert row is not None, "시가총액 소스가 없어도 종목은 삽입되어야 한다"
         assert row[1] is None, (
-            "market_cap should be NULL when pykrx fails and sectormap has no D-day column"
+            "basic_data.xlsx가 없으면 market_cap은 NULL이어야 한다"
         )

@@ -66,14 +66,18 @@ def _make_stock_meta_db(stocks: list[dict]) -> sqlite3.Connection:
     return conn
 
 
+# stock_meta.market_cap은 프로덕션에서 원 단위로 저장된다(meta_service: 상장주식수 × 종가).
+# 요청(ScreenRequest.market_cap_min)만 억원 단위이므로 픽스처도 원 단위로 맞춘다.
+_EOK = 100_000_000  # 1억원
+
 _SAMPLE_STOCKS = [
-    {"code": "005930", "name": "삼성전자", "market": "KOSPI", "market_cap": 3000000,
+    {"code": "005930", "name": "삼성전자", "market": "KOSPI", "market_cap": 3_000_000 * _EOK,
      "sector_major": "전기전자", "close": 70000.0, "rs_12m": 85.0, "sma50": 65000.0},
-    {"code": "000660", "name": "SK하이닉스", "market": "KOSPI", "market_cap": 1500000,
+    {"code": "000660", "name": "SK하이닉스", "market": "KOSPI", "market_cap": 1_500_000 * _EOK,
      "sector_major": "전기전자", "close": 130000.0, "rs_12m": 72.0, "sma50": 120000.0},
-    {"code": "005490", "name": "POSCO홀딩스", "market": "KOSPI", "market_cap": 500000,
+    {"code": "005490", "name": "POSCO홀딩스", "market": "KOSPI", "market_cap": 500_000 * _EOK,
      "sector_major": "철강금속", "close": 200000.0, "rs_12m": 60.0, "sma50": 190000.0},
-    {"code": "035420", "name": "NAVER", "market": "KOSPI", "market_cap": 800000,
+    {"code": "035420", "name": "NAVER", "market": "KOSPI", "market_cap": 800_000 * _EOK,
      "sector_major": "서비스업", "close": 150000.0, "rs_12m": 55.0, "sma50": 145000.0},
 ]
 
@@ -91,10 +95,11 @@ class TestBuildWhere:
         assert params == []
 
     def test_market_cap_filter(self):
+        # 요청은 억원 단위, DB는 원 단위 → 1억 배 변환된 값이 바인딩되어야 한다
         req = ScreenRequest(market_cap_min=1000000)
         where, params = _build_where(req)
         assert "market_cap >= ?" in where
-        assert 1000000 in params
+        assert 1000000 * 100_000_000 in params
 
     def test_chg_1d_filter(self):
         req = ScreenRequest(chg_1d_min=2.0)
@@ -202,12 +207,25 @@ class TestBuildWhere:
         assert "close >= sma50 * ?" in where
 
     def test_max_patterns_enforced(self):
-        """Pydantic model should reject more than 3 patterns."""
-        patterns = [
-            PatternCondition(indicator_a="Close", operator="gt", indicator_b="SMA50", multiplier=1.0)
-        ] * 4
+        """patterns는 5개까지 허용하고 6개부터 거부한다 (max_length=5).
+
+        SPEC-MINERVINI-001이 Minervini 템플릿을 위해 상한을 3 → 5로 올렸다.
+        경계를 양쪽으로 단언해 상한값 자체를 고정한다.
+        """
+        def _patterns(n: int) -> list[PatternCondition]:
+            return [
+                PatternCondition(
+                    indicator_a="Close", operator="gt", indicator_b="SMA50", multiplier=1.0
+                )
+            ] * n
+
+        # 경계 이하: 5개는 통과
+        req = ScreenRequest(patterns=_patterns(5))
+        assert len(req.patterns) == 5
+
+        # 경계 초과: 6개는 거부
         with pytest.raises(ValidationError):
-            ScreenRequest(patterns=patterns)
+            ScreenRequest(patterns=_patterns(6))
 
 
 # ---------------------------------------------------------------------------

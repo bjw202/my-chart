@@ -1,6 +1,7 @@
 """Meta service: rebuild the stock_meta screening snapshot table.
 
-Joins daily DB (latest date) + weekly DB (latest date + RS) + sectormap + pykrx market cap
+Joins daily DB (latest date) + weekly DB (latest date + RS) + sectormap +
+Input/basic_data.xlsx 기반 시가총액(상장주식수 × 종가, 원 단위)
 into a single denormalized table for sub-100ms SQL filtering.
 """
 
@@ -91,10 +92,11 @@ def _business_days_since(target: datetime.date) -> int:
 
 
 def rebuild_stock_meta(daily_db_path: str, weekly_db_path: str) -> None:
-    """Rebuild stock_meta from latest daily + weekly + RS + sectormap + pykrx data.
+    """Rebuild stock_meta from latest daily + weekly + RS + sectormap + basic_data.xlsx.
 
     Stocks missing from daily DB are excluded from stock_meta.
-    NULL is stored for pykrx market cap when the fetch fails.
+    시가총액은 Input/basic_data.xlsx의 상장주식수 × 종가로 계산해 원 단위로 저장하며,
+    해당 소스를 읽을 수 없으면 NULL을 저장한다.
     """
     conn = get_db_conn(daily_db_path)
     try:
