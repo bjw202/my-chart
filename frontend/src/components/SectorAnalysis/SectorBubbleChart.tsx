@@ -10,12 +10,16 @@ import {
   bubbleSymbolSize,
   sizeLegendRefs,
   formatTradingValueEok,
-  PERIOD_SIZE_LADDER,
+  SECTOR_PERIOD_SIZE_LADDER,
   SECTOR_BUBBLE_R_MIN,
   SECTOR_BUBBLE_R_MAX,
 } from './bubbleRadius'
 import type { SizePeriod } from './bubbleRadius'
 import { metricText, toMetricValue } from '../common/MetricCell'
+
+// M5.5(SPEC-SECTOR-METRIC-UNIFY-001) — 섹터 trading_value는 M4 이후 VolumeWon
+// 기간 누적 = 억원 단위. 기존 포맷터는 원 단위 입력을 가정하므로 원 복원 후 표기한다.
+const formatSectorTradingValue = (v: number): string => formatTradingValueEok(v * 1e8)
 
 // 시장 필터 → 벤치마크 이름 (VZ-10). X=0 초과수익률 = 벤치마크 동일 성과.
 // @MX:NOTE: [AUTO] 벤치마크 절대 수익률 값(+1.88% 등)은 backend 가 미전달 — VZ-5 절대값은 debt(AC-SUX-042 섹터 PASS-WITH-DEBT).
@@ -53,8 +57,8 @@ interface Props {
 
 // 크기 범례 (VZ-2) — 3개 참조 버블 + 실제 값 텍스트 + 기간 병기.
 function SizeLegend({ period }: { period: SizePeriod }): ReactElement {
-  const refs = sizeLegendRefs(period, SECTOR_BUBBLE_R_MIN, SECTOR_BUBBLE_R_MAX)
-  const { periodLabel } = PERIOD_SIZE_LADDER[period]
+  const refs = sizeLegendRefs(period, SECTOR_BUBBLE_R_MIN, SECTOR_BUBBLE_R_MAX, SECTOR_PERIOD_SIZE_LADDER[period])
+  const { periodLabel } = SECTOR_PERIOD_SIZE_LADDER[period]
   return (
     <div className="bubble-size-legend" data-testid="sector-size-legend">
       <span className="bubble-size-legend-title">크기 = 거래대금 {periodLabel} (로그·고정 눈금)</span>
@@ -66,7 +70,7 @@ function SizeLegend({ period }: { period: SizePeriod }): ReactElement {
               style={{ width: r.diameter, height: r.diameter }}
               aria-hidden
             />
-            <span className="bubble-size-legend-value">{formatTradingValueEok(r.value)}</span>
+            <span className="bubble-size-legend-value">{formatSectorTradingValue(r.value)}</span>
           </span>
         ))}
       </span>
@@ -92,7 +96,7 @@ function ColorLegend(): ReactElement {
 }
 
 export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'all' }: Props): ReactElement {
-  const ladder = PERIOD_SIZE_LADDER[period]
+  const ladder = SECTOR_PERIOD_SIZE_LADDER[period]
   const benchmarkLabel = MARKET_BENCHMARK_LABEL[market ?? 'all'] ?? '전체 상한가중'
 
   const option = useMemo((): EChartsOption => {
@@ -240,7 +244,7 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
           const periodReturn = metricText(toMetricValue(d[3]), n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`)
           const tvLine = missing
             ? '거래대금: 데이터 없음'
-            : `거래대금: ${formatTradingValueEok(Number(d[5]))}`
+            : `거래대금: ${formatSectorTradingValue(Number(d[5]))}`
           return [
             `<b>${name}</b>`,
             `초과수익률: ${excessReturn}`,

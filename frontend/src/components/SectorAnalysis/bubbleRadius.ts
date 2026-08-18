@@ -24,10 +24,27 @@ export interface SizeLadder {
 }
 
 export const PERIOD_SIZE_LADDER: Readonly<Record<SizePeriod, SizeLadder>> = {
-  // 억 = 1e8, 조 = 1e12
+  // 억 = 1e8, 조 = 1e12 — 종목 버블 기준(원 단위 Close×Volume 스케일)
   '1w': { vMin: 1e10, vMax: 1e12, refs: [1e10, 1e11, 1e12], periodLabel: '1W' }, // 100억 / 1,000억 / 1조
   '1m': { vMin: 5e10, vMax: 5e12, refs: [5e10, 5e11, 5e12], periodLabel: '1M' }, // 500억 / 5,000억 / 5조
   '3m': { vMin: 1e11, vMax: 1e13, refs: [1e11, 1e12, 1e13], periodLabel: '3M' }, // 1,000억 / 1조 / 10조
+}
+
+// 섹터 전용 사다리 (SPEC-SECTOR-METRIC-UNIFY-001 M5.5 / AC-SMU-018·갭 G-3).
+// M4 이후 섹터 버블의 trading_value는 VolumeWon 기간 누적 = 억원 단위
+// (실측: close×volume/1e8 — 삼성전자·SK하이닉스·에코프로비엠 ratio 1.00e8 공히).
+// 종목 버블(원 단위 Close×Volume)과 단위가 갈려 사다리를 분리한다 —
+// frozen fixture 2026-08-11 post-M4 분포(18섹터, all)의 5~95 백분위가 구간 안으로
+// 들어오도록 재산출했고, 로그 중간값을 refs 중간 참조로 둔다:
+//   1w 분포 [2.2e3, 9.4e5] p5 3.6e3 / p95 1.8e5 → [1e3, 1e6]
+//   1m 분포 [4.9e3, 4.0e6] p5 1.1e4 / p95 7.3e5 → [5e3, 5e6]
+//   3m 분포 [3.6e4, 1.5e7] p5 4.4e4 / p95 3.2e6 → [1e4, 1e7]
+// 종목 버블의 억원 단위 통일은 SPEC-SECTOR-DISPLAY-UNIFY-001 판단 사항으로 이월.
+// @MX:SPEC: SPEC-SECTOR-METRIC-UNIFY-001 (REQ-SMU-023)
+export const SECTOR_PERIOD_SIZE_LADDER: Readonly<Record<SizePeriod, SizeLadder>> = {
+  '1w': { vMin: 1e3, vMax: 1e6, refs: [1e3, 3e4, 1e6], periodLabel: '1W' },
+  '1m': { vMin: 5e3, vMax: 5e6, refs: [5e3, 1.5e5, 5e6], periodLabel: '1M' },
+  '3m': { vMin: 1e4, vMax: 1e7, refs: [1e4, 3e5, 1e7], periodLabel: '3M' },
 }
 
 /**
@@ -72,13 +89,16 @@ export function bubbleSymbolSize(
 /**
  * 크기 범례 참조 버블 데이터 (VZ-2). [값, 지름] 쌍 3개 + 기간 라벨.
  * 범례 컴포넌트가 이 값을 그대로 렌더한다 — 프론트가 값을 계산하지 않는다.
+ * ladder 인자 생략 시 종목 버블용 PERIOD_SIZE_LADDER (기존 호환) —
+ * 섹터 버블은 SECTOR_PERIOD_SIZE_LADDER를 명시적으로 전달한다 (M5.5 단위 분리).
  */
 export function sizeLegendRefs(
   period: SizePeriod,
   rMin: number,
   rMax: number,
+  ladder?: SizeLadder,
 ): { value: number; diameter: number }[] {
-  const { vMin, vMax, refs } = PERIOD_SIZE_LADDER[period]
+  const { vMin, vMax, refs } = ladder ?? PERIOD_SIZE_LADDER[period]
   return refs.map(value => ({
     value,
     diameter: 2 * bubbleRadius(value, vMin, vMax, rMin, rMax),

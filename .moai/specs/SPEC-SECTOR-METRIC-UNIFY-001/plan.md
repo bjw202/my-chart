@@ -138,6 +138,7 @@ M5 이후에도 레거시 `sectors[]`는 KOSPI 기준이라 Table과 Bubble이 *
 | `backend/tests/test_sector_advanced.py:277-334` | 주석으로 "이 함수는 더 이상 `/api/sectors/bubble`를 지원하지 않음" 명시 (M4) |
 | `backend/tests/test_bubble_characterization.py` (M0 신설) | M4 커밋에서 뒤집거나 삭제 |
 | `tests/test_sectors_bubble_market_contract.py::test_bubble_market_partition_is_exact` | **M4 런타임 등재 (2026-08-18, 사용자 승인 — 계획 누락 보완)**: 기존 "kospi+kosdaq == all" 분할 등식은 AG-5 미적용 시에만 참인 계약. M4가 버블에 봉투와 동일한 AG-5(시장별 멤버쉽 기준, AC-SMU-015/REQ-SMU-012)를 적용하면서 디스플레이·패션(단일 시장 유니버스 미달)이 시장별 응답에서 제외되어 등식이 구조적으로 깨짐 — M0의 bubble-only 관측(kospi {디스플레이,스마트폰,패션})이 이미 예측한 귀결. 재기술: 양쪽 존재 섹터는 엄격 등식 유지 + 한쪽만 존재 섹터는 존재 쪽 < all 엄격 부등식 + (a) 집합 최소 1개 단언 (완화 아닌 AG-5 의미론 반영) |
+| `frontend/src/components/SectorAnalysis/__tests__/SectorBubbleChart.m5.test.tsx` (AC-SUX-039 범례 3종) | **M5.5 런타임 등재 (2026-08-18, 사용자 승인 — 사다리 분리의 귀결)**: 참조 리터럴이 구 사다리(원 단위 기준) 값이었으나 M5.5가 섹터 전용 사다리 SECTOR_PERIOD_SIZE_LADDER(억원 VolumeWon 기준 재산출)를 신설하면서 갱신. 함께 M4가 만든 표시 회귀(억원 trading_value를 원 단위 가정 포맷터에 통과해 범례·툴팁이 0억으로 렌더)를 섹터 차트 호출부 원 복원으로 해소 |
 
 이 목록 밖의 기존 테스트가 깨지면 **의도치 않은 회귀**로 취급한다.
 

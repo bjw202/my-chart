@@ -31,19 +31,21 @@ beforeEach(() => { capturedOption = {} })
 afterEach(() => { vi.restoreAllMocks(); cleanup() })
 
 describe('AC-SUX-039 — 크기 범례 (VZ-2, 기간별 고정 눈금)', () => {
-  it('1W 범례 참조값 3개 = 100억/1,000억/1조 리터럴 + 기간 병기 텍스트', () => {
+  // M5.5(SPEC-SECTOR-METRIC-UNIFY-001) — 섹터 버블 사다리가 SECTOR_PERIOD_SIZE_LADDER
+  // (억원 VolumeWon 기준, AC-SMU-018 재산출)로 분리됨에 따라 참조 리터럴 갱신.
+  it('1W 범례 참조값 3개 = 1,000억/3조/100조 리터럴 + 기간 병기 텍스트', () => {
     const { container } = render(<SectorBubbleChart sectors={makeSectors()} onSectorClick={() => {}} period="1w" />)
     const legend = container.querySelector('[data-testid="sector-size-legend"]')
     expect(legend).not.toBeNull()
     expect(legend!.textContent).toContain('1W')
     const values = Array.from(legend!.querySelectorAll('.bubble-size-legend-value')).map(e => e.textContent)
-    expect(values).toEqual(['100억', '1,000억', '1조'])
+    expect(values).toEqual(['1,000억', '3조', '100조'])
   })
 
-  it('3M 범례 참조값 = 1,000억/1조/10조', () => {
+  it('3M 범례 참조값 = 1조/30조/1,000조', () => {
     const { container } = render(<SectorBubbleChart sectors={makeSectors()} onSectorClick={() => {}} period="3m" />)
     const values = Array.from(container.querySelectorAll('.bubble-size-legend-value')).map(e => e.textContent)
-    expect(values).toEqual(['1,000억', '1조', '10조'])
+    expect(values).toEqual(['1조', '30조', '1,000조'])
   })
 
   it('데이터 불변 — 거래대금 분포가 전혀 달라도 범례 값 3개는 동일 (데이터 적응형이면 실패)', () => {
@@ -54,7 +56,7 @@ describe('AC-SUX-039 — 크기 범례 (VZ-2, 기간별 고정 눈금)', () => {
     rerender(<SectorBubbleChart sectors={big} onSectorClick={() => {}} period="1w" />)
     const v2 = Array.from(container.querySelectorAll('.bubble-size-legend-value')).map(e => e.textContent)
     expect(v1).toEqual(v2)
-    expect(v1).toEqual(['100억', '1,000억', '1조'])
+    expect(v1).toEqual(['1,000억', '3조', '100조'])
   })
 })
 
