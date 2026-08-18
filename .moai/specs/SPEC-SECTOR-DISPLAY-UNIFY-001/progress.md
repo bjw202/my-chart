@@ -243,7 +243,8 @@ $ cd frontend && npx vitest run --exclude "e2e/**"
 - **실행 방식**: orchestrator-direct(운영자 승인 A, 리드 경유) — 스폰 2회 사망 경위·부작위 관측은 §E.2.0/§E.2.1
 - **미푸시 상태**: 본 SPEC 6커밋(0023210·45ffaad·ae2b8af·a2c1550·4059f44 + 본 §E.3 정리 커밋) — 본 커밋 착지 후 `git rev-list --count --left-right origin/main...HEAD` = `0 6`. t3·t5·t6 계열은 런 착수 전 pre-flight에서 이미 동기화(`0 0`)였다. push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)
 - **G-F2 백로그 (범위 밖 기록 — spec.md §4)**: `ThemeAnalysis/ThemeRankingTable.tsx:33/:38/:43`이 같은 직접 포맷 패턴(`toFixed` 계열 percent 포매터 3종)을 가진다. 본 SPEC 범위 확장 금지 — 후속 백로그로만 남긴다.
-- **라이브 확인 상태 (lessons #1/#2, DoD 잔여)**: 프론트 dev 서버 가동 중(localhost:5173, Vite HMR — 변경 자동 반영)·백엔드 8000 청취 관측(2026-08-19 00:30). 라벨·색 채널의 **시각적 최종 확인은 운영자 화면 점검**으로 남긴다.
+- **라이브 확인 상태 (lessons #1/#2) — 해소 (2026-08-19, 운영자 판정)**: 색 채널 구분 양호(RS 등급 열 ↔ RS 80+ 비중 열)·차트 셀 배지 `RS등급 {v}` 가독성 문제없음(RS Line 버튼과 구분)·기간 토글 실동작 확인·나머지 라벨 이의 없음.
+  **경위 기록 (재발 패턴)**: 최초 확인 시 기간 토글이 Table·Bubble 양쪽에서 무반응이었다 — 코드 결함이 아니라 **낡은 dev 서버**였다. M7 이 MarketContext.tsx 의 provider effect dep 를 `[fetchAll, market]` → `[fetchAll, market, period]` 로 넓혔는데, React Fast Refresh 가 이미 마운트된 provider 의 예전 effect 를 보존해 period 변경이 재조회를 트리거하지 못했다. 기간 버튼은 눌렸지만 숫자가 안 움직여 "선택 불가"로 보였다(버블은 `PERIOD_DISABLED_SUBTABS = ['rrg','bump']` 외라 원래 활성 — 첫 관찰의 "버블 선택 불가"도 같은 원인). 근거: 현 vite 프로세스 시작 01:00:00 > 마지막 커밋 a544c36 00:47:59, 그 사이 코드 변경 0(리드 명령은 전부 읽기 전용). 서버 재시작 후 동일 UI 정상 동작. **교훈: provider·hook dep·모듈 싱글턴을 건드린 변경의 라이브 확인은 dev 서버 재시작 후에 한다 — 안 하면 낡은 번들을 검사하고 미구현으로 오판한다.** (본 §E.3 이전 기술의 "Vite HMR — 변경 자동 반영" 주장도 이 함정의 일부였다: HMR 은 컴포넌트는 갱신하지만 마운트된 provider 의 effect 보존으로 dep 변경이 반영되지 않을 수 있다.)
 - **ef 종결**: EF-1~EF-4 처분은 §E.2.3 M7 Gaps 노트 참조 (전부 구조적 커버 또는 타입 레벨 차단).
 
 ## §E.4 Sync-phase Audit-Ready Signal
