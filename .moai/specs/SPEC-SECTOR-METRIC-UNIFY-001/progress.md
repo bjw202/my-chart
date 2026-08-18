@@ -301,7 +301,26 @@ period  min         p5          p50         p95         max          | 기존 �
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+- sync_status: audit-ready
+- sync_complete_at: 2026-08-18
+- sync_commit_sha: pending-backfill-sync (후속 backfill 커밋에서 실제 SHA 기입 — 선례 a4ecea8 → 777f044)
+- 실행 방식: **orchestrator-direct (사용자 승인, 2026-08-18)** — gate-sync-1·gate-sync-2·실행 방식 3문항 1회 AskUserQuestion 통합 승인. 근거: GLM 세션 manager-docs 스폰 하위 컨텍스트 한계 연쇄 사망 선례(어제 sync 2회·본 SPEC run 4회, memory `project_glm_subagent_ctx_death`) + 검증·커버리지는 이미 본 세션이 직접 완료
+- **sync 검증 배치 (관측 주체: sync-tjvce8 세션, HEAD 6cb3735, 이번 실행 — 리드 재현 및 §E.3 기준선과 독립 대조)**:
+  | 검증 | 관측 출력 | 증거 파일(절대 경로) |
+  |---|---|---|
+  | pytest SPEC 9스위트 단일 호출(컬렉션 함정 파일 `test_ai_report_router_deep_mode.py` 제외) | `157 passed, 1 warning in 136.48s`, exit 0 — §E.3 기준선 157과 일치 | `/Users/byunjungwon/Dev/my-project-01/my_chart/.moai/state/verify/sync-tjvce8-smu001/coverage-pytest.txt` |
+  | vitest 레인 `src/components/SectorAnalysis src/components/common` | `Test Files 29 passed (29)` · `Tests 290 passed (290)`, exit 0 — §E.3 기준선 290과 일치 | `…/sync-tjvce8-smu001/vitest-lane.txt` |
+  | `cd frontend && npx tsc -b` (교정된 게이트 명령) | exit 2, `error TS` 29건 — `SectorBubbleChart` 귀속 **0건**(전부 무관 pre-existing). 리드 B2 재현(29/0)과 일치 | `…/sync-tjvce8-smu001/tsc-b.txt` |
+  | 스냅샷 소비 시도 `moai verify check --key-current` | `fresh: false — no snapshot recorded for the current working-tree key` → attributable diff-check 불가, 재실행으로 귀속(위 3종) | — |
+- **커버리지 (G-5 해소 — 리드 승인 하에 venv에 coverage 7.15.4 설치 후 최초 실측)**: `coverage run --source=my_chart,backend -m pytest <9 files>` → `coverage report` (acceptance §E DoD 형태 그대로):
+  - SPEC 변경 파일: `backend/schemas/sector_advanced.py` **100%** · `backend/services/sector_advanced_service.py` **88%** · `my_chart/analysis/sector_metrics.py` **97%** · `backend/routers/sectors.py` 78% · `my_chart/analysis/sector_advanced.py` 81%
+  - 전체 TOTAL 39% — `--source` 전수(my_chart+backend 전 파일) 값으로 SPEC 무관 파일 대부분이 미실행에 포함됨. 게이트 수치가 아니라 측정 기록. 증거: `…/sync-tjvce8-smu001/coverage-report.txt`
+- **AC-005 Gap 상태 공시 (sync 미처리 — manager-spec 소관)**: frozen 픽스처에 기계·금융 섹터 부재(F24)로 되돌림 불가. AC 문구 개정(섹터 재지정 또는 합성 픽스처)은 후속 manager-spec 위임 사항
+- **잔여 항목 분류 (review-report.md §권고 처리 순서 기준)**: ①~③ run 재작업 완료(`1f0c304`) · **④** SPEC 개정(REQ-SMU-023/AC-SMU-018 → `SECTOR_PERIOD_SIZE_LADDER` 지목 + HISTORY 행) — manager-spec 후속 · **⑤** F7 사다리 상수 vMin/vMax 관측자 신설 — 배포 전 권고, 후속 · **⑥** F3/F22 단위 표기 정정 + `formatSectorTradingValue` export 이동 — SDU-001/후속 · **⑦** F14~F29 — SDU-001·백로그 분류. 본 sync는 문서 동기화 단계로 코드 변경 없음(docs-only)
+- **증거 보존 확인 (리드 지시 — 절대 경로 ls)**: `.moai/state/verify/run-tjvce8-smu001/` 8파일(약 2.8MB) · `review-tjvce8-smu001/` 2파일 · `sync-tjvce8-smu001/` 4파일 모두 실재 관측. 리드 정정(2026-08-18) 반영: §E.5의 "인용 경로 미해석" 관측은 리드 측 cwd 오염(`cd frontend` 후 상대 경로 → `frontend/.moai/` nested 잔재)에 의한 오관측으로 철회됨 — 증거 소실 사고 없었음. 커밋 직후 재확인 분은 backfill 커밋에 기록
+- MX 관찰: 변경 코드 파일 내 `@MX` 태그 27개(SectorBubbleChart 9 · sector_advanced 7 · bubbleRadius 4 · schemas 4 · routers 2 · types 1). `sector_advanced_service.py` 0개는 변경 전 기준선과 동일(실측 `git show 777f044 | grep -c @MX` = 0 — 회귀 아님)
+- CHANGELOG: `[Unreleased]`에 `Fixed (SPEC-SECTOR-METRIC-UNIFY-001 v0.5.0)` 항목 1건 기록. 사전 중복 검사 `grep -c 'SPEC-SECTOR-METRIC-UNIFY-001' CHANGELOG.md` = 0(B12). AC 수는 acceptance.md SSOT 기준(22 AC = 21 PASS + 1 Gap)으로 기록
+- disclosures: docs-only diff + pre-commit 게이트의 pytest 2m 타임아웃(§E.3·전 SPEC sync 선례와 동일 기제) → 문서화된 `SKIP_MOAI_PRECOMMIT=1` 오버라이드 사용. 대체 증거: 동일 HEAD 6cb3735에서 pytest 157 · vitest 290/290 · tsc 귀속 0 커버리지 실측(`…/sync-tjvce8-smu001/`). 스펙 상 no-verify 플래그 미사용
 
 ## §E.5 Review-phase Signal (review-tjvce8, 2026-08-18)
 

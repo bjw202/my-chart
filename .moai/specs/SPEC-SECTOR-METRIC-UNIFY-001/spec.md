@@ -2,7 +2,7 @@
 id: SPEC-SECTOR-METRIC-UNIFY-001
 title: Sector Analysis 지표 산출 원천 단일화
 version: "0.5.0"
-status: in-progress
+status: completed
 created: 2026-08-18
 updated: 2026-08-18
 author: manager-spec

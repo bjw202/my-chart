@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SPEC-SECTOR-METRIC-UNIFY-001 v0.5.0, 2026-08-18)
+
+- **섹터 버블 차트 지표가 랭킹 탭과 달랐던 결함 — 산출 원천 단일화** — 같은 RS 정의를 공유하면서도 섹터 집계 구현이 두 벌 존재해 결측 처리(0점 대체 vs 제외)·초과수익률 벤치마크(KOSPI 지수 vs 시장별 상한 시총가중 유니버스)·거래대금 산식(주봉 close×volume 1개 vs VolumeWon 기간 누적, 약 2.5e7배 차이)·유니버스가 전부 갈렸다. `/api/sectors/bubble`을 `compute_sector_aggregates` 투영으로 전환해 두 경로 지표를 일치시켰다(**불일치 N=18 → 0**, 9조합×4필드쌍 전부). RS 결측 종목은 분모에서 제외(방산 1w/all rs_avg 48.16→54.18), 전원 결측 섹터는 0.0이 아닌 `null`, 거래대금은 VolumeWon 누적(억원) 기준. 봉투 `market_filter`가 모든 요청에 `"all"`로 거짓말하던 결함(D4)도 해소 — 이제 요청 시장을 반영한다
+  - **커밋 하이라이트**: M0 특성화 `6aabf81`(손대지 않은 트리 GREEN 단독 커밋 — 불일치 N=18 리터럴 고정) · M1 RED `3cb3828`(파리티 9조합 + 결측 제외) · M2 배선 `d96ade6`(동작 불변) · M3 nullable `d16cb65`(백 스키마 4필드 `float | None` + TS `number | null` 동시 확장) · **M4 전환 `8f0a0c7`(수치가 바뀐 유일 단계 — N=18→0)** · M5 봉투 정상화 `3d06d9d`(`envelope_fields` + `market_filter` 정직화) · M5.5 `d6d1083`(섹터 전용 사다리 `SECTOR_PERIOD_SIZE_LADDER` 신설 + M4가 폭로한 `0억` 표시 회귀 해소) · review 재작업 `1f0c304`(차단 5건 해소)
+  - **신설된 회귀 가드**: 백엔드 테스트 5종 신설(특성화 21 · 랭킹 파리티 30 · 스키마 nullable 6 · 결측 제외 3 · 빈 date 엣지 1) — SPEC 스위트 파일별 9종 **157 passed**. AC 22종 중 21종 **되돌림 RED 실측**(주입 → RED 관측 → 복원 → 바이트 동등 증명). 관측자 결함 2건을 스스로 폭로·보강(항진명제 — 봉투 market_filter 미검사, 스칼라-only 단언의 판별력 0)
+  - **결측 표시**: `sectorReturnColor`가 null을 받으면 결측 전용색 `#4B5563`으로 렌더 — 종전에는 null이 산술 비교에서 0으로 강제 변환돼 결측 섹터가 보합과 같은 중립 회색으로 렌더되던 회귀 해소(review B2). TS 이중 캐스트 4건 제거로 타입 되돌림 시 `tsc -b` 하드 오류가 나는 정직한 픽스처 복원(AC-029)
+  - **검증**: AC **21/22 PASS + 1 Gap(AC-005)** · pytest 157 passed · vitest SectorAnalysis+common **290/290** · `cd frontend && npx tsc -b` SPEC 귀속 **0건**(잔여 29건 전부 무관 기존 오류 — 루트 tsconfig가 `files: []` solution-style이라 `tsc --noEmit`은 0파일 검사하는 공허 관측임을 리뷰에서 확정, 게이트 교정) · **커버리지 최초 실측**(`coverage run --source=my_chart,backend`): `schemas/sector_advanced.py` 100% · `services/sector_advanced_service.py` 88% · `sector_metrics.py` 97% · `routers/sectors.py` 78% · `analysis/sector_advanced.py` 81%
+  - **Gap**: AC-005(기계·금융 섹터 실측치 — frozen 픽스처에 해당 섹터 부재로 어느 방향으로도 관측 불가, AC 문구 개정은 manager-spec 소관) · 사다리 refs 스케일의 라이브 검증 미실시(대형주 편중 fixture 기준 — 배포 후 첫 주 실측 분포 대비 재확인 권고)
+  - **잔여 분류 (후속)**: F4(SPEC 문구 개정 REQ-SMU-023/AC-018 → `SECTOR_PERIOD_SIZE_LADDER` + HISTORY 행) manager-spec 소관 · F7(`SECTOR ladder` vMin/vMax 커밋 테스트 0건) 배포 전 관측자 신설 권고 · F3/F22(단위 표기 "원"→"억원" 정정 4곳)·F14~F29는 `SPEC-SECTOR-DISPLAY-UNIFY-001` 및 후속 분류 — review-report.md §권고 처리 순서 참조
+
 ### Added (SPEC-CHECKED-SECTOR-GROUP-001 v0.3.0, 2026-08-17)
 
 - **차트 그리드 종목 목록 체크 탭 섹터 그룹핑** — `체크(N)` 탭이 평면 목록에서 섹터 헤더 + 체크 종목 행 구조로 전환. 헤더는 섹터명과 **그 섹터의 체크 수**(유니버스 `stock_count` 아님)를 표시하고 모든 행은 어떤 헤더 아래에 위치한다. 그룹 키는 백엔드 규칙의 정확한 재현(`major = sector_major || '기타'`, `minor ? `${major} > ${minor}` : major` — `backend/services/screen_service.py:221-223`), 정렬은 코드포인트 오름차순(백엔드 `sorted()` 파리티 — `localeCompare('ko')`는 ICU collation이 한글을 Latin 앞에 두어 두 탭 순서가 어긋나므로 기각, 되돌림 보조축으로 실증). 접기 상태는 체크 탭 전용 `Set`으로 분리(전체 탭 `flatItems`/`collapsedSectors` 경로 무변경)
