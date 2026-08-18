@@ -86,7 +86,7 @@ async def sector_bubble(
     from backend.services.sector_advanced_service import get_sector_bubble
 
     try:
-        return get_sector_bubble(WEEKLY_DB_PATH, period=period, market=market)
+        return get_sector_bubble(WEEKLY_DB_PATH, period=period, market=market, daily_db_path=DAILY_DB_PATH)
     except Exception as exc:
         raise HTTPException(
             status_code=503,

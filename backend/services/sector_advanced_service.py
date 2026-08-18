@@ -42,6 +42,7 @@ def get_sector_bubble(
     weekly_db_path: str,
     period: str = "1w",
     market: str | None = "all",
+    daily_db_path: str | None = None,
 ) -> SectorBubbleResponse:
     """섹터 버블 차트 API 응답을 반환한다.
 
@@ -51,6 +52,8 @@ def get_sector_bubble(
         market: ``all``/``None``=전체, ``kospi``/``kosdaq`` (대소문자 무관).
             형제 엔드포인트와 같은 계약이며 ``compute_sector_bubble`` 의
             섹터 유니버스 필터에 실배선된다(get_stock_bubble 관용과 동일).
+        daily_db_path: 일봉 DB 경로(시총가중 원천) — 형제 엔드포인트 정합
+            배선이며 현 시점엔 소비되지 않는다(기본 ``None``).
 
     Returns:
         SectorBubbleResponse
