@@ -255,3 +255,16 @@ period  min         p5          p50         p95         max          | 기존 �
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase>_
+
+## §E.5 Review-phase Signal (review-tjvce8, 2026-08-18)
+
+- review_status: **차단(blocked)** — sync 진행 불가
+- 범위: `777f044..eef55e0` · 모드: `/moai review --deep` (4 헌트 렌즈 → 3인 적대적 패널 2-of-3 quorum)
+- 본문: [review-report.md](./review-report.md) — 확정 결함 29건 + 반증 8건 + 중점 3건 판정 + 미해결 3건 처분
+- 증거: `.moai/state/verify/review-tjvce8-smu001/`
+- 차단 사유 2건(리뷰어 직접 재현):
+  - **B1** `backend/tests/test_bubble_schema_nullable.py`가 main에서 RED (`패션.period_return: None` vs `isinstance(float)`). §E.2가 AC-028 되돌림 증거로 인용한 "1 failed"는 주입 전에도 성립 → 판별력 0 (lessons #9 계열)
+  - **B2** `SectorBubbleChart.tsx(124,77) TS2345` 라이브 타입 오류. 루트 `tsconfig.json`이 `files: []`라 `tsc --noEmit`이 0개 파일 컴파일 → §E.3 `tsc: exit 0`·AC-029 "tsc 통과"는 공허한 관측. 런타임에선 결측 섹터가 보합과 같은 중립 회색으로 렌더
+- §E.3 집계 정정 필요: AC-004/005/008은 §E.2 되돌림 표에 행이 없음에도 "AC-001~011 전부" 블록에 포함 → 21/22 PASS는 액면 성립 불가(최소 18/22 + 4 Gaps, B1 반영 시 추가 하향)
+- 미해결 3건 처분: ① AC-029 Gap 유지 부당 — `null as unknown as number` 캐스트 5개(m5.test:65, MetricTextParity.m7.test:93-94) 제거로 관측자 복원 가능 ② 커버리지 sync 보측 타당하나 B1 선행 ③ 사다리 라이브 미검증은 배포 차단 사유 아님(창 11/32/95일로 규모 정합 실측 확인) — 단 F7(사다리 상수 무관측)은 배포 전 처리 권고
+- 추가 확인: backend 컬렉션 오류 2건은 **본 SPEC 무관 확인**, 단 원인은 `db_service.py` import 실패가 아니라 `test_ai_report_router_deep_mode.py:64-70`의 `sys.modules` 전역 스텁에 의한 수집 순서 의존. 파생 주의 — `pytest backend/tests` 일괄 실행은 0건 실행으로 중단됨
