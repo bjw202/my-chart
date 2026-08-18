@@ -99,6 +99,26 @@ def _make_service_mock():
 
 
 # ---------------------------------------------------------------------------
+# 매너 호출 sleep 무력화 (테스트 전용)
+#
+# 본 파일의 테스트는 HTTP 응답을 전부 목킹하지만, crawler._enforce_sleep_policy()
+# 의 time.sleep(REQUEST_SLEEP_SECONDS=0.7) 와 5xx 재시도의
+# time.sleep(RETRY_BACKOFF_SECONDS=1.0) 은 목킹 대상이 아니라 실제로 잔다.
+# 목킹 요청 6회 × 0.7s ≈ 4.2s/테스트 × 13건 ≈ 60초가 순수 대기였다(2026-08-18 실측).
+# 두 상수만 0 으로 monkeypatch 하여 대기를 없앤다 — 프로덕션 코드와 매너 호출
+# 정책(REQ-NT2-NF-001)은 변경하지 않으며, monkeypatch 이므로 테스트 종료 시 복원된다.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_request_sleep(monkeypatch):
+    from backend.services.naver_theme_v2 import config as _nt2_config
+
+    monkeypatch.setattr(_nt2_config, "REQUEST_SLEEP_SECONDS", 0)
+    monkeypatch.setattr(_nt2_config, "RETRY_BACKOFF_SECONDS", 0)
+
+
+# ---------------------------------------------------------------------------
 # AC-1: 시그니처 검증
 # ---------------------------------------------------------------------------
 

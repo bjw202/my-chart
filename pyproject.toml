@@ -54,6 +54,9 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# 기본 실행에서 live(라이브 HTTP)·slow(장시간) 테스트를 제외한다.
+# 명시 실행: pytest -m live / pytest -m slow / pytest -m ""(전체)
+addopts = '-m "not live and not slow"'
 markers = [
     "unit: 네트워크 없이 실행 가능한 순수 단위 테스트",
     "live: 라이브 HTTP 요청이 필요한 테스트",

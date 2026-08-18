@@ -265,6 +265,9 @@ def test_ac_sag_037_naive_max_date_revert_fails_for_each_endpoint(
 # ---------------------------------------------------------------------------
 
 
+# slow: 라이브 SQLite DB 실측 — 2026-08-18 기준 14.5초. 정보성 검사이며 회귀 방어는
+# 위 픽스처 기반 두 테스트가 전담하므로 기본 실행에서 제외한다 (pytest -m slow 로 실행).
+@pytest.mark.slow
 def test_ac_sag_037_live_smoke_as_of_date_matches_across_endpoints() -> None:
     """라이브 DB 에서도 7개 값이 동일함을 확인하되 **정보성 검사**로 표시한다.
 
