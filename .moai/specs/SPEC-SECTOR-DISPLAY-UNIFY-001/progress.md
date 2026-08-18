@@ -206,7 +206,10 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 - **AC 요약**: AC-SDU-001~011 전부 **PASS — 되돌림/주입 RED verbatim 관측 완료**(§E.2.3) · AC-SDU-012/013 **PASS**(§F 전 구간 — typecheck exit 0, vitest 261 green[의도 갱신 4종 포함, 그 밖 0건], eslint B\A==∅ 신규 0건)
 - **Gaps**: 0건 — 잔여는 DoD 의 라이브 화면 확인(lessons #1/#2)뿐
 - **실행 방식**: orchestrator-direct(운영자 승인 A, 리드 경유) — 스폰 2회 사망 경위·부작위 관측은 §E.2.0/§E.2.1
-- **미푸시 상태**: t3·t5·t6 잔여 미푸시 4건 + 본 SPEC M6·M7 — push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)
+- **미푸시 상태**: 본 SPEC 4커밋(0023210·45ffaad·ae2b8af·1fa0fd1) — `git rev-list --count --left-right origin/main...HEAD` = `0 4` 관측. t3·t5·t6 계열은 런 착수 전 pre-flight에서 이미 동기화(`0 0`)였다. push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)
+- **G-F2 백로그 (범위 밖 기록 — spec.md §4)**: `ThemeAnalysis/ThemeRankingTable.tsx:33/:38/:43`이 같은 직접 포맷 패턴(`toFixed` 계열 percent 포매터 3종)을 가진다. 본 SPEC 범위 확장 금지 — 후속 백로그로만 남긴다.
+- **라이브 확인 상태 (lessons #1/#2, DoD 잔여)**: 프론트 dev 서버 가동 중(localhost:5173, Vite HMR — 변경 자동 반영)·백엔드 8000 청취 관측(2026-08-19 00:30). 라벨·색 채널의 **시각적 최종 확인은 운영자 화면 점검**으로 남긴다.
+- **ef 종결**: EF-1~EF-4 처분은 §E.2.3 M7 Gaps 노트 참조 (전부 구조적 커버 또는 타입 레벨 차단).
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
