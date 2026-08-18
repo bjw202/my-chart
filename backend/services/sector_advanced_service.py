@@ -13,7 +13,9 @@ from my_chart.analysis.sector_advanced import (
     compute_stock_bubble,
     compute_treemap_data,
 )
+from my_chart.analysis.aggregate_types import WEIGHT_CAP
 from my_chart.analysis.weekly_grid import _get_latest_valid_date
+from backend.schemas.envelope import envelope_fields
 from backend.schemas.sector_advanced import (
     RRGResponse,
     RRGSectorItem,
@@ -59,6 +61,11 @@ def get_sector_bubble(
     봉투 ``data[]`` 와 같은 기준으로 ``excluded[]`` 에 등록되고 ``sectors[]``
     에서 빠진다(AC-SMU-015).
 
+    M5 — 봉투 정상화(D4): 봉투 12키를 직접 나열하지 않고 랭킹 봉투와 같은
+    ``envelope_fields`` 공유 헬퍼로 구성한다. ``market_filter`` 는 스키마
+    기본값 "all" 이 아니라 **요청 market** 을 반영한다(유일하게 거짓말하던
+    엔드포인트였다). 빈 date(guard)에서는 봉투 필드가 기본값으로 내려간다.
+
     Args:
         weekly_db_path: weekly SQLite DB 경로
         period: 수익률 기간 ("1w", "1m", "3m") — 라우터 쿼리값을 변환 없이
@@ -75,6 +82,7 @@ def get_sector_bubble(
     date = _get_latest_valid_date(weekly_db_path) or ""
     aggregates = []
     excluded = []  # 가드 밖 초기화 [HARD] — M5가 envelope_fields(excluded=excluded) 배선
+    result = None  # SectorAggregationResult — 빈 date 가드에서는 None 유지
     if date:
         # E-6 — 빈 date 가드(get_stock_bubble 관행). 가드가 없으면
         # date.fromisoformat('') ValueError 가 라우터 포괄 except 를 타고 503 이 된다.
@@ -106,12 +114,27 @@ def get_sector_bubble(
         for a in aggregates
     ]
 
+    # M5(D4) — 봉투 12키는 envelope_fields 공유 헬퍼로 구성한다(랭킹 봉투와 동일
+    # 호출 형태). data[]/benchmark/return_window_days 는 여기서 원천 공유되며,
+    # 빈 date 에서는 result=None 이므로 기본값(benchmark=None · data=[] ·
+    # return_window_days 3키 전부 None)으로 폴백한다.
     return SectorBubbleResponse(
         date=date,
         period=period,
         market=market,
         sectors=items,
-        as_of_date=date or None,
+        **envelope_fields(
+            as_of_date=date or None,
+            as_of_is_partial_week=result.as_of_is_partial_week if result else None,
+            return_window_days=result.return_window_days if result else None,
+            market_filter=(market or "all").lower(),
+            weight_cap=WEIGHT_CAP,
+            benchmark=result.benchmark if result else None,
+            data=aggregates,
+            excluded=excluded,
+            warnings=result.warnings if result else None,
+            baseline_date=result.baseline_date if result else None,
+        ),
     )
 
 
