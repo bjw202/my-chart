@@ -8,6 +8,9 @@ import { useWatchlist } from '../../contexts/WatchlistContext'
 import { usePriceRangeMeasure } from '../../hooks/usePriceRangeMeasure'
 import { PriceRangeOverlay } from './PriceRangeOverlay'
 import { useAnalysis } from '../../hooks/useAnalysis'
+// REQ-SDU-001/003 (M6): RS 표시 반올림·임계값의 단일 출처.
+import { rating0 } from '../common/MetricCell'
+import { RS_TOP_THRESHOLD } from '../../utils/rsMetrics'
 import { AnalysisModal } from '../AnalysisModal'
 import { useAiReport } from '../../hooks/useAiReport'
 import { AiReportModal } from '../AiReportModal'
@@ -294,9 +297,10 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
     ? '-'
     : `${stock.change_1d >= 0 ? '+' : ''}${stock.change_1d.toFixed(2)}%`
 
-  const rsValue = stock.rs_12m === null ? null : Math.round(stock.rs_12m)
-  const rsDisplay = rsValue === null ? '-' : rsValue.toString()
-  const rsHighlight = rsValue !== null && rsValue >= 80
+  // REQ-SDU-001/003 (M6): 반올림은 rating0 단일 출처, 강조 술어는 RS_TOP_THRESHOLD 상수.
+  //   (기존 Math.round 직접 호출 제거 — 반올림 규약 단일 출처 위반 호출부.)
+  const rsDisplay = stock.rs_12m === null ? '-' : rating0(stock.rs_12m)
+  const rsHighlight = stock.rs_12m !== null && stock.rs_12m >= RS_TOP_THRESHOLD
 
   const cellClassName = [
     'chart-cell',
@@ -323,7 +327,12 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
             </span>
           )}
           <span className={`chart-cell-change ${changeColor}`}>{changeDisplay}</span>
-          <span className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}>RS {rsDisplay}</span>
+          {/* REQ-SDU-004 (M6): 'RS' → 'RS등급' — 같은 셀의 RS Line 버튼과 지시 대상을 구분. */}
+          {/* REQ-SDU-003: 강조 술어(≥RS_TOP_THRESHOLD)의 상수 유래 title. */}
+          <span
+            className={`chart-cell-rs${rsHighlight ? ' chart-cell-rs--high' : ''}`}
+            title={`RS 등급(0-100) — ${RS_TOP_THRESHOLD} 이상 강조`}
+          >RS등급 {rsDisplay}</span>
           {stock.stage !== null && (
             <span className={`stage-badge stage-badge--s${stock.stage}`}>S{stock.stage}</span>
           )}

@@ -62,9 +62,9 @@ describe('SectorDetailPanel — rendering', () => {
     expect(screen.getByText('75')).toBeInTheDocument()
   })
 
-  it('renders RS Top % metric', () => {
+  it('renders RS 80+ 비중 metric (REQ-SDU-004 개명)', () => {
     renderPanel(<SectorDetailPanel sector={mockSector} />)
-    expect(screen.getByText('RS Top %')).toBeInTheDocument()
+    expect(screen.getByText('RS 80+ 비중')).toBeInTheDocument()
     expect(screen.getByText('30%')).toBeInTheDocument()
   })
 
@@ -333,5 +333,38 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
     const dashes = screen.getAllByText('–')
     expect(dashes.length).toBeGreaterThanOrEqual(1)
     expect(dashes[0].className).toContain('metric-cell--missing')
+  })
+})
+
+// ── SPEC-SECTOR-DISPLAY-UNIFY-001 M6 (AC-SDU-002 / REQ-SDU-002·D7) ────────────────
+// null% 버그: 결측 지표를 가진 섹터에서 카드가 'null%' 문자열을 렌더하던 결함.
+// 생산 지점은 MetricCard 내부가 아니라 호출부 템플릿 보간(`${x}%`)이었으므로
+// 양쪽을 함께 고쳤다. 관측량은 렌더 출력 문자열(생산 지점과 무관하게 유효).
+describe('SectorDetailPanel — REQ-SDU-002 null% 해소', () => {
+  beforeEach(() => {
+    mockFetchSectorDetail.mockResolvedValue({
+      sector_name: 'Technology',
+      sub_sectors: [],
+      top_stocks: [],
+    })
+  })
+
+  it('결측 지표 카드는 null% 가 아니라 – 를 렌더한다', () => {
+    renderPanel(
+      <SectorDetailPanel
+        sector={{
+          ...mockSector,
+          rs_top_pct: null as unknown as number,
+          rs_avg: null as unknown as number,
+        }}
+      />,
+    )
+    const metricsEl = document.querySelector('.sector-detail-metrics') as HTMLElement
+    expect(metricsEl).not.toBeNull()
+    // 렌더 출력에 'null' 부분 문자열이 없어야 한다(null% / null 모두).
+    expect(metricsEl.textContent).not.toContain('null')
+    // MetricValue 규약의 결측 표기 '–' 가 보여야 한다.
+    const dashes = screen.getAllByText('–')
+    expect(dashes.length).toBeGreaterThanOrEqual(2)
   })
 })

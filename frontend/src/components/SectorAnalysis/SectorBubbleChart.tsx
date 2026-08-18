@@ -15,7 +15,9 @@ import {
   SECTOR_BUBBLE_R_MAX,
 } from './bubbleRadius'
 import type { SizePeriod } from './bubbleRadius'
-import { metricText, toMetricValue } from '../common/MetricCell'
+import { metricText, toMetricValue, rating0 } from '../common/MetricCell'
+// REQ-SDU-003 (M6): RS 중앙선 Y 좌표 상수화.
+import { RS_UNIVERSE_MIDPOINT } from '../../utils/rsMetrics'
 
 // M5.5(SPEC-SECTOR-METRIC-UNIFY-001) — 섹터 trading_value는 M4 이후 VolumeWon
 // 기간 누적 = 억원 단위. 기존 포맷터는 원 단위 입력을 가정하므로 원 복원 후 표기한다.
@@ -162,7 +164,8 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
       },
       yAxis: {
         type: 'value',
-        name: 'RS 평균 (0-100)',
+        // REQ-SDU-004 (M6): 'RS 평균' → 'RS Rating 평균' — 드릴다운(StockBubbleChart 'RS Rating (0-100)')과 정렬.
+        name: 'RS Rating 평균 (0-100)',
         nameLocation: 'middle',
         nameGap: 45,
         nameTextStyle: { color: '#9ca3af', fontSize: 12 },
@@ -224,7 +227,8 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
             symbol: 'none',
             data: [
               { xAxis: 0, label: { show: true, formatter: `${benchmarkLabel} (초과수익률 0 = 벤치마크)`, color: '#9ca3af', fontSize: 10, position: 'insideEndTop' } },
-              { yAxis: 50, label: { show: true, formatter: 'RS 중앙', color: '#9ca3af', fontSize: 10, position: 'insideEndTop' } },
+              // REQ-SDU-003/004 (M6): 50 상수 → RS_UNIVERSE_MIDPOINT, 'RS 중앙' → 백분위 중앙임을 정확히 서술.
+              { yAxis: RS_UNIVERSE_MIDPOINT, label: { show: true, formatter: 'RS 50 (유니버스 백분위 중앙)', color: '#9ca3af', fontSize: 10, position: 'insideEndTop' } },
             ],
             lineStyle: { color: '#6b7280', type: 'dashed', width: 1 },
           },
@@ -246,7 +250,8 @@ export function SectorBubbleChart({ sectors, onSectorClick, period, market = 'al
           // D2: 결측·저신뢰 표기는 표 셀(MetricCell)과 같은 metricText 로 생성한다.
           // 값이 있을 때의 포맷은 종전과 동일하다 — 바뀐 것은 결측 경로뿐이다.
           const excessReturn = metricText(toMetricValue(d[0]), n => `${n.toFixed(2)}%`)
-          const rsAvg = metricText(toMetricValue(d[1]), n => n.toFixed(1))
+          // REQ-SDU-001/008 (M6): RS 평균 표기는 rating0 — 순위표·상세 패널과 동일 문자열(3면 동일성).
+          const rsAvg = metricText(toMetricValue(d[1]), rating0)
           const periodReturn = metricText(toMetricValue(d[3]), n => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`)
           const tvLine = missing
             ? '거래대금: 데이터 없음'

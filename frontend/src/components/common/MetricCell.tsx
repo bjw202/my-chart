@@ -39,6 +39,19 @@ export function percent2(n: number): string {
   return `${n > 0 ? '+' : ''}${n.toFixed(2)}%`
 }
 
+// SPEC-SECTOR-DISPLAY-UNIFY-001 REQ-SDU-001 (M6) — 반올림 규약 단일 출처 확장.
+//   rating0: RS 등급 계열 0자리 정수 표시(등급·섹터 RS 평균·종목 RS 공통).
+//   pct0: 비율 계열 0자리 정수 + %(RS 80+ 비중·신고가 비중·Stage2 비중).
+//   export function 선언으로만 둔다 — 화살표 const는 react-refresh/only-export-components가
+//   잡는다(실측, plan.md §F.2). 그 대가의 +2건은 §F.1에 사전 선언된 예외다.
+export function rating0(n: number): string {
+  return String(Math.round(n))
+}
+
+export function pct0(n: number): string {
+  return `${Math.round(n)}%`
+}
+
 function normalize(value: MetricValue): MetricObject {
   if (value === null || value === undefined) return { value: null }
   if (typeof value === 'number') return { value }

@@ -39,6 +39,29 @@
 ### AC-SDU-001 — 반올림 규약 단일 출처
 **Given** M6 적용 트리 **When** `MetricCell.tsx` 밖에서 RS/비율 값을 직접 포맷하는 호출부를 스캔하면 **Then** 잔여가 **0**이고, 전환된 호출부 개수가 M6 착수 시 확정한 관측값과 같다.
 - **[HARD] 개수는 착수 시 실행 스캔으로 확정한다.** 원본 계획의 "8개"는 미검증 수치이므로 그대로 단언하지 않는다(갭 G-F3). 착수 스캔의 **관측 출력을 이 AC에 리터럴로 고정**한 뒤 판정한다.
+- **착수 스캔 확정 (2026-08-18, M6 첫 커밋 이전 — G-F3 소진).** 아래 명령의 관측 출력 **14줄**을 리터럴로 고정한다. 판정 시 동일 명령의 잔여가 **0**이고 전환 개수가 **14 (rating0 7 + pct0 7)** 과 같아야 한다:
+  ```bash
+  cd frontend && grep -rn --include='*.tsx' -E 'String\(Math\.round\(n\)\)|Math\.round\(stock\.rs_12m\)|n => n\.toFixed\(1\)|value=\{sector\.rs_avg\} />|label="RS Avg" value=\{sector\.rs_avg\} />|\$\{Math\.round\(n\)\}%|\(n\) => `\$\{n\}%`|\$\{sector\.(rs_top_pct|nh_pct|stage2_pct)\}%' src/components/SectorAnalysis src/components/ChartGrid src/components/StockExplorer | grep -v __tests__
+  ```
+  > 패턴 정정 (M6 커밋 이전, 2026-08-19): 최초 핀의 `label="RS Avg" value={sector.rs_avg}` 은 전환된 형태(`format={rating0}` 부착)까지 부분 매칭해 잔여 0 판정을 오염시켰다. 종결자 ` />` 를 붙여 **미전환 형태만** 매칭한다. 킥오프 관측 출력 14줄은 변하지 않는다(원 라인이 모두 `} />` 또는 위 패턴들로 종결).
+  관측 출력 (14줄, 전부 변환 대상):
+  ```
+  src/components/SectorAnalysis/SectorBubbleChart.tsx:249:          const rsAvg = metricText(toMetricValue(d[1]), n => n.toFixed(1))
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:99:        <MetricCard label="RS Avg" value={sector.rs_avg} />
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:100:        <MetricCard label="RS Top %" value={`${sector.rs_top_pct}%`} />
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:101:        <MetricCard label="52W High %" value={`${sector.nh_pct}%`} />
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:102:        <MetricCard label="Stage 2 %" value={`${sector.stage2_pct}%`} />
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:139:                        <MetricCell value={sub.rs_avg} format={(n) => String(Math.round(n))} />
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:142:                        <MetricCell value={sub.stage2_pct} format={(n) => `${Math.round(n)}%`} />
+  src/components/SectorAnalysis/SectorDetailPanel.tsx:181:                          <MetricCell value={stock.rs_12m} format={(n) => String(Math.round(n))} />
+  src/components/SectorAnalysis/SectorRankingTable.tsx:188:                <MetricCell value={sector.rs_avg} />
+  src/components/SectorAnalysis/SectorRankingTable.tsx:197:                <MetricCell value={sector.rs_top_pct} format={(n) => `${n}%`} />
+  src/components/SectorAnalysis/SectorRankingTable.tsx:206:                <MetricCell value={sector.nh_pct} format={(n) => `${n}%`} />
+  src/components/SectorAnalysis/SectorRankingTable.tsx:215:                <MetricCell value={sector.stage2_pct} format={(n) => `${n}%`} />
+  src/components/ChartGrid/ChartCell.tsx:297:  const rsValue = stock.rs_12m === null ? null : Math.round(stock.rs_12m)
+  src/components/StockExplorer/StockTable.tsx:229:                <td data-col-key="rs_12m"><MetricCell value={c.rs_12m} format={(n) => String(Math.round(n))} /></td>
+  ```
+  할당 — **rating0 (7)**: BubbleChart `:249`, Panel `:99`·`:139`·`:181`, RankingTable `:188`, ChartCell `:297`, StockTable `:229` / **pct0 (7)**: Panel `:100`·`:101`·`:102`·`:142`, RankingTable `:197`·`:206`·`:215`.
 - **되돌림**: 전환된 호출부 하나를 `toFixed(1)` 직접 호출로 되돌림 → 잔여 스캔이 1을 반환하는 것을 RED로 관측
 
 ### AC-SDU-002 — `null%` 버그 해소

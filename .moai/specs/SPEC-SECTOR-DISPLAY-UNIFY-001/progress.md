@@ -75,9 +75,82 @@ Tier M 임계 0.80. must-pass 7건 전부 통과.
 | **`depends_on` override** | M6 단독 착지 시 `--ignore-deps` 사용 + **미충족 의존 ID·spec.md §2 비대칭 근거**를 `.moai/logs/depends-on-override.log`에 기록 | **M6 run 진입 시** | M7 착지라면 override가 아니라 **`wait`**가 옳다. 착지 대상이 불명확하면 `abort`. 분기표는 spec.md §2.1 |
 | **G-F2** | `ThemeAnalysis/ThemeRankingTable.tsx` 동일 표시 패턴 여부 | 범위 밖 | 발견되면 **백로그 기록만**. 본 SPEC 범위를 넓히지 않는다 |
 
+## §F Phase 4 Mode Selection
+
+- **작성 시각**: 2026-08-18 (run 진입, 카드 t2 — kanban lead 디스패치, 운영자 승인 완료)
+- **입력 파라미터**: tier M · 대상 파일 ~11개(MetricCell, rsMetrics+테스트, SectorRankingTable, SectorDetailPanel, SectorBubbleChart, ChartCell, StockTable, SectorAnalysis, api/market, MarketContext, types/market + 기존 테스트 3종) · 도메인 수 1(프론트엔드 React/TS 단일) · 언어 구성 TS/TSX 100% · 동시성 편익 LOW(코딩 집약 — Anthropic coding-task 병렬성 경고) · Agent Teams 폐기(모드 3 tombstone)
+- **모드 평가**: trivial ✗(다파일 의미 변경) / background ✗(쓰기 작업) / agent-team ✗(RETIRED) / parallel ✗(코딩 집약 — Mode 5 우선 원칙) / workflow ✗(~30파일 기계 변환 아님, 의미적 변경 다수) / **sub-agent ✓**
+- **Decision: sub-agent (Mode 5)** — 마일스톤별 순차 manager-develop 위임(M6 → M7). 다이어트 스폰(아티팩트는 디스크 참조, 인라인 복사 최소화)으로 운용하며, **동일 사망 2회 관측 시 orchestrator-direct 전환을 리드에게 블로커 보고**한다(본 세션 환경의 확립 패턴 — memory `glm-subagent-context-death`; 형제 SPEC run에서 4회 사망 선례).
+- **근거**: 코딩 집약 작업은 순차 서브에이전트가 안전한 기본(Anthropic 코딩 과제 병렬성 경고). 병렬 편익이 없어 Mode 4/6의 조정 오버헤드가 이득을 상회한다.
+
 ## §E.2 Run-phase Evidence
 
-_<pending run-phase>_
+### §E.2.0 Run 킥오프 — 의존 게이트·G-F5·G-F3 소전 (2026-08-18, M6 첫 커밋 이전)
+
+**의존 pre-flight (G-F4 해소 근거)** — `depends_on` 2건 전부 `status: completed` 관측:
+```
+$ head -5 .moai/specs/SPEC-SECTOR-METRIC-UNIFY-001/spec.md → status: completed
+$ head -5 .moai/specs/SPEC-SECTOR-UX-001/spec.md            → status: completed
+```
+`--ignore-deps` override도 `wait`도 불필요 (spec.md §2.1 분기표 어디에도 해당하지 않는 정상 경로). M5 착지는 리드가 커밋 수준으로 확인해 디스패치에 명시했다: `3d06d9d` "M5 봉투 정상화 — envelope_fields 구성" + 배선 실재(`backend/schemas/envelope.py:238` → `backend/services/sector_advanced_service.py:126`, `backend/services/sector_ranking_service.py:14`). 본 세션도 소스에서 재확인: `envelope.py` `envelope_fields(...)`가 `data: list[SectorAggregate] | None`를 받고 `sector_ranking_service.py:106`이 `data=agg.aggregates`로 전달하며, `my_chart/analysis/sector_metrics.py:695-706`이 `period` 지정 시 해당 기간 초과수익률 기준으로 `data[].rank`를 재배정한다. **§B(M7) AC는 폴백이 아닌 실경로를 측정한다.**
+
+**동기화 pre-flight**: `git fetch origin main` → `git rev-list --count --left-right origin/main...HEAD` = `0 0` (동기화). HEAD `f11730d` (main). `frontend/` 추적 파일 청결 (미추적 `coverage/`·`test-results/` 등은 스테이징 배제 대상). 활성 세션 1건(SPEC 미부속 — 리드 세션으로 추정, 카드 디스패치 당사자).
+
+**Phase 1 Plan Audit Gate — 스킵 근거 (3조건)**: (1) 판정 PASS-WITH-DEBT — moai.md §8 Plan Audit 규약의 PASS 계열이며 부채 4건은 §E.1.3 인계표로 전량 처분됨 (2) 점수 0.875 ≥ Tier M 임계 0.80 (3) 아티팩트 해시 — 판정 기록 커밋(`21f370a`) 이후 spec/plan/acceptance 무변경 (단, 본 킥오프에서 plan.md §F.1 예외 등재 + acceptance.md AC-SDU-001 리터럴 고정을 §E.1.3가 사전 승인한 기계적 수정으로 수행 — 아래 참조). 감사 캐시 `compute_hash` = `7b0400fd…`, lookup hit 없음(캐시 미생성 — 진행열 세션이 gate 프로세스를 거치지 않았음) → 기록 기반 판정.
+
+**G-F5 소진 (M6 첫 커밋 이전 — §E.1.3 [HARD]) — (c) 사망 실측 → (a) 채택**:
+```
+[실험] MetricCell.tsx에 export const rating0/pct0 (화살표) 임시 추가 후:
+$ cd frontend && npx eslint src/components/common/MetricCell.tsx
+→ ✖ 7 problems (7 errors, 0 warnings)
+  기존 5건(34:17, 38:17, 74:17, 90:17, 97:17 — +4행 삽입으로 이동) 외
+  신규 2건: 43:14, 44:14 react-refresh/only-export-components   ← (c)안 사망 관측
+[복원 증명]
+$ git status --short -- frontend/src   → 출력 없음 (청결)
+$ npx eslint src/components/common/MetricCell.tsx → ✖ 5 problems (기준선 복귀)
+```
+`allowConstantExport: true`는 상수 리터럴만 면제 — 화살표 함수 const는 면제하지 않음이 확정. **결정: (a) 예외 사전 선언** — `rating0`/`pct0`를 `export function` 선언으로 구현, 증가분 최대 2건(파일·규칙·원인 한정)을 `plan.md §F.1` 기준선의 사전 선언 예외로 등재 완료(본 커밋 세트에 포함).
+
+**G-F3 소진 (M6 첫 커밋 이전)** — 반올림 규약 전환 대상 호출부 실행 스캔: **14개 관측** (rating0 7 + pct0 7). 명령·출력 14줄을 `acceptance.md` AC-SDU-001에 리터럴로 고정 완료. 원본 계획의 "8개"는 실측과 불일치(미검증 수치였음이 확인됨). 스캔은 `frontend/` cwd에서 `grep -rn --include='*.tsx'` (따옴표 글롭) + `__tests__` 제외로 실행.
+
+**문서 수정 근거**: 위 두 편집(plan.md §F.1 / acceptance.md AC-SDU-001)은 §E.1.3 인계표가 run 세션에 명시적으로 지시한 사전 승인 수정이며 M6 첫 커밋 이전에 수행됨(사후 합리화 아님). manager-develop 소유가 아닌 orchestrator가 기계적 등록만 수행.
+
+### §E.2.1 M6 구현
+
+**실행 방식**: orchestrator-direct (운영자 승인 A — 리드 경유, 2026-08-19). 근거: manager-develop 스폰 2회 사망(#1 "Prompt is too long" 진입 직후·전체 Section A-E 프롬프트 / #2 "Autocompact is thrashing" — 다이어트 스폰, 정찰 후 사망). 두 사망 모두 부작위(커밋 0·구현 쓰기 0 — worktree·main 상태 리드 실물 대조 4/4 확인). memory `glm-subagent-context-death` 확립 패턴 + 형제 SPEC run 선례(스폰 4회 사망 → direct 마무리). 3회째 재스폰 금지 지시.
+
+**구현 내역** (REQ-SDU-001~005, 008):
+- `common/MetricCell.tsx`: `rating0`/`pct0` `export function` 추가(G-F5 (a)안 — 화살표 아님) + 계열 주석
+- `utils/rsMetrics.ts` 신설: 4 상수(RS_TOP_THRESHOLD=80 외 3) + `utils/__tests__/rsMetrics.test.ts`(교차 언어)
+- 14개 핀 호출부 전환: `SectorRankingTable`(188→rating0·197/206/215→pct0), `SectorDetailPanel`(99·139·181→rating0, 100-102·142→pct0 — MetricCard MetricValue 수용·보간 제거), `SectorBubbleChart`(249→rating0), `ChartCell`(297 Math.round 제거→rating0+상수), `StockTable`(229→rating0)
+- 라벨: 'RS Top %'→'RS 80+ 비중'(열+카드+임계값 title), Y축→'RS Rating 평균 (0-100)', markLine→'RS 50 (유니버스 백분위 중앙)'(50→RS_UNIVERSE_MIDPOINT), ChartCell 배지→'RS등급', RRG 캡션 신설(rrg-metric-caption)
+- 색 램프: `getCellColor` 제3 type `'rating'`(보라 rgba(139,92,246)) — rs_avg 셀 전환, rs_top_pct는 기존 파란 채널
+- 테스트: 기존 2종 라벨 갱신 + 신규(색램프 분리·rating0 반올림·null%·3면 동일성)
+
+**검증 (커밋 전, HEAD f11730d 트리에 적용 후)**:
+```
+$ cd frontend && npm run typecheck            → exit 0
+$ <AC-SDU-001 핀 스캔 — 정정 패턴>             → 출력 0줄, exit 1 (잔여 0)
+$ npx vitest run <M6 4파일>                    → 4 suites passed, 38 tests passed
+    (SectorRankingTable 21 · SectorDetailPanel 15 · rsMetrics 2 · rsDisplayConsistency 1 — 최초 실행에서
+     rsMetrics만 "TypeError: The URL must be of scheme file" 로 적색 → import.meta.url 의 vitest(jsdom)
+     /@fs/ 형태 처리 추가 후 재실행 2 passed. CWD 가정 없이 모듈 URL 기준 유지)
+$ npx eslint <§F.1 범위> --max-warnings=0      → exit 1, ✖ 23 problems (23 errors, 0 warnings)
+```
+
+**eslint 델타 (AC-SDU-012 차원) — B \ A == ∅ PASS**: (파일,규칙) 다중집합 대조. B: ChartCell any×2·refs×4(행이동 392/394→401/403), MetricCell only-export×7(=A 5+선언 예외 2 — 정확히 일치), RRGChart×2, SectorAnalysis×1, SectorBubbleChart×1, zoom 테스트 immutability×4, StockExplorer×2. **신규 (파일,규칙) 쌍 0건.** 소실 5건(ChartGrid/__tests__ no-unused-vars ×3+×1+×1)은 내가 미변경 파일 — t5 커밋 f11730d의 테스트 갱신 소관이며 D12대로 의도적 미확인 대상. 기준선 §F.1 실측일(2026-08-18)이 f11730d 이전 트리였던 것으로 추정.
+
+**스캔 패턴 정정 (M6 커밋 이전)**: 최초 핀의 `label="RS Avg" value={sector.rs_avg}` 패턴이 전환된 형태(`format={rating0}` 부착)를 부분 매칭해 잔여 1 오탐. 종결자 ` />` 추가로 미전환 형태만 매칭. 킥오프 14줄 관측 출력은 불변(원 라인이 모두 `} />` 종결). acceptance.md 동시 갱신.
+
+**RED 사양 확인 (신규 테스트가 구현 전 상태를 실패시킬 수 있었는지)**: 되돌림 판정(§E.2.3)에서 관측한다 — 각 AC의 되돌림이 해당 테스트를 RED로 만드는지가 판정 기준이므로 사전 RED 캡처는 판정 요건이 아님(acceptance 규약). 신규 테스트 전부 구현 후 GREEN 관측 완료.
+
+### §E.2.2 M7 구현
+
+_<pending>_
+
+### §E.2.3 AC 판정 (되돌림 RED 관측)
+
+_<pending>_
 
 ## §E.3 Run-phase Audit-Ready Signal
 

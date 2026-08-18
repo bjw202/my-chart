@@ -7,7 +7,7 @@ import type { SectorDetailResponse } from '../../types/sector'
 import { fetchSectorDetail } from '../../api/sectors'
 import { buildQueryKey, useQuery } from '../../contexts/DataLoadContext'
 // D6 / AC-SUX-052: 셀 5상태 공용 컴포넌트.
-import { MetricCell, percent1 } from '../common/MetricCell'
+import { MetricCell, percent1, rating0, pct0, metricDisplay, type MetricValue } from '../common/MetricCell'
 
 interface SectorDetailPanelProps {
   sector: SectorRankItem
@@ -17,14 +17,20 @@ interface SectorDetailPanelProps {
 
 interface MetricCardProps {
   label: string
-  value: string | number
+  // REQ-SDU-002 (M6/D7): MetricValue 수용 — 결측은 'null%' 문자열이 아니라
+  //   metricDisplay 규약의 '–' 로 렌더한다(ER-2). null% 는 컴포넌트가 아니라
+  //   호출부 템플릿 보간(value={`${x}%`})에서 만들어지므로 호출부도 함께 바꿨다.
+  value: MetricValue
+  // REQ-SDU-001: 숫자 포맷은 MetricCell 단일 출처(rating0/pct0/percent1)만 받는다.
+  format?: (n: number) => string
 }
 
-function MetricCard({ label, value }: MetricCardProps): ReactElement {
+function MetricCard({ label, value, format }: MetricCardProps): ReactElement {
+  const display = metricDisplay(value, format)
   return (
     <div className="sector-detail-metric">
       <div className="sector-detail-metric-label">{label}</div>
-      <div className="sector-detail-metric-value">{value}</div>
+      <div className="sector-detail-metric-value">{display.text}</div>
     </div>
   )
 }
@@ -94,12 +100,12 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
         <ReturnBar period="3M" excessReturn={sector.excess_returns.m3} />
       </div>
 
-      {/* Metric cards grid */}
+      {/* Metric cards grid — REQ-SDU-001/002/004 (M6): 보간 제거·rating0/pct0 전환·라벨 개명 */}
       <div className="sector-detail-metrics">
-        <MetricCard label="RS Avg" value={sector.rs_avg} />
-        <MetricCard label="RS Top %" value={`${sector.rs_top_pct}%`} />
-        <MetricCard label="52W High %" value={`${sector.nh_pct}%`} />
-        <MetricCard label="Stage 2 %" value={`${sector.stage2_pct}%`} />
+        <MetricCard label="RS Avg" value={sector.rs_avg} format={rating0} />
+        <MetricCard label="RS 80+ 비중" value={sector.rs_top_pct} format={pct0} />
+        <MetricCard label="52W High %" value={sector.nh_pct} format={pct0} />
+        <MetricCard label="Stage 2 %" value={sector.stage2_pct} format={pct0} />
         <MetricCard label="Composite Score" value={sector.composite_score} />
         <MetricCard label="Stock Count" value={sector.stock_count} />
       </div>
@@ -136,10 +142,10 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
                         {sub.stock_count}
                       </td>
                       <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px' }}>
-                        <MetricCell value={sub.rs_avg} format={(n) => String(Math.round(n))} />
+                        <MetricCell value={sub.rs_avg} format={rating0} />
                       </td>
                       <td style={{ textAlign: 'right', padding: '5px 0', color: sub.stage2_pct != null && sub.stage2_pct >= 50 ? 'var(--positive)' : 'var(--text-secondary)' }}>
-                        <MetricCell value={sub.stage2_pct} format={(n) => `${Math.round(n)}%`} />
+                        <MetricCell value={sub.stage2_pct} format={pct0} />
                       </td>
                     </tr>
                   ))}
@@ -178,7 +184,7 @@ export function SectorDetailPanel({ sector, onViewStocks }: SectorDetailPanelPro
                           <span style={{ color: 'var(--text-muted)', marginLeft: 4, fontSize: 11 }}>{stock.code}</span>
                         </td>
                         <td style={{ textAlign: 'right', color: 'var(--text-secondary)', padding: '5px 6px', fontWeight: 600 }}>
-                          <MetricCell value={stock.rs_12m} format={(n) => String(Math.round(n))} />
+                          <MetricCell value={stock.rs_12m} format={rating0} />
                         </td>
                         <td style={{ textAlign: 'right', color: chgColor, padding: '5px 6px', fontWeight: 500 }}>
                           <MetricCell value={stock.chg_1m} format={percent1} />

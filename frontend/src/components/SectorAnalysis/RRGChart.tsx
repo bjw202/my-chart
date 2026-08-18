@@ -328,6 +328,11 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       <div className="rrg-baseline-legend" data-testid="rrg-baseline-legend">
         기준선 100 = 벤치마크({benchmarkLabel})와 동일 성과 · 롤링 정규화 미적용(표준 JdK RRG와 발산)
       </div>
+      {/* REQ-SDU-004 (M6): 축 RS-Ratio 는 순위표 RS Rating 과 다른 지표임을 고지 —
+          화면의 'RS' 가 세 가지(등급·RRG RS-Ratio·RS Line)를 지칭하는 오독 방지. */}
+      <div className="rrg-baseline-legend" data-testid="rrg-metric-caption">
+        RS-Ratio·RS-Momentum은 순위표 RS Rating과 다른 지표입니다 (롤링 상대강도, 기준 100)
+      </div>
       <div className="rrg-main-area">
         <KospiSparkline
           kospiData={data.kospi}

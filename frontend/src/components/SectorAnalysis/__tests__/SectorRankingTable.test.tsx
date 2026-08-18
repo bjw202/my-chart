@@ -67,7 +67,7 @@ describe('SectorRankingTable — column headers', () => {
     expect(screen.getByText('1M')).toBeInTheDocument()
     expect(screen.getByText('3M')).toBeInTheDocument()
     expect(screen.getByText('RS Avg')).toBeInTheDocument()
-    expect(screen.getByText('RS Top %')).toBeInTheDocument()
+    expect(screen.getByText('RS 80+ 비중')).toBeInTheDocument()
     expect(screen.getByText('52W High %')).toBeInTheDocument()
     expect(screen.getByText('Stage 2 %')).toBeInTheDocument()
   })
@@ -171,5 +171,37 @@ describe('SectorRankingTable — row selection', () => {
     const selectedRows = document.querySelectorAll('tr.selected')
     // Only 1 row selected out of 3
     expect(selectedRows.length).toBe(1)
+  })
+})
+
+// ── SPEC-SECTOR-DISPLAY-UNIFY-001 M6 (AC-SDU-005 / REQ-SDU-001) ──────────────────
+// 색 램프 분리: 등급 셀(:185 계열)과 비중 셀(:194 계열)은 같은 수치를 넣어도
+// 다른 채널이어야 한다. 비교 양변은 두 프로덕션 호출부의 렌더 출력(lessons #9).
+describe('SectorRankingTable — REQ-SDU-005 색 램프 분리', () => {
+  const sameValueSector: SectorRankItem = {
+    ...mockSectors[0],
+    name: 'SameValue',
+    // 등급(rs_avg)과 비중(rs_top_pct)에 같은 값을 넣어 채널만 비교 가능하게 한다.
+    rs_avg: 55,
+    rs_top_pct: 55,
+  }
+
+  it('동일 수치에서 등급 셀과 비중 셀의 배경색이 다르다', () => {
+    render(<SectorRankingTable {...defaultProps} sectors={[sameValueSector]} />)
+    const row = screen.getByText('SameValue').closest('tr') as HTMLTableRowElement
+    const tds = row.querySelectorAll('td')
+    // 열 순서: rank(0) name(1) 1W(2) 1M(3) 3M(4) RS Avg(5) RS 80+ 비중(6) ...
+    const ratingBg = (tds[5] as HTMLElement).style.background
+    const pctBg = (tds[6] as HTMLElement).style.background
+    expect(ratingBg).not.toBe('')
+    expect(pctBg).not.toBe('')
+    expect(ratingBg).not.toBe(pctBg)
+  })
+
+  it('RS Avg 셀은 rating0 반올림 문자열을 렌더한다 (62.6 → 63)', () => {
+    render(<SectorRankingTable {...defaultProps} sectors={[{ ...sameValueSector, rs_avg: 62.6 }]} />)
+    const row = screen.getByText('SameValue').closest('tr') as HTMLTableRowElement
+    const tds = row.querySelectorAll('td')
+    expect(tds[5].textContent).toBe('63')
   })
 })

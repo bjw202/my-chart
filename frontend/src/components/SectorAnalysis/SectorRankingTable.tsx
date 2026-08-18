@@ -5,7 +5,9 @@
 import type { ReactElement } from 'react'
 import type { SectorRankItem, ExcludedSector } from '../../types/market'
 // D6 / AC-SUX-052: 셀 5상태는 공용 MetricCell 이 전담한다 (화면별 표기 발산 방지).
-import { MetricCell, percent1 } from '../common/MetricCell'
+import { MetricCell, percent1, rating0, pct0 } from '../common/MetricCell'
+// REQ-SDU-003: RS 임계값 상수 — 라벨 title 이 상수에서 나온다.
+import { RS_TOP_THRESHOLD } from '../../utils/rsMetrics'
 
 interface SectorRankingTableProps {
   sectors: SectorRankItem[]
@@ -38,7 +40,8 @@ const COLUMNS: ColumnDef[] = [
   { label: '1M', field: 'excess_m1', align: 'right', badge: 'W' },
   { label: '3M', field: 'excess_m3', align: 'right', badge: 'W' },
   { label: 'RS Avg', field: 'rs_avg', align: 'right', badge: 'E' },
-  { label: 'RS Top %', field: 'rs_top_pct', align: 'right', badge: 'E' },
+  // REQ-SDU-004: 'RS Top %' → 'RS 80+ 비중' — RS 점수가 아니라 "RS≥80 종목 비율"임을 정확히 서술.
+  { label: 'RS 80+ 비중', field: 'rs_top_pct', align: 'right', badge: 'E' },
   { label: '52W High %', field: 'nh_pct', align: 'right', badge: 'E' },
   { label: 'Stage 2 %', field: 'stage2_pct', align: 'right', badge: 'E' },
   { label: 'Composite', field: 'composite_score', align: 'right', badge: undefined },
@@ -51,13 +54,20 @@ const BADGE_TITLE: Record<NonNullable<WeightBadge>, string> = {
 }
 
 // AC-SUX-053 (ER-2): 결측은 배경색 채널에서도 0 으로 취급하지 않는다 — 색 없음.
-function getCellColor(value: number | null | undefined, type: 'return' | 'percentage'): string {
+// REQ-SDU-005 (M6): 세 번째 type 'rating' 추가 — 등급(rs_avg)과 비중(rs_top_pct)이
+//   파란 램프를 공유하면 같은 값이 같은 색으로 보여 두 채널이 구분되지 않는다.
+//   등급은 보라 채널, 비중은 기존 파란 채널을 쓴다(동일 값에서도 색이 다르다).
+function getCellColor(value: number | null | undefined, type: 'return' | 'percentage' | 'rating'): string {
   if (value == null || Number.isNaN(value)) return 'transparent'
   if (type === 'return') {
     // Clamp to ±15 to handle large sector returns (API returns up to 16%+)
     if (value > 0) return `rgba(38, 166, 154, ${Math.min(Math.abs(value) / 15, 0.4)})`
     if (value < 0) return `rgba(239, 83, 80, ${Math.min(Math.abs(value) / 15, 0.4)})`
     return 'transparent'
+  }
+  if (type === 'rating') {
+    // rating: RS 등급 0-100 — 보라 채널 (비중의 파란 채널과 구분)
+    return `rgba(139, 92, 246, ${Math.min(value / 100, 0.3)})`
   }
   // percentage: 0-100 scale
   return `rgba(59, 130, 246, ${Math.min(value / 100, 0.3)})`
@@ -113,6 +123,8 @@ export function SectorRankingTable({
                 key={col.field}
                 style={{ textAlign: col.align }}
                 onClick={() => onSort(col.field)}
+                // REQ-SDU-003/004: 'RS 80+ 비중' 헤더 — 임계값이 상수에서 나온 title.
+                title={col.field === 'rs_top_pct' ? `섹터 내 RS ${RS_TOP_THRESHOLD} 이상 종목의 비율` : undefined}
               >
                 <span>{col.label}</span>
                 {/* AC-SUX-025: Rank 열 헤더에 rank_change 기준일(baseline_date) 표기 */}
@@ -178,23 +190,23 @@ export function SectorRankingTable({
               >
                 <MetricCell value={sector.excess_returns.m3} format={formatReturn} />
               </td>
-              {/* RS Avg */}
+              {/* RS Avg — REQ-SDU-005 'rating' 채널(보라), REQ-SDU-001 rating0(3면 동일성) */}
               <td
                 style={{
                   textAlign: 'right',
-                  background: getCellColor(sector.rs_avg, 'percentage'),
+                  background: getCellColor(sector.rs_avg, 'rating'),
                 }}
               >
-                <MetricCell value={sector.rs_avg} />
+                <MetricCell value={sector.rs_avg} format={rating0} />
               </td>
-              {/* RS Top % */}
+              {/* RS 80+ 비중 — REQ-SDU-004 개명. 비중은 기존 파란 채널 유지 */}
               <td
                 style={{
                   textAlign: 'right',
                   background: getCellColor(sector.rs_top_pct, 'percentage'),
                 }}
               >
-                <MetricCell value={sector.rs_top_pct} format={(n) => `${n}%`} />
+                <MetricCell value={sector.rs_top_pct} format={pct0} />
               </td>
               {/* 52W High % */}
               <td
@@ -203,7 +215,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.nh_pct, 'percentage'),
                 }}
               >
-                <MetricCell value={sector.nh_pct} format={(n) => `${n}%`} />
+                <MetricCell value={sector.nh_pct} format={pct0} />
               </td>
               {/* Stage 2 % */}
               <td
@@ -212,7 +224,7 @@ export function SectorRankingTable({
                   background: getCellColor(sector.stage2_pct, 'percentage'),
                 }}
               >
-                <MetricCell value={sector.stage2_pct} format={(n) => `${n}%`} />
+                <MetricCell value={sector.stage2_pct} format={pct0} />
               </td>
               {/* Composite score (plan M4) */}
               <td style={{ textAlign: 'right' }}><MetricCell value={sector.composite_score} format={(n) => n.toFixed(2)} /></td>

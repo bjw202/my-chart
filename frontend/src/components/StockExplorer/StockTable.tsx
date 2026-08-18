@@ -3,7 +3,9 @@ import type { ReactElement } from 'react'
 import type { Stage2Candidate } from '../../types/stage'
 import { COLLAPSE_ORDER, hiddenColumnKeys, INVARIANT_COLUMN_KEYS } from './stockTableColumns'
 // D6 / AC-SUX-052: 셀 5상태는 공용 MetricCell 이 전담한다 (화면별 표기 발산 방지).
-import { MetricCell, percent1, percent2 } from '../common/MetricCell'
+import { MetricCell, percent1, percent2, rating0 } from '../common/MetricCell'
+// REQ-SDU-003: s2-strong 술어 임계값 상수 — 라벨 없던 술어에 상수 유래 title 을 붙인다.
+import { RS_S2_STRONG_THRESHOLD } from '../../utils/rsMetrics'
 import { filterCandidates } from './stockFilter'
 
 interface StockTableProps {
@@ -56,7 +58,8 @@ function getStageBadgeClass(candidate: Stage2Candidate): string {
   const { stage, stage_detail, rs_12m } = candidate
 
   if (stage === 2) {
-    if (rs_12m > 60) return 'stage-badge--s2-strong'
+    // REQ-SDU-003: 60 매직넘버 제거 — RS_S2_STRONG_THRESHOLD 상수 사용.
+    if (rs_12m > RS_S2_STRONG_THRESHOLD) return 'stage-badge--s2-strong'
     if (stage_detail?.toLowerCase().includes('entry')) return 'stage-badge--s2-entry'
     return 'stage-badge--s2'
   }
@@ -221,12 +224,16 @@ export function StockTable({
                 </td>
                 <td data-col-key="market">{c.market}</td>
                 <td data-col-key="stage">
-                  <span className={`stage-badge ${badgeClass}`}>
+                  <span
+                    className={`stage-badge ${badgeClass}`}
+                    // REQ-SDU-003: s2-strong 은 RS>60 판정 — 상수 유래 title 로 근거 노출.
+                    title={badgeClass === 'stage-badge--s2-strong' ? `RS ${RS_S2_STRONG_THRESHOLD} 초과 강세 판정` : undefined}
+                  >
                     S{c.stage}
                   </span>
                   {isEntry && <span className="entry-star">★</span>}
                 </td>
-                <td data-col-key="rs_12m"><MetricCell value={c.rs_12m} format={(n) => String(Math.round(n))} /></td>
+                <td data-col-key="rs_12m"><MetricCell value={c.rs_12m} format={rating0} /></td>
                 <td data-col-key="chg_1w"><MetricCell value={c.chg_1w} format={percent1} /></td>
                 <td data-col-key="chg_1m" className={`chg-cell ${chgColor}`}>
                   <div className="chg-cell-inner">

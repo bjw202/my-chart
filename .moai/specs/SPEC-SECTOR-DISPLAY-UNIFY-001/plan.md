@@ -118,6 +118,8 @@ EXIT=1
 
 **[HARD] 이 기준선은 고치는 대상이 아니다.** 27건 중 M6이 건드리는 파일에 있는 것들을 "겸사겸사" 고치면 범위 침식이다. 본 SPEC의 의무는 **신규 0건**이지 기준선 해소가 아니다.
 
+**[HARD] 사전 선언 예외 +2 — G-F5 소진 (M6 첫 커밋 이전, 2026-08-18).** (c) 화살표 const 안을 실측으로 사망 확인했다: `rating0`/`pct0`를 `export const` 화살표 함수로 임시 추가한 뒤 `npx eslint src/components/common/MetricCell.tsx`를 실행하면 기준선 5건 외에 **두 건이 추가로 발화**한다(`react-refresh/only-export-components`, 실험 시 위치 `:43:14`/`:44:14`, 총 7 problems). `reactRefresh.configs.vite`의 `allowConstantExport: true`가 상수 리터럴만 면제하고 화살표 함수 const는 면제하지 않는다는 §F.2 가설이 확정됐다. 따라서 **(a) 예외 사전 선언을 채택**한다: `rating0`/`pct0`는 `percent1`/`percent2`와 같은 `export function` 선언으로 구현하며, 그 결과 생기는 `react-refresh/only-export-components` 증가분 — **파일 `common/MetricCell.tsx`, 규칙 `react-refresh/only-export-components`, 원인 신규 함수 export `rating0`/`pct0`, 최대 2건** — 을 기준선의 **사전 선언된 예외**로 등재한다. 판정 시 A는 "27건 고정 triple + 이 예외 규칙"으로 읽는다(예외에 해당하는 증가분은 `B \ A` 계산에서 제외). 실험 후 트리는 완전 복원했다: `git status --short -- frontend/src` 출력 없음 + eslint 재실행 5건 복귀 관측.
+
 **A는 집합이 아니라 다중집합이다 (D12).** 위 표의 `×3`(`ChartCell.tsx:392:20` `react-hooks/refs`)이 다중도를 기록한다. 엄격한 집합 의미에서는 이 3건이 원소 하나로 붕괴하므로 셋 중 하나가 사라져도 `B \ A == ∅`가 검출하지 못한다. **의도된 결과다** — AC의 목적은 **신규 검출**이고, 기준선 오류가 *고쳐지는* 것은 회귀가 아니다. 즉 **`A \ B`(소실)는 의도적으로 확인하지 않는다.** 판정 시 A는 이 표의 다중도를 포함한 다중집합으로 읽되, 비교는 `B \ A` 한 방향만 한다.
 
 ---
