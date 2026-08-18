@@ -76,6 +76,8 @@ const mockStageData: StageOverviewResponse = {
       sma200: 160000,
     },
   ],
+  // all_stocks: 종목 표 전체 목록. 이 픽스처는 stage2_candidates 폴백 경로를 검증하므로 빈 배열.
+  all_stocks: [],
 }
 
 const originalDelays = [...RETRY_DELAYS_MS]

@@ -63,6 +63,7 @@ const makeStock = (overrides: Partial<StockItem> = {}): StockItem => ({
   sma50: 72000,
   sma100: null,
   sma200: 68000,
+  stage: null,
   ...overrides,
 })
 

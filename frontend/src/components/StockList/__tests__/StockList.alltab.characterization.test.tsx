@@ -9,7 +9,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
-import React from 'react'
 import type { StockItem } from '../../../types/stock'
 
 // ── 의존성 모킹: StockList가 소비하는 context/hook만 최소 모킹 ──

@@ -39,7 +39,7 @@ export function useDbUpdate(): DbUpdateState {
             unsubscribeRef.current = null
           }
         },
-        (event) => {
+        () => {
           // SSE error; close EventSource and stop running state
           unsubscribeRef.current?.()
           unsubscribeRef.current = null

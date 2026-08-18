@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
-import type { EChartsOption } from 'echarts'
+import type {
+  EChartsOption,
+  TooltipComponentFormatterCallbackParams,
+  DefaultLabelFormatterCallbackParams,
+} from 'echarts'
 import type { StockBubbleItem } from '../../types/bubble'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import {
@@ -13,6 +17,14 @@ import {
   STOCK_BUBBLE_R_MAX,
 } from './bubbleRadius'
 import type { SizePeriod } from './bubbleRadius'
+
+// tooltip formatter가 읽는 series.data 항목 shape.
+// value 는 이종 배열(숫자 + 문자열)이지만 기존 코드가 인덱스별로 캐스팅하므로 number[] 선언을 유지한다.
+interface BubbleTooltipDatum {
+  value: number[]
+  sector_minor?: string | null
+  product?: string | null
+}
 
 interface Props {
   stocks: StockBubbleItem[]
@@ -346,8 +358,10 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
         textStyle: { color: '#e5e7eb', fontSize: 12 },
         // @MX:NOTE: [AUTO] tooltip에 주요제품 라인 추가. escapeHtml 적용 (XSS hardening).
         // @MX:SPEC: SPEC-STOCK-TOOLTIP-PRODUCT-001
-        formatter: (params: { data: { value: number[]; sector_minor?: string | null; product?: string | null } }) => {
-          const d = params.data
+        formatter: (params: TooltipComponentFormatterCallbackParams) => {
+          // trigger: 'item' 이므로 실제로는 단일 항목이지만, 타입상 배열도 허용되므로 좁혀서 사용한다.
+          const p = (Array.isArray(params) ? params[0] : params) as DefaultLabelFormatterCallbackParams
+          const d = p.data as BubbleTooltipDatum
           const val = d.value
           const name = escapeHtml(val[4] as unknown as string)
           const priceChange = (val[0] as number).toFixed(2)

@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, cleanup, waitFor } from '@testing-library/react'
-import React, { Profiler, useCallback } from 'react'
+import { Profiler } from 'react'
 import type { StockItem } from '../../../types/stock'
 import type { StockMasterItem } from '../../../api/stocks'
 
@@ -58,7 +58,6 @@ vi.mock('../StockSearchBox', () => ({
 
 // useChartGrid: pageSize=4, 페이지 기반 slicing
 const mockGoToPage = vi.fn()
-const mockSetCurrentPage = vi.fn()
 
 vi.mock('../../../hooks/useChartGrid', () => ({
   useChartGrid: vi.fn((stocks: StockItem[]) => ({
@@ -608,7 +607,7 @@ describe('T13/T14: Full integration — AC-INTEGRATE-005 (3 cascade scenarios)',
 
     const initialCallCount = mockUseChartGrid.mock.calls.length
 
-    const { rerender } = render(
+    render(
       <ChartGrid
         filterResults={[stockA, stockB]}
         injectedStock={null}
@@ -758,7 +757,7 @@ describe('Regression (2026-05-12): cell wrapper height CSS Grid chain', () => {
   it('cell wrapper div에 style.display === "contents" 적용 — CSS Grid item이 .chart-cell 자체가 되도록', async () => {
     const { ChartGrid } = await import('../ChartGrid')
     const onSelectStock = vi.fn()
-    const stockA = makeStock('LIVEFIX-A', '회귀종목A')
+    const stockA = makeStock('LIVEFIX-A')
 
     const { container } = render(
       <ChartGrid

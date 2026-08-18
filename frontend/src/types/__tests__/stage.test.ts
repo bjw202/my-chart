@@ -79,6 +79,8 @@ describe('StageOverviewResponse type', () => {
           sma200: 68000,
         },
       ],
+      // all_stocks: 종목 표 전체 목록. 이 타입 픽스처는 stage2_candidates 만 검증하므로 빈 배열.
+      all_stocks: [],
     }
     expect(response.distribution.total).toBe(280)
     expect(response.stage2_candidates).toHaveLength(1)

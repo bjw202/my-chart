@@ -297,15 +297,13 @@ describe('SectorDetailPanel — top stocks table with chg_1m (R3)', () => {
       ],
     })
 
-    const { container } = renderPanel(<SectorDetailPanel sector={mockSector} />)
+    renderPanel(<SectorDetailPanel sector={mockSector} />)
 
     await waitFor(() => {
       expect(screen.getByText('-3.2%')).toBeInTheDocument()
     })
 
-    // 음수 변화율에는 negative 클래스나 스타일이 적용되어야 함
-    const negEl = container.querySelector('.chg-negative, [class*="negative"], [style*="negative"]')
-    // 텍스트로 '-3.2%' 확인으로 충분 (스타일은 구현에 따라 다를 수 있음)
+    // 음수 변화율 표기는 텍스트 '-3.2%' 확인으로 충분 (클래스/스타일은 구현에 따라 다를 수 있음)
     expect(screen.getByText('-3.2%')).toBeInTheDocument()
   })
 

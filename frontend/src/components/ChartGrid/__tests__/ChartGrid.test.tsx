@@ -8,7 +8,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
-import React from 'react'
 import type { StockItem } from '../../../types/stock'
 
 // 무거운 의존성 모킹
