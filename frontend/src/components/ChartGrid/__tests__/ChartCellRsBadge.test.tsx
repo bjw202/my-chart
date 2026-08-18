@@ -79,7 +79,7 @@ describe('ChartCell RS badge', () => {
     )
 
     // RS value should be shown (rounded to 76)
-    expect(screen.getByText(/RS 76/)).toBeInTheDocument()
+    expect(screen.getByText(/RS등급 76/)).toBeInTheDocument()
   })
 
   it('should show high RS highlight class when rs >= 80', () => {
@@ -120,6 +120,6 @@ describe('ChartCell RS badge', () => {
       />
     )
 
-    expect(screen.getByText(/RS -/)).toBeInTheDocument()
+    expect(screen.getByText(/RS등급 -/)).toBeInTheDocument()
   })
 })

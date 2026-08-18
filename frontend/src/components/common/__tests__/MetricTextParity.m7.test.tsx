@@ -116,7 +116,10 @@ describe('D2 — 섹터 버블 툴팁이 표 셀과 같은 결측 문자열을 �
     const point = series.flatMap(s => s.data ?? []).find(p => p.value[4] === '반도체')!
     const html = tooltipFormatter()({ data: point })
     expect(html).toContain('초과수익률: 2.50%')
-    expect(html).toContain('RS 평균: 60.0')
+    // SPEC-SECTOR-DISPLAY-UNIFY-001 REQ-SDU-008: RS 값 포맷이 toFixed(1) → rating0 로
+    // 3면(표·버블 툴팁·상세 패널) 동시 변경 — D2 의 동등성 불변식은 유지되고 부수
+    // 리터럴만 갱신된다(판정 근거 progress.md §E.2.4).
+    expect(html).toContain('RS 평균: 60')
     expect(html).toContain('기간수익률: +4.00%')
   })
 })

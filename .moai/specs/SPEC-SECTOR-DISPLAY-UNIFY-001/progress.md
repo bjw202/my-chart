@@ -166,6 +166,8 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 
 **구 라벨 잔여 최종 측정 (AC-SDU-004 보조)**: 소스(테스트 제외)에서 `'RS Top %'`·`'RS 중앙'`·`'RS 평균 (0-100)'` 스캔 → **잔여 0** (주석 2건은 변경 서술 문자열로 라벨 아님). 테스트 파일에도 잔여 0.
 
+> ⚠️ **위 검증 블록의 범위 한계 (리드 정정으로 밝혀짐 — §E.2.4 참조)**: 위 `npx vitest run src/components/SectorAnalysis/__tests__` 는 §F 가 지정한 전체 스위트를 **디렉터리로 좁힌 실행**이었다. §F.1 범위 각주가 명시한 ChartGrid/·common/ 을 보지 못해 3건의 §D 누락 갱신 대상 실패를 놓쳤다. 축자 전체 실행 결과와 재판정은 §E.2.4.
+
 ### §E.2.3 AC 판정 (되돌림 RED 관측)
 
 **M6 판정 (2026-08-19, 커밋 0023210 트리 — 각 되돌림 후 복원, 최종 4스위트 38 tests passed + `git status --short -- frontend/src my_chart/` 출력 없음으로 트리 무결 증명)**
@@ -178,7 +180,7 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 | AC-SDU-004 | **PASS** | 열 라벨을 'RS Top %'로 되돌림 → `TestingLibraryElementError: Unable to find an element with the text: RS 80+ 비중` → 복원. 나머지 라벨(Y축·markLine·RS등급·RRG 캡션)도 동일 계열 변경으로 header/렌더 단언이 커버 — 구 문자열 잔여는 아래 Grep 확인 |
 | AC-SDU-005 | **PASS** | rs_avg 셀을 `'percentage'`로 되돌림 → `AssertionError: expected 'rgba(59, 130, 246, 0.3)' not to be 'rgba(59, 130, 246, 0.3)'` (두 셀 동일 파랑 수렴) → 복원 `'rating'` |
 | AC-SDU-008 | **PASS** | 버블 툴팁을 `n => n.toFixed(1)`로 되돌림 → `AssertionError: expected '<b>Alpha</b><br/>초과수익률: 1.20%<br/>RS …' to contain 'RS 평균: 63'` (62.6 발산) → 복원 rating0 |
-| AC-SDU-012 | **PASS** | M6 단독 트리(형제 SPEC completed·G-F4 해소로 의존 게이트 정상 경로)에서 §F 전 구간: `npm run typecheck` exit 0 · 레인 로컬 vitest 실패 0(§D M6 대상은 라벨 갱신으로 사전 반영) · eslint **B \ A == ∅**(23 problems — 신규 (파일,규칙) 0, MetricCell only-export 7 = 기준선 5 + 사전선언 예외 2 정확) |
+| AC-SDU-012 | **PASS — §E.2.4 정정 재판정** | ~~원 판정(레인 로컬 좁힘 증거)~~ 무효 — §F 축자 전체 실행 기준으로 §E.2.4 재판정: 리드 재현 실패 3건 = §D 누락 갱신 대상(회귀 아님), §D 7종 등재 후 축자 실행 typecheck 0 · vitest 735/735 · eslint B\A==∅ |
 
 **AC-SDU-004 보조 grep (구 문자열 잔여 0)**: `'RS Top %'`·`'RS 중앙'`·`'RS 평균 (0-100)'` 각각 스캔에서 소스 잔여 0 — M7 종료 시 재측정해 §E.2.4에 기록.
 
@@ -193,9 +195,42 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 | AC-SDU-009 | **PASS** | 버블 series Y에 기간 오프셋 주입(`s.rs_avg + (period==='1w' ? 5 : …)`) → `AssertionError: expected 65 to be 60 // Object.is equality` (Y 이동) → 복원. X 변화 단언은 정상 구현에서 w.x≠m.x≠q.x 관측 |
 | AC-SDU-010 | **PASS** | 선택 기간 열만 남기는 filter 주입 → `TestingLibraryElementError: Unable to find an element with the text: 1W` (열 소실) → 복원. 마커는 1M 헤더에만 존재(1W 헤더 not.toContain 대조) |
 | AC-SDU-011 | **PASS** | 고지 띠를 원시 상태값 출력으로 되돌림 → `AssertionError: expected 'excess_w1 ↓ 기준 정렬 · 기간 1m · 시장 all — …' to contain '기간 1M'` → 복원 |
-| AC-SDU-013 | **PASS** | 전 마일스톤 완료 트리: vitest 실패가 의도적 갱신 대상(§D 3종 + §E.2.2 정정 1종 m4.test)에 한정·그 밖 0건(261 green), typecheck exit 0, eslint B \ A == ∅(23 problems, M6과 동일 다중집합) |
+| AC-SDU-013 | **PASS — §E.2.4 정정 재판정** | ~~원 판정(디렉터리 좁힘 증거)~~ 무효 — §F 축자 전체 실행으로 교체: 갱신 대상 7종(§D) 반영 후 전체 스위트 실패 0건(84파일 735테스트)·typecheck exit 0·eslint B\A==∅ |
 
 **Gaps (M7)**: 없음. EF-1(전 지표 null 섹터)은 M6 null% 테스트 + MetricCard MetricValue 수용이 구조적으로 커버(각 카드 '–', 행 소실 없음 — SectorRankItem 행 렌더는 값과 무관). EF-4(알 수 없는 기간값)는 PERIOD_LABELS 가 Record<Period,string> 타입으로 미지 키를 컴파일 타임 차단 — 런타임 미지값 경로 없음.
+
+### §E.2.4 리드 정정 — §F 전체 스위트 정정 판정 (2026-08-19)
+
+**결함 공개**: §E.2.1/§E.2.2 에 기록한 vitest 증거는 §F 지정 명령(`npx vitest run --exclude "e2e/**"`)을 `src/components/SectorAnalysis/__tests__` 로 좁힌 실행이었다. §F.1 범위 각주가 M6 이 ChartGrid/·common/ 를 수정한다고 명시했으므로 좁힘은 근거 결함이다. 리드의 축자 재현에서 **3건 실패** 관측(증거: `.moai/state/verify/b3e680b5/vitest.out`):
+
+| 실패 | 원인 REQ/AC | 처분 |
+|---|---|---|
+| `ChartGrid/__tests__/ChartCellRsBadge.test.tsx:82` (`/RS 76/`) | REQ-SDU-004/AC-SDU-004 — 배지 `RS {v}` → `RS등급 {v}` | `/RS등급 76/` 로 갱신 + §D 등재 |
+| `ChartGrid/__tests__/ChartCellRsBadge.test.tsx:123` (`/RS -/`) | 동일 | `/RS등급 -/` 로 갱신 + §D 등재 |
+| `common/__tests__/MetricTextParity.m7.test.tsx:119` (`'RS 평균: 60.0'`) | REQ-SDU-008/AC-SDU-008 — RS 툴팁 toFixed(1) → rating0 | `'RS 평균: 60'` 로 갱신 + §D 등재 |
+
+세 건 모두 **회귀가 아니라 §D "의도적 갱신" 목록의 계획 시점 누락**(m4.test 정정과 동일 계열). 갱신 대상은 4종 → **7종**(§D 표에 근거 한 줄씩 등재 완료).
+
+**완료 SPEC 단언 갱신 근거 (MetricTextParity — 리드 판단 동의)**: 이 파일은 SPEC-SECTOR-UX-001 D2 가 세우고 SPEC-SECTOR-METRIC-UNIFY-001 review 가 손댄 것이다. D2 의 실질 불변식은 **표 셀 ↔ 차트 툴팁 문자열 동등**(파일 헤더 명시)이며 `'60.0'` 은 당시의 부수 리터럴이다. REQ-SDU-008 은 RS 포맷을 3면 동시에 rating0 로 바꾸며 동등성을 유지한다(AC-SDU-008 3면 동일성 테스트가 동등 불변식을 실증) — D2 계약 생존, 부수 리터럴만 갱신. 블로커 회신 사유 없음(판단에 동의).
+
+**§F 축자 재실행 (갱신 후, 전체 스위트 — 축자 명령)**:
+```
+$ cd frontend && npm run typecheck
+  → exit 0
+$ cd frontend && npx eslint src/components/SectorAnalysis src/components/common \
+    src/components/ChartGrid src/components/StockExplorer src/utils --max-warnings=0 > /tmp/lint.out 2>&1; echo $?
+  → 1   ✖ 23 problems (23 errors, 0 warnings) — (파일,규칙) 다중집합 §E.2.2 측정과 동일, B \ A == ∅
+$ cd frontend && npx vitest run --exclude "e2e/**"
+  → Test Files  84 passed (84) │ Tests  735 passed (735) │ Duration 29.32s
+```
+
+**AC-SDU-012 / AC-SDU-013 재판정 (§E.2.3 해당 행 정정)**:
+- **AC-SDU-012 — 원 PASS 무효 → §D 정정 후 PASS.** 원 판정의 증거는 좁힌 실행이므로 "vitest 실패가 §D M6 대상에 한정" 근거로서 무효. 정정 근거: 리드 축자 실행(정정 전 트리)의 실패 3건이 전부 §D 누락 갱신 대상(회귀 아님 — `git diff` 상 두 테스트 파일 변경 0, 원인은 본 SPEC 소스 변경)이었고 §D 등재 후 축자 전체 실행 735/735. M6 단독 트리 조건은 §D 정정본 기준으로 성립.
+- **AC-SDU-013 — 원 PASS 무효 → 정정 후 PASS.** 같은 이유로 근거 교체: 갱신 대상 7종 반영 후 전체 스위트 실패 0건·typecheck exit 0·eslint B \ A == ∅ (축자 증거 위).
+
+**AC-SDU-004 보조 재측정**: 구 라벨 잔여 0 (§E.2.2 측정 유지 — 전체 스위트 green이 재확인).
+
+**cwd 오염 노트 (frontend/.moai/ 재생성)**: `frontend/.moai/state/config-cache.json` 생성 시각(2026-08-19 00:11:05)이 본 세션의 `cd frontend && …` 배치 실행과 일치 — Bash cwd 가 frontend/ 인 순간 moai 훅이 프로젝트 루트를 CWD 로 오인해 캐시를 기록(B7 계열: CWD 폴백 누출). 미추적 상태 유지·커밋 미포함. 완화: 세션 내 Bash 는 절대경로 기준 `cd /…/my_chart && …` 로 시작하는 한 상관없음 — `cd frontend` 중첩 후 훅이 도는 것이 발생 조건.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
@@ -203,7 +238,7 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 - **run_complete_at**: 2026-08-19
 - **run_commit_sha**: 45ffaad
 - **커밋**: M6 `0023210` (16파일, +448/−40) · M7 `45ffaad` (10파일, +381/−20 — api/market·MarketContext·types·SectorAnalysis·SectorRankingTable·SectorBubbleChart·테스트 3종 갱신 + sectorPeriodToggle 신설)
-- **AC 요약**: AC-SDU-001~011 전부 **PASS — 되돌림/주입 RED verbatim 관측 완료**(§E.2.3) · AC-SDU-012/013 **PASS**(§F 전 구간 — typecheck exit 0, vitest 261 green[의도 갱신 4종 포함, 그 밖 0건], eslint B\A==∅ 신규 0건)
+- **AC 요약 (§E.2.4 정정본)**: AC-SDU-001~011 **PASS — 되돌림/주입 RED verbatim 관측**(§E.2.3) · AC-SDU-012/013 **PASS — §E.2.4 정정 재판정**(원 좁힘 증거 무효화 → §F 축자 전체 스위트 근거로 교체: typecheck 0 · vitest 84파일 735테스트 green · eslint B\A==∅. 갱신 대상 7종 §D 등재). 판정 경위(좁힘 결함→리드 독립 재현→정정)는 이력 보존
 - **Gaps**: 0건 — 잔여는 DoD 의 라이브 화면 확인(lessons #1/#2)뿐
 - **실행 방식**: orchestrator-direct(운영자 승인 A, 리드 경유) — 스폰 2회 사망 경위·부작위 관측은 §E.2.0/§E.2.1
 - **미푸시 상태**: 본 SPEC 4커밋(0023210·45ffaad·ae2b8af·1fa0fd1) — `git rev-list --count --left-right origin/main...HEAD` = `0 4` 관측. t3·t5·t6 계열은 런 착수 전 pre-flight에서 이미 동기화(`0 0`)였다. push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)

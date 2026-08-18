@@ -54,6 +54,10 @@
 | `SectorAnalysis.market-delivery.test.tsx:56,64,81` | `api/market.ts` 인자 1개 → 2개 (M7). **실측 확인** — `toHaveBeenLastCalledWith('all'/'kospi'/'kosdaq')` 세 곳. 원본 계획의 `:60,68,79`는 미검증 수치였다. 같은 파일 `:55`/`:77`의 인자 없는 `toHaveBeenCalled()`는 arity 변경 영향 없음 |
 | `SectorRankingTable.test.tsx:70` | 라벨 문자열 변경 (M6) |
 | `SectorDetailPanel.test.tsx:65-67` | 라벨 문자열 변경 (M6) |
+| `SectorAnalysis.m4.test.tsx:66-67` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-010/AC-SDU-011: 고지 띠 원시 상태값(`1m`/`all`) 단언을 표시 라벨(`1M`/`All`)로. 계획 시점 누락 |
+| `ChartGrid/__tests__/ChartCellRsBadge.test.tsx:82` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-004/AC-SDU-004: 배지 `RS {v}` → `RS등급 {v}` 로 개명. `/RS 76/` → `/RS등급 76/` |
+| `ChartGrid/__tests__/ChartCellRsBadge.test.tsx:123` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-004/AC-SDU-004: 동일 개명. `/RS -/` → `/RS등급 -/` |
+| `common/__tests__/MetricTextParity.m7.test.tsx:119` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-008/AC-SDU-008: RS 툴팁 포맷 `toFixed(1)` → `rating0` 3면 동시 변경. D2(SECTOR-UX-001)의 실질 불변식인 표↔툴팁 문자열 동등은 유지되고 부수 리터럴 `'RS 평균: 60.0'`만 `'RS 평균: 60'`로 — 완료 SPEC 단언 갱신 근거는 progress.md §E.2.4 |
 
 이 목록 밖의 기존 테스트가 깨지면 **의도치 않은 회귀**로 취급한다.
 
