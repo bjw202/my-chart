@@ -236,12 +236,12 @@ $ cd frontend && npx vitest run --exclude "e2e/**"
 
 - **run_status**: audit-ready
 - **run_complete_at**: 2026-08-19
-- **run_commit_sha**: 45ffaad
-- **커밋**: M6 `0023210` (16파일, +448/−40) · M7 `45ffaad` (10파일, +381/−20 — api/market·MarketContext·types·SectorAnalysis·SectorRankingTable·SectorBubbleChart·테스트 3종 갱신 + sectorPeriodToggle 신설)
+- **run_commit_sha**: 4059f44 — §E.3 이 주장하는 감사준비 상태(§F 축자 735/735 + AC-012/013 재판정)가 성립하는 트리는 정정 커밋 시점이다. 45ffaad 트리는 전체 스위트 기준 green 이 아니었으므로 유지 근거 없음
+- **커밋**: M6 `0023210` (16파일, +448/−40) · M7 `45ffaad` (10파일, +381/−20 — api/market·MarketContext·types·SectorAnalysis·SectorRankingTable·SectorBubbleChart·테스트 3종 갱신 + sectorPeriodToggle 신설) · 정정 `4059f44` (§D 7종 등재 + 3단언 갱신 + §E.2.4)
 - **AC 요약 (§E.2.4 정정본)**: AC-SDU-001~011 **PASS — 되돌림/주입 RED verbatim 관측**(§E.2.3) · AC-SDU-012/013 **PASS — §E.2.4 정정 재판정**(원 좁힘 증거 무효화 → §F 축자 전체 스위트 근거로 교체: typecheck 0 · vitest 84파일 735테스트 green · eslint B\A==∅. 갱신 대상 7종 §D 등재). 판정 경위(좁힘 결함→리드 독립 재현→정정)는 이력 보존
 - **Gaps**: 0건 — 잔여는 DoD 의 라이브 화면 확인(lessons #1/#2)뿐
 - **실행 방식**: orchestrator-direct(운영자 승인 A, 리드 경유) — 스폰 2회 사망 경위·부작위 관측은 §E.2.0/§E.2.1
-- **미푸시 상태**: 본 SPEC 4커밋(0023210·45ffaad·ae2b8af·1fa0fd1) — `git rev-list --count --left-right origin/main...HEAD` = `0 4` 관측. t3·t5·t6 계열은 런 착수 전 pre-flight에서 이미 동기화(`0 0`)였다. push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)
+- **미푸시 상태**: 본 SPEC 6커밋(0023210·45ffaad·ae2b8af·a2c1550·4059f44 + 본 §E.3 정리 커밋) — 본 커밋 착지 후 `git rev-list --count --left-right origin/main...HEAD` = `0 6`. t3·t5·t6 계열은 런 착수 전 pre-flight에서 이미 동기화(`0 0`)였다. push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)
 - **G-F2 백로그 (범위 밖 기록 — spec.md §4)**: `ThemeAnalysis/ThemeRankingTable.tsx:33/:38/:43`이 같은 직접 포맷 패턴(`toFixed` 계열 percent 포매터 3종)을 가진다. 본 SPEC 범위 확장 금지 — 후속 백로그로만 남긴다.
 - **라이브 확인 상태 (lessons #1/#2, DoD 잔여)**: 프론트 dev 서버 가동 중(localhost:5173, Vite HMR — 변경 자동 반영)·백엔드 8000 청취 관측(2026-08-19 00:30). 라벨·색 채널의 **시각적 최종 확인은 운영자 화면 점검**으로 남긴다.
 - **ef 종결**: EF-1~EF-4 처분은 §E.2.3 M7 Gaps 노트 참조 (전부 구조적 커버 또는 타입 레벨 차단).
