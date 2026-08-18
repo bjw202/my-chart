@@ -321,6 +321,10 @@ _<pending sync-phase>_
   - B2 `cd frontend && npx tsc -b` → 총 오류 **29** (차단 시점 30), `SectorBubbleChart` 귀속 **0건** (차단 시점 `(124,77) TS2345` 1건). 감소분이 정확히 본 SPEC 몫과 일치
   - 커밋 `1f0c304` 5파일 실재, origin/main 0/0 동기화, 작업트리 청결
   - 판정: **차단 해소 — sync 컬럼 이관**
-- **[증거 소실] 인용 경로 미해석 (2026-08-18 관측)** — `.moai/state/verify/run-tjvce8-smu001/` 및 `.moai/state/verify/review-tjvce8-smu001/` 모두 **존재하지 않음**. `.moai/state/verify/` 하위에는 빈 디렉토리 `d68da0f0`만 잔존. `.moai/state/`는 git 미추적이라 복구 불가. run-phase 정리 단계가 임시 프로브 파일과 검증 증거를 같은 대상으로 처리한 것으로 추정되나 **미확정**.
-  - 영향 범위: B1·B2는 리드 직접 재현으로 대체 확인됐으므로 해소 판정은 유지. 소실된 것은 나머지 항목(AC-004/008 되돌림, AC-029 RED 5건, 풀스위트 157/290)의 **보조 증거**이며, 이들 주장은 현재 감사 시점에 재확인할 근거가 없음 — VCI §2 기준 미귀속 상태로 기록한다.
-  - 처분: 사용자 결정으로 **재생성 없이 sync 진행**. 되돌림 실험 재실행 비용이 회복되는 감사 가치를 상회한다는 판단. 재발 방지는 전 세션 공지 + 메모리로 처리.
+- **[철회됨] 증거 소실 주장 — 리드 오관측 (2026-08-18)** — 직전 커밋(`6cb3735`)에서 리드가 "인용 증거 경로 2곳 소실"로 기록했으나 **사실이 아니며 철회한다.** 두 디렉토리 모두 무결하다:
+  - `.moai/state/verify/run-tjvce8-smu001/` — 8파일 약 2.8MB (`pytest-ac004/008/028-rollback.txt`, `tsc-b-ac029-rollback.txt`, `tsc-b-after-fix.txt`, `pytest-spec-suites-final.txt`, `precommit-attempt2.log`, `SectorBubbleChart.current.bak`)
+  - `.moai/state/verify/review-tjvce8-smu001/` — 2파일 (`collection-error-rootcause.md`, `partition-contract-hole.md`, mtime 15:28 이후 무변경)
+  - **오관측 원인 (확정)**: 리드가 B2 재현을 위해 `cd frontend`를 실행했고 Bash 작업 디렉토리가 호출 간 유지되어, 이후 상대 경로 `ls .moai/state/verify/...`가 `frontend/.moai/state/verify/`(팬아웃 잔재 nested 캐시, 빈 `d68da0f0`만 보유)를 가리켰다. 같은 cwd 오염으로 `git status -- backend/` 빈 출력·`awk` 파일 열기 실패가 동반 관측됐으나 리드가 그 두 신호를 흘려보냈다. 절대 경로 재실행으로 전건 확인.
+  - **정정 사항**: (a) run-phase 정리 단계가 증거를 삭제했다는 추정은 근거 없음 — 삭제 명령은 소스 디렉토리의 주입 백업 `.exp-bak` 4건뿐이며 증거 디렉토리 자체를 지운 명령은 없었다. (b) "재생성 없이 진행" 결정의 전제(복구 불가)는 성립하지 않았고, 재생성 자체가 불필요하다 — AC-004/008 되돌림·AC-029 RED·풀스위트 결과의 보조 증거는 인용 경로에 그대로 있다. (c) VCI §2 미귀속 기록도 철회한다.
+  - **유효하게 남는 교훈**: 부재 관측(“없다”)은 존재 관측보다 취약하다 — cwd 오염·경로 오타·권한 부족이 삭제와 동일한 신호를 낸다. 인용 경로 검증은 절대 경로로 수행한다.
+- **sync 이관 판정 (유지)** — 차단 결함 B1·B2 해소는 리드 직접 재현으로 확인됐고, 위 철회는 그 판정에 영향을 주지 않는다.
