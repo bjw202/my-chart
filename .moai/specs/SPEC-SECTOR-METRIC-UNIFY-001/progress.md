@@ -316,3 +316,11 @@ _<pending sync-phase>_
 - 미해결 3건 처분: ① AC-029 Gap 유지 부당 — `null as unknown as number` 캐스트 5개(m5.test:65, MetricTextParity.m7.test:93-94) 제거로 관측자 복원 가능 ② 커버리지 sync 보측 타당하나 B1 선행 ③ 사다리 라이브 미검증은 배포 차단 사유 아님(창 11/32/95일로 규모 정합 실측 확인) — 단 F7(사다리 상수 무관측)은 배포 전 처리 권고
 - 추가 확인: backend 컬렉션 오류 2건은 **본 SPEC 무관 확인**, 단 원인은 `db_service.py` import 실패가 아니라 `test_ai_report_router_deep_mode.py:64-70`의 `sys.modules` 전역 스텁에 의한 수집 순서 의존. 파생 주의 — `pytest backend/tests` 일괄 실행은 0건 실행으로 중단됨
 - **run 재작업 완료 (2026-08-18, run-tjvce8)**: 리드 지시 5건 전부 처분 — ① B1 해소(단언 완화 + 필드별 null 집합 고정, `6 passed`) ② B2 해소(`sectorReturnColor(number|null)` 결측색 `#4B5563` + m5 관측자 신설, tsc SPEC 귀속 1→0) ③ tsc 게이트 `tsc -b` 교정 + §E.2/§E.3 재관측 ④ §E.3 집계 정정(AC-004/008 되돌림 행 신설 → **21/22 PASS + 1 Gap(AC-005)**, F23 반영) ⑤ AC-029 캐스트 4건 제거·관측자 복원(되돌림 RED 5건 실측) → Gaps 폐지·PASS. 증거: `.moai/state/verify/run-tjvce8-smu001/`. 잔여: AC-005 Gap(픽스처 섹터 부재, AC 문구 개정은 manager-spec 소관)·커버리지 보층·F7 등 sync/형제 SPEC 분류 항목.
+- **리드 독립 재현 (2026-08-18, lead-tjvce8)** — 차단 해소를 보고가 아니라 직접 실행으로 확인. 관측:
+  - B1 `python -m pytest backend/tests/test_bubble_schema_nullable.py -q` → `6 passed` (차단 시점 관측 `:103 AssertionError` 1 failed에서 전환)
+  - B2 `cd frontend && npx tsc -b` → 총 오류 **29** (차단 시점 30), `SectorBubbleChart` 귀속 **0건** (차단 시점 `(124,77) TS2345` 1건). 감소분이 정확히 본 SPEC 몫과 일치
+  - 커밋 `1f0c304` 5파일 실재, origin/main 0/0 동기화, 작업트리 청결
+  - 판정: **차단 해소 — sync 컬럼 이관**
+- **[증거 소실] 인용 경로 미해석 (2026-08-18 관측)** — `.moai/state/verify/run-tjvce8-smu001/` 및 `.moai/state/verify/review-tjvce8-smu001/` 모두 **존재하지 않음**. `.moai/state/verify/` 하위에는 빈 디렉토리 `d68da0f0`만 잔존. `.moai/state/`는 git 미추적이라 복구 불가. run-phase 정리 단계가 임시 프로브 파일과 검증 증거를 같은 대상으로 처리한 것으로 추정되나 **미확정**.
+  - 영향 범위: B1·B2는 리드 직접 재현으로 대체 확인됐으므로 해소 판정은 유지. 소실된 것은 나머지 항목(AC-004/008 되돌림, AC-029 RED 5건, 풀스위트 157/290)의 **보조 증거**이며, 이들 주장은 현재 감사 시점에 재확인할 근거가 없음 — VCI §2 기준 미귀속 상태로 기록한다.
+  - 처분: 사용자 결정으로 **재생성 없이 sync 진행**. 되돌림 실험 재실행 비용이 회복되는 감사 가치를 상회한다는 판단. 재발 방지는 전 세션 공지 + 메모리로 처리.
