@@ -201,8 +201,8 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 
 - **run_status**: audit-ready
 - **run_complete_at**: 2026-08-19
-- **run_commit_sha**: pending-backfill-m7 (본 섹션을 운반하는 M7 커밋 직후 chore 커밋으로 backfill — D3 자기참조 해결 패턴, 형제 SPEC 62b309e 선례)
-- **커밋**: M6 `0023210` (16파일, +448/−40) · M7 `pending-backfill-m7` (api/market·MarketContext·types·SectorAnalysis·SectorRankingTable·SectorBubbleChart·테스트 3종 갱신 + sectorPeriodToggle 신설)
+- **run_commit_sha**: 45ffaad
+- **커밋**: M6 `0023210` (16파일, +448/−40) · M7 `45ffaad` (10파일, +381/−20 — api/market·MarketContext·types·SectorAnalysis·SectorRankingTable·SectorBubbleChart·테스트 3종 갱신 + sectorPeriodToggle 신설)
 - **AC 요약**: AC-SDU-001~011 전부 **PASS — 되돌림/주입 RED verbatim 관측 완료**(§E.2.3) · AC-SDU-012/013 **PASS**(§F 전 구간 — typecheck exit 0, vitest 261 green[의도 갱신 4종 포함, 그 밖 0건], eslint B\A==∅ 신규 0건)
 - **Gaps**: 0건 — 잔여는 DoD 의 라이브 화면 확인(lessons #1/#2)뿐
 - **실행 방식**: orchestrator-direct(운영자 승인 A, 리드 경유) — 스폰 2회 사망 경위·부작위 관측은 §E.2.0/§E.2.1
