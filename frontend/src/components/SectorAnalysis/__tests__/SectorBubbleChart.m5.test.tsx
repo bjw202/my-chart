@@ -62,7 +62,7 @@ describe('AC-SUX-039 — 크기 범례 (VZ-2, 기간별 고정 눈금)', () => {
 
 describe('AC-SUX-040 (섹터) — 결측 거래대금 → 최소크기 + 점선 테두리 + 툴팁', () => {
   it('trading_value:null 버블 symbolSize = 2×rMin(=14), borderType=dashed', () => {
-    const sectors = makeSectors([{ name: '결측', trading_value: null as unknown as number, period_return: 1 }])
+    const sectors = makeSectors([{ name: '결측', trading_value: null, period_return: 1 }])
     render(<SectorBubbleChart sectors={sectors} onSectorClick={() => {}} period="1w" />)
     const seriesArr = capturedOption.series as unknown as Array<{ data: DataPoint[] }>
     const pts = seriesArr[0].data
@@ -135,6 +135,21 @@ describe('AC-SUX-059 — 섹터 버블 색상: 발산형 5단계 (REQ-SUX-056, �
     expect(sectorReturnColor(0)).toBe('#9CA3AF')
     // 벤치마크가 +1.88% 여도 0% 버블은 중립 — 발산 기준점은 0% 다
     expect(sectorReturnColor(0)).toBe(sectorReturnColor(0))
+  })
+
+  it('period_return:null → 결측 전용색 — 중립(0%) 회색과 구분된다 (B2, SPEC-SECTOR-METRIC-UNIFY-001)', () => {
+    const missingColor = sectorReturnColor(null)
+    expect(missingColor).not.toBe('#9CA3AF') // 중립(보합)과 같으면 B2 회귀
+    const sectors = makeSectors([
+      { name: '결측PR', excess_return: 1, period_return: null },
+      { name: '보합', excess_return: 1, period_return: 0 },
+    ])
+    render(<SectorBubbleChart sectors={sectors} onSectorClick={() => {}} period="1w" />)
+    const pts = (capturedOption.series as unknown as Array<{ data: DataPoint[] }>)[0].data
+    const byName = (n: string) => pts.find(p => p.value[4] === n)!
+    expect(byName('결측PR').itemStyle?.color).toBe(missingColor)
+    expect(byName('보합').itemStyle?.color).toBe('#9CA3AF')
+    expect(byName('결측PR').itemStyle?.color).not.toBe(byName('보합').itemStyle?.color)
   })
 
   it('색상 범례가 5개 구간을 실제 값 텍스트와 렌더', () => {

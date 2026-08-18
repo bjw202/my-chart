@@ -6,8 +6,10 @@
   `Optional[float]` 양형 모두 허용)이고 MetricValueModel/dict-모델이 아니다.
 - 현재 실응답(프로즌 픽스처 1조합)은 4개 필드가 전부 딕트 아닌 스칼라(float)다.
 
-M4 이후 null 유입이 시작되면 두 번째 단언은 "스칼라-or-None" 으로 완화된다
-(이 파일은 M3 시점의 관찰을 고정한다).
+M4 이후 returns/excess 계열에 null(결측 섹터)이 유입되므로 두 번째 단언은
+"스칼라-or-None + 필드별 null 섹터 집합 고정"으로 완화 적용했다
+(2026-08-18, frozen 픽스처 1w/all 관측 — 패션·헬스케어만 null).
+딕트/MetricValueModel 배제 단언은 엄격한 채로 유지된다 (AC-SMU-028 관찰자).
 """
 from __future__ import annotations
 
@@ -88,8 +90,20 @@ def client() -> Iterator[Any]:
         yield TestClient(app)
 
 
+# 필드별 null 섹터 집합 — frozen 픽스처 관측치(2026-08-18, 1w/all)에 고정.
+# 판별력 유지: null이 고정 집합 밖 섹터에서 나타나거나(새 결측 회귀),
+# 고정 집합이 0-대체로 사라지면(방향 역전) 어느 쪽이든 RED.
+FIELD_NULL_SECTORS: dict[str, frozenset[str]] = {
+    "period_return": frozenset({"패션", "헬스케어"}),
+    "excess_return": frozenset({"패션", "헬스케어"}),
+    "rs_avg": frozenset(),
+    "trading_value": frozenset(),
+}
+
+
 def test_live_response_fields_are_scalars(client: Any) -> None:
-    """1조합(1w/all) 실응답 — 4개 필드가 딕트 아닌 스칼라(float)임을 관찰 고정."""
+    """1조합(1w/all) 실응답 — 4개 필드가 딕트 아닌 스칼라(float|None)이며
+    null은 관측 고정된 결측 섹터에서만 나타난다."""
     resp = client.get("/api/sectors/bubble", params={"period": "1w", "market": "all"})
     assert resp.status_code == 200, resp.text[:300]
     sectors = resp.json()["sectors"]
@@ -100,6 +114,12 @@ def test_live_response_fields_are_scalars(client: Any) -> None:
             assert not isinstance(value, (dict, list)), (
                 f"{sector['name']}.{field}: 스칼라여야 한다(딕트 관찰): {value!r}"
             )
-            assert isinstance(value, float), (
-                f"{sector['name']}.{field}: float 관찰값과 다르다: {value!r}"
+            assert isinstance(value, (float, type(None))), (
+                f"{sector['name']}.{field}: float|None 관찰값과 다르다: {value!r}"
             )
+    for field, pinned in FIELD_NULL_SECTORS.items():
+        observed = {s["name"] for s in sectors if s[field] is None}
+        assert observed == pinned, (
+            f"{field}: null 섹터 집합이 관측 고정과 다르다 — "
+            f"관측 {sorted(observed)} vs 고정 {sorted(pinned)}"
+        )

@@ -215,6 +215,7 @@ period  min         p5          p50         p95         max          | 기존 �
 ### 되돌림 실증 배치 (AC 22종 판정, 2026-08-18, orchestrator 직접 관측)
 
 방법: 주입(임시 편집/M3 파일 교체) → 대상 테스트만 실행 → RED tail 확보 → cp 백업 복원 → `diff -q` 바이트 동등 확인. 전 사이클 복원 증명 완료.
+**2026-08-18 review 재작업**: 004/008 행 신설, 028/029 행 교정 — verbatim 증거는 아래 "review 차단 재작업" 절 + `.moai/state/verify/run-tjvce8-smu001/`.
 
 | AC | 되돌림 | 관측된 RED |
 |---|---|---|
@@ -222,6 +223,8 @@ period  min         p5          p50         p95         max          | 기존 �
 | 002a/007 | sector_metrics L450 결측 제외 → 0-대체 | exclusion 2 failed (분모 10 복귀·전원결측 0.0) |
 | 006 | L529 `rs_avg or 0.0` 주입 | all_missing 1 failed |
 | 003 | rs_avg 투영 → `a.excess_returns[p].value` 오염 | period_invariance 3 failed |
+| **004** | `sector_metrics.py:846` excess 산출 기준 -1.0p 이동 주입(보고 벤치마크 유지) | `test_excess_identity_envelope` **9 failed** — 항등식 위반 전 9조합 *(2026-08-18 재작업 신설)* |
+| **008** | 서비스 M3(d16cb65) 교체 — AC-001과 동일 기법 | 파리티 **9 failed** — `per_pair={'trading_value': 18,…}` + `bubble=1514051627310.0 envelope=42919.6`(≈3.5e7배 규모차 실증) *(2026-08-18 재작업 신설)* |
 | **009** | `market_filter="all"` 하드코딩 | **보강 후 6 failed** — 최초 관측 시 9 passed로 **관측자 결함 폭로**: envelope_contract가 랭킹(우변)만 검사하고 버블(AC 대상) 미검사 → 버블 market_filter 단언 추가(영구 보강) 후 RED 확보 (kospi/kosdaq 6조합) |
 | 010 | M3 상태 | 스캔 `envelope_fields` = 0 |
 | 011 | 스키마에서 market 필드 제거 | `test_backward_compatible_legacy_keys_preserved` 1 failed |
@@ -231,26 +234,70 @@ period  min         p5          p50         p95         max          | 기존 �
 | 015 | `MIN_SECTOR_MEMBERS` 5→20 | characterization 12 failed (소형 섹터 소실·집합 붕괴) |
 | 018 | SECTOR ladder vMax→1e3 | 반지름 고유값 **1종 [24.5]** (u=0.5 상수 분기) — 게이트 ≥3 위반 관측 |
 | 022 | 컴프리헨션에 null rs_avg 드롭 조건 | all_missing(not-dropped) 1 failed |
-| 028 | `rs_avg=a.rs_avg`(객체) 주입 | `test_live_response_fields_are_scalars` 1 failed |
-| **029** | TS `number`로 되돌림 | **Gaps — tsc exit 0 (RED 미관측)**: strict 하에서도 프로덕션에 null→number 할당 경로가 없어 컴파일 오류가 발생하지 않음. 타입 증명 파일 시도 후 철회. 대체 방어선: M3 백엔드 관측자 6종(GREEN) + M5.5 프론트 722 테스트(null 렌더 E-2 포함) |
+| 028 | 스키마 `rs_avg: MetricValueModel` 주입 | **3 failed** — 어노테이션 관찰 2종(유니온 아님·BaseModel 탑재) + live 관찰(pydantic 검증거부 → 503 래핑). **재수립(2026-08-18)**: 종전 "`rs_avg=a.rs_avg` 주입 → live 1 failed" 증거는 B1 붉은 상태에서 측정돼 주입 전후 동일 실패 — 판별력 0으로 폐기 |
+| **029** | TS `number`로 되돌림 | 캐스트 제거 후 재측정 — `tsc -b` **신규 5 오류**(m5:65·m5:144·m7:93×2·m7:94) RED 관측 → **Gaps 폐지, PASS 재판정** *(2026-08-18 재작업)*. 종전 "tsc exit 0"은 루트 tsconfig `files: []`로 0파일 검사한 공허 관측이었음 |
 | 025 | G-7 술어 실행 | `merge-base --is-ancestor 6aabf81 8f0a0c7` exit 0 ✓ · M0 경로 필터 후 프로덕션 **0줄** ✓ |
 | 026 | 마일스톤별 관측 기록 소비 | M1/M2/M3 시점 특성화 21 GREEN(각 보고) · **M4 커밋에서만 뒤집힘**(flipped 22 GREEN 관측) — 국소성 성립 |
 | 027 | plan §F 전 구간 | root `-k` 스위프 **254 passed** · 프론트 전체 **81 files / 722 tests GREEN** · `cd backend && pytest tests/ -k …` 컬렉션 오류 2건 — `db_service.py` import 실패로 **본 SPEC 무관 pre-existing** (커밋 범위 내 db_service/weekly 변경 0건 · 오류 파일 최종 터처 = SPEC-SECTOR-AGGREGATION-001/GRID-001) |
 
 **커버리지 (G-5): Gaps** — 라이브 venv(`/Users/byunjungwon/Dev/my_chart/.venv`)에 `coverage` 미설치 (`No module named coverage`). 무단 설치 대신 미측정 사유 명시. 측정 형태는 lessons #9 동작 형태로 확정돼 있음 — 도구 설치 후 sync 단계 보측 가능.
 
+### review 차단 재작업 (2026-08-18, run-tjvce8 — 리드 지시 5건 처분)
+
+**B1 — `test_bubble_schema_nullable.py` 단언 완화 (M3 docstring 예고 적용)**
+- 완화 근거: AC-028의 M3 결정은 스키마 4필드를 `float | None`로 선언했고 M4가 결측(패션·헬스케어)을 null로 유입시켰다. 스칼라-only 단언은 그 계약과 충돌 — 관측자는 구현이 아니라 계약을 따라야 한다.
+- 픽스처 관측 고정(1w/all, frozen, 프로브 1회): `period_return`/`excess_return` observed_types={NoneType,float}, null={패션,헬스케어} · `rs_avg`/`trading_value` {float}, null=∅.
+- 수정: 딕트 배제 단언 유지 + `float|None` 허용 + **필드별 null 섹터 집합을 픽스처 관측치로 양방향 고정**(null 확산·소실 모두 RED).
+- 관측: 수정 전 `1 failed, 5 passed`(패션.period_return None) → 수정 후 `6 passed`.
+
+**AC-028 되돌림 재수립 (기존 증거 폐기 — 판별력 0)**
+- 재실증 사이클(cp 백업 → 주입 → 관측 → 복원 → `git diff` 빈): 스키마 `rs_avg: MetricValueModel` 주입 → **`3 failed, 3 passed`**:
+  ```
+  AssertionError: rs_avg: 어노테이션이 유니온이 아니다 — <class 'backend.schemas.envelope.MetricValueModel'>
+  AssertionError: rs_avg: BaseModel 서브클래스(MetricValueModel) 탑재 — MetricValueModel 포함 AC-SMU-028 위반
+  AssertionError: {"detail":{"error":"weekly_db_not_ready", … "Input should be a valid dictionary or instance of MetricValueModel … input_value=69.29…"
+  ```
+  복원 후 `6 passed`. 증거: `pytest-ac028-rollback.txt`.
+
+**B2 — `sectorReturnColor` null 분기 + tsc 오류 해소**
+- `sectorReturnColor(periodReturn: number | null)` — null → 결측 전용색 `#4B5563`(gray-700). 중립(0%) `#9CA3AF`(gray-400)과 구분 — 결측 섹터가 보합과 같은 색으로 렌더되던 회귀 해소. 점선 테두리(VZ-3)의 결측 의미 확장은 표시 소관 형제 SPEC(SPEC-SECTOR-DISPLAY-UNIFY-001) 영역으로 남김(색 채널만 고정).
+- 관측자 신설: m5.test "period_return:null → 결측 전용색"(결측 ≠ 보합 색상 단언, 렌더+직접 호출 2경로).
+- `tsc -b` 관측: 오류 **30건 → 29건**(SPEC 귀속 1건 해소 — `SectorBubbleChart.tsx(124,77) TS2345`). 잔여 29건 전부 무관 pre-existing.
+
+**AC-029 관측자 복원 (캐스트 제거 + 되돌림 RED 실측) → Gaps 폐지·PASS 재판정**
+- 이중 캐스트 제거: `SectorBubbleChart.m5.test.tsx:65`(trading_value 1건) + `MetricTextParity.m7.test.tsx:93-94`(excess_return·rs_avg·period_return 3건) — 픽스처가 정직한 null을 담는다. `er2-screens`/`StockBubbleChart.m5` 캐스트는 비-SectorBubbleItem 타입(SectorRankItem·StockBubbleItem)이라 미대상.
+- 되돌림 실측: `types/bubble.ts` 4필드 `number` 임시 복원 → `tsc -b` 오류 **34건 = 29 pre-existing + 신규 5**:
+  ```
+  MetricTextParity.m7.test.tsx(93,23)(93,44)(94,30): error TS2322: Type 'null' is not assignable to type 'number'.
+  SectorBubbleChart.m5.test.tsx(65,48)(144,41):      error TS2322: Type 'null' is not assignable to type 'number | undefined'.
+  ```
+  복원 후 29건·`git diff` 빈(바이트 동등). 증거: `tsc-b-ac029-rollback.txt` / `tsc-b-after-fix.txt`.
+- 관측자 복원 판정 근거: 타입을 되돌리면 캐스트 제거 픽스처 4곳 + 신설 B2 관측자 픽스처 1곳에서 하드 오류 — 리뷰 ① 처분 의견("Gap 유지 부당") 채택.
+
+**AC-004 / AC-008 되돌림 행 신설 (기존 표 행 부재 — F23 지적)**
+- AC-004: `sector_metrics.py:846`에 excess 산출 기준 -1.0p 이동 주입(보고 벤치마크 유지 — "산출 기준만 다른 기준으로 되돌리는" 부분 되돌림 회귀 모드) → identity **9 failed**(`항등식 위반 10.006… - 6.378… != 4.628…`) → 복원 후 `9 passed`. 증거: `pytest-ac004-rollback.txt`.
+- AC-008: 서비스 M3(d16cb65) 교체 → 파리티 **9 failed**, `per_pair={'trading_value': 18, …}`, 상세 `Auto.trading_value: bubble=1514051627310.0 envelope=42919.6160361`(≈3.5e7배 — 구산식 close*volume과의 규모 차, AC의 "약 2.5e7배" 차수) → 복원 후 `9 passed`. 증거: `pytest-ac008-rollback.txt`.
+
+**검증 게이트 교정 [HARD]**
+- 루트 `frontend/tsconfig.json`이 `files: []` + project references → `tsc --noEmit`은 **0개 파일**을 검사한다(공허 관측). **이후 이 프로젝트의 타입 검사 관측은 `cd frontend && npx tsc -b` 기준.** 종전 §E.2/§E.3의 `tsc: exit 0` 기록은 공허한 관측이었음(리뷰 B2 실측 확정) — 본 재작업에서 전량 재관측했다.
+
+**AC-005 Gap 잔여 사유**: frozen 픽스처에 AC가 명명한 기계·금융 섹터 부재(리뷰 F24) — `22.36→18.70`/`-4.80→-8.45` 리터럴을 어느 방향으로도 관측 불가. AC 문구 개정(섹터 재지정 또는 합성 픽스처)은 manager-spec 소관 — 본 SPEC에서는 Gap 공시.
+
+**재검증(재작업 후)**: 백엔드 파일별 9스위트 **157 passed**(파리티 30·특성화 21·스키마 6·결측제외 3·빈date 1·sector_advanced 46·응답계약 14·consumer 26·sag037 10 — 디렉터리 일괄 실행은 컬렉션 함정으로 파일별 호출) · 프론트 레인(SectorAnalysis+common) **290/290** · `tsc -b` SPEC 귀속 0건 · eslint 변경 3파일 1건 react-refresh **pre-existing 실측**(HEAD 버전 43:17 동일 에러, 라인 이동만 — `SectorBubbleChart.current.bak` 대조).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 - run_status: audit-ready
-- run_complete_at: 2026-08-18
-- baseline_commits (Hybrid Trunk main-direct): M0 `6aabf81` (특성화+N=18, 단독) · M1 `3cb3828` (RED 11, +`status: draft→in-progress`) · plan산출물 `6c82d0b` · M2 `d96ade6` (배선 +4/−1) · M3 `d16cb65` (nullable) · **M4 `8f0a0c7` (전환 — N=18→0, 유일 수치 변경)** · M5 `3d06d9d` (봉투) · M5.5 `d6d1083` (섹터 사다리+0억 회귀 해소) · evidence/관측자 보강 커밋 (본 §E.2/§E.3)
-- ac_matrix: **21/22 PASS + 1 Gaps(AC-029)** — AC-001~011, 013~015, 018, 022, 025~028 전부 되돌림 RED 관측. AC-016/017/019~021/023/024는 형제 SPEC tombstone.
-- 관측자 결함 1건 발견·보강(영구 반영): AC-009 envelope_contract가 버블 market_filter 미검사(항진명제) → 단언 추가 후 되돌림 RED 확보.
+- run_complete_at: 2026-08-18 (review 재작업 반영 갱신)
+- baseline_commits (Hybrid Trunk main-direct): M0 `6aabf81` (특성화+N=18, 단독) · M1 `3cb3828` (RED 11, +`status: draft→in-progress`) · plan산출물 `6c82d0b` · M2 `d96ade6` (배선 +4/−1) · M3 `d16cb65` (nullable) · **M4 `8f0a0c7` (전환 — N=18→0, 유일 수치 변경)** · M5 `3d06d9d` (봉투) · M5.5 `d6d1083` (섹터 사다리+0억 회귀 해소) · evidence/관측자 보강 커밋 · **review 재작업 커밋(B1/B2/tsc 게이트 교정/AC-029 관측자 복원/§E.3 집계 정정 — 2026-08-18)**
+- ac_matrix: **21/22 PASS + 1 Gaps(AC-005)** — 되돌림 RED 관측: AC-001~004, 006~015, 018, 022, 025~029. AC-016/017/019~021/023/024는 형제 SPEC tombstone.
+  - **집계 정정 이력(리뷰 F23 반영)**: 정정 전 "21/22 + 1 Gaps(AC-029)"는 AC-004/005/008을 되돌림 표 행 없이 PASS 블록에 포함한 오기입 — 실측 기준 18/22 + 4 Gaps였다. 2026-08-18 재작업으로 004/008 행 신설 + 029 관측자 복원(RED 실측) + 028 증거 재수립 → **21/22가 실측 바탕으로 성립**. AC-005는 frozen 픽스처에 기계·금융 섹터 부재(F24)로 어느 방향으로도 관측 불가 — Gap 공시.
+- 관측자 결함 2건 발견·보강(영구 반영): ① AC-009 envelope_contract가 버블 market_filter 미검사(항진명제) → 단언 추가 후 되돌림 RED 확보 ② AC-028 live 관찰이 스칼라-only 단언이라 M4 null 유입 후 항상 RED(판별력 0) → 스칼라-or-None + 필드별 null 집합 고정으로 완화(B1)
 - g8: 분기 A 확정(status 관측량) — §E.2 기록. g3: VIOLATION 측정 → 섹터 전용 사다리 재산출(사용자 승인) + M4 숨은 0억 표시 회귀 해소.
-- regression: root 스위프 254 passed · 프론트 722/722 · 본 SPEC 백엔드 스위트 33+22+21+46+계약(파티션 포함). backend `-k` 컬렉션 오류 2건은 무관 pre-existing(실증).
-- tsc: exit 0 · eslint: SectorAnalysis L39 react-refresh 1건 pre-existing(변경 전 동일 에러 실측).
-- gaps: ① AC-029 되돌림 관측자 부재 ② 커버리지 미측정(coverage 미설치) ③ 사다리 refs 스케일의 라이브 검증 미실시(배포 후 첫 주 권고)
-- disclosures: pre-commit pytest 2m 타임아웃으로 `SKIP_MOAI_PRECOMMIT=1` 문서화 오버라이드 다수(전 건 대체 증거 수집·공개, `--no-verify` 미사용). 스폰 사망 대응 — orchestrator 직접 마무리 4건(M4 파티션 재기술·M5.5 사다리·되돌림 배치·검증 배치 — 사용자 승인 3건: 파티션 재기술+§D 등재 / 사다리 분리 / m5.test 갱신+§D 등재). plan 산출물 지연 커밋 1건(6c82d0b — lead 누락).
+- **tsc 게이트 [교정]**: 루트 tsconfig가 `files: []` + project references → `tsc --noEmit`은 0파일 검사(공허 관측). 게이트 명령을 **`cd frontend && npx tsc -b`**로 교정. 관측(2026-08-18): exit 2, 오류 29건 — 전부 무관 pre-existing(stage.test·ChartGrid 계열), **SPEC 귀속 0건**(B2 해소 전 1건). 이후 타입 검사 관측은 전부 이 명령 기준.
+- regression(2026-08-18 재작업 후 재측정): 백엔드 파일별 9스위트 **157 passed**(파리티 30·특성화 21·스키마 6·결측제외 3·빈date 1·sector_advanced 46·응답계약 14·consumer 26·sag037 10 — 디렉터리 일괄 실행은 컬렉션 함정으로 파일별 호출) · 프론트 레인(SectorAnalysis+common) **290/290** · `tsc -b` SPEC 귀속 0건 · eslint 변경 3파일 1건 react-refresh pre-existing(HEAD 대조 실측). 선행 관측(root 스위프 254·프론트 722)은 §E.2 재작업 절 이전 기록 — 재작업 diff는 레인 로컬로 재측정.
+- gaps: ① **AC-005 되돌림 불가**(frozen 픽스처에 기계·금융 부재, F24 — AC 문구 개정은 manager-spec 소관) ② 커버리지 미측정(coverage 미설치) ③ 사다리 refs 스케일의 라이브 검증 미실시(배포 후 첫 주 권고) ④ F7(SECTOR ladder vMin/vMax 커밋 테스트 0건) 외 리뷰 확정 결함 잔여분은 sync/형제 SPEC 분류 — review-report.md §권고 처리 순서 참조
+- disclosures: pre-commit pytest 2m 타임아웃으로 `SKIP_MOAI_PRECOMMIT=1` 문서화 오버라이드 다수(전 건 대체 증거 수집·공개, `--no-verify` 미사용). 스폰 사망 대응 — orchestrator 직접 마무리 4건(M4 파티션 재기술·M5.5 사다리·되돌림 배치·검증 배치 — 사용자 승인 3건: 파티션 재기술+§D 등재 / 사다리 분리 / m5.test 갱신+§D 등재). plan 산출물 지연 커밋 1건(6c82d0b — lead 누락). review 재작업(2026-08-18)도 orchestrator 직접 실행 — 칸반 리드(lead-tjvce8)의 run 컬럼 복귀 지시에 따른 처분.
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
@@ -268,3 +315,4 @@ _<pending sync-phase>_
 - §E.3 집계 정정 필요: AC-004/005/008은 §E.2 되돌림 표에 행이 없음에도 "AC-001~011 전부" 블록에 포함 → 21/22 PASS는 액면 성립 불가(최소 18/22 + 4 Gaps, B1 반영 시 추가 하향)
 - 미해결 3건 처분: ① AC-029 Gap 유지 부당 — `null as unknown as number` 캐스트 5개(m5.test:65, MetricTextParity.m7.test:93-94) 제거로 관측자 복원 가능 ② 커버리지 sync 보측 타당하나 B1 선행 ③ 사다리 라이브 미검증은 배포 차단 사유 아님(창 11/32/95일로 규모 정합 실측 확인) — 단 F7(사다리 상수 무관측)은 배포 전 처리 권고
 - 추가 확인: backend 컬렉션 오류 2건은 **본 SPEC 무관 확인**, 단 원인은 `db_service.py` import 실패가 아니라 `test_ai_report_router_deep_mode.py:64-70`의 `sys.modules` 전역 스텁에 의한 수집 순서 의존. 파생 주의 — `pytest backend/tests` 일괄 실행은 0건 실행으로 중단됨
+- **run 재작업 완료 (2026-08-18, run-tjvce8)**: 리드 지시 5건 전부 처분 — ① B1 해소(단언 완화 + 필드별 null 집합 고정, `6 passed`) ② B2 해소(`sectorReturnColor(number|null)` 결측색 `#4B5563` + m5 관측자 신설, tsc SPEC 귀속 1→0) ③ tsc 게이트 `tsc -b` 교정 + §E.2/§E.3 재관측 ④ §E.3 집계 정정(AC-004/008 되돌림 행 신설 → **21/22 PASS + 1 Gap(AC-005)**, F23 반영) ⑤ AC-029 캐스트 4건 제거·관측자 복원(되돌림 RED 5건 실측) → Gaps 폐지·PASS. 증거: `.moai/state/verify/run-tjvce8-smu001/`. 잔여: AC-005 Gap(픽스처 섹터 부재, AC 문구 개정은 manager-spec 소관)·커버리지 보층·F7 등 sync/형제 SPEC 분류 항목.

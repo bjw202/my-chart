@@ -40,7 +40,13 @@ const SECTOR_RETURN_BANDS: readonly DivergingBand[] = [
   { label: '+3% ~ +10%', color: '#EF9A9A', test: (v) => v >= 3 && v < 10 },   // 약한 양수 — red-200
   { label: '≥+10%', color: '#C62828', test: (v) => v >= 10 },                 // 강한 양수 — red-800
 ]
-export function sectorReturnColor(periodReturn: number): string {
+// 결측(데이터 없음) 전용 색 — 중립(0%) 밴드의 #9CA3AF(gray-400)와 구분되는 gray-700.
+// @MX:NOTE: [AUTO] period_return=null 섹터가 null→0 강제 변환으로 보합과 같은 중립
+// 회색으로 렌더되던 회귀(B2, review-tjvce8) 방지. 값 부재는 밴드가 아닌 별도 채널.
+const MISSING_RETURN_COLOR = '#4B5563'
+
+export function sectorReturnColor(periodReturn: number | null): string {
+  if (periodReturn == null) return MISSING_RETURN_COLOR
   for (const b of SECTOR_RETURN_BANDS) {
     if (b.test!(periodReturn)) return b.color
   }

@@ -89,9 +89,9 @@ describe('D2 — 섹터 버블 툴팁이 표 셀과 같은 결측 문자열을 �
   function renderWithMissing() {
     const sectors: SectorBubbleItem[] = [
       { name: '반도체', excess_return: 2.5, rs_avg: 60, trading_value: 5e11, period_return: 4 },
-      // 결측 지표 — 백엔드가 null 을 준 섹터
-      { name: '결측섹터', excess_return: null as unknown as number, rs_avg: null as unknown as number,
-        trading_value: 1e11, period_return: null as unknown as number },
+      // 결측 지표 — 백엔드가 null 을 준 섹터 (M3 nullable 타입 — 캐스트 없이 정직한 픽스처)
+      { name: '결측섹터', excess_return: null, rs_avg: null,
+        trading_value: 1e11, period_return: null },
     ]
     render(<SectorBubbleChart sectors={sectors} onSectorClick={() => {}} period="1m" />)
   }
