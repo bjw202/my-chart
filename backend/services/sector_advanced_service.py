@@ -10,7 +10,6 @@ import sqlite3
 
 from my_chart.analysis.sector_advanced import (
     compute_rrg_data,
-    compute_sector_bubble,
     compute_stock_bubble,
     compute_treemap_data,
 )
@@ -46,30 +45,65 @@ def get_sector_bubble(
 ) -> SectorBubbleResponse:
     """섹터 버블 차트 API 응답을 반환한다.
 
+    SPEC-SECTOR-METRIC-UNIFY-001 M4 — 메트릭 원천을 랭킹 봉투(/sectors/ranking
+    ``data[]``)와 동일한 ``compute_sector_aggregates`` 로 통일한다(AC-SMU-001).
+    4개 메트릭은 같은 원천에서 기간 키 ``period`` 를 변환 없이 써서 투영한다:
+
+    - ``period_return`` ← ``a.returns[period].value``
+    - ``excess_return`` ← ``a.excess_returns[period].value``
+    - ``rs_avg`` ← ``a.rs_avg.value`` (기간 불변, INV-3)
+    - ``trading_value`` ← ``a.trading_value[period].value``
+
+    결측(``MetricValue.value is None``)은 치환 금지(§9.1)에 따라 None 그대로
+    통과한다(DEC-3 — 결측 섹터 drop 없음). AG-5(최소 구성종목 5) 미달 섹터는
+    봉투 ``data[]`` 와 같은 기준으로 ``excluded[]`` 에 등록되고 ``sectors[]``
+    에서 빠진다(AC-SMU-015).
+
     Args:
         weekly_db_path: weekly SQLite DB 경로
-        period: 수익률 기간 ("1w", "1m", "3m")
+        period: 수익률 기간 ("1w", "1m", "3m") — 라우터 쿼리값을 변환 없이
+            기간 키로 쓴다.
         market: ``all``/``None``=전체, ``kospi``/``kosdaq`` (대소문자 무관).
-            형제 엔드포인트와 같은 계약이며 ``compute_sector_bubble`` 의
-            섹터 유니버스 필터에 실배선된다(get_stock_bubble 관용과 동일).
-        daily_db_path: 일봉 DB 경로(시총가중 원천) — 형제 엔드포인트 정합
-            배선이며 현 시점엔 소비되지 않는다(기본 ``None``).
+            집계 시점 유니버스 필터에 실배선된다(``compute_sector_aggregates``
+            관용 — ``member_count`` 자체가 달라진다).
+        daily_db_path: 일봉 DB 경로(시총가중·거래대금 원천) — M2 배선.
+            ``None`` 이면 시총 결측 취급(등가중 폴백).
 
     Returns:
         SectorBubbleResponse
     """
     date = _get_latest_valid_date(weekly_db_path) or ""
-    bubbles = compute_sector_bubble(weekly_db_path, period=period, market=market)
+    aggregates = []
+    excluded = []  # 가드 밖 초기화 [HARD] — M5가 envelope_fields(excluded=excluded) 배선
+    if date:
+        # E-6 — 빈 date 가드(get_stock_bubble 관행). 가드가 없으면
+        # date.fromisoformat('') ValueError 가 라우터 포괄 except 를 타고 503 이 된다.
+        from my_chart.analysis.sector_metrics import compute_sector_aggregates
+        result = compute_sector_aggregates(
+            weekly_db_path, date,
+            daily_db_path=daily_db_path,
+            market=market,
+            as_of=date,
+            period=period,
+            # 버블 투영은 rank_change 를 소비하지 않는다 — 기본 True 는
+            # anchor(t,28) 기준일 집계를 1회 더 돌려 비용만 2배로 만든다.
+            compute_rank_change=False,
+        )
+        aggregates = result.aggregates
+        excluded = result.excluded  # E-6 branch-B 관측 원천 (M5 보존)
+        if excluded:
+            logger.debug("sector bubble AG-5 excluded: %s",
+                         [(e.sector, e.count) for e in excluded])
 
     items = [
         SectorBubbleItem(
-            name=b.name,
-            excess_return=b.excess_return,
-            rs_avg=b.rs_avg,
-            trading_value=b.trading_value,
-            period_return=b.period_return,
+            name=a.name,
+            excess_return=a.excess_returns[period].value,
+            rs_avg=a.rs_avg.value,
+            trading_value=a.trading_value[period].value,
+            period_return=a.returns[period].value,
         )
-        for b in bubbles
+        for a in aggregates
     ]
 
     return SectorBubbleResponse(

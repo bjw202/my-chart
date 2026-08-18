@@ -541,6 +541,16 @@ def compute_sector_bubble(
 ) -> list[SectorBubble]:
     """섹터 버블 차트 데이터를 계산한다.
 
+    .. deprecated:: SPEC-SECTOR-METRIC-UNIFY-001 M4 (AC-SMU-013)
+        이 함수는 더 이상 ``/api/sectors/bubble`` 의 원천이 아니다 — HTTP 엔드포인트는
+        ``compute_sector_aggregates`` 투영(``get_sector_bubble``)으로 교체됐다.
+        **이 함수를 다시 HTTP 엔드포인트에 연결하지 말 것** — 섹터 소속(주간
+        stock_meta vs registry), RS 결측(0-대체 vs 가용평균), 거래대금(주간 1봉
+        Close*Volume[원] vs 일봉 VolumeWon 기간 합산[억]) 원천이 봉투와 다시 갈라진다.
+
+        삭제 금지 — ``detect_sector_transitions``(:951 근처)가 ``/market/overview``
+        경로에서 이 함수를 소비한다. 신규 사용도 금지.
+
     Args:
         db_path: weekly SQLite DB 경로
         period: 수익률 계산 기간 ("1w", "1m", "3m")

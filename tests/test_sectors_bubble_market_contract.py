@@ -110,24 +110,45 @@ def test_bubble_market_filter_actually_narrows_universe(client: Any) -> None:
 
 
 def test_bubble_market_partition_is_exact(client: Any) -> None:
-    """kospi + kosdaq == all (섹터별 거래대금) — 필터가 메아리가 아니라 실제 분할이다.
+    """시장 파티션 등식 — AG-5 시장별 멤버십 적용 후의 의미론 (M4, AC-SMU-015).
 
-    거래대금은 구성 종목 합이므로, 시장 필터가 유니버스에 정확히 걸렸다면 두 시장의
-    합이 전체와 일치해야 한다. 값이 무시되거나 잘못 걸리면 이 등식이 즉시 깨진다.
+    M4(`/api/sectors/bubble` → compute_sector_aggregates 투영) 이전에는 세 시장
+    응답의 섹터 집합이 동일해 "kospi + kosdaq == all" 엄격 등식이 성립했다. M4는
+    버블에 봉투(/api/sectors/ranking)와 동일한 AG-5 최소 멤버 기준을 **시장별
+    멤버십 기준**으로 적용한다 — 단일 시장 유니버스에서 미달인 섹터(이 픽스처에서
+    kospi 의 디스플레이·스마트폰·패션, kosdaq 의 패션)는 그 시장 응답에서 제외된다.
+    등식의 전제("모든 섹터가 세 응답에 공통 존재")는 M4 로 제거되었으므로 계약을
+    AG-5 의미론으로 재기술한다 (완화가 아니다):
+      (a) 양 시장 응답에 모두 존재하는 섹터 — 기존 엄격 등식 그대로
+      (b) 한쪽에만 존재하는 섹터(AG-5 경계) — 존재 쪽 값이 all 보다 엄격히 작다
+          (진부분집합 증명)
+      (c) (a) 집합이 비지 않는다 (공허한 통과 방지)
     """
     all_tv = _trading_value(client, "all")
     kospi_tv = _trading_value(client, "kospi")
     kosdaq_tv = _trading_value(client, "kosdaq")
 
-    # 공허한 통과 방지 — all 이 비면 아래 루프가 0회 돌고 무조건 통과한다.
     assert all_tv, "all 응답이 비어 있다 — 등식을 검사할 대상이 없다"
 
-    for name, total in all_tv.items():
-        part = kospi_tv.get(name, 0.0) + kosdaq_tv.get(name, 0.0)
-        assert part == pytest.approx(total, rel=1e-9), (
-            f"{name}: kospi({kospi_tv.get(name)}) + kosdaq({kosdaq_tv.get(name)}) "
-            f"!= all({total})"
+    both = set(kospi_tv) & set(kosdaq_tv)  # (c)
+    assert both, "양쪽 모두에 존재하는 섹터가 0개 — 파티션 등식 검사 대상 없음"
+
+    for name in both:  # (a)
+        part = kospi_tv[name] + kosdaq_tv[name]
+        assert part == pytest.approx(all_tv[name], rel=1e-9), (
+            f"{name}: kospi({kospi_tv[name]}) + kosdaq({kosdaq_tv[name]}) "
+            f"!= all({all_tv[name]})"
         )
+
+    for name, total in all_tv.items():  # (b)
+        if name in both:
+            continue
+        for side_name, side in (("kospi", kospi_tv), ("kosdaq", kosdaq_tv)):
+            if name in side:
+                assert side[name] < total, (
+                    f"{name}: {side_name}에만 존재(AG-5 경계)한데 값({side[name]})이 "
+                    f"all({total}) 이상 — 진부분집합 위반"
+                )
 
 
 def test_bubble_market_omitted_still_means_whole_universe(client: Any) -> None:

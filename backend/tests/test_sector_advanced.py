@@ -275,7 +275,13 @@ class TestRRGData:
 # ---------------------------------------------------------------------------
 
 class TestSectorBubble:
-    """섹터 버블 차트 데이터 계산 검증."""
+    """섹터 버블 차트 데이터 계산 검증.
+
+    SPEC-SECTOR-METRIC-UNIFY-001 M4 — 이 함수(compute_sector_bubble)는 더 이상
+    ``/api/sectors/bubble`` 를 지원하지 않는다(엔드포인트는 compute_sector_aggregates
+    투영으로 교체). 아래는 레거시 함수 자체의 단위 동작 검증이며,
+    ``/market/overview`` 의 detect_sector_transitions 소비 경로를 보호한다.
+    """
 
     def test_returns_list_of_sector_bubble(self, test_db: str) -> None:
         """SectorBubble 리스트를 반환해야 한다."""

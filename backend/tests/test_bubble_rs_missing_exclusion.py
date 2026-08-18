@@ -14,6 +14,14 @@ M4 가 버블 rs_avg 의 결측 의미론을 "0 대체 → 가용 평균/None" �
 수치 설계(0-대체와 가용-평균이 우연히 같아지는 항진명제 방어):
 - 부분결측 가용 8개 합 520 → 분모 8 평균 65.0 / 0-대체 분모 10 평균 52.0 (엄격히 다름)
 - 정상섹터 6개 합 420 → 평균 70.0 (어떤 분모든 동일 — control 이므로 문제없음)
+
+M4 fixture 적응 — 신경로(``compute_sector_aggregates``)의 두 가지 입력 계약:
+1. ``_load_weekly_snapshot`` 이 ``stock_prices.VolumeSMA10`` 컬럼을 참조한다(구경로
+   ``compute_sector_bubble`` 은 Close·Volume·CHG·RS 만 읽었다).
+2. 섹터 소속 원천이 주간 DB ``stock_meta``(구경로)에서 **registry**(UN-1 단일 원천,
+   ``_load_registry_mapping``)로 바뀐다 — 합성 섹터명을 실 SECTORMAP 에 넣을 수
+   없으므로 ``my_chart.analysis.sector_metrics.get_sector_registry`` 를 합성
+   DataFrame 으로 패치한다.
 """
 from __future__ import annotations
 
@@ -61,11 +69,8 @@ def _create_synthetic_db() -> str:
         CREATE TABLE stock_prices (
             Name TEXT, Date TEXT, Close REAL, Volume REAL,
             SMA10 REAL, SMA40 REAL, SMA40_Trend_4M REAL,
-            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL
-        );
-        CREATE TABLE stock_meta (
-            name TEXT, code TEXT, sector_major TEXT, sector_minor TEXT,
-            market TEXT, market_cap REAL, product TEXT
+            CHG_1W REAL, CHG_1M REAL, CHG_3M REAL, MAX52 REAL,
+            VolumeSMA10 REAL
         );
         CREATE TABLE relative_strength (
             Name TEXT, Date TEXT, RS_12M_Rating REAL
@@ -73,7 +78,6 @@ def _create_synthetic_db() -> str:
     """)
 
     price_rows: list[tuple] = []
-    meta_rows: list[tuple] = []
     rs_rows: list[tuple] = []
 
     # KOSPI 지수 행 (관용 — 초과수익률 벤치마크 입력)
@@ -81,18 +85,14 @@ def _create_synthetic_db() -> str:
         close = 2500.0 + i * 10.0
         price_rows.append(("KOSPI", date, close, 5_000_000.0,
                            close * 0.98, close * 0.95, close * 0.93,
-                           0.005 + i * 0.001, 0.015, 0.04, close * 1.05))
+                           0.005 + i * 0.001, 0.015, 0.04, close * 1.05,
+                           4_500_000.0))
 
     # 섹터별 종목 — 세 섹터 모두 동일한 가격 공식(축은 RS 존재뿐)
     for sector, names, rs_values in _SECTOR_PLAN:
         for j, name in enumerate(names):
             base_close = 50_000.0 + j * 10_000.0
             factor = 0.01 + j * 0.001
-            code = f"{hash(name) % 900000 + 100000:06d}"
-            meta_rows.append((name, code, sector, sector + "소그룹",
-                              "KOSPI" if j % 2 == 0 else "KOSDAQ",
-                              10_000_000_000.0 - j * 1_000_000_000.0,
-                              f"{name} 주요제품"))
             for i, date in enumerate(_BASE_DATES):
                 close = base_close * (1 + factor * i)
                 chg_1w = factor * (1 + i * 0.1)
@@ -100,27 +100,44 @@ def _create_synthetic_db() -> str:
                     name, date, close, 1_000_000.0 + i * 50_000,
                     close * 0.99, close * 0.97, close * 0.95,
                     chg_1w, chg_1w * 4, chg_1w * 12, close * 1.1,
+                    900_000.0,
                 ))
             # RS 축 — rs_values 에 없는 종목은 relative_strength 행을 아예 넣지 않는다.
             if name in rs_values:
                 for date in _BASE_DATES:
                     rs_rows.append((name, date, rs_values[name]))
 
-    conn.executemany("INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?)", price_rows)
-    conn.executemany("INSERT INTO stock_meta VALUES (?,?,?,?,?,?,?)", meta_rows)
+    conn.executemany("INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", price_rows)
     conn.executemany("INSERT INTO relative_strength VALUES (?,?,?)", rs_rows)
     conn.commit()
     conn.close()
     return tmp.name
 
 
+def _synthetic_registry_df():
+    """합성 섹터 매핑 DataFrame — UN-1 registry 계약(Name/산업명(대)/Market 컬럼)."""
+    import pandas as pd
+
+    rows = [
+        {"Name": name, "산업명(대)": sector, "Market": "KOSPI"}
+        for sector, names, _rs in _SECTOR_PLAN
+        for name in names
+    ]
+    return pd.DataFrame(rows)
+
+
 @pytest.fixture(scope="module")
 def bubble_response():
     """합성 DB 위에서의 현재 /api/sectors/bubble 서비스 출력 (period=1w, market=all)."""
+    from unittest.mock import patch
+
     from backend.services.sector_advanced_service import get_sector_bubble
 
     db_path = _create_synthetic_db()
-    return get_sector_bubble(db_path, period="1w", market="all")
+    # UN-1 — 신경로의 섹터 소속 원천은 registry 다(주간 stock_meta 아님).
+    with patch("my_chart.analysis.sector_metrics.get_sector_registry",
+               return_value=_synthetic_registry_df()):
+        return get_sector_bubble(db_path, period="1w", market="all")
 
 
 def _find_sector(bubble_response, name: str):
