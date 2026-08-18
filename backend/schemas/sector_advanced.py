@@ -20,10 +20,12 @@ class SectorBubbleItem(BaseModel):
     """섹터 버블 차트 단일 항목."""
 
     name: str
-    excess_return: float    # KOSPI 대비 초과수익률 (%)
-    rs_avg: float           # 섹터 평균 RS
-    trading_value: float    # 거래대금 합계
-    period_return: float    # 기간 수익률 (%)
+    # M3 (AC-SMU-028) — 메트릭 스키마만 nullable 확장, 값은 불변.
+    # MetricValueModel 미탑재(스칼라 유지), null 섹터 미제거(DEC-3).
+    excess_return: float | None    # KOSPI 대비 초과수익률 (%)
+    rs_avg: float | None           # 섹터 평균 RS
+    trading_value: float | None    # 거래대금 합계
+    period_return: float | None    # 기간 수익률 (%)
 
 
 class SectorBubbleResponse(EnvelopeMixin):

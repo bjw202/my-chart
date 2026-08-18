@@ -3,10 +3,11 @@
 
 export interface SectorBubbleItem {
   name: string
-  excess_return: number  // KOSPI 대비 초과수익률 (%)
-  rs_avg: number         // 섹터 평균 RS (0-100)
-  trading_value: number  // 거래대금 합계 (원)
-  period_return: number  // 기간 수익률 (%)
+  // M3 (AC-SMU-029) — 백엔드 nullable 확장과 동시 적용, 값은 불변.
+  excess_return: number | null  // KOSPI 대비 초과수익률 (%)
+  rs_avg: number | null         // 섹터 평균 RS (0-100)
+  trading_value: number | null  // 거래대금 합계 (원)
+  period_return: number | null  // 기간 수익률 (%)
 }
 
 export interface SectorBubbleResponse {
