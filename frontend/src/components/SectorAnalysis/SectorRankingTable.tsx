@@ -20,6 +20,13 @@ interface SectorRankingTableProps {
   excluded?: ExcludedSector[]
   // AC-SUX-025 (REQ-SUX-023): rank_change 기준일 — Rank 열 헤더에 표기.
   baselineDate?: string | null
+  // M7 (REQ-SDU-009): 활성 기간 — 해당 기간 수익률 열 헤더에 (순위 기준) 마커.
+  // 기간 랭킹이 실제 활성일 때만 부모가 넘긴다(마커가 거짓을 말하지 않게).
+  activePeriod?: '1w' | '1m' | '3m'
+  // M7 (REQ-SDU-007): data[] 부재/전량 조인 실패로 composite 폴백 중이면 캡션이 그 사실을 말한다.
+  compositeFallback?: boolean
+  // M7 (EF-2): 기간 랭킹 활성 중 이름 조인 실패로 composite 순위를 유지한 섹터 수.
+  partialFallbackCount?: number
 }
 
 // 가중 방식 배지 (AC-SUX-026 / REQ-SUX-024): 초과수익률 3열 = ⓦ(시총가중, 상한10%),
@@ -51,6 +58,13 @@ const BADGE_GLYPH: Record<NonNullable<WeightBadge>, string> = { W: 'ⓦ', E: '�
 const BADGE_TITLE: Record<NonNullable<WeightBadge>, string> = {
   W: '시총가중 (상한 10%)',
   E: '등가중',
+}
+
+// M7 (REQ-SDU-009): 활성 기간 → 수익률 열 필드 매핑. 세 열은 전부 유지된다(DEC-F4).
+const PERIOD_COLUMN_FIELD: Record<'1w' | '1m' | '3m', string> = {
+  '1w': 'excess_w1',
+  '1m': 'excess_m1',
+  '3m': 'excess_m3',
 }
 
 // AC-SUX-053 (ER-2): 결측은 배경색 채널에서도 0 으로 취급하지 않는다 — 색 없음.
@@ -108,6 +122,9 @@ export function SectorRankingTable({
   selectedSector,
   excluded,
   baselineDate,
+  activePeriod,
+  compositeFallback,
+  partialFallbackCount,
 }: SectorRankingTableProps): ReactElement {
   // AC-SUX-058 (REQ-SUX-055): 분모 = 순위 대상 총수. data[] 중 rank !== null 인 개수에서 도출.
   // 총 섹터 수를 상수로 박지 않는다 — 시장 필터로 제외가 늘면 분모가 줄어든다.
@@ -115,6 +132,18 @@ export function SectorRankingTable({
 
   return (
     <div className="sector-ranking-table-wrapper">
+      {/* M7 (REQ-SDU-007): composite 폴백 중임을 캡션이 말한다 — 조용한 폴백 금지 */}
+      {compositeFallback && (
+        <div className="ranking-basis-caption" data-testid="ranking-basis-caption">
+          순위 기준: 종합점수(3기간 가중)
+        </div>
+      )}
+      {/* M7 (EF-2): 부분 조인 실패 — 남은 섹터의 순위 기준이 섞여 있음을 고지 */}
+      {!compositeFallback && (partialFallbackCount ?? 0) > 0 && (
+        <div className="ranking-basis-caption" data-testid="ranking-basis-partial">
+          일부 {partialFallbackCount}개 섹터는 이름 조인 실패로 종합점수 순위 유지
+        </div>
+      )}
       <table className="sector-ranking-table" data-testid="sector-ranking-table">
         <thead>
           <tr>
@@ -140,6 +169,10 @@ export function SectorRankingTable({
                   >
                     {BADGE_GLYPH[col.badge]}
                   </span>
+                )}
+                {/* M7 (REQ-SDU-009): 선택 기간 열에 (순위 기준) — 세 수익률 열은 모두 유지(DEC-F4) */}
+                {activePeriod && col.field === PERIOD_COLUMN_FIELD[activePeriod] && (
+                  <span className="rank-basis-marker"> (순위 기준)</span>
                 )}
                 {sortField === col.field && (
                   <span className="sort-arrow">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>

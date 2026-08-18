@@ -64,8 +64,9 @@ describe('AC-SUX-022 — 정렬 고지 띠', () => {
     fireEvent.click(screen.getByText('RS Avg'))
     const notice = screen.getByTestId('sort-notice')
     expect(notice.textContent).toContain('rs_avg')
-    expect(notice.textContent).toContain('1m')   // period (초기)
-    expect(notice.textContent).toContain('all')  // market (초기)
+    // REQ-SDU-010 (M7): 고지 띠는 원시 상태값(1m/all)이 아니라 표시 라벨(1M/All)을 쓴다
+    expect(notice.textContent).toContain('1M')   // period 표시 라벨 (초기)
+    expect(notice.textContent).toContain('All')  // market 표시 라벨 (초기)
   })
 
   it('[순위순으로] 버튼 클릭 시 rank/asc 로 복귀하고 띠가 사라진다', () => {

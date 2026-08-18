@@ -146,15 +146,67 @@ $ npx eslint <§F.1 범위> --max-warnings=0      → exit 1, ✖ 23 problems (2
 
 ### §E.2.2 M7 구현
 
-_<pending>_
+**구현 내역** (REQ-SDU-006~011, M6 커밋 0023210 위에 중첩):
+- `api/market.ts`: `fetchSectorRanking(market?, period?)` — period 전송 시 봉투 `data[]` 의 기간 순위 수신(백엔드 `routers/sectors.py:46` Query `period` ^(1w|1m|3m)$ 확인)
+- `MarketContext.tsx`: `periodRef`(marketRef 관용 확장) + effect dep `[market, period]` — 기간 토글 시 재조회. overview 도 재조회되나 값은 period 무관(무해, 주석 명시)
+- `types/market.ts`: `SectorAggregateItem { name, rank: number|null, rank_change: number|null }` 최소형 + `data?` 필드(DEC-F5)
+- `SectorAnalysis.tsx`: `joinedSectors` useMemo — 이름 조인으로 rank/rank_change 덮어쓰기(EF-2 조인 실패·EF-3 빈 배열·rank null 은 composite 유지), `periodRankingActive`/`partialFallbackCount` 산출, 정렬 소스를 joinedSectors 로 전환, `:218` 고지 띠 표시 라벨(PERIOD_LABELS/MARKET_LABELS)
+- `SectorRankingTable.tsx`: `activePeriod`(선택 기간 열 `(순위 기준)` 마커 — 기간 랭킹 활성 시에만), `compositeFallback`(캡션 `순위 기준: 종합점수(3기간 가중)`), `partialFallbackCount`(부분 조인 실패 고지). 세 수익률 열 유지(DEC-F4)
+- `SectorBubbleChart.tsx`: `MARKET_BENCHMARK_LABEL` kospi/kosdaq → 'KOSPI 상한가중'/'KOSDAQ 상한가중' — X축 라벨이 정의 B(상한 시쟁가중 유니버스)를 시장 무관 서술
+
+**검증 (커밋 전)**:
+```
+$ npm run typecheck                              → exit 0
+$ npx vitest run src/components/SectorAnalysis/__tests__ → 27 files / 261 tests passed
+$ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems — (파일,규칙) 다중집합이
+  M6 측정과 동일(행이동만: SectorAnalysis.tsx set-state 115→144). B \ A == ∅, 신규 0건
+```
+
+**§D 목록 정정 (투명 기록)**: `SectorAnalysis.m4.test.tsx` 고지 띠 단언(`:66-67`, `toContain('1m')`/`toContain('all')`)이 REQ-SDU-010 이 정확히 교체하는 원시 상태값을 단언해 적색화 — 계획 §D 가 놓친 **의도적 갱신 대상**으로 판정, `toContain('1M')`/`toContain('All')` 로 갱신. §D 의 delivery 라인번호도 실측으로 정정됐던 전례와 동일 계열이며, 갱신 근거는 커밋 diff로 감사 가능. **AC-SDU-013 판정 시 이 1건은 "의도적 갱신"으로 계상한다.**
+
+**구 라벨 잔여 최종 측정 (AC-SDU-004 보조)**: 소스(테스트 제외)에서 `'RS Top %'`·`'RS 중앙'`·`'RS 평균 (0-100)'` 스캔 → **잔여 0** (주석 2건은 변경 서술 문자열로 라벨 아님). 테스트 파일에도 잔여 0.
 
 ### §E.2.3 AC 판정 (되돌림 RED 관측)
 
-_<pending>_
+**M6 판정 (2026-08-19, 커밋 0023210 트리 — 각 되돌림 후 복원, 최종 4스위트 38 tests passed + `git status --short -- frontend/src my_chart/` 출력 없음으로 트리 무결 증명)**
+
+| AC | 판정 | 되돌림 → RED 관측 (verbatim 요지) |
+|---|---|---|
+| AC-SDU-001 | **PASS** | RankingTable RS Avg 셀을 `format={(n) => String(Math.round(n))}` 로 되돌림 → 핀 스캔 정확히 **1줄** 반환(`SectorRankingTable.tsx:200 …`) → 복원 후 0줄·exit 1 |
+| AC-SDU-002 | **PASS** | MetricCard를 구형(string\|number + 원시 렌더)·호출부를 `` value={`${sector.rs_top_pct}%`} `` 로 되돌림 → `AssertionError: expected 'RS AvgRS 80+ 비중null%52W High %…' not to contain 'null'` (null% 문자 재현) → 복원 |
+| AC-SDU-003 | **PASS** | 안전 규약 하 `my_chart/analysis/sector_metrics.py:58` 을 85.0으로 임시 편집 → `AssertionError: expected 80 to be 85 // Object.is equality` → 복원 80.0 + `git status --short -- my_chart/` 출력 없음. **And 조항**: StockTable:62 `rs_12m > RS_S2_STRONG_THRESHOLD`(+렌더 title), ChartCell:303 `>= RS_TOP_THRESHOLD`(+title) grep 관측. **공개**: 복원 sed가 cwd 함정(frontend/ 상대경로)으로 1회 실패 — 절대경로로 즉시 복원, 최종 청결은 git 무출력으로 증명. 단일 스텝이 순간적으로 깨졌으나 부작용 없이 종결 |
+| AC-SDU-004 | **PASS** | 열 라벨을 'RS Top %'로 되돌림 → `TestingLibraryElementError: Unable to find an element with the text: RS 80+ 비중` → 복원. 나머지 라벨(Y축·markLine·RS등급·RRG 캡션)도 동일 계열 변경으로 header/렌더 단언이 커버 — 구 문자열 잔여는 아래 Grep 확인 |
+| AC-SDU-005 | **PASS** | rs_avg 셀을 `'percentage'`로 되돌림 → `AssertionError: expected 'rgba(59, 130, 246, 0.3)' not to be 'rgba(59, 130, 246, 0.3)'` (두 셀 동일 파랑 수렴) → 복원 `'rating'` |
+| AC-SDU-008 | **PASS** | 버블 툴팁을 `n => n.toFixed(1)`로 되돌림 → `AssertionError: expected '<b>Alpha</b><br/>초과수익률: 1.20%<br/>RS …' to contain 'RS 평균: 63'` (62.6 발산) → 복원 rating0 |
+| AC-SDU-012 | **PASS** | M6 단독 트리(형제 SPEC completed·G-F4 해소로 의존 게이트 정상 경로)에서 §F 전 구간: `npm run typecheck` exit 0 · 레인 로컬 vitest 실패 0(§D M6 대상은 라벨 갱신으로 사전 반영) · eslint **B \ A == ∅**(23 problems — 신규 (파일,규칙) 0, MetricCell only-export 7 = 기준선 5 + 사전선언 예외 2 정확) |
+
+**AC-SDU-004 보조 grep (구 문자열 잔여 0)**: `'RS Top %'`·`'RS 중앙'`·`'RS 평균 (0-100)'` 각각 스캔에서 소스 잔여 0 — M7 종료 시 재측정해 §E.2.4에 기록.
+
+**Gaps (M6)**: 없음 — 단 AC-SDU-004의 라이브 화면 확인(lessons #1/#2)은 DoD 항목으로 M7 랜딩 후 남음.
+
+**M7 판정 (2026-08-19, M7 커밋 전 트리 — 각 주입·되돌림 후 복원, 최종 typecheck exit 0 + 27파일 261테스트 green + `git status --short -- frontend/src`가 M7 변경분만)**
+
+| AC | 판정 | 되돌림/주입 → RED 관측 (verbatim 요지) |
+|---|---|---|
+| AC-SDU-006 | **PASS** | `joinedSectors` 조인 제거(sectors[] 만 반환) → `AssertionError: expected [ 'A', 'B', 'C' ] to deeply equal [ 'B', 'C', 'A' ]` → 복원 |
+| AC-SDU-007 | **PASS** | `compositeFallback` 캡션 분기 무력화(`{false && …}`) → `TestingLibraryElementError: Unable to find an element by: [data-testid="ranking-basis-caption"]` → 복원 |
+| AC-SDU-009 | **PASS** | 버블 series Y에 기간 오프셋 주입(`s.rs_avg + (period==='1w' ? 5 : …)`) → `AssertionError: expected 65 to be 60 // Object.is equality` (Y 이동) → 복원. X 변화 단언은 정상 구현에서 w.x≠m.x≠q.x 관측 |
+| AC-SDU-010 | **PASS** | 선택 기간 열만 남기는 filter 주입 → `TestingLibraryElementError: Unable to find an element with the text: 1W` (열 소실) → 복원. 마커는 1M 헤더에만 존재(1W 헤더 not.toContain 대조) |
+| AC-SDU-011 | **PASS** | 고지 띠를 원시 상태값 출력으로 되돌림 → `AssertionError: expected 'excess_w1 ↓ 기준 정렬 · 기간 1m · 시장 all — …' to contain '기간 1M'` → 복원 |
+| AC-SDU-013 | **PASS** | 전 마일스톤 완료 트리: vitest 실패가 의도적 갱신 대상(§D 3종 + §E.2.2 정정 1종 m4.test)에 한정·그 밖 0건(261 green), typecheck exit 0, eslint B \ A == ∅(23 problems, M6과 동일 다중집합) |
+
+**Gaps (M7)**: 없음. EF-1(전 지표 null 섹터)은 M6 null% 테스트 + MetricCard MetricValue 수용이 구조적으로 커버(각 카드 '–', 행 소실 없음 — SectorRankItem 행 렌더는 값과 무관). EF-4(알 수 없는 기간값)는 PERIOD_LABELS 가 Record<Period,string> 타입으로 미지 키를 컴파일 타임 차단 — 런타임 미지값 경로 없음.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+- **run_status**: audit-ready
+- **run_complete_at**: 2026-08-19
+- **run_commit_sha**: pending-backfill-m7 (본 섹션을 운반하는 M7 커밋 직후 chore 커밋으로 backfill — D3 자기참조 해결 패턴, 형제 SPEC 62b309e 선례)
+- **커밋**: M6 `0023210` (16파일, +448/−40) · M7 `pending-backfill-m7` (api/market·MarketContext·types·SectorAnalysis·SectorRankingTable·SectorBubbleChart·테스트 3종 갱신 + sectorPeriodToggle 신설)
+- **AC 요약**: AC-SDU-001~011 전부 **PASS — 되돌림/주입 RED verbatim 관측 완료**(§E.2.3) · AC-SDU-012/013 **PASS**(§F 전 구간 — typecheck exit 0, vitest 261 green[의도 갱신 4종 포함, 그 밖 0건], eslint B\A==∅ 신규 0건)
+- **Gaps**: 0건 — 잔여는 DoD 의 라이브 화면 확인(lessons #1/#2)뿐
+- **실행 방식**: orchestrator-direct(운영자 승인 A, 리드 경유) — 스폰 2회 사망 경위·부작위 관측은 §E.2.0/§E.2.1
+- **미푸시 상태**: t3·t5·t6 잔여 미푸시 4건 + 본 SPEC M6·M7 — push 시점은 리드/운영자 판단에 위임(전체 스위트는 push 후 CI)
 
 ## §E.4 Sync-phase Audit-Ready Signal
 

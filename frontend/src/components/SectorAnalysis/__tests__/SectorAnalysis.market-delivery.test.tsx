@@ -53,7 +53,7 @@ describe('AC-SUX-018 — 시장 토글 실동작 (market=kospi 파라미터 전�
     )
     // 마운트 시 최초 조회 (market=all)
     await waitFor(() => expect(mockFetchSectorRanking).toHaveBeenCalled())
-    expect(mockFetchSectorRanking).toHaveBeenLastCalledWith('all')
+    expect(mockFetchSectorRanking).toHaveBeenLastCalledWith('all', '1m')
 
     // KOSPI 버튼 클릭 → market 변경
     const kospiBtn = screen.getByRole('button', { name: /kospi/i })
@@ -61,7 +61,7 @@ describe('AC-SUX-018 — 시장 토글 실동작 (market=kospi 파라미터 전�
 
     // market=kospi 로 재조회 발생 (무동작 ST-4 해소)
     await waitFor(() => {
-      expect(mockFetchSectorRanking).toHaveBeenLastCalledWith('kospi')
+      expect(mockFetchSectorRanking).toHaveBeenLastCalledWith('kospi', '1m')
     })
   })
 
@@ -78,7 +78,7 @@ describe('AC-SUX-018 — 시장 토글 실동작 (market=kospi 파라미터 전�
     const kosdaqBtn = screen.getByRole('button', { name: /kosdaq/i })
     await user.click(kosdaqBtn)
     await waitFor(() => {
-      expect(mockFetchSectorRanking).toHaveBeenLastCalledWith('kosdaq')
+      expect(mockFetchSectorRanking).toHaveBeenLastCalledWith('kosdaq', '1m')
     })
   })
 })

@@ -88,11 +88,40 @@ export function SectorAnalysis(): ReactElement {
   const [sortField, setSortField] = useState('rank')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
+  // M7 (REQ-SDU-006): 봉투 data[] 의 기간별 rank/rank_change 를 섹터명 조인으로 덮어쓴다.
+  // data[] 부재·빈 배열(EF-3)·이름 조인 실패 섹터(EF-2)·rank null 항목은 sectors[] 의
+  // composite 순위를 유지한다 — 조용한 폴백이 아니라 표 캡션/부분 표기로 노출된다.
+  const joinedSectors = useMemo((): SectorRankItem[] => {
+    const base = sectorRanking?.sectors
+    const data = sectorRanking?.data
+    if (!base) return []
+    if (!data || data.length === 0) return base
+    const byName = new Map(data.map(d => [d.name, d]))
+    return base.map(s => {
+      const d = byName.get(s.name)
+      return d ? { ...s, rank: d.rank ?? s.rank, rank_change: d.rank_change } : s
+    })
+  }, [sectorRanking])
+
+  // 폴백 판정 재료: 조인 성공 섹터 수(이름 일치). 0이면 data[] 가 있어도 composite 폴백.
+  const periodJoinCount = useMemo(() => {
+    const base = sectorRanking?.sectors
+    const data = sectorRanking?.data
+    if (!base || !data || data.length === 0) return 0
+    const names = new Set(data.map(d => d.name))
+    return base.filter(s => names.has(s.name)).length
+  }, [sectorRanking])
+
+  const periodRankingActive = periodJoinCount > 0
+  const partialFallbackCount = periodRankingActive
+    ? (sectorRanking?.sectors?.length ?? 0) - periodJoinCount
+    : 0
+
   // Sort sectors based on current sort field/direction
   // AC-SUX-024 (REQ-SUX-022): null/NaN 을 항상 마지막에 둔다 (방향 무관) — compareNumericNullsLast.
   const sortedSectors = useMemo((): SectorRankItem[] => {
-    if (!sectorRanking?.sectors) return []
-    const sectors = [...sectorRanking.sectors]
+    if (!joinedSectors.length) return []
+    const sectors = [...joinedSectors]
 
     sectors.sort((a, b) => {
       // String sort for sector name
@@ -107,7 +136,7 @@ export function SectorAnalysis(): ReactElement {
     })
 
     return sectors
-  }, [sectorRanking, sortField, sortDirection])
+  }, [joinedSectors, sortField, sortDirection])
 
   // AC-SUX-023 (REQ-SUX-021): period 또는 market 이 바뀌면 정렬을 rank/asc 로 리셋한다.
   // (period 토글이 정렬 키를 excess 필드로 바꾸던 기존 동작은 AC-SUX-023 이 폐기 — rank/asc 복귀.)
@@ -215,7 +244,8 @@ export function SectorAnalysis(): ReactElement {
           {!isRankSorted && (
             <div className="sort-notice" data-testid="sort-notice">
               <span className="sort-notice-text">
-                {sortField} {sortDirection === 'asc' ? '↑' : '↓'} 기준 정렬 · 기간 {period} · 시장 {market} — 순위와 다릅니다.
+                {/* REQ-SDU-010 (M7): 원시 상태값('기간 1m')이 아니라 표시 라벨(:30/:38 유래)을 쓴다 */}
+                {sortField} {sortDirection === 'asc' ? '↑' : '↓'} 기준 정렬 · 기간 {PERIOD_LABELS[period]} · 시장 {MARKET_LABELS[market]} — 순위와 다릅니다.
               </span>
               <button
                 type="button"
@@ -241,6 +271,12 @@ export function SectorAnalysis(): ReactElement {
             selectedSector={selectedSector}
             excluded={excluded}
             baselineDate={baselineDate}
+            /* M7: 기간 랭킹 활성 시에만 activePeriod 를 줘 (순위 기준) 마커가 참을 말하게 한다 */
+            activePeriod={periodRankingActive ? period : undefined}
+            /* M7 (REQ-SDU-007): data[] 부재·전량 조인 실패 → composite 폴백 + 캡션 */
+            compositeFallback={!periodRankingActive}
+            /* M7 (EF-2): 부분 조인 실패 섹터 수 — 캡션이 그 사실을 말한다 */
+            partialFallbackCount={partialFallbackCount}
           />
 
           {/* AC-SUX-020: 선택 섹터가 제외되면 선택을 유지하고 상세 패널 자리에 안내 (조용한 해제 금지). */}

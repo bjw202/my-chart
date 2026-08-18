@@ -26,9 +26,11 @@ const formatSectorTradingValue = (v: number): string => formatTradingValueEok(v 
 // 시장 필터 → 벤치마크 이름 (VZ-10). X=0 초과수익률 = 벤치마크 동일 성과.
 // @MX:NOTE: [AUTO] 벤치마크 절대 수익률 값(+1.88% 등)은 backend 가 미전달 — VZ-5 절대값은 debt(AC-SUX-042 섹터 PASS-WITH-DEBT).
 const MARKET_BENCHMARK_LABEL: Record<string, string> = {
+  // M7: 정의 B 정렬 — 벤치마크는 시장 무관하게 상한 시쟁가중 유니버스다(형제 SPEC BM 규칙).
+  // X축 라벨(${benchmarkLabel} 대비 초과수익률 %)이 가중 방식까지 서술하도록 값을 통일한다.
   all: '전체 상한가중',
-  kospi: 'KOSPI',
-  kosdaq: 'KOSDAQ',
+  kospi: 'KOSPI 상한가중',
+  kosdaq: 'KOSDAQ 상한가중',
 }
 
 // REQ-SUX-056: 기간 수익률 발산형 5단계 — 기준점 0%(벤치마크 아님). 경계값 단일 위치 상수.

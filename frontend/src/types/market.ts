@@ -117,4 +117,14 @@ export interface SectorRankingResponse {
   as_of_date?: string | null      // AC-SUX-037 기준일 배지 (M6 정식 소비)
   as_of_is_partial_week?: boolean | null
   grid_version?: string | null   // SN-5: 격자 규칙 버전 — 변경 시 전 캐시 무효화
+  // M7 (REQ-SDU-006 / DEC-F5): 봉투 data[] 최소 형태 — 프론트가 읽는 필드만 선언한다.
+  // 백엔드 SectorAggregate 전체 스키마를 복제하면 백엔드 변경마다 드리프트하므로 하지 않는다.
+  data?: SectorAggregateItem[]
+}
+
+// M7: 봉투 data[] 항목의 프론트 최소 형태 — 기간별 순위 덮어쓰기에 필요한 3필드.
+export interface SectorAggregateItem {
+  name: string
+  rank: number | null   // 기간 초과수익률 기준 순위 (period 전송 시)
+  rank_change: number | null
 }
