@@ -350,6 +350,94 @@ $ cd frontend && npx vitest run --exclude "e2e/**"
 
 ---
 
+### §R.6 재확인 (범위 한정 — 커밋 `3b9398b`, 2026-08-19)
+
+- **리뷰어**: review-tjvce8 세션 (칸반 리드 2차 디스패치, 범위 한정 — 전면 재리뷰 아님)
+- **대상**: `8c94ab7..3b9398b` (7파일 +83/−13, 소스 2 / 테스트 3 / 문서 2), `origin/main...HEAD` = `0 0`
+- **증거 경로**: `.moai/state/verify/08214523-r2/{tsc.out,eslint.out,vitest.out}`
+- **판정**: **이관 가능 — 차단 사유 0건.** F1·F2·F3 수정이 각각 지적한 구멍을 실제로 닫았다. 신규 소견 **1건(F6, 문구 정확성 · 차단 아님)** + 참고 2건.
+- **§R.1~§R.4 결론은 유효**하며 재수립하지 않았다.
+
+#### R.6.1 §F 축자 재실행 (좁힘 없음)
+
+```
+$ cd frontend && npm run typecheck                                   → exit 0
+$ cd frontend && npx eslint <§F.1 범위> --max-warnings=0 ; echo $?   → 1, ✖ 23 problems
+$ cd frontend && npx vitest run --exclude "e2e/**"                   → 84파일 738테스트 all green, exit 0
+```
+
+**eslint 대조는 기계적으로 했다.** r1(수정 전) 출력과 r2(수정 후) 출력에서 모든 숫자를 치환한 뒤 `diff` 한 결과 **텍스트 차이 0** — 즉 (파일, 규칙, 개수)가 완전히 동일하고 유일한 변화는 행번호 이동(`ChartCell.tsx` `react-hooks/refs` 401:20→403:20, 403:20→405:20)뿐이다. D12 판정 기준상 `B \ A == ∅` 유지. 리드 주장과 일치하며 반증 없음. 테스트 총계도 735 + 신규 3 = **738**로 정확히 맞는다.
+
+#### R.6.2 재확인 요청 5건
+
+**① F1 이 경계 이동을 닫았는가 — 닫았다.** `rsHighlight = stock.rs_12m !== null && Number(rsDisplay) >= RS_TOP_THRESHOLD`. 술어가 표시 문자열을 그대로 읽으므로 표시-술어 불일치가 **구조적으로 불가능**하다. 실행 확인:
+
+```
+rs=79.4  display="79"  highlight=false  | 표시-술어 일치=true
+rs=79.5  display="80"  highlight=true   | 표시-술어 일치=true   ← §R.3 F1 이 지적한 구멍
+rs=79.9  display="80"  highlight=true   | 표시-술어 일치=true
+rs=80    display="80"  highlight=true   | 표시-술어 일치=true
+rs=null  display="-"   highlight=false  | null 가드로 Number("-")=NaN 미도달
+```
+
+`Number('-')` = `NaN` 경로는 **`stock.rs_12m !== null` 이 `&&` 좌변에서 단락**시키므로 도달하지 않는다. 타입도 확인했다 — `types/stock.ts:13 rs_12m: number | null` 로 `undefined` 가 없어 `=== null` 가드와 `!== null` 가드가 같은 집합을 막는다(두 가드가 어긋나는 제3 상태 없음). `rs=0` 도 정상(`Number('0') >= 80` false).
+
+**회귀 무발생 확인**: AC-SDU-001 핀 스캔 잔여 여전히 **0**, 소스에서 RS 표시용 `Math.round` 직접 호출 부활 **없음**(남은 `Math.round` 는 거래대금·가격 포매터 등 무관 기존 코드와 `rating0`/`pct0` 정의부뿐). `MetricCell` export 불변 → eslint `only-export-components` 7건 유지로 §F.1 +2 산술 보존 확인.
+
+**② F2 가드가 구멍을 닫았는가 — 닫았다.** 두 지점이 함께 좁혀졌다:
+- `joinedSectors`: `d && d.rank != null` 일 때만 `rank`·`rank_change` 를 **함께** 덮어쓴다 → §R.3 F2 가 지적한 rank(composite)/rank_change(period) **혼합 행이 생성 불가**.
+- `periodJoinCount`: `data.filter(d => d.rank != null)` 이름 집합과 교집합 → rank null 항목이 `periodRankingActive` 를 밀지 못한다.
+
+**분기 일관성 확인** (`SectorAnalysis.tsx:115-118` 미변경, 새 정의와 대조):
+
+| data[] 상태 | periodJoinCount | periodRankingActive | (순위 기준) 마커 | composite 캡션 | 부분 고지 | 판정 |
+|---|---|---|---|---|---|---|
+| 전량 rank 존재 | N | true | 표시(참) | 없음 | 0 | 일관 |
+| 일부만 rank 존재 | 0<k<N | true | 표시(참 — 실제 k행이 기간 순위) | 없음 | N−k | 일관 |
+| **전량 rank null** | **0** | **false** | **없음** | **표시** | **0** | **구멍 닫힘** |
+| 부재 / 빈 배열 | 0 | false | 없음 | 표시 | 0 | 일관 |
+
+`partialFallbackCount = 활성 ? sectors.length − periodJoinCount : 0` 는 새 정의에서 **오히려 더 정확해졌다** — 이제 "composite 로 남은 행 수"를 빠짐없이 센다(이름 미일치 + 이름 일치·rank null 양쪽). 이중 고지(캡션+부분 고지 동시 표시)도 발생하지 않는다(활성일 때만 부분 고지). 다만 그 **문구**가 어긋난다 → F6.
+
+**③ F3 단언이 되돌림을 검출하는가 — 검출한다.** 툴팁은 `[...].join('<br/>')` 이고 `RS 평균` 은 마지막 요소가 아니므로 `<br/>` 종결 앵커가 항상 성립한다(`SectorBubbleChart.tsx:255-267`). 실행 확인:
+
+```
+신(rating0)  'RS 평균: 60<br/>' ⊂ 'RS 평균: 60<br/>기간…'   = true   ← 통과
+구(toFixed1) 'RS 평균: 60<br/>' ⊂ 'RS 평균: 60.0<br/>기간…' = false  ← 되돌림 검출
+(참고) 이전 앵커 'RS 평균: 60' 은 구 문자열에도 매치        = true   ← §R.3 F3 이 지적한 공허 상태
+```
+
+공허 단언 해소 확인. 제목도 `RS 라인은 rating0 예외` 로 정정돼 본문과 어긋나지 않는다.
+
+**④ 신규 테스트 3건의 lessons #9 — 3건 모두 만족.**
+
+| 테스트 | 양변 출처 | 판별력(구 코드에서 RED 인가) |
+|---|---|---|
+| `ChartCellRsBadge` 79.5 | **프로덕션 `<ChartCell>` 렌더** 의 텍스트 + `container.querySelector('.chart-cell-rs--high')` ↔ 리터럴 기대값 | **RED.** 구 술어(원시 `79.5 >= 80`)에서 클래스가 안 붙어 `toBeTruthy()` 실패 — 이 테스트의 존재 이유가 정확히 그 경계다 |
+| `ChartCellRsBadge` 79.4 | 동일 | 대조군(구·신 모두 GREEN). 79.5 와 짝을 이뤄 "항상 강조" 구현을 배제 |
+| `sectorPeriodToggle` 전량 rank null | **프로덕션 `<SectorAnalysis>` 렌더** 의 `ranking-basis-caption` textContent + `.rank-basis-marker` 부재 ↔ 리터럴 | **RED.** 구 정의(이름 일치)에서 `periodRankingActive` 가 true 라 캡션이 안 뜨고 마커가 붙어 양쪽 단언 모두 실패 |
+| `MetricTextParity` `<br/>` 앵커 | **프로덕션 tooltip formatter 출력** ↔ 리터럴 | ③에서 실행 확인 |
+
+단언 양변이 같은 표현식에서 오는 항목 **0건**. F1 경계 테스트가 프로덕션 렌더 결과(텍스트 + 클래스)를 본다는 요청 사항도 충족.
+
+**⑤ 이 수정이 만든 새 문제 — 1건(문구), 차단 아님.**
+
+| # | 등급 | 소견 |
+|---|---|---|
+| **F6** | **소견 (차단 아님 · 사용자 노출 문구)** | **부분 폴백 고지 문구가 새 정의와 어긋난다.** `SectorRankingTable.tsx:144` 는 `일부 {n}개 섹터는 **이름 조인 실패**로 종합점수 순위 유지` 라고 말하고 prop 주석(`:28`)도 같은 서술인데, F2 이후 `partialFallbackCount` 는 **이름 조인은 성공했으나 기간 rank 가 null 인 섹터도 포함**한다. 즉 문구가 원인을 단정하는데 실제 원인은 둘이다. 이 SPEC 이 REQ-SDU-004 로 "라벨이 실제를 정확히 서술할 것"을 요구한 것과 같은 계열의 부정확이다. 최소 수선은 `이름 조인 실패` → `기간 순위 없음` 류의 원인 중립 서술(주석 포함). **차단하지 않는 이유**: 오표기 조건이 rank null 항목이 실려야 발생하고(§R.3 F2 에서 도달성 미검증으로 남긴 그 조건), 잘못 표시돼도 행 수와 "종합점수 순위 유지" 라는 결론 자체는 참이다. |
+| 참고 1 | INFO | **조인 성공 정의가 두 곳에 중복**된다 — `joinedSectors` 의 `d && d.rank != null` 과 `periodJoinCount` 의 `data.filter(d => d.rank != null)`. 현재는 일치하나 한쪽만 고치면 조용히 어긋나는 구조다(고지/마커와 실제 행이 불일치). 공용 술어로 뽑을 여지. |
+| 참고 2 | INFO | `Number(rsDisplay)` 는 표시 문자열 → 수치 역파싱이라 `rating0` 의 출력 형식에 결합된다. RS 가 0-100 정수라 현재는 안전하지만, 훗날 `rating0` 이 천단위 구분자·접미사를 붙이면 술어가 조용히 `false` 로 죽는다(`Number('1,000')` = NaN). 표시-술어 일치를 얻은 대가로 받아들일 만한 결합이나 `rating0` 변경 시 동반 검토 대상이다. |
+
+**F5 유지 확인**: 미수정 결정에 동의한다. AC-SDU-009 의 Y 불변 절반은 주입 되돌림 RED 로 실증됐고 `w.y === RS` 상수 단언이 "전체 상수" 함정을 닫고 있다.
+
+#### R.6.3 리드에게
+
+- **카드 이관 가능**(차단 0건). F6 은 사용자 노출 문구 한 줄 + 주석 한 줄로, 이번 카드에서 닫을지 백로그로 남길지는 리드/운영자 판단이다 — 리뷰어는 고르지 않는다.
+- 리뷰 중 추적 파일 변경 0(읽기 전용 — 본 절 기록 외). 1차 때 정리했던 중첩 `.moai/` 재생성은 없었다. `frontend/.moai/`·`coverage/`·`test-results/` 미추적 잔여는 본 세션 이전부터 있던 것으로 §E.2.4 기록 범위다.
+- 본 절은 **커밋하지 않았다**. 명시 pathspec: `git add .moai/specs/SPEC-SECTOR-DISPLAY-UNIFY-001/progress.md`
+
+---
+
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase>_
