@@ -138,7 +138,7 @@ $ npx vitest run <M6 4파일>                    → 4 suites passed, 38 tests p
 $ npx eslint <§F.1 범위> --max-warnings=0      → exit 1, ✖ 23 problems (23 errors, 0 warnings)
 ```
 
-**eslint 델타 (AC-SDU-012 차원) — B \ A == ∅ PASS**: (파일,규칙) 다중집합 대조. B: ChartCell any×2·refs×4(행이동 392/394→401/403), MetricCell only-export×7(=A 5+선언 예외 2 — 정확히 일치), RRGChart×2, SectorAnalysis×1, SectorBubbleChart×1, zoom 테스트 immutability×4, StockExplorer×2. **신규 (파일,규칙) 쌍 0건.** 소실 5건(ChartGrid/__tests__ no-unused-vars ×3+×1+×1)은 내가 미변경 파일 — t5 커밋 f11730d의 테스트 갱신 소관이며 D12대로 의도적 미확인 대상. 기준선 §F.1 실측일(2026-08-18)이 f11730d 이전 트리였던 것으로 추정.
+**eslint 델타 (AC-SDU-012 차원) — B \ A == ∅ PASS**: (파일,규칙) 다중집합 대조. B: ChartCell any×2·refs×4(행이동 392/394→401/403), MetricCell only-export×7(=A 5+선언 예외 2 — 정확히 일치), RRGChart×2, SectorAnalysis×1, SectorBubbleChart×1, zoom 테스트 immutability×4, StockExplorer×2. **신규 (파일,규칙) 쌍 0건.** 소실은 총 **6건**(리뷰 F4 정정 — 최초 5건 기록에서 1건 누락): ChartGrid/__tests__ no-unused-vars 5건(×3+×1+×1, t5 커밋 f11730d 소관) + `SectorAnalysis/__tests__/SectorDetailPanel.test.tsx:307` no-unused-vars 1건(본 SPEC 이 M6 에 수정한 파일 — 라벨 갱신 편집 중 미사용 심볼이 해소됨). D12대로 `A \ B`는 판정 대상이 아니며 산술 27 − 6 + 2 = 23 이 성립한다.
 
 **스캔 패턴 정정 (M6 커밋 이전)**: 최초 핀의 `label="RS Avg" value={sector.rs_avg}` 패턴이 전환된 형태(`format={rating0}` 부착)를 부분 매칭해 잔여 1 오탐. 종결자 ` />` 추가로 미전환 형태만 매칭. 킥오프 14줄 관측 출력은 불변(원 라인이 모두 `} />` 종결). acceptance.md 동시 갱신.
 
@@ -198,6 +198,27 @@ $ npx eslint <§F.1 범위> --max-warnings=0        → exit 1, ✖ 23 problems 
 | AC-SDU-013 | **PASS — §E.2.4 정정 재판정** | ~~원 판정(디렉터리 좁힘 증거)~~ 무효 — §F 축자 전체 실행으로 교체: 갱신 대상 7종(§D) 반영 후 전체 스위트 실패 0건(84파일 735테스트)·typecheck exit 0·eslint B\A==∅ |
 
 **Gaps (M7)**: 없음. EF-1(전 지표 null 섹터)은 M6 null% 테스트 + MetricCard MetricValue 수용이 구조적으로 커버(각 카드 '–', 행 소실 없음 — SectorRankItem 행 렌더는 값과 무관). EF-4(알 수 없는 기간값)는 PERIOD_LABELS 가 Record<Period,string> 타입으로 미지 키를 컴파일 타임 차단 — 런타임 미지값 경로 없음.
+
+### §E.2.5 리뷰 소견 반영 — F1·F2·F3·F4 (2026-08-19, 카드 run 복귀 후)
+
+**F1 — ChartCell 강조 술어 반올림값 통일 (운영자 결정)**: 표시는 `rating0`(반올림)·강조는 원시값이어서 `rs_12m ∈ [79.5, 80)` 에서 배지가 'RS등급 80'을 보이며 강조가 사라지던 경계 이동(변경 전 양쪽 반올림 일치의 회귀). 수선: 술어가 **표시 문자열을 그대로 읽는다** — `Number(rsDisplay) >= RS_TOP_THRESHOLD`. `Math.round` 직접 호출 미부활(REQ-SDU-001 위반 호출부)·`MetricCell` export 미증가(§F.1 예외 +2 산술 보존). 표시↔강조 일치가 우연이 아니라 구조가 됐다.
+**되돌림 RED 관측 (F1)**: 술어를 원시값 기준(`stock.rs_12m >= …`)으로 되돌림 → `AssertionError: expected null to be truthy` (`ChartCellRsBadge.test.tsx` 79.5 경계 케이스 — 강조 소실 재현) → 복원. 신규 경계 단언 2건(79.5 강조 있음 + 표시 80 / 79.4 강조 없음 + 표시 79) 상시 관측.
+
+**F2 — periodRankingActive rank null 가드**: 조인 성공의 정의를 '이름 일치'에서 **'기간 rank 존재'**로 좁히고(`data.filter(d => d.rank != null)`), `joinedSectors` 도 `d.rank != null`일 때만 rank·rank_change 를 함께 덮어쓴다(혼합 행 방지). 판정 근거: rank null 항목은 rank 가 composite 폴백인데 `periodRankingActive=true` 로 `(순위 기준)` 마커가 붙고 `compositeFallback`·`partialFallbackCount` 모두 0이라 아무 고지가 없던 것이 REQ-SDU-007 금지의 조용한 폴백. 도달성(sectors[] 교차)은 리드 소스 추론(비후보 aggregate `a.rank=None` → `data[]` 전량)로 확인됐으나 런타임 미관측 — 도달 여부와 무관하게 틀린 구조라 가드로 수선했다. 신규 테스트: data[] 전량 rank null → composite 캡션 + 마커 부재 단언.
+
+**F3 — MetricTextParity 단언 강도 복구**: `toContain('RS 평균: 60')` 은 구 포맷 '60.0'에도 부분 매치되어 toFixed(1) 되돌림 미검출(공허 단언). `toContain('RS 평균: 60<br/>')` 정확 일치(줄 종결 앵커)로 복구 + 테스트 제목에 RS 라인 rating0 예외 명시.
+**되돌림 RED 관측 (F3)**: 툴팁을 `n => n.toFixed(1)` 로 되돌림 → `AssertionError: expected '…RS 평균…' to contain 'RS 평균: 60<br/>'` — 검출 복구 확인(구 단언이었다면 통과했을 것) → 복원.
+
+**F4 — 기록 정정**: §E.2.1 "소실 5건" → **6건** (누락 1건: `SectorDetailPanel.test.tsx:307` no-unused-vars — 본 SPEC 수정 파일에서 라벨 갱신 편집 중 해소). 27 − 6 + 2 = 23 산술 정합. 판정 불변(D12: `A \ B` 미확인 대상).
+
+**§F 축자 재실행 (F1·F2·F3 적용 후, 2026-08-19)**:
+```
+$ cd frontend && npm run typecheck                          → exit 0
+$ npx eslint <§F.1 범위> --max-warnings=0; echo $?          → 1, ✖ 23 problems — (파일,규칙) 다중집합
+  직전 측정과 동일(Number() 추가는 export 미증가 → 예외 +2 산술 보존, B \ A == ∅)
+$ npx vitest run --exclude "e2e/**"                         → 84 files / 738 tests all green
+  (735 + 신규 3: F1 경계 2 + F2 rank-null 캡션 1)
+```
 
 ### §E.2.4 리드 정정 — §F 전체 스위트 정정 판정 (2026-08-19)
 

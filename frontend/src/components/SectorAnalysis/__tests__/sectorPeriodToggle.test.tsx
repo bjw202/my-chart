@@ -133,6 +133,18 @@ describe('AC-SDU-007 — data[] 부재 폴백 캡션', () => {
     expect(rowOrder()).toEqual(['A', 'B', 'C'])
     expect(screen.getByTestId('ranking-basis-caption').textContent).toBe('순위 기준: 종합점수(3기간 가중)')
   })
+
+  // 리뷰 F2 — data[] 전량 rank null(비후보 aggregate)이면 조용한 폴백이 아니라
+  // composite 캡션이 떠야 한다(REQ-SDU-007). rank null 을 '조인 성공'으로 세지 않는다.
+  it('data[] 전량 rank null 이면 (순위 기준) 마커 없이 composite 캡션이 뜬다', async () => {
+    renderAnalysis({
+      ...RANKING_NO_DATA,
+      data: RANKING_NO_DATA.sectors.map(s => ({ name: s.name, rank: null, rank_change: null })),
+    })
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument())
+    expect(screen.getByTestId('ranking-basis-caption').textContent).toBe('순위 기준: 종합점수(3기간 가중)')
+    expect(document.querySelector('.rank-basis-marker')).toBeNull()
+  })
 })
 
 describe('AC-SDU-010 — activePeriod 열 마커 + 세 수익률 열 유지', () => {

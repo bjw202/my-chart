@@ -297,10 +297,12 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
     ? '-'
     : `${stock.change_1d >= 0 ? '+' : ''}${stock.change_1d.toFixed(2)}%`
 
-  // REQ-SDU-001/003 (M6): 반올림은 rating0 단일 출처, 강조 술어는 RS_TOP_THRESHOLD 상수.
-  //   (기존 Math.round 직접 호출 제거 — 반올림 규약 단일 출처 위반 호출부.)
+  // REQ-SDU-001/003 (M6) + 리뷰 F1: 반올림은 rating0 단일 출처, 강조 술어는 RS_TOP_THRESHOLD 상수.
+  //   술어는 표시 문자열(rsDisplay)을 그대로 읽는다 — 표시 'RS등급 80' 인데 강조가 없는
+  //   경계(원시값 79.5 이상 80 미만)가 구조적으로 불가능하다. 변경 전 양쪽 모두
+  //   반올림값 기준이었던 일치를, Math.round 직접 호출 없이 rating0 경유로 복원한다.
   const rsDisplay = stock.rs_12m === null ? '-' : rating0(stock.rs_12m)
-  const rsHighlight = stock.rs_12m !== null && stock.rs_12m >= RS_TOP_THRESHOLD
+  const rsHighlight = stock.rs_12m !== null && Number(rsDisplay) >= RS_TOP_THRESHOLD
 
   const cellClassName = [
     'chart-cell',

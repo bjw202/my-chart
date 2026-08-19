@@ -110,16 +110,16 @@ describe('D2 — 섹터 버블 툴팁이 표 셀과 같은 결측 문자열을 �
     expect(html).not.toContain('NaN')
   })
 
-  it('값이 있으면 종전 포맷을 그대로 유지한다 (결측 경로만 바뀌었다)', () => {
+  it('값이 있으면 종전 포맷을 유지한다 — RS 라인은 rating0 예외 (리뷰 F3: 정확 일치)', () => {
     renderWithMissing()
     const series = capturedOption.series as Array<{ data?: Array<{ value: (string | number)[] }> }>
     const point = series.flatMap(s => s.data ?? []).find(p => p.value[4] === '반도체')!
     const html = tooltipFormatter()({ data: point })
     expect(html).toContain('초과수익률: 2.50%')
-    // SPEC-SECTOR-DISPLAY-UNIFY-001 REQ-SDU-008: RS 값 포맷이 toFixed(1) → rating0 로
-    // 3면(표·버블 툴팁·상세 패널) 동시 변경 — D2 의 동등성 불변식은 유지되고 부수
-    // 리터럴만 갱신된다(판정 근거 progress.md §E.2.4).
-    expect(html).toContain('RS 평균: 60')
+    // SPEC-SECTOR-DISPLAY-UNIFY-001 REQ-SDU-008: RS 포맷 toFixed(1) → rating0 3면 동시 변경.
+    // '<br/>' 종결 앵커로 정확 일치 — 부분 매치('60' ⊂ '60.0')면 toFixed(1) 되돌림을
+    // 검출하지 못하는 공허 단언이 된다(리뷰 F3).
+    expect(html).toContain('RS 평균: 60<br/>')
     expect(html).toContain('기간수익률: +4.00%')
   })
 })

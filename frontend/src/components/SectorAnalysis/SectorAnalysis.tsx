@@ -99,17 +99,21 @@ export function SectorAnalysis(): ReactElement {
     const byName = new Map(data.map(d => [d.name, d]))
     return base.map(s => {
       const d = byName.get(s.name)
-      return d ? { ...s, rank: d.rank ?? s.rank, rank_change: d.rank_change } : s
+      // 리뷰 F2: rank null 항목은 rank·rank_change 모두 폴백 — rank 만 composite 를
+      // 쓰고 rank_change 는 기간값을 쓰는 혼합 행을 만들지 않는다.
+      return d && d.rank != null ? { ...s, rank: d.rank, rank_change: d.rank_change } : s
     })
   }, [sectorRanking])
 
-  // 폴백 판정 재료: 조인 성공 섹터 수(이름 일치). 0이면 data[] 가 있어도 composite 폴백.
+  // 폴백 판정 재료: 조인 성공 섹터 수. 리뷰 F2 — '이름 일치'가 아니라 '기간 rank 존재'가
+  // 조인 성공의 정의다. rank null 항목(sector_metrics 비후보 aggregate)이 실려도
+  // periodRankingActive 를 밀어 (순위 기준) 마커가 거짓으로 붙는 조용한 폴백을 막는다.
   const periodJoinCount = useMemo(() => {
     const base = sectorRanking?.sectors
     const data = sectorRanking?.data
     if (!base || !data || data.length === 0) return 0
-    const names = new Set(data.map(d => d.name))
-    return base.filter(s => names.has(s.name)).length
+    const ranked = new Set(data.filter(d => d.rank != null).map(d => d.name))
+    return base.filter(s => ranked.has(s.name)).length
   }, [sectorRanking])
 
   const periodRankingActive = periodJoinCount > 0

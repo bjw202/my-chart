@@ -110,6 +110,35 @@ describe('ChartCell RS badge', () => {
     expect(rsEl).toBeNull()
   })
 
+  // 리뷰 F1 — 강조 술어는 표시(rating0 반올림)와 같은 기준을 본다.
+  // 경계값: 79.5 → 표시 'RS등급 80' + 강조 있음 / 79.4 → 표시 'RS등급 79' + 강조 없음.
+  it('rs 79.5 — 반올림값 80 기준 강조가 있다 (표시↔술어 일치)', () => {
+    const { container } = render(
+      <ChartCell
+        stock={makeStock({ rs_12m: 79.5 })}
+        isSelected={false}
+        onClick={vi.fn()}
+        timeframe="daily"
+      />
+    )
+    // 표시와 강조가 함께 — 배지가 80을 보이는데 강조가 없는 경계를 구조적으로 봉쇄
+    expect(screen.getByText(/RS등급 80/)).toBeInTheDocument()
+    expect(container.querySelector('.chart-cell-rs--high')).toBeTruthy()
+  })
+
+  it('rs 79.4 — 반올림값 79 기준 강조가 없다', () => {
+    const { container } = render(
+      <ChartCell
+        stock={makeStock({ rs_12m: 79.4 })}
+        isSelected={false}
+        onClick={vi.fn()}
+        timeframe="daily"
+      />
+    )
+    expect(screen.getByText(/RS등급 79/)).toBeInTheDocument()
+    expect(container.querySelector('.chart-cell-rs--high')).toBeNull()
+  })
+
   it('should display dash when rs_12m is null', () => {
     render(
       <ChartCell

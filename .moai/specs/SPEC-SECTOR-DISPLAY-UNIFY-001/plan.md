@@ -58,6 +58,8 @@
 | `ChartGrid/__tests__/ChartCellRsBadge.test.tsx:82` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-004/AC-SDU-004: 배지 `RS {v}` → `RS등급 {v}` 로 개명. `/RS 76/` → `/RS등급 76/` |
 | `ChartGrid/__tests__/ChartCellRsBadge.test.tsx:123` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-004/AC-SDU-004: 동일 개명. `/RS -/` → `/RS등급 -/` |
 | `common/__tests__/MetricTextParity.m7.test.tsx:119` | **run 중 정정 등재(2026-08-19)** — REQ-SDU-008/AC-SDU-008: RS 툴팁 포맷 `toFixed(1)` → `rating0` 3면 동시 변경. D2(SECTOR-UX-001)의 실질 불변식인 표↔툴팁 문자열 동등은 유지되고 부수 리터럴 `'RS 평균: 60.0'`만 `'RS 평균: 60'`로 — 완료 SPEC 단언 갱신 근거는 progress.md §E.2.4 |
+| `ChartGrid/__tests__/ChartCellRsBadge.test.tsx` (신설 2건, 리뷰 F1) | **리뷰 반영 등재(2026-08-19)** — REQ-SDU-001/AC-SDU-004 계열: 강조 술어의 반올림값 기준 경계(79.5 강조 있음/79.4 없음) 관측. 기존 85/60 단언은 유지 |
+| `common/__tests__/MetricTextParity.m7.test.tsx:118-122` (리뷰 F3 재정정) | **리뷰 반영 등재(2026-08-19)** — REQ-SDU-008/AC-SDU-008: `'RS 평균: 60<br/>'` 정확 일치로 강도 복구(부분 매치는 toFixed(1) 되돌림 미검출) + 제목에 RS 라인 rating0 예외 명시 |
 
 이 목록 밖의 기존 테스트가 깨지면 **의도치 않은 회귀**로 취급한다.
 
