@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (frontend 테스트 tsconfig 분리 — 프로덕션 타입 경계 폐쇄, 2026-08-19)
+
+- **프로덕션 `src` 코드에서 Node 내장 모듈과 vitest 전역이 더 이상 타입 검사를 통과하지 않는다** — `tsconfig.app.json` 이 `include: ["src"]` 하나로 프로덕션과 테스트를 한 프로젝트에 담고 있었다. 테스트가 `node:fs` 를 쓰므로 `types` 에 `"node"` 가 들어가 있었고(`d0cfe75`) `"vitest/globals"` 도 같은 구조였다 — 그 결과 **프로덕션 코드도 Node 모듈을 import 하면 타입 검사를 통과**했다. 테스트 전용 프로젝트 `tsconfig.test.json` 을 분리해 이 경계를 닫았다 (chore 카드 t4 — 운영자 승인으로 SPEC 3종 생략)
+  - **변경** (`736f4d4`): `tsconfig.test.json` 신설 — extends app · `types` `["vite/client","vitest/globals","node"]` · include `__tests__/**` + `*.test.ts|tsx` + `test-setup.ts` + `src/**/*.d.ts` · tsbuildinfo 분리. `tsconfig.app.json` 은 `types` 를 `["vite/client"]` 로 축소하고 테스트 갈래를 exclude. 루트 `tsconfig.json` references 3개로 확장. `src/**/*.d.ts` 명시는 필수 — 이 줄이 없으면 `src/types/react-window.d.ts` ambient 선언이 test 프로젝트에서 보이지 않아 TS7016 4건이 재발한다(t9 백로그 참조)
+  - **증명 (설정 diff 가 아니라 관측이다)**: 프로덕션 파일에 `node:fs` import 주입 → 변경 전 `tsc -b` exit 0 / 변경 후 exit 2 (TS2307) — 기준선은 리드가 구현 전에 독립 측정 · 같은 파일에 `describe/it/expect` 주입 → 변경 후 exit 2 (TS2593 ×2 + TS2304) · `.spec.ts` 파일은 F1 전 app 프로젝트로 떨어져 exit 2 / F1 후 exit 0 (`--listFilesOnly` 소속 test 1 · app 0) · test 프로젝트가 장식품이 아님 — `tsc -b --dry` 에 app·node·test 세 프로젝트가 모두 오르고, 테스트에 타입 오류 주입 시 TS2322 로 실패(리뷰 실측)
+  - **배터리 불변**: `npm run typecheck` exit 0 · vitest 전체 **84파일 738테스트 green** · eslint §F.1 범위 23 problems 불변 · `npm run build` exit 0 — sync 세션 재실행으로 4/4 재확인 (`.moai/state/verify/sync-69061723-t4/`)
+  - **남은 소견 (리뷰 판정 전부 비차단)**: **F1** `*.spec.ts|tsx` 갈래 누락 — 누락 파일이 생기면 경계가 조용히 열리는 게 아니라 빌드가 즉시 깨져 시끄럽게 알린다 → 후속 커밋 `c1c2d35` 로 app exclude·test include 양쪽 추가 **완료** · **F2** 공유 프로덕션 파일 오류가 test·app 두 프로젝트에서 2줄 중복 출력 — 미관 문제, 오류를 놓치는 방향 아님(기록만) · **F3** `tsc -b` 가 noEmit 프로젝트를 매번 out-of-date 로 판정해 증분 캐시가 무효 — 기존 app·node 도 같은 성질이고 절대 비용 2.4초라 조치 불요(기록만) · **중복 컴파일 실측** — 프로덕션 102파일 이중 검사, `tsc -b` 2.36s (app 단독 1.04s / test 단독 1.58s), 순증 1초 미만(기록만)
+  - **근거**: 리드·run·review 증거 — `.moai/state/verify/b3e680b5/t4-*` · `.moai/state/verify/1a086d99/t4-*` · `.moai/state/verify/04afee96/t4-review.md` (이 레포에는 테스트 CI 가 없다 — 워크플로는 label-sync.yml 하나뿐이라 로컬 재현이 유일한 근거)
+
 ### Fixed (SPEC-SECTOR-DISPLAY-UNIFY-001 v0.3.0, 2026-08-19)
 
 - **섹터 분석 화면의 RS 라벨 부정확·null% 렌더·기간 토글 무동작 해소** — 형제 백엔드 `SPEC-SECTOR-METRIC-UNIFY-001`(M0~M5)에서 분리된 프론트 SPEC(원본 계획 M6·M7). UI의 "RS"가 등급·RRG RS-Ratio·RS Line 세 가지를 지칭하던 모호함과, 같은 지표의 반올림이 제각각이던 것(`Math.round`/`toFixed(1)`/없음 혼재)을 `rating0`(등급 정수)/`pct0`(비율 정수) 단일 출처로 통일
