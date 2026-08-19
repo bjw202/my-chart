@@ -223,3 +223,49 @@ describe('AC-SDU-009 — 기간 토글 축 거동 (버블)', () => {
     expect(m.x).not.toBe(q.x)
   })
 })
+
+// t7 (기간 조인 술어 중복 제거) — 부분 조인 특성화. 기존 케이스(전량 조인·전량 rank
+// null·data 부재)가 덮지 않던 구간으로, partialFallbackCount 가 쓰이는 유일한 경우이자
+// joinedSectors 와 periodJoinCount 두 정의가 갈라질 수 있는 유일한 구간이다.
+// 기대치는 손으로 유도한 리터럴이고 단언 대상은 프로덕션 렌더 결과(DOM)다 —
+// 같은 헬퍼 양변 비교가 아니다.
+describe('t7 — 부분 조인: 3개 중 2개만 기간 rank 보유 (나머지 1개 rank null)', () => {
+  beforeEach(() => {
+    mockFetchSectorRanking.mockReset()
+    mockFetchMarketOverview.mockReset()
+  })
+
+  it('조인 행은 기간 rank·rank_change 로, rank null 행은 composite 값 그대로 구분 표시되고 부분 고지 수가 composite 잔류 행 수와 일치한다', async () => {
+    // sectors[] composite 순위 [1,2,3] / data[] 기간 순위: B=1(▼1), A=2(▲1), C=null
+    renderAnalysis({
+      ...RANKING_WITH_DATA,
+      data: [
+        { name: 'A', rank: 2, rank_change: 1 },
+        { name: 'B', rank: 1, rank_change: -1 },
+        { name: 'C', rank: null, rank_change: null },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument())
+
+    // 기간 rank asc 정렬: B=1, A=2, C=composite 3 → 행 순서 B,A,C
+    expect(rowOrder()).toEqual(['B', 'A', 'C'])
+
+    const rowOf = (name: string) => screen.getByText(name).closest('tr') as HTMLTableRowElement
+    // 조인된 두 행 — rank 셀과 rank_change 모두 기간값
+    expect(rowOf('A').querySelector('[data-testid="rank-value"]')?.textContent).toBe('2')
+    expect(rowOf('B').querySelector('[data-testid="rank-value"]')?.textContent).toBe('1')
+    expect(rowOf('A').querySelector('.rank-change')?.textContent).toBe('▲1')
+    expect(rowOf('B').querySelector('.rank-change')?.textContent).toBe('▼1')
+    // composite 로 남은 행 — rank 는 composite 3, rank_change 는 composite 0('–').
+    // 리뷰 F2: data[] 의 rank_change null('신규')을 섞어 넣지 않는다.
+    expect(rowOf('C').querySelector('[data-testid="rank-value"]')?.textContent).toBe('3')
+    expect(rowOf('C').querySelector('.rank-change')?.textContent).toBe('–')
+    expect(rowOf('C').textContent).not.toContain('신규')
+
+    // 부분 고지 — 화면에 composite 로 남은 행은 C 하나뿐이고 문구의 수도 1(리터럴 단언)
+    expect(screen.getByTestId('ranking-basis-partial').textContent)
+      .toBe('일부 1개 섹터는 이번 기간 순위가 없어 종합점수 순위 유지')
+    // 부분 폴백이지 전량 폴백이 아니므로 composite 캡션은 없다
+    expect(screen.queryByTestId('ranking-basis-caption')).toBeNull()
+  })
+})

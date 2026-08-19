@@ -91,29 +91,32 @@ export function SectorAnalysis(): ReactElement {
   // M7 (REQ-SDU-006): 봉투 data[] 의 기간별 rank/rank_change 를 섹터명 조인으로 덮어쓴다.
   // data[] 부재·빈 배열(EF-3)·이름 조인 실패 섹터(EF-2)·rank null 항목은 sectors[] 의
   // composite 순위를 유지한다 — 조용한 폴백이 아니라 표 캡션/부분 표기로 노출된다.
-  const joinedSectors = useMemo((): SectorRankItem[] => {
+  // t7: 조인 결과와 조인 성공 수를 한 순회에서 함께 낸다 — joinedSectors 와
+  // periodJoinCount 가 서로 다른 말을 하는 상태가 구조적으로 표현 불가능하다.
+  const { joinedSectors, periodJoinCount } = useMemo((): {
+    joinedSectors: SectorRankItem[]
+    periodJoinCount: number
+  } => {
     const base = sectorRanking?.sectors
     const data = sectorRanking?.data
-    if (!base) return []
-    if (!data || data.length === 0) return base
+    if (!base) return { joinedSectors: [], periodJoinCount: 0 }
+    if (!data || data.length === 0) return { joinedSectors: base, periodJoinCount: 0 }
     const byName = new Map(data.map(d => [d.name, d]))
-    return base.map(s => {
+    const joined: SectorRankItem[] = []
+    let joinedCount = 0
+    for (const s of base) {
       const d = byName.get(s.name)
       // 리뷰 F2: rank null 항목은 rank·rank_change 모두 폴백 — rank 만 composite 를
-      // 쓰고 rank_change 는 기간값을 쓰는 혼합 행을 만들지 않는다.
-      return d && d.rank != null ? { ...s, rank: d.rank, rank_change: d.rank_change } : s
-    })
-  }, [sectorRanking])
-
-  // 폴백 판정 재료: 조인 성공 섹터 수. 리뷰 F2 — '이름 일치'가 아니라 '기간 rank 존재'가
-  // 조인 성공의 정의다. rank null 항목(sector_metrics 비후보 aggregate)이 실려도
-  // periodRankingActive 를 밀어 (순위 기준) 마커가 거짓으로 붙는 조용한 폴백을 막는다.
-  const periodJoinCount = useMemo(() => {
-    const base = sectorRanking?.sectors
-    const data = sectorRanking?.data
-    if (!base || !data || data.length === 0) return 0
-    const ranked = new Set(data.filter(d => d.rank != null).map(d => d.name))
-    return base.filter(s => ranked.has(s.name)).length
+      // 쓰고 rank_change 는 기간값을 쓰는 혼합 행을 만들지 않는다. 조인 성공의 정의도
+      // '이름 일치'가 아니라 '기간 rank 존재'다 — 마커가 거짓을 말하는 조용한 폴백 방지.
+      if (d && d.rank != null) {
+        joinedCount++
+        joined.push({ ...s, rank: d.rank, rank_change: d.rank_change })
+      } else {
+        joined.push(s)
+      }
+    }
+    return { joinedSectors: joined, periodJoinCount: joinedCount }
   }, [sectorRanking])
 
   const periodRankingActive = periodJoinCount > 0
