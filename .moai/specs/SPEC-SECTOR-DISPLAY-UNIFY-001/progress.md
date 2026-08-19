@@ -247,6 +247,88 @@ $ cd frontend && npx vitest run --exclude "e2e/**"
   **경위 기록 (재발 패턴)**: 최초 확인 시 기간 토글이 Table·Bubble 양쪽에서 무반응이었다 — 코드 결함이 아니라 **낡은 dev 서버**였다. M7 이 MarketContext.tsx 의 provider effect dep 를 `[fetchAll, market]` → `[fetchAll, market, period]` 로 넓혔는데, React Fast Refresh 가 이미 마운트된 provider 의 예전 effect 를 보존해 period 변경이 재조회를 트리거하지 못했다. 기간 버튼은 눌렸지만 숫자가 안 움직여 "선택 불가"로 보였다(버블은 `PERIOD_DISABLED_SUBTABS = ['rrg','bump']` 외라 원래 활성 — 첫 관찰의 "버블 선택 불가"도 같은 원인). 근거: 현 vite 프로세스 시작 01:00:00 > 마지막 커밋 a544c36 00:47:59, 그 사이 코드 변경 0(리드 명령은 전부 읽기 전용). 서버 재시작 후 동일 UI 정상 동작. **교훈: provider·hook dep·모듈 싱글턴을 건드린 변경의 라이브 확인은 dev 서버 재시작 후에 한다 — 안 하면 낡은 번들을 검사하고 미구현으로 오판한다.** (본 §E.3 이전 기술의 "Vite HMR — 변경 자동 반영" 주장도 이 함정의 일부였다: HMR 은 컴포넌트는 갱신하지만 마운트된 provider 의 effect 보존으로 dep 변경이 반영되지 않을 수 있다.)
 - **ef 종결**: EF-1~EF-4 처분은 §E.2.3 M7 Gaps 노트 참조 (전부 구조적 커버 또는 타입 레벨 차단).
 
+## §R 리뷰 (review 컬럼 — 카드 t2, 2026-08-19)
+
+- **리뷰어**: review-tjvce8 세션 (칸반 리드 디스패치, `/moai review --deep`, 렌즈 `--deep` 단독)
+- **대상**: `f11730d..8c94ab7` (25파일 +876/−61), main 체크아웃, `origin/main...HEAD` = `0 0`
+- **증거 경로**: `.moai/state/verify/08214523/{tsc.out,eslint.out,vitest.out}`
+- **판정**: **조건부 통과 — 차단 사유 0건.** run 되돌림으로 되돌릴 결함 없음. 후속 처리 항목 2건(F1·F2)과 기록 정확성 3건(F3~F5)을 아래에 남긴다.
+
+### R.1 §F 축자 재현 (독립 실행 — 좁힘 없음)
+
+```
+$ cd frontend && npm run typecheck
+  → exit 0
+$ cd frontend && npx eslint src/components/SectorAnalysis src/components/common \
+    src/components/ChartGrid src/components/StockExplorer src/utils --max-warnings=0 ; echo $?
+  → 1   ✖ 23 problems (23 errors, 0 warnings)
+$ cd frontend && npx vitest run --exclude "e2e/**"
+  → Test Files 84 passed (84) │ Tests 735 passed (735) │ exit 0
+```
+
+**eslint 델타 독립 재구성 (B \ A 한 방향, A는 §F.1 다중집합 + 사전 선언 예외)** — 출력을 (파일,규칙) 다중집합으로 직접 파싱:
+
+| 파일 | 규칙 | B | A | B\A |
+|---|---|---|---|---|
+| ChartGrid/ChartCell.tsx | no-explicit-any | 2 | 2 | 0 |
+| ChartGrid/ChartCell.tsx | react-hooks/refs | 4 | 4 | 0 |
+| SectorAnalysis/RRGChart.tsx | only-export / set-state-in-effect | 1/1 | 1/1 | 0 |
+| SectorAnalysis/SectorAnalysis.tsx | set-state-in-effect | 1 | 1 | 0 |
+| SectorAnalysis/SectorBubbleChart.tsx | only-export | 1 | 1 | 0 |
+| SectorAnalysis/__tests__/SectorBubbleChart.zoom | immutability | 2 | 2 | 0 |
+| SectorAnalysis/__tests__/StockBubbleChart.zoom | immutability | 2 | 2 | 0 |
+| StockExplorer/StockExplorer.tsx | only-export / set-state-in-effect | 1/1 | 1/1 | 0 |
+| common/MetricCell.tsx | only-export | 7 | 5 + **사전 선언 예외 2** | 0 |
+
+**`B \ A == ∅` 독립 확인.** 산술도 맞는다: 27 − 소실 6 + 예외 2 = 23. 행 이동(392/394→401/403, 115→144)은 (파일,규칙) 다중집합 판정에 무영향.
+
+### R.2 지적 4지점 적대 검토
+
+**① 자기 판정 구조(orchestrator-direct — 쓴 자가 판정)**. §E.2.3 되돌림 표에서 lessons #9 위반(양변이 같은 함수/표현식) 후보를 전수 확인했다. 무효 항목 **0건**:
+
+- **AC-SDU-003** — `rsMetrics.test.ts`가 `import.meta.url` 기준 경로로 `sector_metrics.py` **원문을 읽어** 정규식 추출 + `parseFloat`. 한 변이 손으로 옮겨 적은 상수가 아니다. 유효.
+- **AC-SDU-005** — 픽스처 `rs_avg = rs_top_pct = 55`로 **같은 수치**를 넣고 두 프로덕션 `<td>`의 `style.background`를 비교. 헬퍼 직접 2회 호출이 아니다. 되돌림 시 양쪽 `rgba(59,130,246,0.3)`(둘 다 알파 클램프)로 수렴하는 관측과 일치. 유효.
+- **AC-SDU-008** — 세 변이 각각 Table 렌더 / Panel 렌더 / Bubble **프로덕션 tooltip.formatter** 출력. `62.6 → '63'`이라 `toFixed(1)`('62.6') 되돌림을 실제로 검출한다. 유효.
+- **AC-SDU-001 / AC-SDU-004** — 잔여 스캔을 직접 재현: 핀 스캔 **0줄**, 구 라벨(`'RS Top %'`·`'RS 중앙'`) 소스 잔여 **0**(매치 4건 전부 변경 서술 주석).
+- **AC-SDU-006** — 픽스처 `sectors[1,2,3]` vs `data[3,1,2]` 순서 상이 확인(항진명제 아님).
+
+**② 범위 좁힘 재발** — R.1대로 축자 전체 실행. 재발 없음. §E.2.4의 735/735 주장은 본 세션에서 **독립 재현**됐다.
+
+**③ 교차 SPEC 계약(MetricTextParity)** — **판단에 동의한다.** 파일 헤더가 D2의 불변식을 "표 셀 텍스트 ↔ 차트 툴팁 텍스트 **문자열 동등**"으로 명시하고, 그 불변식을 지탱하는 단언(4소비자의 `MISSING_TEXT` 동등, `NaN` 누출 0)은 **한 줄도 건드려지지 않았다**. 갱신된 `:119`는 "값이 있으면 종전 포맷 유지" 테스트 안의 부수 리터럴이고, RS 포맷 변경은 3면 동시 적용이라 동등성은 보존된다(AC-SDU-008이 실증). 완료 SPEC 계약을 뒤집은 것이 아니다. 단 갱신 **값 선택**에 결함이 있다 → F3.
+
+**④ M7 조인 로직** — `joinedSectors`(SectorAnalysis.tsx:94-104) 경로별 확인:
+- 조인 전량 실패 → `periodJoinCount 0` → `compositeFallback` 캡션. AC-SDU-007 커버.
+- `data` 부재/빈 배열 → `base` 그대로. EF-3(널 아님과 길이 0 무구분) 코드상 성립.
+- 부분 실패 → `partialFallbackCount` 고지 띠. EF-2 커버. (순위 기준이 행마다 섞이는 것 자체는 EF-2가 승인한 설계이며 고지로 처리된다.)
+- **`d.rank === null` 경로는 미가드** → F2.
+
+### R.3 소견
+
+| # | 등급 | 소견 |
+|---|---|---|
+| **F1** | **후속 처리 필요 (차단 아님)** | **ChartCell RS 강조 술어 경계 이동 — 표시와 술어의 반올림 기준 불일치.** `ChartCell.tsx:297-302`가 `rsValue = Math.round(rs_12m)` 제거 후 표시는 `rating0(rs_12m)`(반올림), 강조는 `stock.rs_12m >= RS_TOP_THRESHOLD`(**원시값**)로 갈렸다. 변경 전에는 양쪽 다 반올림값 기준이라 일치했다. 실행 확인: `rs_12m ∈ [79.5, 80)` 에서 배지는 `RS등급 80` 을 표시하면서 강조가 **사라진다**(79.5 → before `true` / after `false`). 기존 코드가 `Math.round` 를 쓰고 있었다는 사실 자체가 소수값 도달 가능성의 근거다. 어떤 AC도 이 술어를 관측하지 않고(`ChartCellRsBadge.test.tsx` 는 76 과 `-` 만) 되돌림 대상도 아니었다. REQ-SDU-001 의 "표시 반올림 단일 출처" 취지와 상충한다. **선택은 결정 사항이다**(표시-술어 일관성 우선 = `Math.round` 기준으로 통일 / 임계값 엄밀성 우선 = 표시도 절사 규약 재검토) — 리뷰어가 임의로 고르지 않는다. |
+| **F2** | **후속 처리 필요 (도달성 미검증)** | **`periodRankingActive` 술어가 rank 존재가 아니라 이름 조인 성공만 본다 + `rank_change` 무가드 덮어쓰기.** `joinedSectors` 는 `rank: d.rank ?? s.rank` 로 null 을 방어하지만 `rank_change: d.rank_change` 는 가드가 없다. 한편 `periodJoinCount`(:107-113)는 **이름 일치만** 센다. 따라서 조인된 `d.rank === null` 인 섹터는 (a) rank 는 composite 폴백인데 (b) `periodRankingActive = true` 라 `(순위 기준)` 마커가 붙고 (c) `compositeFallback` 도 `partialFallbackCount` 도 0 이라 **아무 고지도 뜨지 않는다** — REQ-SDU-007 이 금지한 "조용한 폴백"의 잔여 구멍이며, 동시에 rank(composite)/rank_change(period) 혼합 행이 된다. **소스로 확인한 것**: 봉투 `data` 는 `agg.aggregates` 전량이고(`sector_ranking_service.py:106`) 비후보 섹터는 `a.rank = None` 으로 남는다(`sector_metrics.py:679`); `sectors[]` 는 `compute_sector_ranking`, `data[]` 는 `compute_sector_aggregates` 로 **산출 경로가 서로 다르다**. **미검증 갭**: rank=None 인 이름이 실제로 `sectors[]` 에도 나타나는지는 관측하지 못했다 — 도달성 미확인이므로 결함 확정이 아니라 **가드 부재**로 보고한다. 최소 수선안은 `periodJoinCount` 를 `d.rank != null` 조건으로 좁히고 `rank_change` 에도 동일 가드를 두는 것. |
+| **F3** | 기록/테스트 강도 | **`MetricTextParity.m7.test.tsx:119` 갱신이 가드를 공허하게 만들었다.** `toContain('RS 평균: 60')` 은 구 포맷 문자열 `'RS 평균: 60.0'` 에도 **매치된다**(부분문자열). 즉 이 단언은 `toFixed(1)` 되돌림을 더는 검출하지 못한다. 계약 판단(③)은 옳지만 갱신 값 선택이 아쉽다 — 정확 일치나 소수부가 살아 있는 픽스처였다면 강도가 유지됐다. 실질 검출은 AC-SDU-008(`62.6 → '63'`)이 담당하므로 **커버리지 공백은 아니다**. 부수로, 그 테스트의 제목 "값이 있으면 종전 포맷을 그대로 유지한다(결측 경로만 바뀌었다)" 는 이제 RS 라인에 대해 참이 아니다(본문 주석은 경위를 설명하고 있다). |
+| **F4** | 기록 정확성 | §E.2.1 의 "소실 5건(ChartGrid/__tests__ …)" 은 실제 **6건**이다. 누락된 1건은 `SectorAnalysis/__tests__/SectorDetailPanel.test.tsx:307 no-unused-vars` — 본 SPEC 이 실제로 수정한 파일이다. D12 대로 `A \ B` 는 판정 대상이 아니므로 **판정에는 영향 없다**(27 − 6 + 2 = 23 으로 산술이 맞아떨어진다). 기록만 정정 대상. |
+| **F5** | 기록 정확성 | AC-SDU-009 의 X축 변화 단언은 판별력이 약하다. 픽스처가 기간마다 다른 `excess_return`(1.0/2.0/3.0)을 **직접 주입**하므로 `w.x ≠ m.x ≠ q.x` 는 `excess_return` 을 X 로 플롯하는 어떤 구현에서도 성립한다. 다만 AC 가 요구한 핵심 절반(Y 불변)은 주입 되돌림으로 RED 를 실제 관측했고 `w.y === RS` 상수 단언도 있어 "응답 전체가 상수여도 통과" 함정은 닫혀 있다. **판정 유지**, 강도만 기록. |
+
+### R.4 확인했으나 이상 없던 것
+
+- `MetricCell.tsx` 의 `rating0`/`pct0` 가 `export function` 선언(화살표 아님) — G-F5 (a)안 이행 확인, lint 예외 +2 와 정확히 대응.
+- `StockTable.tsx` 의 `rs_12m > RS_S2_STRONG_THRESHOLD` 는 변경 전후 모두 원시값 기준이라 F1 같은 경계 이동이 없다.
+- `MarketContext` 의 `periodRef` + `[market, period]` dep — `fetchAll` 안정성(`[]`) 유지, overview 동시 재조회는 주석대로 무해.
+- `types/market.ts` 의 `SectorAggregateItem` 최소형 — 백엔드 스키마 복제 회피(DEC-F5) 타당.
+- `totalRanked = sectors.filter(s => s.rank != null)` — 조인 후 rank 가 null 이려면 양쪽 다 null 이어야 하므로 AC-SUX-058 분모 의미 보존.
+- 리뷰 중 트리 변경 0(읽기 전용). 훅 cwd 폴백으로 생긴 미추적 `.moai/` 잔여 3곳(§E.2.4 B7 계열 재발)은 정리했다.
+
+### R.5 리드에게
+
+- **카드 이동 가능**(차단 사유 없음). F1·F2 는 **본 SPEC 되돌림이 아니라 후속 결정 항목**으로 본다 — 둘 다 AC 가 관측하지 않는 지점이고, F1 은 표시 규약 결정을, F2 는 도달성 확인을 각각 필요로 한다. sync 로 넘길지 백로그로 남길지는 리드/운영자 판단.
+- 본 절은 **커밋하지 않았다**(작업 트리에 하네스 잔여 684 경로 — 스윕 오염 회피). 필요 시 명시 pathspec 으로 스테이징하라: `git add .moai/specs/SPEC-SECTOR-DISPLAY-UNIFY-001/progress.md`
+
+
+---
+
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase>_
