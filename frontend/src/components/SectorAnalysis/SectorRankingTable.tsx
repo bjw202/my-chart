@@ -25,7 +25,8 @@ interface SectorRankingTableProps {
   activePeriod?: '1w' | '1m' | '3m'
   // M7 (REQ-SDU-007): data[] 부재/전량 조인 실패로 composite 폴백 중이면 캡션이 그 사실을 말한다.
   compositeFallback?: boolean
-  // M7 (EF-2): 기간 랭킹 활성 중 이름 조인 실패로 composite 순위를 유지한 섹터 수.
+  // M7 (EF-2) / 리뷰 F6: 기간 랭킹 활성 중 이번 기간 순위가 없어(data[] 미포함 또는
+  // rank 미산출 — 조인 실패와 rank null 모두) composite 순위를 유지한 섹터 수.
   partialFallbackCount?: number
 }
 
@@ -138,10 +139,11 @@ export function SectorRankingTable({
           순위 기준: 종합점수(3기간 가중)
         </div>
       )}
-      {/* M7 (EF-2): 부분 조인 실패 — 남은 섹터의 순위 기준이 섞여 있음을 고지 */}
+      {/* M7 (EF-2) / 리뷰 F6: 부분 폴백 — 기간 순위가 없는 섹터의 순위 기준이 섞여 있음을 고지.
+          원인은 이름 조인 실패와 rank 미산출 양쪽이 될 수 있어 단정하지 않는다. */}
       {!compositeFallback && (partialFallbackCount ?? 0) > 0 && (
         <div className="ranking-basis-caption" data-testid="ranking-basis-partial">
-          일부 {partialFallbackCount}개 섹터는 이름 조인 실패로 종합점수 순위 유지
+          일부 {partialFallbackCount}개 섹터는 이번 기간 순위가 없어 종합점수 순위 유지
         </div>
       )}
       <table className="sector-ranking-table" data-testid="sector-ranking-table">

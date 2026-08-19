@@ -220,6 +220,9 @@ $ npx vitest run --exclude "e2e/**"                         → 84 files / 738 t
   (735 + 신규 3: F1 경계 2 + F2 rank-null 캡션 1)
 ```
 
+**F6 — 부분 폴백 고지 원인 중립화 (리뷰 재확인 신규 소견, 2026-08-19)**: F2 이후 `partialFallbackCount = sectors.length − periodJoinCount`이고 periodJoinCount 는 '기간 rank 존재' 기준이므로 그 수에 (a) 이름 미일치 섹터와 (b) 이름 일치·rank null 섹터가 **둘 다** 들어간다. 구 문구 `이름 조인 실패로` 는 (a)만 단정해 (b)인 경우 사용자에게 틀린 이유를 말했다 — 라벨 정확성을 다루는 이 SPEC(REQ-SDU-004 계열)이 부정확한 라벨을 남기고 닫힐 수 없다. 세 곳(캡션 :144·prop 주석 :28·JSX 주석 :141)을 원인 중립 서술로 정정: 캡션 `일부 {n}개 섹터는 이번 기간 순위가 없어 종합점수 순위 유지`, 주석 두 곳은 (a)·(b) 병열 명시. 기존 테스트가 구 문구를 단언하지 않아(스캔 관측) §D 등재 대상 없음. 참고 2건(조인 술어 중복·Number 결합)은 지시대로 미수정 — 전자는 리드 백로그, 후자는 기록으로 충분.
+**§F 축자 재실행 (F6 후)**: typecheck exit 0 · eslint exit 1 ✖ 23(다중집합 불변, B\A=∅) · vitest 전체 **84파일 738테스트 all green** — 문구 전용 변경이라 수치 불변, 이동한 테스트 0(예측과 일치).
+
 ### §E.2.4 리드 정정 — §F 전체 스위트 정정 판정 (2026-08-19)
 
 **결함 공개**: §E.2.1/§E.2.2 에 기록한 vitest 증거는 §F 지정 명령(`npx vitest run --exclude "e2e/**"`)을 `src/components/SectorAnalysis/__tests__` 로 좁힌 실행이었다. §F.1 범위 각주가 M6 이 ChartGrid/·common/ 를 수정한다고 명시했으므로 좁힘은 근거 결함이다. 리드의 축자 재현에서 **3건 실패** 관측(증거: `.moai/state/verify/b3e680b5/vitest.out`):
