@@ -443,4 +443,22 @@ rs=null  display="-"   highlight=false  | null 가드로 Number("-")=NaN 미도�
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+- **sync_status**: audit-ready
+- **sync_complete_at**: 2026-08-19
+- **sync_commit_sha**: pending-backfill-sdu001-sync (자기 참조 불가 — D3 SHA backfill 면제, 선례 86d4af8→777f044 · 본 SPEC §E.3 ae2b8af)
+- **실행 방식**: orchestrator-direct (칸반 sync 디스패치 — 카드 t2, 리드 lead-tjyky8 경유). 근거: GLM 세션 manager-* 스폰 하위 컨텍스트 한계 연쇄 사망 확립 패턴(memory `project_glm_subagent_ctx_death` — 08-17 sync 2회·본 SPEC run 2회 관측, §E.2.1) + 형제 SPEC sync 선례(86d4af8 orchestrator-direct, 사용자 승인). 리드 디스패치가 sync 과업을 명시 열거했고 PR 생성 금지·push 리드 소관을 지시
+- **sync 검증 배치 (관측 주체: 본 sync 세션, HEAD 739ba53, 이번 실행 — 리드 b3e680b5 기준선·§R.6.1 과 독립 대조)**:
+
+  | 검증 | 관측 출력 | 증거 파일 |
+  |---|---|---|
+  | `cd frontend && npm run typecheck` (§F 축자) | exit 0 — `tsc -b` 오류 0 | `.moai/state/verify/sync-69061723-sdu001/typecheck.out` |
+  | `cd frontend && npx eslint src/components/SectorAnalysis src/components/common src/components/ChartGrid src/components/StockExplorer src/utils --max-warnings=0` (§F 축자) | exit 1, ✖ 23 problems (23 errors, 0 warnings) — 기준선 산술 27 − 소실 6 + 사전 선언 예외 2 와 일치 | `.moai/state/verify/sync-69061723-sdu001/eslint.out` |
+  | `cd frontend && npx vitest run --exclude "e2e/**"` (§F 축자) | exit 0 — Test Files **84 passed (84)** · Tests **738 passed (738)** · 29.35s | `.moai/state/verify/sync-69061723-sdu001/vitest.out` |
+
+  리드 독립 기준선(`.moai/state/verify/b3e680b5/`의 tsc4·eslint4·vitest4)과 **3/3 일치**. eslint 23의 (파일,규칙) 다중집합 `B \ A == ∅` 판정은 §R.1·§R.6.1(리뷰어·리드 독립 파싱)이 소유하며 본 세션은 개수 정합으로 대조했다 — 좁힘 없음
+- **CHANGELOG**: `[Unreleased]` 최상단에 `Fixed (SPEC-SECTOR-DISPLAY-UNIFY-001 v0.3.0, 2026-08-19)` 1건 기록. B12 사전 중복 검사 `grep -c 'SPEC-SECTOR-DISPLAY-UNIFY-001' CHANGELOG.md` = **1** — 해당 매치는 형제 METRIC-UNIFY 항목의 잔여 분류 교차 참조(`F14~F29는 SPEC-SECTOR-DISPLAY-UNIFY-001 및 후속 분류`)이고 본 SPEC 명의 항목 헤딩은 0건(헤딩 전수 grep 관측) → 중복 항목 아님으로 판정하고 발행(발행 후에는 본 항목 헤딩이 더해져 `grep -c` = 2가 된다 — 헤딩 1 + 교차 참조 1, 감사 A2 보강). AC 수는 acceptance.md SSOT 기준(13 AC 전부 PASS)으로 기록. plan-phase 위임 파일 대조(B12 전단)는 생략하지 않았다 — CHANGELOG에 적은 파일 경로(`frontend/src/utils/rsMetrics.ts` 등) 전부 본 세션이 실측한 MX 스캔·§E.2 구현 내역과 일치
+- **README/docs-site 확인 (디스패치 지시 — 확인 없는 '해당 없음' 기재 금지)**: docs-site 디렉토리 **부재** (`ls` 관측 — 존재하지 않음). README `5탭 워크플로우 가이드` §2️⃣ Sector Analysis 서술은 마케팅 수준(주도주 추적·네이버 테마 데이터·색상·범례)으로 본 SPEC이 변경한 라벨 문자열(`RS Top %`·`RS 중앙`·배지)·기간 토글 거동·null% 렌더를 서술하지 않음 → 부정확해진 문장 없음, **갱신 불요**. 최근 형제 SPEC sync(SECTOR-UX·METRIC-UNIFY·CHECKED-SECTOR-GROUP·BUBBLE-ZOOM)도 README SPEC 테이블 미갱신(grep 0매치 관측) — 관례 일관
+- **MX 관찰 (변경 소스 12파일 — 테스트 제외, 커밋 범위 f11730d..739ba53)**: `@MX` 태그 **31개** — SectorBubbleChart 9 · RRGChart 5 · SectorAnalysis 3 · MetricCell 3 · api/market 2 · MarketContext 2 · types/market 2 · SectorDetailPanel 2 · SectorRankingTable 2 · StockTable 1 · ChartCell 0 · rsMetrics(신설 순수 모듈) 0. 첫 측정이 cwd 함정으로 공허 관측(frontend/ 상대경로)되어 절대 경로 재측정으로 확정 — 부재 관측은 절대 경로 재확인 원칙(`feedback_cwd_trap_relative_paths`) 적용 사례
+- **sync-auditor**: **PASS — 4차원 96/97/93/95, 조화평균 95.2/100, 차단 소견 0건** (독립 스폰, 읽기 전용, sync 커밋 전 워킹트리 HEAD 739ba53 대상). 감사자가 §F 축자 3종을 **재실행**해 본 세션 증거 3파일과 바이트 동일 확인 + 리드 기준선 b3e680b5 와 개수 정합(23/84/738). CHANGELOG 사용자 가시 주장 전수 추적(라벨·4상수·캡션·인용 SHA 5종·AC 13=13·eslint 산술 재유도) · spec.md diff 정확히 1행(frontmatter 전이 — body drift 없음) · SPEC 귀속 워킹트리 3파일 확인(나머지 685 더티 경로는 mtime 08-16 하네스 분해물로 본 SPEC 무관 판정) · MX 31개 분포 독립 재현. Info 2건(A1: typecheck.out 에 EXIT 라인 리터럴 부재 — 재실행 EXIT=0 확인됨, 향후 증거 파일에 `echo EXIT=$?` 관행 채택 권고 / A2: B12 count 서술 보강 — 아래 괄호 반영) · Gaps(감사자 미관측 명시): 커버리지 %(본 SPEC §F 게이트 집합 밖) · 라이브 화면(§E.3 운영자 판정 존중) · 런타임 data[] 응답 형상(조인 코드·테스트만 관측)
+- **잔여 항목 분류 (본 SPEC 미수정·기록)**: F5(AC-SDU-009 X축 변화 단언 강도 — Y 불변 절반은 주입 되돌림 RED 실증, 판정 유지) · 참고 1(조인 성공 술어 2곳 중복) → **리드 백로그 t7** · G-F2(ThemeRankingTable 동일 패턴) → **리드 백로그 t8** — 리드가 이미 등록했으므로 중복 등록 없음(디스패치 확인) · 참고 2(`Number(rsDisplay)`↔`rating0` 출력 결합) — 리뷰 판정대로 기록으로 충분
+- **커밋**: 단일 sync 커밋(CHANGELOG.md + spec.md frontmatter `in-progress → completed` 전이 + 본 §E.4) — 명시 pathspec, `git add -A` 계열 미사용. push 는 리드 소관(디스패치 지시)

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SPEC-SECTOR-DISPLAY-UNIFY-001 v0.3.0, 2026-08-19)
+
+- **섹터 분석 화면의 RS 라벨 부정확·null% 렌더·기간 토글 무동작 해소** — 형제 백엔드 `SPEC-SECTOR-METRIC-UNIFY-001`(M0~M5)에서 분리된 프론트 SPEC(원본 계획 M6·M7). UI의 "RS"가 등급·RRG RS-Ratio·RS Line 세 가지를 지칭하던 모호함과, 같은 지표의 반올림이 제각각이던 것(`Math.round`/`toFixed(1)`/없음 혼재)을 `rating0`(등급 정수)/`pct0`(비율 정수) 단일 출처로 통일
+  - **라벨 정확성 (REQ-SDU-004)**: `'RS Top %'` → **`RS 80+ 비중`** (RS 점수처럼 읽히는 혼동 해소 — 임계값 80을 이름에 명시) · `'RS 중앙'`(50 상수 표기) → **`RS 50 (유니버스 백분위 중앙)`** · 차트 셀 배지 `RS {v}` → **`RS등급 {v}`** (RS Line 버튼과 구분) · RRG 차트 측정 지표 캡션 신설 · 버블 Y축 → `RS Rating 평균 (0-100)`
+  - **null% 표시 버그 (REQ-SDU-002)**: MetricCard가 결측값에 문자열 `null%`를 렌더하던 결함 해소 — 이제 결측은 `-`
+  - **RS 임계값 상수화 (REQ-SDU-003)**: `frontend/src/utils/rsMetrics.ts` 신설 (`RS_TOP_THRESHOLD=80` 외 3상수). 백엔드 `my_chart/analysis/sector_metrics.py` 원문을 읽어 등식을 검증하는 교차 언어 테스트로 고정 — 임계값 드리프트 구조적 차단
+  - **색 램프 분리 (REQ-SDU-005)**: RS 등급(rs_avg) 보라 ↔ RS 80+ 비중(rs_top_pct) 파랑 — 같은 수치에서 두 셀이 같은 색으로 수렴하던 것을 되돌림으로 실증
+  - **기간 토글 실동작 (REQ-SDU-006~011)**: 랭킹 표 순위가 선택 기간(1W/1M/3M)으로 재산출 — 봉투 `data[]` 이름 조인으로 `rank`/`rank_change` 전환, 선택 기간 열에 `(순위 기준)` 마커, 화면 상단에 기간·시장 고지 띠. 봉투 부재·전량 rank null 시 `순위 기준: 종합점수(3기간 가중)` 캡션, 일부 폴백 시 `일부 N개 섹터는 이번 기간 순위가 없어 종합점수 순위 유지` 고지(원인 중립 문구 — 리뷰 F6). 버블 X축 벤치마크 라벨도 형제 SPEC의 정의 B 전환을 반영해 `KOSPI/KOSDAQ 상한가중`으로 정정
+  - **커밋 하이라이트**: M6 `0023210` (표시 통일 — 반올림 단일출처·상수화·라벨·색램프) · M7 `45ffaad` (기간 토글 — data[] 조인·폴백 캡션·마커·X축 라벨) · 정정 `4059f44` (§F 전체 스위트로 좁힘 결함 정정 — 누락 갱신 대상 3종 등재 + AC-012/013 재판정) · 리뷰 F1~F4 `3b9398b` (배지 강조 술어를 표시 문자열 기준으로 통일·rank null 가드·단언 강도 복구·기록 정정) · F6 `739ba53` (부분 폴백 고지 원인 중립화) 외 SPEC 기록 docs 6건 — 총 11커밋
+  - **신설된 회귀 가드**: 신규 관측 — `rsMetrics.test.ts`(교차 언어 등식) · `rsDisplayConsistency`(표 셀·상세 패널·버블 툴팁 3면 RS 문자열 동일성) · `sectorPeriodToggle`(신설 파일 — 조인 순서·폴백 캡션·열 마커·전량 rank null) · 색램프 분리 · rating0 반올림 · null% 렌더 + F1 경계 단언 2건(`rs_12m ∈ [79.5,80)` 배지-강조 일치) · F2 rank-null 캡션 1건. 기존 2종 테스트는 라벨 갱신
+  - **검증**: AC-SDU-001~013 **13/13 PASS — 되돌림/주입 RED 실측**(AC-012/013은 리드 정정 재판정: 원 좁힘 증거 무효화 → §F 축자 전체 스위트 근거로 교체) · `npm run typecheck` exit 0 · eslint §F.1 범위 23 problems = 기준선 27 − 소실 6 + 사전 선언 예외 2, **신규 (파일,규칙) 0건 (B\A=∅)** · vitest 전체 **84파일 738테스트 all green**. 실행 방식 orchestrator-direct(manager-develop 스폰 GLM 하위 컨텍스트 한계 2회 사망 → 운영자 승인 A, 리드 경유 — §E.2.1). DoD 라이브 화면 확인은 운영자 판정으로 해소(§E.3 — provider·hook dep 변경은 dev 서버 재시작 후 확인해야 한다는 교훈 포착)
+  - **Gap/잔여 (본 SPEC 미수정·기록)**: F5(AC-SDU-009 X축 변화 단언 강도 — Y 불변 절반은 주입 되돌림 RED 실증이라 판정 유지) · 참고 2건은 리드 백로그 t7(조인 성공 술어 2곳 중복 — 공용 술어 후보)·t8(`ThemeAnalysis/ThemeRankingTable.tsx` 동일 직접 포맷 패턴, G-F2) · `Number(rsDisplay)`와 `rating0` 출력 결합(포맷 확장 시 동반 검토)
+
 ### Fixed (SPEC-SECTOR-METRIC-UNIFY-001 v0.5.0, 2026-08-18)
 
 - **섹터 버블 차트 지표가 랭킹 탭과 달랐던 결함 — 산출 원천 단일화** — 같은 RS 정의를 공유하면서도 섹터 집계 구현이 두 벌 존재해 결측 처리(0점 대체 vs 제외)·초과수익률 벤치마크(KOSPI 지수 vs 시장별 상한 시총가중 유니버스)·거래대금 산식(주봉 close×volume 1개 vs VolumeWon 기간 누적, 약 2.5e7배 차이)·유니버스가 전부 갈렸다. `/api/sectors/bubble`을 `compute_sector_aggregates` 투영으로 전환해 두 경로 지표를 일치시켰다(**불일치 N=18 → 0**, 9조합×4필드쌍 전부). RS 결측 종목은 분모에서 제외(방산 1w/all rs_avg 48.16→54.18), 전원 결측 섹터는 0.0이 아닌 `null`, 거래대금은 VolumeWon 누적(억원) 기준. 봉투 `market_filter`가 모든 요청에 `"all"`로 거짓말하던 결함(D4)도 해소 — 이제 요청 시장을 반영한다

@@ -2,7 +2,7 @@
 id: SPEC-SECTOR-DISPLAY-UNIFY-001
 title: Sector Analysis 프론트 표시 통일 및 기간 토글 실동작
 version: "0.3.0"
-status: in-progress
+status: completed
 created: 2026-08-18
 updated: 2026-08-19
 author: manager-spec
