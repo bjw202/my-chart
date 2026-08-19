@@ -5,8 +5,8 @@
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    // "node": src/**/__tests__/ 테스트가 node:fs/node:path 등 Node API를 사용하므로 포함.
-    "types": ["vite/client", "vitest/globals", "node"],
+    // 프로덕션 프로젝트 — node/vitest globals 미포함. 테스트는 tsconfig.test.json 에서 검사.
+    "types": ["vite/client"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -25,5 +25,11 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/**/__tests__",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/test-setup.ts"
+  ]
 }
