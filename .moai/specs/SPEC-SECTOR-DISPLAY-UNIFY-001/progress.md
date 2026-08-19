@@ -445,7 +445,7 @@ rs=null  display="-"   highlight=false  | null 가드로 Number("-")=NaN 미도�
 
 - **sync_status**: audit-ready
 - **sync_complete_at**: 2026-08-19
-- **sync_commit_sha**: pending-backfill-sdu001-sync (자기 참조 불가 — D3 SHA backfill 면제, 선례 86d4af8→777f044 · 본 SPEC §E.3 ae2b8af)
+- **sync_commit_sha**: fd53f7e (docs(SPEC-SECTOR-DISPLAY-UNIFY-001): sync-phase — CHANGELOG 기록·3-phase close — D3 자기 참조 backfill, 선례 86d4af8→777f044)
 - **실행 방식**: orchestrator-direct (칸반 sync 디스패치 — 카드 t2, 리드 lead-tjyky8 경유). 근거: GLM 세션 manager-* 스폰 하위 컨텍스트 한계 연쇄 사망 확립 패턴(memory `project_glm_subagent_ctx_death` — 08-17 sync 2회·본 SPEC run 2회 관측, §E.2.1) + 형제 SPEC sync 선례(86d4af8 orchestrator-direct, 사용자 승인). 리드 디스패치가 sync 과업을 명시 열거했고 PR 생성 금지·push 리드 소관을 지시
 - **sync 검증 배치 (관측 주체: 본 sync 세션, HEAD 739ba53, 이번 실행 — 리드 b3e680b5 기준선·§R.6.1 과 독립 대조)**:
 
