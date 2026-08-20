@@ -1,7 +1,8 @@
 // @MX:NOTE: [AUTO] ThemeRankingTable은 강세 테마 목록을 정렬 가능한 테이블로 렌더링; theme_description hover tooltip 지원
-// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-005, SPEC-NAVER-THEME-003 REQ-NT3-004
+// @MX:SPEC: SPEC-NAVER-THEME-001 REQ-NT-005, SPEC-NAVER-THEME-003 REQ-NT3-004, SPEC-THEME-DISPLAY-UNIFY-001
 import type { ReactElement } from 'react'
 import type { ThemeItem } from '../../api/themes'
+import { MetricCell, percent2, toMetricValue, MISSING_TEXT } from '../common/MetricCell'
 
 interface ThemeRankingTableProps {
   themes: ThemeItem[]
@@ -25,22 +26,6 @@ function getChangePctColor(value: number): string {
   if (value > 0) return `rgba(38, 166, 154, ${Math.min(Math.abs(value) / 10, 0.4)})`
   if (value < 0) return `rgba(239, 83, 80, ${Math.min(Math.abs(value) / 10, 0.4)})`
   return 'transparent'
-}
-
-function formatPct(value: number): string {
-  if (!isFinite(value)) return '-'
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(2)}%`
-}
-
-function formatBreadth(value: number | undefined): string {
-  if (value == null || !isFinite(value)) return '-'
-  return `${(value * 100).toFixed(1)}%`
-}
-
-function formatMomentum(value: number | undefined): string {
-  if (value == null || !isFinite(value)) return '-'
-  return value.toFixed(2)
 }
 
 export function ThemeRankingTable({
@@ -88,7 +73,7 @@ export function ThemeRankingTable({
                 background: getChangePctColor(theme.change_pct),
               }}
             >
-              {formatPct(theme.change_pct)}
+              <MetricCell value={toMetricValue(theme.change_pct)} format={percent2} />
             </td>
             <td
               style={{
@@ -96,12 +81,19 @@ export function ThemeRankingTable({
                 background: getChangePctColor(theme.change_pct_3d),
               }}
             >
-              {formatPct(theme.change_pct_3d)}
+              <MetricCell value={toMetricValue(theme.change_pct_3d)} format={percent2} />
             </td>
-            <td style={{ textAlign: 'right' }}>{formatMomentum(theme.momentum_score)}</td>
-            <td style={{ textAlign: 'right' }}>{formatBreadth(theme.breadth_ratio)}</td>
+            <td style={{ textAlign: 'right' }}>
+              <MetricCell value={toMetricValue(theme.momentum_score)} format={(n) => n.toFixed(2)} />
+            </td>
+            <td style={{ textAlign: 'right' }}>
+              <MetricCell
+                value={toMetricValue(theme.breadth_ratio)}
+                format={(n) => `${(n * 100).toFixed(1)}%`}
+              />
+            </td>
             <td style={{ textAlign: 'left', fontSize: 11, color: 'var(--text-muted)' }}>
-              {theme.top_stocks_preview ?? '-'}
+              {theme.top_stocks_preview ?? MISSING_TEXT}
             </td>
           </tr>
         ))}
