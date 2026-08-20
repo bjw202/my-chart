@@ -181,6 +181,9 @@ secret-*.*
 .moai/status_line.sh
 .moai/memory/
 .moai/worktrees/
+# moai CLI 가 cwd 기준으로 .moai/state/config-cache.json 을 생성(상류 동작)하므로
+# 어떤 깊이의 중첩 .moai/state/ 도 무시한다 (루트 포함).
+**/.moai/state/
 
 # ===========================================
 # Evolution Telemetry (local-only usage data)
