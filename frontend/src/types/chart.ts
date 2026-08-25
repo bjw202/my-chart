@@ -24,10 +24,12 @@ export interface MAOverlay {
   ema20?: MAPoint[]
   sma50?: MAPoint[]
   sma100?: MAPoint[]
+  sma150?: MAPoint[]
   sma200?: MAPoint[]
   // Weekly timeframe fields
   sma10?: MAPoint[]
   sma20?: MAPoint[]
+  sma30?: MAPoint[]
   sma40?: MAPoint[]
 }
 

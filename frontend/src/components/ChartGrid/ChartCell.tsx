@@ -37,12 +37,14 @@ const MA_COLORS_DAILY: Record<string, string> = {
   ema20: '#ffd166',
   sma50: '#06d6a0',
   sma100: '#118ab2',
+  sma150: '#9ca3af',
   sma200: '#073b4c',
 }
 
 const MA_COLORS_WEEKLY: Record<string, string> = {
   sma10: '#06d6a0',
   sma20: '#118ab2',
+  sma30: '#9ca3af',
   sma40: '#073b4c',
 }
 

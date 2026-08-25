@@ -35,7 +35,7 @@ _STOCK_PRICES_COLS = (
     "Volume", "VolumeSMA10",
     "CHG_1W", "CHG_1M", "CHG_2M", "CHG_3M",
     "CHG_6M", "CHG_9M", "CHG_12M",
-    "SMA10", "SMA20", "SMA40",
+    "SMA10", "SMA20", "SMA30", "SMA40",
     "SMA40_Trend_1M", "SMA40_Trend_2M",
     "SMA40_Trend_3M", "SMA40_Trend_4M",
     "MAX10", "MAX52", "min52", "Close_52min",
@@ -55,7 +55,7 @@ _PRICE_DF_COLS = (
     "Volume", "Volume SMA10",
     "CHG_1W", "CHG_1M", "CHG_2M", "CHG_3M",
     "CHG_6M", "CHG_9M", "CHG_12M",
-    "SMA10", "SMA20", "SMA40",
+    "SMA10", "SMA20", "SMA30", "SMA40",
     "SMA40_Trend(1M)", "SMA40_Trend(2M)",
     "SMA40_Trend(3M)", "SMA40_Trend(4M)",
     "MAX 10W", "MAX 52W", "min 52W", "Close-min 52W",
@@ -73,7 +73,9 @@ def _setup_db(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-_REQUIRED_COLS = {"VolumeSMA10", "SMA10", "SMA20", "SMA40"}
+# SMA30 포함: 기존 주간 DB(SMA30 없음)는 구 스키마로 감지돼 DROP 후 재생성 —
+# SMA30의 과거 값은 fetch 시점에 계산되므로 전체 재수집이 유일한 백필 경로다.
+_REQUIRED_COLS = {"VolumeSMA10", "SMA10", "SMA20", "SMA30", "SMA40"}
 
 
 def _ensure_stock_prices_table(conn: sqlite3.Connection) -> None:
@@ -97,7 +99,7 @@ def _ensure_stock_prices_table(conn: sqlite3.Connection) -> None:
             Volume REAL, VolumeSMA10 REAL,
             CHG_1W REAL, CHG_1M REAL, CHG_2M REAL, CHG_3M REAL,
             CHG_6M REAL, CHG_9M REAL, CHG_12M REAL,
-            SMA10 REAL, SMA20 REAL, SMA40 REAL,
+            SMA10 REAL, SMA20 REAL, SMA30 REAL, SMA40 REAL,
             SMA40_Trend_1M REAL, SMA40_Trend_2M REAL,
             SMA40_Trend_3M REAL, SMA40_Trend_4M REAL,
             MAX10 REAL, MAX52 REAL, min52 REAL, Close_52min REAL,

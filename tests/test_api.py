@@ -81,7 +81,7 @@ def stock_meta_db(tmp_path):
             Open REAL, High REAL, Low REAL, Close REAL,
             Change REAL, High52W REAL,
             Volume REAL, Volume20MA REAL, VolumeWon REAL,
-            EMA10 REAL, EMA20 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA200 REAL,
+            EMA10 REAL, EMA20 REAL, SMA21 REAL, SMA50 REAL, EMA65 REAL, SMA100 REAL, SMA150 REAL, SMA200 REAL,
             DailyRange REAL, HLC REAL,
             FromEMA10 REAL, FromEMA20 REAL, FromSMA50 REAL, FromSMA200 REAL,
             Range REAL, ADR20 REAL,
@@ -103,10 +103,10 @@ def stock_meta_db(tmp_path):
         date = f"2026-02-{20 + i:02d}"
         conn.execute(
             """INSERT INTO stock_prices
-               (Name,Date,Open,High,Low,Close,Volume,EMA10,EMA20,SMA50,SMA100,SMA200)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               (Name,Date,Open,High,Low,Close,Volume,EMA10,EMA20,SMA50,SMA100,SMA150,SMA200)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             ("삼성전자", date, 69500.0, 70500.0, 69000.0, 70000.0 + i * 100,
-             1_000_000, 69000.0, 68000.0, 65000.0, 63000.0, 60000.0),
+             1_000_000, 69000.0, 68000.0, 65000.0, 63000.0, 62000.0, 60000.0),
         )
     conn.commit()
     conn.close()
@@ -232,7 +232,7 @@ class TestChartEndpoint:
     def test_ma_overlays_structure(self, client, patch_db):
         resp = client.get("/api/chart/005930")
         ma = resp.json()["ma"]
-        for key in ("ema10", "ema20", "sma50", "sma100", "sma200"):
+        for key in ("ema10", "ema20", "sma50", "sma100", "sma150", "sma200"):
             assert key in ma
 
     def test_unknown_code_returns_404(self, client, patch_db):

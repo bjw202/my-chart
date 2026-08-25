@@ -130,11 +130,12 @@ def price_naver_rs(
     price["Date"] = pd.to_datetime(price["Date"])
     price.set_index("Date", inplace=True)
 
-    # @MX:NOTE: [AUTO] Weekly rolling windows: SMA10=10w, SMA20=20w, SMA40=40w
+    # @MX:NOTE: [AUTO] Weekly rolling windows: SMA10=10w, SMA20=20w, SMA30=30w, SMA40=40w
     # Naming follows actual window size for clarity
     price["Volume SMA10"] = price["Volume"].rolling(window=10).mean()
     price["SMA10"] = price["Close"].rolling(window=10).mean()
     price["SMA20"] = price["Close"].rolling(window=20).mean()   # NOTE: window changed 30->20
+    price["SMA30"] = price["Close"].rolling(window=30).mean()
     price["SMA40"] = price["Close"].rolling(window=40).mean()
 
     # SMA40 trend
