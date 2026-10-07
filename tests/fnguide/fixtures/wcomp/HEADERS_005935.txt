@@ -1,0 +1,30 @@
+HTTP/2 200 
+cache-control: private, max-age=10800
+content-type: application/json; charset=utf-8
+expires: Wed, 07 Oct 2026 17:16:20 GMT
+last-modified: Wed, 07 Oct 2026 14:16:20 GMT
+vary: *
+server: 
+date: Wed, 07 Oct 2026 14:16:19 GMT
+content-length: 263
+
+HTTP/2 200 
+cache-control: private, max-age=10800
+content-type: application/json; charset=utf-8
+expires: Wed, 07 Oct 2026 17:16:20 GMT
+last-modified: Wed, 07 Oct 2026 14:16:20 GMT
+vary: *
+server: 
+date: Wed, 07 Oct 2026 14:16:20 GMT
+content-length: 174
+
+HTTP/2 200 
+cache-control: private, max-age=10800
+content-type: application/json; charset=utf-8
+expires: Wed, 07 Oct 2026 17:16:20 GMT
+last-modified: Wed, 07 Oct 2026 14:16:20 GMT
+vary: *
+server: 
+date: Wed, 07 Oct 2026 14:16:20 GMT
+content-length: 174
+

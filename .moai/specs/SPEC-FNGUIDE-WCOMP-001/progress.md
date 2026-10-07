@@ -203,7 +203,128 @@ plan_status: audit-ready
 
 ## §E.2 Run-phase Evidence
 
-_<pending run-phase>_
+### M1 — 재현, fixture, 확인 과제 (2026-10-07)
+
+#### BASE
+
+- BASE SHA: `d6ed32e` (`git rev-parse --short HEAD`, 첫 run 단계 커밋 직전). AC-WC-015 1번의 `git diff --stat "$BASE"` 기준점이다.
+- 작업 위치: 에이전트 격리 워크트리(`.claude/worktrees/agent-a20b6e0f16e957192`, 브랜치 `worktree-agent-a20b6e0f16e957192`). 워크트리는 `fd5f11f`에서 만들어져 있어 `git merge --ff-only d6ed32e`로 main 끝까지 빨리 감기한 뒤 작업했다. 커밋은 이 브랜치에 쌓이며 main 반영은 오케스트레이터 몫이다.
+
+#### 착수 전 점검 (plan.md §C, 실행 출력)
+
+```text
+$ git rev-parse --short HEAD && git branch --show-current
+d6ed32e
+worktree-agent-a20b6e0f16e957192
+$ git status --short fnguide tests backend
+(출력 없음)
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests/test_analysis_api.py -q -p no:cacheprovider | tail -1
+101 passed, 94 deselected, 1 warning in 0.54s
+$ ls <plan 표본>/raw | wc -l
+     102
+```
+
+#### fixture 확보
+
+- 표본 디렉터리가 살아 있어(102개) 가장 먼저 세션 scratchpad로 통째로 복사한 뒤 축소본을 만들었다.
+- 축소본은 `tests/fnguide/fixtures/wcomp/`에 54개 파일(재무제표 JSON 40, 원본 그대로 4, 스냅샷 6, 헤더 4) + `README.md`. 축소 방법·원본 URL·캡처 시각은 README에 있다.
+- 라이브 요청: 표본에 없던 응답 16건(001750 Income Q `C`·`B`, Balance·CashFlow Y·Q `C`·`B` 8건, 330590 Q Balance·CashFlow `B`, 105560 Q Balance·CashFlow `C`, 001750·330590 스냅샷) — 모두 HTTP 200, 2026-10-07T23:15:50~58+09:00. V-1 헤더 9건 + 리디렉션 추종 3건. 합계 28건, 순차 요청.
+- AC-WC-015 5번 판정: `F=tests/fnguide/fixtures/wcomp/README.md; test -s "$F" && grep -qE 'https://wcomp\.fnguide\.com/' "$F" && grep -qE '20[0-9]{2}-[0-9]{2}-[0-9]{2}' "$F" && echo README_OK` → `README_OK`
+
+#### RED 관측 — AC-WC-001
+
+프로덕션 코드를 바꾸기 전(`git diff --stat -- fnguide` 출력 없음)에 새 테스트만 추가한 상태에서 실행했다.
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_repro.py -q -p no:cacheprovider -k ac_wc_001 --tb=short -W ignore::UserWarning; echo "exit=$?"
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_ac_wc_001_legacy_stub_raises_value_error_with_code ____________
+tests/fnguide/test_wcomp_repro.py:59: in test_ac_wc_001_legacy_stub_raises_value_error_with_code
+    read_fs("005930")
+fnguide/crawler.py:187: in read_fs
+    account_type, df_bs_ann = table_parsing(tables[0])
+                              ^^^^^^^^^^^^^^^^^^^^^^^^
+fnguide/parser.py:38: in table_parsing
+    account_type: str = th[0][0]
+                        ^^^^^^^^
+E   IndexError: list index out of range
+=========================== short test summary info ============================
+FAILED tests/fnguide/test_wcomp_repro.py::test_ac_wc_001_legacy_stub_raises_value_error_with_code
+1 failed, 1 deselected in 0.31s
+exit=1
+$ git status --short
+?? .moai/logs/
+?? tests/fnguide/fixtures/
+?? tests/fnguide/test_wcomp_repro.py
+```
+
+기대(acceptance AC-WC-001 "수정 전 실행 시 `1 failed`이고 출력에 `IndexError`")와 일치한다. 실패 위치는 spec §1.1의 장애 경로(`crawler.py:187` → `parser.py:38`)와 같다. `.moai/logs/`는 착수 전부터 있던 미추적 디렉터리이며 이 SPEC과 무관하다. GREEN은 M3(`read_fs` 재작성) 몫이다.
+
+RED를 관측한 뒤, 실패하는 테스트가 pre-commit 게이트(`moai gate`)와 기본 스위트를 깨지 않도록 `@pytest.mark.xfail(raises=IndexError, strict=True)`를 붙여 커밋했다. `raises=IndexError`라 다른 실패는 그대로 실패로 드러나고, `strict=True`라 M3에서 `read_fs`가 고쳐져 통과하면 XPASS가 실패가 되어 표지를 지우게 된다(M3 작업 항목: 이 표지 제거 → `1 passed` 확인). 표지를 붙인 뒤의 출력:
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_repro.py -q -p no:cacheprovider -rx -W ignore::UserWarning
+.x                                                                       [100%]
+=========================== short test summary info ============================
+XFAIL tests/fnguide/test_wcomp_repro.py::test_ac_wc_001_legacy_stub_raises_value_error_with_code - M1 RED 고정: read_fs 재작성(M3) 전까지 옛 안내 페이지에서 IndexError
+1 passed, 1 xfailed in 0.22s
+```
+
+#### M1 확인 과제 V-1 ~ V-4
+
+| ID | 상태 | 결과 |
+|---|---|---|
+| V-1 | 완료 — 모순 없음(주의 1건) | 아래 표. 파일 `tests/fnguide/fixtures/wcomp/HEADERS_{005930,005935,999999}.txt`, `HEADERS_999999_follow.txt` |
+| V-2 | M3로 이월 | 통과 조건이 "구현된 `read_fs` 결과의 `df.loc['이자비용'].iloc[0]`"이라 `read_fs` 재작성(M3) 전에는 판정할 수 없다. fixture 쪽 절반만 미리 실행: `[('202560', '202550', '9302.53'), ('204800', '201830', None), ('203130', None, '-44808.35')]` — 이자비용 첫 행 AC_CODE 202560(부모 202550) 9302.53, 법인세비용 203130 −44808.35로 plan 기대와 같다 |
+| V-3 | M3로 이월 | 명령이 `tests/fnguide/test_wcomp_reader.py -k "ac_wc_006 and dec"`인데 이 파일과 합성 fixture 테스트는 M3에서 만든다 |
+| V-4 | 완료 — 통과 | 아래 출력 |
+
+V-1 응답 헤더(plan.md §F.1 명령 그대로 실행, 2026-10-07T23:16:20+09:00):
+
+| 경우 | 엔드포인트 | 상태 줄 | Content-Type | content-length |
+|---|---|---|---|---|
+| 005930 (정상) | getFinIncome / getFinBalance / getFinCashFlow | `HTTP/2 200` ×3 | `application/json; charset=utf-8` ×3 | 11981 / 15232 / 18494 |
+| 005935 (빈 dataset) | 같음 | `HTTP/2 200` ×3 | `application/json; charset=utf-8` ×3 | 263 / 174 / 174 |
+| 999999 (없는 종목) | 같음 | `HTTP/2 302` ×3, `location: /Error/InvalidCompany?errorPath=…` | `text/html; charset=utf-8` ×3 | 197 / 198 / 199 |
+| 999999, 리디렉션 추종(`curl -sL`) | 같음 | `302` → `HTTP/2 200` ×3, `FINAL 200 1668 1` ×3 | `text/html; charset=utf-8` | 1668 ×3 |
+
+판정: REQ-WC-002·003과 모순되지 않는다. 오류 응답의 첫 홉은 302지만 `requests.get`은 기본으로 리디렉션을 따라가므로 리더가 받는 최종 응답은 HTTP 200 + 1,668바이트 HTML이고(research.md F-13과 같음), REQ-WC-002의 본문 판정(`<` 시작)이 `ValueError`(404)를 낸다. **주의(M3 입력)**: 리더가 `allow_redirects=False`로 요청하면 302가 REQ-WC-003의 "2xx 밖 상태"에 걸려 503이 되므로, 리더는 리디렉션 추종 기본값을 유지해야 한다. `Content-Type`은 정상·빈 dataset이 JSON, 오류가 HTML로 갈리지만 REQ-WC-002는 이를 판정에 쓰지 않는다(기록만).
+
+V-4 출력:
+
+```text
+$ for f in tests/fnguide/fixtures/wcomp/getFinBalance_005930_Y_C.json tests/fnguide/fixtures/wcomp/getFinBalance_403870_Y_B.json; do echo "$f"; /Users/byunjungwon/Dev/my_chart/.venv/bin/python -c "import json,sys;d=json.load(open(sys.argv[1],encoding='utf-8-sig'))['dataset']['data'];print([(r['P_AC_CODE'],r['NAME'].strip()) for r in d if '충당부채' in r['NAME']])" "$f"; done
+tests/fnguide/fixtures/wcomp/getFinBalance_005930_Y_C.json
+[('131580', '유동종업원급여충당부채'), ('131580', '단기충당부채'), ('130010', '비유동종업원급여충당부채'), ('130010', '장기충당부채')]
+tests/fnguide/fixtures/wcomp/getFinBalance_403870_Y_B.json
+[('131580', '유동종업원급여충당부채'), ('131580', '단기충당부채'), ('130010', '비유동종업원급여충당부채'), ('130010', '장기충당부채')]
+```
+
+두 종목 모두 부모 131580·130010 아래 충당부채가 `종업원급여충당부채` 1행 + `단기충당부채`/`장기충당부채` 1행뿐이다. 별칭 `단기충당부채→기타단기충당부채`, `장기충당부채→기타장기충당부채`의 범위가 옛 이름(종업원급여 외 충당부채)과 같다는 plan 단계 관측을 403870에서도 재확인했다.
+
+#### 005930 캐시 미스 소요 시간
+
+측정하지 않음. 새 `get_fnguide`가 아직 없어(M3~M5) 같은 요청 묶음(최대 8건)을 재현하지 않았다. 참고로 M1 라이브 요청 16건의 시각 기록은 23:15:50~23:15:58(요청 사이 0.5초 대기 포함)이었다 — 기준선이 아니다.
+
+#### M1 후 기본 스위트
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests/test_analysis_api.py -q -p no:cacheprovider | tail -1
+102 passed, 94 deselected, 1 xfailed, 1 warning in 0.39s
+```
+
+기준선 101 passed에 fixture 무결성 테스트 1건이 더해졌고, AC-WC-001은 xfail(RED 고정)이다.
+
+#### M1 미검증(Gaps)
+
+- 첫 커밋 시도에서 pre-commit `moai gate`가 워크트리에 새 `.venv`를 만들고 전체 pytest를 돌려 `21 failed, 907 passed, 1 skipped, 97 deselected, 1 xfailed, 1 xpassed`로 거부했다. 실패 21건은 모두 이 SPEC 밖(`test_market_api` 12, `test_m6_gap_closure` 4, `test_response_contract` 4, `test_ac_sag_045_r1_r4_r5a` 1)이며, 메모리 `project_worktree_precommit_db_trap.md`의 워크트리 환경 문제(운영 DB 부재, setuptools 82)와 파일 구성이 같다. 그 해소법대로 워크트리 `.venv`에 `setuptools<81`(80.10.2)을 넣고 공용 체크아웃의 `Output/stock_data_{daily,weekly}.db`를 워크트리 `Output/`에 복사한 뒤(둘 다 gitignore 대상) 다시 커밋했다. 게이트 우회는 하지 않았다.
+- 이 환경에 `ruff`가 없어(`which ruff` → `ruff not found`, venv에도 없음) 새 테스트 파일의 린트를 돌리지 못했다.
+
+- 001750·330590·105560의 일부 재무제표는 plan 표본(00시대)과 M1 라이브(23시대)가 섞였다. 기간 머리글 일치는 확인했으나 그 사이 수치 정정 여부는 확인하지 않았다.
+- `legacy_stub_1829.html`의 원본 URL은 표본 이름(`fs.html`)으로 추정한 것이다.
+- 005935·999999는 `consol_typ=C` 응답만 있다. 리더가 `B`도 요청하므로 M3 테스트는 같은 응답을 `B` 요청에도 돌려줘야 한다(사이트가 `B`에서 같은 본문을 주는지는 관측하지 않음).
+- V-2·V-3은 M3로 이월.
 
 ## §E.3 Run-phase Audit-Ready Signal
 

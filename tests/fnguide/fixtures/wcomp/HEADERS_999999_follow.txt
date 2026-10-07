@@ -1,0 +1,57 @@
+HTTP/2 302 
+cache-control: private, max-age=10800
+content-type: text/html; charset=utf-8
+expires: Wed, 07 Oct 2026 17:16:41 GMT
+last-modified: Wed, 07 Oct 2026 14:16:41 GMT
+location: /Error/InvalidCompany?errorPath=%3Ferrorpath%3D%252fCompanyInfo%252fgetFinIncome
+vary: *
+server: 
+date: Wed, 07 Oct 2026 14:16:41 GMT
+content-length: 197
+
+HTTP/2 200 
+cache-control: private
+content-type: text/html; charset=utf-8
+server: 
+date: Wed, 07 Oct 2026 14:16:41 GMT
+content-length: 1668
+
+FINAL 200 1668 1
+HTTP/2 302 
+cache-control: private, max-age=10800
+content-type: text/html; charset=utf-8
+expires: Wed, 07 Oct 2026 17:16:41 GMT
+last-modified: Wed, 07 Oct 2026 14:16:41 GMT
+location: /Error/InvalidCompany?errorPath=%3Ferrorpath%3D%252fCompanyInfo%252fgetFinBalance
+vary: *
+server: 
+date: Wed, 07 Oct 2026 14:16:41 GMT
+content-length: 198
+
+HTTP/2 200 
+cache-control: private
+content-type: text/html; charset=utf-8
+server: 
+date: Wed, 07 Oct 2026 14:16:41 GMT
+content-length: 1668
+
+FINAL 200 1668 1
+HTTP/2 302 
+cache-control: private, max-age=10800
+content-type: text/html; charset=utf-8
+expires: Wed, 07 Oct 2026 17:16:41 GMT
+last-modified: Wed, 07 Oct 2026 14:16:41 GMT
+location: /Error/InvalidCompany?errorPath=%3Ferrorpath%3D%252fCompanyInfo%252fgetFinCashFlow
+vary: *
+server: 
+date: Wed, 07 Oct 2026 14:16:41 GMT
+content-length: 199
+
+HTTP/2 200 
+cache-control: private
+content-type: text/html; charset=utf-8
+server: 
+date: Wed, 07 Oct 2026 14:16:41 GMT
+content-length: 1668
+
+FINAL 200 1668 1

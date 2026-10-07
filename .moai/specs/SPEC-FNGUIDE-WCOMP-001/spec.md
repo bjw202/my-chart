@@ -2,7 +2,7 @@
 id: SPEC-FNGUIDE-WCOMP-001
 title: "FnGuide 신사이트(wcomp) 이전 대응 — 재무제표·스냅샷 수집층 재작성, 분석 로직 불변"
 version: "0.2.3"
-status: draft
+status: in-progress
 created: 2026-10-07
 updated: 2026-10-07
 author: manager-spec

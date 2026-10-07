@@ -1,0 +1,1263 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head prefix="og: http://ogp.me/ns#">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8" />
+    <meta http-equiv="content-language" content="ko" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+    <meta name="viewport" content="width=device-width" />
+    <meta name="format-detection" content="telephone=no">
+    <meta name="robots" content="index,follow" />
+    <meta name="googlebot" content="index,follow" />
+    <meta name="NaverBot" content="All" />
+    <meta name="NaverBot" content="index,follow" />
+    <meta name="Yeti" content="All" />
+    <meta name="Yeti" content="index,follow" />
+    <title>KB금융(105560) | Snapshot | 기업정보 | Company Guide</title>
+    <link rel="shortcut icon" sizes="16x16 24x24 32x32 64x64" type="image/x-icon" href="/favicon.ico?ver=1">
+    <meta name="description" content="에프앤가이드 상장기업분석" />
+    <meta name="image" content="" />
+    <meta name="keywords" content="에프앤가이드, 에프엔가이드, FnGuide, fn가이드" />
+    <meta name="author" content="에프앤가이드" />
+    <meta name="copyright" content="Copyright© FnGuide Inc. All rights reserved." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="에프앤가이드" />
+    <meta property="og:description" content="에프앤가이드 상장기업분석" />
+    <meta property="og:image" content="" />
+    <meta property="og:url" content="" />
+    <meta name="dtyp" content="R" />
+    <meta name="sno" content="3" />
+
+    <link href="https://wcompcdn.fnguide.com/bundles/jquery/css?ver=20260903162918" rel="stylesheet"/>
+
+    <link href="https://wcompcdn.fnguide.com/bundles/css?ver=20260903162918" rel="stylesheet"/>
+
+</head>
+<body class="">
+    <div class="fng_body ">
+        <div class="fng_wrap">
+
+    <div class="headwrap">
+        <div class="headertop">
+            <h1><a class="menu_link" href="/"><span> 상장기업분석 </span></a></h1>
+                <div class="hdt_center">
+                    <a href="https://help-center.fnguide.com/ko/articles/%EC%99%80%EC%9D%B4%EC%A6%88%EB%A6%AC%ED%8F%AC%ED%8A%B8--%EB%A6%AC%ED%83%80%EB%AF%BC-%EA%B2%B0%ED%95%A9%EC%9A%94%EA%B8%88%EC%A0%9C-%EC%B6%9C%EC%8B%9C-8384bf2c" target="_blank" class="hdt_bnr" style="background-image:url(../../Contents/images/fngc_topBnr_bg_default.png);">
+                        <strong>
+                            <span class="txt1" style="background-image:url(../../Contents/images/fngc_topBnr_txt_default.png?v260930);width:300px;height:40px;background-size:100%;">
+                                <i class="hide">PC+모바일 리포트 무제한</i>
+                            </span>
+                            <span class="txt2" style="background-image:url(../../Contents/images/fngc_topBnr_txt_default_hover.png?v260930);width:300px;height:40px;background-size:100%;">
+                                <i class="hide">월 2만원에 리타민 추가 구독</i>
+                            </span>
+                        </strong>
+                    </a>
+                </div>
+            <div class="hdt_rgt">
+                <form name="frmMain" method="get">
+                    <div class="input_ty1 lk_in">
+                        <input type="text" id="searchCompany" title="정확한 종목명 또는 종목코드 입력(잘모를 경우 다음 종목찾기 링크 이용)" placeholder="종목명 또는 종목코드 입력" autocomplete="off" />
+                        <button type="button" class="btn_lookup" title="종목검색팝업 새창열기"><span class="htxt">열기</span></button>
+                    </div>
+                    <button type="button" onClick="GoPrint();" class="btn_ty1"><span>인쇄</span></button>
+                </form>
+            </div>
+        </div>
+        <div class="headergnb" id="compGnb">
+            <ul class="gnb_dp1wrap">
+
+                <li class="gnb_dp1 gnb_ac">
+                    <a href="/CompanyInfo/Snapshot" class="menu_link">기업정보</a>
+                    <ul class="gnb_dp2wrap gnb_n1">
+                        <li class="gnb_dp2 gnb_dp2_start">
+                            <a href="/CompanyInfo/Snapshot" class="menu_link ac">Snapshot</a>
+                            <a href="/CompanyInfo/Information" class="menu_link ">기업개요</a>
+                            <a href="/CompanyInfo/Finance" class="menu_link ">재무제표</a>
+                            <a href="/CompanyInfo/FinanceRatio" class="menu_link ">재무비율</a>
+                            <a href="/CompanyInfo/Invest" class="menu_link ">투자지표</a>
+                            <a href="/CompanyInfo/Consensus" class="menu_link ">컨센서스</a>
+                        </li>
+                        <li class="gnb_dp2">
+                            <a href="/CompanyInfo/ShareAnalysis" class="menu_link ">지분분석</a>
+                            <a href="/CompanyInfo/SectorAnalysis" class="menu_link ">업종분석</a>
+                            <a href="/CompanyInfo/Comparison" class="menu_link ">경쟁사비교</a>
+                            <a href="/CompanyInfo/Disclosure" class="menu_link ">거래소공시</a>
+                            <a href="/CompanyInfo/Dart" class="menu_link ">금감원공시</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1  ">
+                    <a href="/Etp/EtfSnapshot" class="menu_link ">ETF/ETN 정보</a>
+                    <ul class="gnb_dp2wrap gnb_n2">
+                        <li class="gnb_dp2 gnb_dp2_start">
+                            <a href="/Etp/EtfSnapshot" class="menu_link ">ETF Snapshot</a>
+                            <a href="/Etp/EtfAnalysis" class="menu_link ">성과 및 위험분석</a>
+                            <a href="/Etp/EtnSnapshot" class="menu_link ">ETN Snapshot</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1  ">
+                    <a href="/Report/ReportTrend" class="menu_link">리포트</a>
+                    <ul class="gnb_dp2wrap gnb_n3">
+                        <li class="gnb_dp2 gnb_dp2_start">
+                            <a href="/Report/ReportTrend" class="menu_link ">리포트동향</a>
+                            <a href="/Report/ReportSummary" class="menu_link ">요약리포트</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1 ">
+                    <a href="/CompPerformance/ProResultCorp" class="menu_link">실적속보</a>
+                    <ul class="gnb_dp2wrap gnb_n4">
+                        <li class="gnb_dp2 gnb_dp2_start"></li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1 ">
+                    <a href="/Consensus/TargetPriceGap" class="menu_link">컨센서스 스크리닝</a>
+                    <ul class="gnb_dp2wrap gnb_n5">
+                        <li class="gnb_dp2 gnb_dp2_start">
+                            <a href="/Consensus/TargetPriceGap" class="menu_link ">목표주가 괴리율</a>
+                            <a href="/Consensus/UpDownRatio" class="menu_link ">컨센서스 상/하향 비율</a>
+                            <a href="/Consensus/EarningSurprise" class="menu_link ">어닝서프라이즈</a>
+                            <a href="/Consensus/TurnAround" class="menu_link ">턴어라운드</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1 ">
+                    <a href="/Ranking/SectorRank" class="menu_link">랭킹 분석</a>
+                    <ul class="gnb_dp2wrap gnb_n6">
+                        <li class="gnb_dp2 gnb_dp2_start">
+                            <a href="/Ranking/SectorRank" class="menu_link ">업종별 순위</a>
+                            <a href="/Ranking/IdxRank" class="menu_link ">지표별 순위</a>
+                            <a href="/Ranking/EtfRank" class="menu_link ">ETF 순위</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1 ">
+                    <a href="/Calendar/CompCalendar" class="menu_link">캘린더</a>
+                    <ul class="gnb_dp2wrap gnb_n7">
+                        <li class="gnb_dp2 gnb_dp2_start"></li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1 ">
+                    <a href="/SideInfo/CorporationList" class="menu_link">부가정보</a>
+                    <ul class="gnb_dp2wrap gnb_n8">
+                        <li class="gnb_dp2 gnb_dp2_start">
+
+                            <a href="/SideInfo/CorporationList" class="menu_link ">기업주소록</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="gnb_dp1 ">
+                    <a href="/Help/Guide" class="menu_link">이용안내</a>
+                    <ul class="gnb_dp2wrap gnb_n9">
+                        <li class="gnb_dp2 gnb_dp2_start"></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+            <div class="ad_vertical">
+                <div class="ad_left" style="position:fixed;top: 150px;width:300px;height:600px;margin-left:-320px;">
+                    <a href="https://help-center.fnguide.com/ko/articles/%EC%99%80%EC%9D%B4%EC%A6%88%EB%A6%AC%ED%8F%AC%ED%8A%B8--%EB%A6%AC%ED%83%80%EB%AF%BC-%EA%B2%B0%ED%95%A9%EC%9A%94%EA%B8%88%EC%A0%9C-%EC%B6%9C%EC%8B%9C-ddd55871" target="_blank" style="display:block;width:100%;height:100%;">
+                        <img src="../../Contents/images/fngc_leftBnr_img_default.png" alt="이제 모바일에서도 리포트를 자유롭게! 지금 확인하기" style="width:100%;height:100%;">
+                    </a>
+                </div>
+                <div class="ad_right" style="position:fixed;top:150px;width:300px;height:600px;margin-left:1028px;">
+                    <a href="https://help-center.fnguide.com/ko/articles/%EC%99%80%EC%9D%B4%EC%A6%88%EB%A6%AC%ED%8F%AC%ED%8A%B8--%EB%A6%AC%ED%83%80%EB%AF%BC-%EA%B2%B0%ED%95%A9%EC%9A%94%EA%B8%88%EC%A0%9C-%EC%B6%9C%EC%8B%9C-ddd55871" target="_blank" style="display:block;width:100%;height:100%;">
+                        <img src="../../Contents/images/fngc_rightBnr_img_default.png" alt="와이즈리포트 회원이라면 리타민을 월 22,000원에. 정가 대비 75% 할인!" style="width:100%;height:100%;">
+                    </a>
+                </div>
+            </div>
+
+    </div>
+
+            <div class="contwrap" id="compBody">
+
+<input id="cmp_nm" name="cmp_nm" type="hidden" value="KB금융" />
+<input id="stk_typ" name="stk_typ" type="hidden" value="1" />
+<input id="master_chk" name="master_chk" type="hidden" value="C" />
+
+    <div class="section ul_corpinfo">
+        <div class="corp_group1">
+            <h1 id="giName">KB금융</h1>
+            <h2>105560</h2><span class="etc1">&#124;</span><h2>12월 결산</h2> <span class="etc1">&#124;</span>
+            <button type="button" onClick="goHompage('www.kbfg.com')" id="btn_shome" class="btn_shome">홈페이지</button>
+            <dl style="display:none;" id="dl_btn_shome">
+                <dt>홈페이지</dt>
+                <dd id="dd_btn_shome">www.kbfg.com</dd>
+            </dl>
+            <button type="button" id="btn_sphone" class="btn_sphone">전화번호</button>
+            <dl style="display:none;" id="dl_btn_sphone">
+                <dt>전화번호</dt>
+                <dd>02-2073-7114 | IR 담당자 02-2073-7114</dd>
+            </dl>
+            <button type="button" id="btn_spmap" data-val="서울특별시 영등포구 국제금융로8길 26 (여의도동, 국민은행 여의도본점)" data-nm="KB금융" class="btn_spmap">주소</button>
+            <dl style="display:none;" id="dl_btn_spmap">
+                <dt>주소</dt>
+                <dd id="dd_btn_spmap">서울특별시 영등포구 국제금융로8길 26 (여의도동, 국민은행 여의도본점)</dd>
+            </dl>
+            <p class="stxt_group">
+                <span class="stxt">KOSPI</span>
+                    <span class="etc2">&#124;</span>
+                    <span class="stxt">코스피 기타금융업</span>
+                    <span style="display:none" id="strMarketTxt"> KOSPI 코스피 기타금융업</span>
+                                    <span class="etc2">&#124;</span>
+                    <span class="stxt stxt2">WI26 은행</span>
+                                    <span class="etc2">&#124;</span>
+                    <span class="stxt stxt3">K200</span>
+                                    <span class="etc2">&#124;</span>
+                    <span class="stxt">NXT</span>
+            </p>
+        </div>
+        <div class="corp_group2" id="corp_group2">
+            <ul>
+                <li>
+                    <dl style="display:none;">
+                        <dt>PER(Price Earning Ratio)</dt>
+                        <dd>전일자 보통주 수정주가 / 최근 결산 수정EPS(주당순이익) <br>*EPS = 당기순이익(지배) / 수정평균발행주식수<br>*최근결산은 2025/12 (연간) 기준임.</dd>
+                    </dl>
+                    <button type="button" class="tip_in" id="h_per">PER</button>
+                </li>
+                <li>11.07 </li>
+            </ul>
+            <ul>
+                <li>
+                    <dl style="display:none;">
+                        <dt>PER(Fwd.12M)</dt>
+                        <dd>전일자 보통주 수정주가 / EPS(Fwd.12M, 지배)</dd>
+                    </dl>
+                    <button type="button" class="tip_in" id="h_12m">PER(Fwd.12M)</button>
+                </li>
+                <li> 8.90 </li>
+            </ul>
+            <ul>
+                <li>
+                    <dl style="display:none;">
+                        <dt>업종 PER</dt>
+                        <dd>WI26 은행∥SUM(구성종목 시가총액)/SUM(구성종목 당기순이익)<br>*전일자 보통주 시가총액 기준<br>*당기순이익은은 최근결산 2025/12 (연간) 기준임.</dd>
+                    </dl>
+                    <button type="button" class="tip_in" id="h_u_per"><span class="ko">업종</span> PER</button>
+                </li>
+                <li> 9.38 </li>
+            </ul>
+            <ul>
+                <li>
+                    <dl style="display:none;">
+                        <dt>PBR(Price Book-value Ratio)</dt>
+                        <dd>전일자 보통주 수정주가 / 최근 결산기 BPS(주당순자산)<br>*BPS=자본총계(지배) / 수정기말발행주식수(자사주차감)<br>*최근결산은 2025/12 (연간) 기준임.</dd>
+                    </dl>
+                    <button type="button" class="tip_in" id="h_pbr">PBR</button>
+                </li>
+                <li>1.02 </li>
+            </ul>
+            <ul>
+                <li>
+                    <dl style="display:none;">
+                        <dt>현금배당수익률</dt>
+                        <dd>{최근 결산 보통주 수정DPS(현금,연간) / 전일자 보통주 수정주가} *100<br>*최근결산은 2025/12 (연간) 기준임.</dd>
+                    </dl>
+                    <button type="button" class="tip_in" id="h_rate"><span class="ko">현금배당수익률</span></button>
+                </li>
+                <li>2.61 % </li>
+            </ul>
+        </div>
+    </div>
+
+<div class="section ul_3colgf">
+    <div class="ul_wrap">
+        <div class="inforow">
+            <p class="tabgp_year" id="topChartBtn">
+                <button type="button" value="3">3개월</button>
+                <button type="button" value="12" class="ac">1년</button>
+                <button type="button" value="36">3년</button>
+            </p>
+            <p class="sec1">
+                <span class="txt_awdn">SELL</span>
+                <span class="txt_awup">BUY</span>
+            </p>
+            <p class="inforrow_rgt sec2">
+                <span class="txt_g">외국인 지분율</span>
+                <span class="txt_b">시가총액</span>
+            </p>
+            <p class="inforrow_rgt sec3" id="ratioChartLegend"></p>
+        </div>
+        <ul class="gf3row clear">
+            <li>
+                <div class="hd">
+                    <h2><strong>주가추이,</strong> 내부자거래<span class="blind" id="svdMainTopChart1">1년</span></h2>
+                    <span id="priceStr"></span>
+                </div>
+                <div class="bd">
+                    <div class="ct">
+                        <div class="chart_wrap" id="SNP_01" style="height:140px"></div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="hd">
+                    <h2><strong>외국인 지분율,</strong> 시가총액<span class="blind" id="svdMainTopChart2">1년</span></h2>
+                    <span id="forignRatioStr"></span>
+                </div>
+                <div class="bd">
+                    <div class="ct">
+                        <div class="chart_wrap" id="SNP_02" style="height:140px"></div>
+                    </div>
+                </div>
+            </li>
+            <li class="end">
+                <div class="hd">
+                    <div>
+                        <dl style="display:none;">
+                            <dt>상대수익률</dt>
+                            <dd>* 상대수익률은 조회시작일의 값을 100포인트로 변환하여 산출된<br />값입니다. <br>* 특정일의 상대수익률 포인트는 (특정일의 지수 및 주가/조회 기준 <br />시작점의 지수 및 주가) * 100 입니다. </dd>
+                        </dl>
+                        <button type="button" class="tip_in" id="h_tip">
+                            <h2>
+                                <strong>상대수익률</strong><span class="blind" id="svdMainTopChart3">1Y</span>
+                            </h2>
+                        </button>
+                    </div>
+                    <span id="ratioStr"></span>
+                </div>
+                <div class="bd">
+                    <div class="ct">
+                        <div class="chart_wrap" id="SNP_03" style="height:140px"></div>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+<div class="section ul_de">
+
+    <div class="ul_wrap" id="div1">
+        <div class="um_topbar botbd_n bmshadow">
+            <div class="topbar_wrap">
+                <div class="topbar_lft">
+                    <h2>시세현황</h2>
+                    <span class="date">[2026/10/02]</span>
+                </div>
+                <div class="topbar_rgt">
+                    <span class="txt1">단위 : 원, 주,%</span>
+                </div>
+            </div>
+        </div>
+        <div class="um_table">
+            <table class="us_table_ty1 table-hb thbg_g h_fix zigbg_no">
+                <caption class="cphidden">시세현황</caption>
+                <colgroup>
+                    <col style="width: 23%;">
+                    <col style="width: 27%;">
+                    <col style="width: 23%;">
+                    <col style="width: 27%;">
+                </colgroup>
+                <tbody>
+                    <tr class="rwf">
+                        <th scope="row" class="clf"><div>종가/ 전일대비/수익률</div></th>
+                        <td class="r">
+                            167,400/&nbsp;
+                            <span class="tcr">
+                                +1,400
+                            </span>/&nbsp;
+                            <span class="tcr">
+                                +0.84
+                            </span>
+                        </td>
+                        <th scope="row"><div>거래량</div></th>
+                        <td class="cle r">587,292</td>
+                    </tr>
+                    <tr class="zigbg_in">
+                        <th scope="row" class="clf"><div>52주.최고가/ 최저가</div></th>
+                        <td class="r">
+                            194,500/&nbsp;
+                            109,200
+                        </td>
+                        <th scope="row"><div>거래대금<span class="csize">(억원)</span></div></th>
+                        <td class="cle r">982</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="clf">
+                            <div>수익률<span class="csize">(1M/ 3M/ 6M/ 1Y)</span></div>
+                        </th>
+                        <td class="r">
+                            <span class="tcb">-1.01</span>/&nbsp;
+                            <span class="tcr">+1.45</span>/&nbsp;
+                            <span class="tcr">+14.27</span>/&nbsp;
+                            <span class="tcr">+43.32</span>
+                        </td>
+                        <th scope="row"><div>외국인지분율</div></th>
+                        <td class="cle r">78.58</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="clf">
+                            <div>
+                                <dl style="display:none;">
+                                    <dt>시가총액(상장예정포함)</dt>
+                                    <dd>시가총액(상장예정포함): 종가*(상장주식수+상장예정주식수), (보통주+우선주)<br>시가총액(보통주)+시가총액(우선주)<br>* 상장예정주식수: 유무상증자, 주식배당의 권리락일(배당락일)이 지났으나, 상장되지 않은 주식수</dd>
+                                </dl>
+                                <button type="button" class="tip_in">시가총액</button>
+                                <span class="csize">(상장예정포함,억원)</span>
+                            </div>
+                        </th>
+                        <td class="r">593,747</td>
+                        <th scope="row">
+                            <div>52주베타</div>
+                        </th>
+                        <td class="cle r">0.03402</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="clf">
+                            <div>
+                                <dl style="display:none;">
+                                    <dt>시가총액(보통주)</dt>
+                                    <dd>종가(보통주)*상장주식수(보통주)</dd>
+                                </dl>
+                                <button type="button" class="tip_in">시가총액</button>
+                                <span class="csize">(보통주,억원)</span>
+                            </div>
+                        </th>
+                        <td class="r">593,747</td>
+                        <th scope="row">
+                            <div>액면가</div>
+                        </th>
+                        <td class="cle r">5,000</td>
+
+                    </tr>
+                    <tr class="rwe zigbg_in"></tr>
+                    <tr>
+                        <th scope="row" class="clf">
+                            <div>발행주식수<span class="csize">(보통주/ 우선주)</span></div>
+                        </th>
+                        <td class="r">
+                            354,687,734/&nbsp;
+                            0
+                        </td>
+                        <th scope="row" class="clf">
+                            <div>종가(NXT)</div>
+                        </th>
+                        <td class="cle r">168,300</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <div>
+                                <dl style="display:none;">
+                                    <dt>유동주식수/비율</dt>
+                                    <dd>유동주식비율 = 유동주식수 / (상장주식수 + 상장예정주식수) * 100<br>유동주식수 = (상장주식수 + 상장예정주식수) - (최대주주등(본인 + 특별관계자) + 우리사주 + 자사주 + 보호예수 + 정부기관(5%이상) + 해외DR)</dd>
+                                </dl>
+                                <button type="button" class="tip_in">유동주식수/비율</button>
+                                <span class="csize">(보통주)</span>
+                            </div>
+                        </th>
+                        <td class="r">
+                            282,874,220/&nbsp;
+                            79.75
+                        </td>
+                        <th scope="row" class="clf">
+                            <div>거래량/거래대금(NXT)<span class="csize">(억원)</span></div>
+                        </th>
+                        <td class="cle r">
+                            104,045/&nbsp;
+                            174
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="ul_wrap" id="div2">
+        <div class="um_topbar botbd_n bmshadow">
+            <div class="topbar_wrap">
+                <div class="topbar_lft">
+                    <h2>실적이슈</h2>
+                    <span class="date">[2026/09 기준, 분기]</span>
+                </div>
+            </div>
+        </div>
+        <div class="um_table">
+            <table class="us_table_ty1 h_fix zigbg_no">
+                <caption class="cphidden">실적이슈</caption>
+                <colgroup>
+                    <col style="width:25%;" span="4">
+                </colgroup>
+                <thead>
+                    <tr class="th_b">
+                        <th class="clf" scope="col">잠정실적 발표일</th>
+                        <th class="" scope="col">잠정실적<span class="stxt">(영업이익,&nbsp;억원)</span></th>
+                        <th class="" scope="col">예상실적대비<span class="stxt">&nbsp;(%)</span></th>
+                        <th class="cle" scope="col">전년동기대비<span class="stxt">&nbsp;(%)</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="rwc_g">
+                            <td class="c clf">
+                                <span>-</span>
+                            </td>
+                            <td class="c">
+                                <span>-</span>
+                            </td>
+                            <td class="c">
+                                <span>-</span>
+                            </td>
+                            <td class="c cle">
+                                <span>-</span>
+                            </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="ul_wrap" id="div3">
+        <div class="um_topbar botbd_n bmshadow">
+            <div class="topbar_wrap">
+                <div class="topbar_lft">
+                    <h2>운용사별 보유 현황</h2>
+                    <span class="date">
+                        [2026/06]
+                    </span>
+                </div>
+                <div class="topbar_rgt">
+                    <span class="txt1">단위 : 천주, 억원, %</span>
+                </div>
+            </div>
+        </div>
+        <div class="um_table">
+            <table class="us_table_ty1 h_fix zigbg_no">
+                <caption class="cphidden">운용사별 보유 현황</caption>
+                <colgroup>
+                    <col style="width:25%;">
+                    <col style="width:auto;" span="4">
+                </colgroup>
+                <thead>
+                    <tr class="th_b">
+                        <th class="clf" scope="col">운용사명</th>
+                        <th scope="col">보유수량</th>
+                        <th scope="col">시가평가액</th>
+                        <th scope="col">상장주식수내비중</th>
+                        <th class="cle" scope="col">운용사내비중</th>
+                    </tr>
+                </thead>
+                <tbody>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>삼성자산운용</div>
+                                </th>
+                                <td class="r">6,909.05</td>
+                                <td class="r">10,985.39</td>
+                                <td class="r">1.95</td>
+                                <td class="cle r">0.46</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>미래에셋자산운용</div>
+                                </th>
+                                <td class="r">3,803.26</td>
+                                <td class="r">6,047.18</td>
+                                <td class="r">1.07</td>
+                                <td class="cle r">0.30</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>케이비자산운용</div>
+                                </th>
+                                <td class="r">1,570.11</td>
+                                <td class="r">2,496.48</td>
+                                <td class="r">0.44</td>
+                                <td class="cle r">0.34</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>신한자산운용</div>
+                                </th>
+                                <td class="r">949.32</td>
+                                <td class="r">1,509.43</td>
+                                <td class="r">0.27</td>
+                                <td class="cle r">0.29</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>한국투자신탁운용</div>
+                                </th>
+                                <td class="r">480.07</td>
+                                <td class="r">763.32</td>
+                                <td class="r">0.14</td>
+                                <td class="cle r">0.12</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>케이씨지아이자산운용</div>
+                                </th>
+                                <td class="r">477.94</td>
+                                <td class="r">759.92</td>
+                                <td class="r">0.13</td>
+                                <td class="cle r">1.35</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>교보악사자산운용</div>
+                                </th>
+                                <td class="r">318.40</td>
+                                <td class="r">506.25</td>
+                                <td class="r">0.09</td>
+                                <td class="cle r">0.41</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>신영자산운용</div>
+                                </th>
+                                <td class="r">305.87</td>
+                                <td class="r">486.33</td>
+                                <td class="r">0.09</td>
+                                <td class="cle r">0.42</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>한화자산운용</div>
+                                </th>
+                                <td class="r">271.44</td>
+                                <td class="r">431.58</td>
+                                <td class="r">0.08</td>
+                                <td class="cle r">0.19</td>
+                            </tr>
+                            <tr>
+                                <th class="clf l" scope="row">
+                                    <div>키움투자자산운용</div>
+                                </th>
+                                <td class="r">264.15</td>
+                                <td class="r">420.00</td>
+                                <td class="r">0.07</td>
+                                <td class="cle r">0.21</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="um_comment">
+            <button type="button" onclick="cmView(this)" class="comment_wrap btn_cm cmhidden">
+                <ul>
+                    <li>* 컨텐츠의 보유 수량, 상장주식 내 비중, 운용사 내 비중 값은 최근 분기말에 공시한 공모펀드 보고서 기준이며, 보유수량 기준 상위 10위 까지 운용사를 보여줍니다.</li>
+                </ul>
+                <span class="cmtext"></span>
+            </button>
+        </div>
+    </div>
+    <div class="ul_col2wrap" id="div4">
+        <div class="ul_col2_l">
+
+            <div class="ul_wrap">
+                <div class="um_topbar botbd_n bmshadow">
+                    <div class="topbar_wrap">
+                        <div class="topbar_lft">
+                            <h2>주주현황</h2>
+                            <span class="date"></span>
+                        </div>
+                        <div class="topbar_rgt">
+                            <span class="txt1">단위 : 주, %</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_table">
+                    <table class="us_table_ty1 h_fix zigbg_no notres">
+                        <caption class="cphidden">주주현황</caption>
+                        <colgroup>
+                            <col style="width: 36%;">
+                            <col>
+                            <col>
+                            <col>
+                        </colgroup>
+                        <thead>
+                            <tr class="th_b">
+                                <th class="clf" scope="col">항목</th>
+                                <th scope="col">보통주</th>
+                                <th scope="col">지분율</th>
+                                <th class="cle" scope="col">최종변동일</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                    <tr>
+                                        <th class="clf l" scope="row" title="국민연금공단">
+                                                <div>국민연금공단</div>
+                                        </th>
+                                        <td class="r">32,622,276</td>
+                                        <td class="r">9.20</td>
+                                        <td class="cle c">2026/08/05</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="clf l" scope="row" title="Capital Research and Management Company (외 2인)">
+                                                <div>
+                                                    <button type="button" class="btn_play_on txt_ell icons">Capital Research and Management Company (외 2인)</button>
+                                                    <span style="display:none;">주주명^지분율(%)||||Capital Research and Management Company^7.08||||Capital International, Inc.^0.03||||Capital International Sarl ^0.01</span>
+                                                </div>
+                                        </th>
+                                        <td class="r">25,261,015</td>
+                                        <td class="r">7.12</td>
+                                        <td class="cle c">2026/03/31</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="clf l" scope="row" title="BlackRock Fund Advisors (외 13인)">
+                                                <div>
+                                                    <button type="button" class="btn_play_on txt_ell icons">BlackRock Fund Advisors (외 13인)</button>
+                                                    <span style="display:none;">주주명^지분율(%)||||BlackRock Fund Advisors^2.89||||BlackRock Advisors (UK) Limited^1.37||||BlackRock Institutional Trust Company, N.A.^1.35||||BlackRock Financial Management, Inc^0.10||||BlackRock Asset Management Canada Limited^0.09</span>
+                                                </div>
+                                        </th>
+                                        <td class="r">22,102,827</td>
+                                        <td class="r">6.23</td>
+                                        <td class="cle c">2026/02/13</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="clf l" scope="row" title="The Capital Group Companies, Inc. (외 16인)">
+                                                <div>
+                                                    <button type="button" class="btn_play_on txt_ell icons">The Capital Group Companies, Inc. (외 16인)</button>
+                                                    <span style="display:none;">주주명^지분율(%)||||Europacific Growth Fund^3.26||||New World Fund, Inc.^0.85||||International Growth and Income Fund^0.52||||The Income Fund of America Inc^0.43||||Emerging Markets Equity Fund^0.03</span>
+                                                </div>
+                                        </th>
+                                        <td class="r">18,318,445</td>
+                                        <td class="r">5.16</td>
+                                        <td class="cle c">2024/12/26</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="clf l" scope="row" title="KB금융우리사주">
+                                                <div>KB금융우리사주</div>
+                                        </th>
+                                        <td class="r">9,454,097</td>
+                                        <td class="r">2.67</td>
+                                        <td class="cle c">2025/06/30</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="clf l" scope="row" title="자사주">
+                                                <div>자사주</div>
+                                        </th>
+                                        <td class="r">3,581,623</td>
+                                        <td class="r">1.01</td>
+                                        <td class="cle c">2026/07/14</td>
+                                    </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="um_comment">
+                    <button type="button" onclick="cmView(this)" class="comment_wrap btn_cm cmhidden">
+                        <ul>
+                            <li>* DART 지분공시를 기준으로 하며, 보통주 지분율 상위 6개까지 표시됩니다.(자기주식 및 우리사주는 자기주식 공시와 정기공시를 포함하여 반영됩니다.)</li>
+                            <li>* 5%미만 개별보고 제출자는 지분분석 메뉴에서 조회 가능합니다.</li>
+                            <li>* 지분공시 제외 대상자(5%미만이고 임원이 아닌 주주)는 표시되지 않습니다.</li>
+                        </ul>
+                        <span class="cmtext"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="ul_col2_r">
+
+            <div class="ul_wrap">
+                <div class="um_topbar botbd_n bmshadow">
+                    <div class="topbar_wrap">
+                        <div class="topbar_lft">
+                            <h2>주주구분 현황</h2>
+                            <span class="date">
+                                <a class="moreBtn" href="/CompanyInfo/ShareAnalysis?link_flag=1">자세히보기</a>
+                            </span>
+                        </div>
+                        <div class="topbar_rgt">
+                            <span class="txt1">단위 : 주, %</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_table">
+                    <table class="us_table_ty1 h_fix zigbg_no notres">
+                        <caption class="cphidden">주주현황</caption>
+                        <colgroup>
+                            <col style="width: 25%;">
+                            <col style="width: 20%;">
+                            <col style="width: 21%;">
+                            <col style="width: 14%;">
+                            <col style="width: 20%;">
+                        </colgroup>
+                        <thead>
+                            <tr class="th_b">
+                                <th scope="col">주주구분</th>
+                                <th scope="col">대표주주수</th>
+                                <th scope="col">보통주</th>
+                                <th scope="col">지분율</th>
+                                <th scope="col">최종변동일</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                    <tr>
+                                        <th scope="row" class="clf l" title="최대주주등 (본인+특별관계자)">
+                                            <div>최대주주등 (본인+특별관계자)</div>
+                                        </th>
+                                        <td class="r">1</td>
+                                        <td class="r">32,622,276</td>
+                                        <td class="r">9.20</td>
+                                        <td class="cle c">2026/08/05</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="clf l" title="10%이상주주 (본인+특별관계자)">
+                                            <div>10%이상주주 (본인+특별관계자)</div>
+                                        </th>
+                                        <td class="r"></td>
+                                        <td class="r"></td>
+                                        <td class="r"></td>
+                                        <td class="cle c"></td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="clf l" title="5%이상주주 (본인+특별관계자)">
+                                            <div>5%이상주주 (본인+특별관계자)</div>
+                                        </th>
+                                        <td class="r">3</td>
+                                        <td class="r">65,682,287</td>
+                                        <td class="r">18.52</td>
+                                        <td class="cle c">2026/03/31</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="clf l" title="임원 (5%미만 중, 임원인자)">
+                                            <div>임원 (5%미만 중, 임원인자)</div>
+                                        </th>
+                                        <td class="r">74</td>
+                                        <td class="r">145,838</td>
+                                        <td class="r">0.04</td>
+                                        <td class="cle c">2026/06/09</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="clf l" title="자사주(자사주+자사주신탁)">
+                                            <div>자사주(자사주+자사주신탁)</div>
+                                        </th>
+                                        <td class="r">1</td>
+                                        <td class="r">3,581,623</td>
+                                        <td class="r">1.01</td>
+                                        <td class="cle c">2026/07/14</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="clf l" title="우리사주조합">
+                                            <div>우리사주조합</div>
+                                        </th>
+                                        <td class="r">1</td>
+                                        <td class="r">9,454,097</td>
+                                        <td class="r">2.67</td>
+                                        <td class="cle c">2025/06/30</td>
+                                    </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="um_comment">
+                    <button type="button" onclick="cmView(this)" class="comment_wrap btn_cm cmhidden">
+                        <ul>
+                            <li>* 주주 구분자별 지분율은 서로 중복되지 않습니다. </li>
+                        </ul>
+                        <span class="cmtext"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ul_wrap" id="div6">
+        <div class="um_topbar bmshadow">
+            <div class="topbar_wrap">
+                <div class="topbar_lft">
+                    <h2>투자의견 컨센서스</h2>
+                    <span class="date">[2026/10/02]</span>
+                </div>
+                <div class="topbar_rgt">
+                    <span class="txt1">단위 : 배, 원, %</span>
+                </div>
+            </div>
+        </div>
+        <div class="um_col2wrap">
+            <div class="um_col2_l">
+                <div class="um_wrap">
+                    <div class="um_bargf">
+                            <div class="bargf_wrap">
+                                <div class="gf_comt">
+                                    <h3>Buy </h3>
+                                </div>
+                                <div class="pd">
+                                    <div class="bgfbox">
+                                        <div class="bg"></div>
+
+                                        <div id="svdMainGraph8" class="gf" style="width:80%">
+                                            <p><span>4.0</span></p>
+                                        </div>
+                                    </div>
+                                    <ul class="txtbox">
+                                        <li class="t1">강력매도</li>
+                                        <li class="t2">매도</li>
+                                        <li class="t3">중립</li>
+                                        <li class="t4">매수</li>
+                                        <li class="t5">강력매수</li>
+                                    </ul>
+                                </div>
+                            </div>
+                    </div>
+                </div>
+            </div>
+            <div class="um_col2_r">
+                <div class="um_wrap">
+                    <div class="um_table">
+                        <table class="us_table_ty1 h_fix zigbg_no th_topbdno">
+                            <caption class="cphidden">투자의견</caption>
+                            <colgroup>
+                                <col>
+                                <col>
+                                <col>
+                                <col>
+                                <col>
+                            </colgroup>
+                            <thead>
+                                <tr class="th_b">
+                                    <th class="clf" scope="col">투자의견</th>
+                                    <th scope="col">목표주가</th>
+                                    <th scope="col">EPS</th>
+                                    <th scope="col">PER</th>
+                                    <th class="cle" scope="col">추정기관수</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    <tr class="rwc_g tr_h68">
+                                        <td class="clf c">4.0</td>
+                                        <td class="c">222,222</td>
+                                        <td class="c ">18,370</td>
+                                        <td class="c ">9.1</td>
+                                        <td class="cle c">18</td>
+                                    </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="um_comment">
+            <button type="button" onclick="cmView(this)" class="comment_wrap btn_cm cmhidden">
+                <ul>
+                    <li>* 1=Sell, 2=U/Weight, 3=Neutral, 4=Buy, 5=S/Buy</li>
+                    <li>* EPS, PER 은 FY1에 대한 증권사 평균 추정실적임.</li>
+                </ul>
+                <span class="cmtext"></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="ul_col2wrap" id="div7">
+        <div class="ul_col2_l">
+
+            <div class="ul_wrap ul_col_l">
+                <div class="um_topbar botbd_n">
+                    <div class="topbar_wrap">
+                        <div class="topbar_lft">
+                            <h2>투자의견 및 목표주가</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_chart chart_ht1">
+                    <div class="chart_etc"></div>
+                    <div class="chart_wrap" id="SNP_04">
+                        <button type="button" class="chartdatapop" title="클릭:차트데이터 새창열림">데이터가 없습니다.</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="ul_col2_r">
+
+            <div class="ul_wrap ul_col_r">
+                <div class="um_topbar botbd_n">
+                    <div class="topbar_wrap">
+                        <div class="topbar_lft">
+                            <h2>투자의견 분포</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_chart chart_ht1">
+                    <div class="chart_etc"></div>
+                    <div class="chart_wrap" id="SNP_05">
+                        <button type="button" class="chartdatapop" title="클릭:차트데이터 새창열림">
+                            데이터가 없습니다.
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ul_wrap" id="div8">
+        <div class="um_topbar botbd_n bmshadow">
+            <div class="topbar_wrap">
+                <div class="topbar_lft">
+                    <h2>Business Summary</h2>
+                    <span class="date" id="bizSummaryDate">[2026/09/14]</span>
+                </div>
+                <div class="topbar_rgt">
+                    <span class="txt1"></span>
+                </div>
+            </div>
+        </div>
+        <div class="um_bssummary">
+            <h3 id="bizSummaryHeader">은행&#183;증권 호조와 디지털 전환 가속</h3>
+            <ul id="bizSummaryContent">
+                        <li>동사는 2008년 KB국민은행 등 8개사의 포괄적 주식이전을 통해 설립된 금융지주회사임. 주식 소유를 통해 금융업을 영위하는 종속기업을 지배하는 것을 주된 사업목적으로 하며, 은행업, 금융투자업, 보험업, 여신전문업 등을 영위하고 있음. KB국민은행은 개인금융 및 기업금융 서비스를, KB증권은 금융투자업무를, KB손해보험은 손해보험업을, KB국민카드는 카드업무를 영위하고 있음.  </li>
+                        <li>2026년 상반기 전년동기 대비 연결기준 매출액은 42.3% 증가, 영업이익은 22.9% 증가, 당기순이익은 13.1% 증가. 은행부문은 순이자이익 증가와 수수료이익 확대로 영업이익이 전년동기 대비 개선되었으며, 증권부문은 위탁/자산관리 수수료수익 증가로 영업이익이 크게 증가함. 보험부문은 당기손익-공정가치측정 금융상품순손익 개선으로 실적이 유지되었으며, 전체적으로 순이자손익과 순수수료손익 증가가 실적 개선을 견인함.</li>
+            </ul>
+        </div>
+    </div>
+
+        <div class="ul_wrap" id="div9">
+            <div class="um_topbar bmshadow">
+                <div class="topbar_wrap">
+                    <div class="topbar_lft">
+                        <h2>업종 비교</h2>
+
+                        <span class="stxt" id="snpSectorTitle"></span>
+                    </div>
+                    <div class="topbar_rgt">
+                        <span class="txt1">단위 : 억원, 배, %</span>
+                    </div>
+                </div>
+            </div>
+            <div class="um_col2wrap upTabDiv">
+                <div class="um_col2_l">
+                    <div class="um_wrap">
+                        <div class="um_table">
+                            <table class="us_table_ty1 h_fix zigbg_no th_topbdno" id="snpSector"></table>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_col2_r">
+                    <div class="um_wrap">
+                        <div class="um_snpsttab" id="snpSectorChartTyp">
+                            <button type="button" value="1">EPS</button>
+                            <button type="button" value="2" class="ac">PER</button>
+                            <button type="button" value="3">EV/EBITDA</button>
+                            <button type="button" value="4">ROE</button>
+                            <button type="button" value="5" class="end">현금배당수익률</button>
+                        </div>
+                        <div class="um_chart chart_ht6">
+                            <div class="chart_etc"></div>
+                            <div class="chart_wrap" id="SNP_06" style="height:250px"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="um_comment">
+                <button type="button" onclick="cmView(this)" class="comment_wrap btn_cm cmhidden">
+                    <ul>
+                        <li>* 직전 회계년도 결산 Data입니다.(단 시가총액은 전일기준임)</li>
+                    </ul>
+                    <span class="cmtext"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ul_wrap" id="div10">
+            <div class="um_topbar bmshadow">
+                <div class="topbar_wrap">
+                    <div class="topbar_lft">
+                        <h2>Band Chart</h2>
+
+                        <span class="stxt" id="snpBandChartTitle"></span>
+                    </div>
+                    <div class="topbar_rgt">
+                        <span class="txt1">단위 : 억원, 배, %</span>
+                        <div class="um_gbtn grd_ty1 fl" id="consTyp1">
+                            <button type="button" class="gbtn_f r3 ac" value="C">연결</button>
+                            <button type="button" class="gbtn_e r3 " value="P">별도</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="um_col2wrap">
+                <div class="um_col2_l">
+                    <div class="um_wrap">
+                        <div class="um_stit_ty">
+                            <div class="um_stopbar">
+                                <div class="topbar_wrap">
+                                    <div class="topbar_lft">
+                                        <h2>PER Band</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="um_chart chart_ht1">
+                                <div class="chart_etc"></div>
+                                <div class="chart_wrap" id="SNP_07"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_col2_r">
+                    <div class="um_wrap">
+                        <div class="um_stit_ty">
+                            <div class="um_stopbar">
+                                <div class="topbar_wrap">
+                                    <div class="topbar_lft">
+                                        <h2>PBR Band</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="um_chart chart_ht1">
+                                <div class="chart_etc"></div>
+                                <div class="chart_wrap" id="SNP_08"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ul_wrap" id="div10">
+            <div class="um_topbar bmshadow">
+                <div class="topbar_wrap">
+                    <div class="topbar_lft">
+                        <h2>주가 및 수급현황</h2>
+                        <span class="stxt" id="div10Comment"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="um_col2wrap">
+                <div class="um_col2_l">
+                    <div class="um_wrap">
+                        <div class="um_stit_ty">
+                            <div class="um_stopbar">
+                                <div class="topbar_wrap">
+                                    <div class="topbar_lft">
+                                        <h2>대차잔고비중</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="um_chart chart_ht1">
+                                <div class="chart_etc"></div>
+                                <div class="chart_wrap" id="SNP_09"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="um_col2_r">
+                    <div class="um_wrap">
+                        <div class="um_stit_ty">
+                            <div class="um_stopbar">
+                                <div class="topbar_wrap">
+                                    <div class="topbar_lft">
+                                        <h2>차입공매도비중</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="um_chart chart_ht1">
+                                <div class="chart_etc"></div>
+                                <div class="chart_wrap" id="SNP_10"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ul_wrap" id="div15">
+            <div class="um_topbar bmshadow">
+                <div class="topbar_wrap">
+                    <div class="topbar_lft">
+                        <h2>Financial Highlight</h2>
+                    </div>
+                    <div class="topbar_rgt" id="divHighBtn">
+                        <span class="txt1">단위 : 억원, %, 배, 주</span>
+                        <div class="um_gbtn grd_ty1 fl" id="consTyp2">
+                            <button type="button" class="gbtn_f r3 ac" value="M">주재무제표</button>
+                            <button type="button" class="gbtn_c r3" value="C">연결</button>
+                            <button type="button" class="gbtn_e r3" value="P">별도</button>
+                        </div>
+                        <div class="um_gbtn grd_ty2 fl pl6" id="freqTyp">
+                            <button type="button" class="gbtn_f r3 ac" value="A">전체</button>
+                            <button type="button" class="gbtn_c r3" value="Y">연간</button>
+                            <button type="button" class="gbtn_e r3" value="Q">분기</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="um_table">
+
+            </div>
+            <div class="um_comment">
+                <button type="button" onclick="cmView(this)" class="comment_wrap btn_cm cmhidden">
+                    <ul>
+                        <li>* 주가는 해당 결산기일 수정주가 기준이며, EPS, BPS, DPS는 무상증자와 액면변경, 주식배당 등을 감안하여 현재기준으로 과거 Data를 수정 하였습니다.</li>
+                        <li>* 연결기업의 순이익, EPS, 순이익률, ROE, BPS, 자본총계는 당기순이익(지배)와 자본총계(지배) 기준입니다.</li>
+                        <li>* 기업이 Net Quarter기준으로 잠정실적을 공시하지 않은경우, 해당값은 누적기준 잠정실적에서 전분기까지의 실적을 차감하여 산출합니다.</li>
+                    </ul>
+                    <span class="cmtext"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="um_comment">
+            <div class="comment_wrap2 cmview">
+                <ul>
+                    <li>* 외국계기업의 영업이익은 기업이 발표한 보고서와 회계집계 방식에서 차이가 있으니 반드시 공시된 서류를 확인하시기 바랍니다.</li>
+                </ul>
+            </div>
+        </div>
+
+</div>
+
+            </div>
+
+<div class="bootomwrap">
+    <div class="ul_bottom">
+        <div class="ul_bottomwrap">
+            <a href="http://www.fnguide.com" class="link_txt" target="_blank"><span>fnguide.com</span></a>
+                <div class="txtbox">
+                    <p class="txt">FnGuide에서 제공하는 정보는 신뢰할 만한 자료 및 정보로부터 얻어진 것이나 그 정확성이나 완전성을 보장 할 수 없으며, 시간이 경과함에 따라 변경될 수 있습니다. 따라서 정보의 오류, 누락에 대하여 FnGuide 또는 FnGuide에 자료를 제공하는 회사에서는 그 결과에 대해 법적인 책임을 지지 않습니다. 모든 콘텐츠에 대한 저작권은 FnGuide에 있으며 사전 허가없이 이를 무단으로 사용하거나, 데이터 베이스화 할 경우 민형사상 책임을 물을 수 있습니다.</p>
+                </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="ul_tip_a" style="display: none;">
+    <i class="arrow_top"></i>
+    <dl id="tip_a_cont"></dl>
+</div>
+<div class="ul_tip_b" style="display: none;width: 352px;top:1000px;left: 100px;">
+    <i class="arrow_top"></i>
+    <div class="um_table" id="ul_tip_b_table">
+        <table class="us_table_ty2 h_fix zigbg_no">
+            <caption class="cphidden">캡션</caption>
+            <colgroup>
+                <col>
+                <col>
+            </colgroup>
+            <thead>
+                <tr class="th_b">
+                    <th scope="row" class="clf">헤더</th>
+                    <th scope="row" class="cle">헤더</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="rwf">
+                    <td class="clf">내용</td>
+                    <td class="cle tcb">내용</td>
+                </tr>
+                <tr class="zigbg_in">
+                    <td class="clf">내용</td>
+                    <td class="cle">내용</td>
+                </tr>
+                <tr>
+                    <td class="clf">내용</td>
+                    <td class="cle">내용</td>
+                </tr>
+                <tr class="zigbg_in">
+                    <td class="clf">내용</td>
+                    <td class="cle">내용</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+        </div>
+    </div>
+    <input type="hidden" id="menu_id" value="1" />
+    <input type="hidden" id="sub_menu_id" value="1" />
+    <input type="hidden" id="c_id" value="AA" />
+    <input type="hidden" id="cmp_cd" value="105560" />
+    <input type="hidden" id="defaultCompanyCode" value="005930" />
+    <input type="hidden" id="defaultEtfCode" value="102780" />
+    <input type="hidden" id="defaultEtnCode" value="580010" />
+    <input type="hidden" id="menu_type" value="01" />
+    <input type="hidden" id="lang" value="KR" />
+
+</body>
+</html>
