@@ -326,6 +326,76 @@ $ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests
 - 005935·999999는 `consol_typ=C` 응답만 있다. 리더가 `B`도 요청하므로 M3 테스트는 같은 응답을 `B` 요청에도 돌려줘야 한다(사이트가 `B`에서 같은 본문을 주는지는 관측하지 않음).
 - V-2·V-3은 M3로 이월.
 
+### M2 — 계정명 단일 출처 (2026-10-08)
+
+#### M2 증거
+
+착수 기준: HEAD `3bfddcf`(M1 커밋), 같은 워크트리.
+
+산출물: `fnguide/account_alias.py`(상수만, 클래스·함수 없음)와 구조 테스트 `tests/fnguide/test_wcomp_alias.py`(18건). 모듈이 담는 것: 일반 레이아웃 별칭표 `ALIASES` 22개, 0 행 보충 `ZERO_ROW_LABELS`(1개), 필수 계정 `REQUIRED_LABELS`(analysis.py 52개 + 대시보드 전용 3개 = 55개), 현금흐름표 한정 개명 `CASHFLOW_RENAMES`, 다중 행 필요 `MULTI_ROW_LABELS`·`MULTI_ROW_MIN`, 접기 `FOLD_PARENT_TO_OTHER`(4개), 가드용 `CONSUMED_ASSET_LABELS`(19)·`CONSUMED_LIABILITY_LABELS`(20)·`ASSET_TOTAL_LABEL`·`LIABILITY_TOTAL_LABEL`, 그리고 M3 리더가 계정명을 직접 쓰지 않도록 레이아웃 표지 `GENERAL_LAYOUT_MARKER`(`매출액(수익)`)와 선택 판정 행 `CONSOL_SELECTION_LABEL`(`당기순이익`).
+
+테스트의 비교 기준은 손으로 옮기지 않고 실행 시점에 뽑는다: 필수 목록은 `analysis.py`의 `df_fs_(ann|quar).loc["…"]` 문자열, 19/20 목록은 spec.md D7 줄의 "소스 순서:" 뒤 계정명(순서까지 비교), 별칭 원천·접기 부모 코드는 실응답 fixture(005930 C, 403870 B, 330590 B), 별칭표 중복 키는 모듈 소스의 dict 리터럴 AST.
+
+RED(모듈이 없는 상태에서 테스트만 추가):
+
+```text
+$ ls fnguide/account_alias.py; /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_alias.py -q -p no:cacheprovider --tb=short -W ignore::UserWarning; echo "exit=$?"
+ls: fnguide/account_alias.py: No such file or directory
+...
+tests/fnguide/test_wcomp_alias.py:18: in <module>
+    from fnguide import account_alias as aa
+E   ImportError: cannot import name 'account_alias' from 'fnguide' (/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/fnguide/__init__.py)
+=========================== short test summary info ============================
+ERROR tests/fnguide/test_wcomp_alias.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.06s
+exit=2
+```
+
+GREEN:
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_alias.py -q -p no:cacheprovider --tb=short -W ignore::UserWarning; echo "exit=$?"
+..................                                                       [100%]
+18 passed in 0.29s
+exit=0
+```
+
+판별력 확인(교훈 #9): 모듈 RED는 "모듈 없음"만 증명하므로, GREEN 뒤에 표를 메모리에서만 하나씩 틀리게 바꾸고 해당 테스트 함수를 직접 호출했다(파일 변경 없음, 마지막에 원복 확인). 11가지 변형 모두 실패했다.
+
+```text
+RED | asset list order swapped | AssertionError
+RED | liability label dropped | AssertionError
+RED | required missing 재고자산 | AssertionError
+RED | alias 투자자산 removed -> no source | AssertionError
+RED | alias source typo | AssertionError
+RED | zero-row widened | AssertionError
+RED | fold target to 유동금융자산 | AssertionError
+RED | cashflow rename to 지배주주순이익 | AssertionError
+RED | multi-row missing 법인세비용 | AssertionError
+RED | alias chain | AssertionError
+restored True
+23 22
+RED | duplicate literal key detected
+```
+
+마지막 두 줄은 모듈 소스 문자열에 `"자산총계": "자산"` 줄을 하나 더 넣은 사본을 AST 판정 함수에 먹인 결과다(키 23개, 고유 22개 → 실패).
+
+기본 스위트:
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests/test_analysis_api.py -q -p no:cacheprovider | tail -1
+120 passed, 94 deselected, 1 xfailed, 1 warning in 0.46s
+```
+
+M1 102 passed + 신규 18 = 120. `crawler.py`·PRESERVE 경로는 바꾸지 않았다(`git diff --stat 3bfddcf -- fnguide` 출력 없음, 신규 파일만 미추적 상태).
+
+#### M2 미검증(Gaps)
+
+- 필수 목록은 REQ-WC-010 문구대로 "analysis.py가 찾는 계정 + 대시보드 전용 3개"다. 대시보드·analyzer가 찾는 `매출액`·`자산`·`자본`·`지배기업주주지분`은 이 목록에 없다 — `매출액`은 레이아웃 표지와 짝인 별칭이라 일반 레이아웃에서 늘 생기고, `자산`·`부채` 부재는 REQ-WC-011 (b)가 따로 경고한다. 나머지 둘의 부재 경고는 SPEC 범위에 없다.
+- 필수 계정마다 출처가 있다는 검사는 일반 레이아웃 세 종목(005930 C, 403870 B, 330590 B)의 연간 응답에서만 했다. 분기 응답과 다른 종목은 보지 않았다.
+- 충당부채 별칭의 의미 일치는 M1 V-4(두 종목)의 계층 관측에 기댄다. 옛 사이트 화면과의 대조는 불가능하다(plan.md Q-E).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
