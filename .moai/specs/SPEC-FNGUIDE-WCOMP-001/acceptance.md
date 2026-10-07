@@ -106,7 +106,7 @@ fixture는 `tests/fnguide/fixtures/wcomp/`에 **축소본**으로 둔다 — 테
 - (c) 열 4개 `["2022/12","2023/12","2024/12","2025/12"]`, `df_yoy_base_ann is None`, `analysis.calc_weight_coeff(df_fs_ann.columns) == (1.0, 2.0, 3.0, 6.0)`.
 - (d) `ValueError`도 `OSError`도 아닌 `RuntimeError` 계열 예외. 라우터 응답 `503`.
 - (e) 예외 없이 반환되고, 연간·분기 네 번째 기간 불일치 경고가 정확히 1건(코드 `005930` 포함).
-**되돌림 시 관측값**: `df_yoy_base_ann`을 늘 `None`으로 두면 (a)의 마지막 매출 YoY가 `-0.08463`. 표지와 무관하게 늘 VAL5로 만들면 (b)·(c)의 `df_yoy_base_ann`이 `None`이 아니다. 기간 일치 검사를 빼면 (d)가 예외 없이 반환된다. `df_yoy_base_ann`의 행 라벨에 별칭을 적용하지 않으면(REQ-WC-006) `dashboard.py:342`의 `base_series.at["매출액"]`이 `KeyError`를 내고 `dashboard.py:348-350`이 이를 삼켜, (a)의 마지막 매출 YoY가 **예외 없이** `-0.08463`이 된다.
+**되돌림 시 관측값**: `df_yoy_base_ann`을 늘 `None`으로 두면 (a)의 마지막 매출 YoY가 `-0.08463`. 표지와 무관하게 늘 VAL5로 만들면 (b)·(c)의 `df_yoy_base_ann`이 `None`이 아니다. 기간 일치 검사를 빼면 (d)가 예외 없이 반환된다. `df_yoy_base_ann`의 행 라벨에 별칭을 적용하지 않으면(REQ-WC-006) `dashboard.py:343`의 `base_series.at["매출액"]`이 `KeyError`를 내고 `dashboard.py:349-351`이 이를 삼켜, (a)의 마지막 매출 YoY가 **예외 없이** `-0.08463`이 된다.
 **명령**: `$PY -m pytest tests/fnguide/test_wcomp_reader.py tests/test_analysis_api_wcomp.py -q -p no:cacheprovider -k ac_wc_006`
 **기대 출력**: `9 passed` (긍정 (a)~(e) 5 + 라우터 (d) 1 + `_contrast` 3)
 
@@ -177,8 +177,9 @@ fixture는 `tests/fnguide/fixtures/wcomp/`에 **축소본**으로 둔다 — 테
 ### AC-WC-013 — 8-튜플 계약과 컨센서스 미요청 [대조]
 **Given** 005930 전체 fixture와 요청 기록기
 **When** `inspect.signature(get_fnguide)`를 보고 `get_fnguide("005930")`을 호출한다
-**Then** 매개변수 이름 목록이 `["code"]`, 반환 길이 8, 위치 2·3·4가 `pd.DataFrame`이면서 `.empty`, 위치 6이 `"IFRS(연결)"`, 위치 7이 `pd.DataFrame`. 기록된 URL 중 `comp.fnguide.com`이나 `01_06`을 포함한 것이 0건이고, 총 요청 수가 8건 이하(연간 Income `C`·`B` 판정 2회 — 결정된 유형의 응답은 데이터로 재사용 — + 나머지 재무 5회 + 스냅샷 1회 = 8).
-**되돌림 시 관측값**: `read_consensus` 호출을 되살리면 기록된 URL에 `comp.fnguide.com/SVO2/json/data/01_06/`이 나타난다.
+**Then** 매개변수 이름 목록이 `["code"]`, 반환 길이 8, 위치 2·3·4가 `pd.DataFrame`이면서 `.empty`, 위치 6이 `"IFRS(연결)"`, 위치 7이 `pd.DataFrame`. 기록된 URL 중 `urllib.parse.urlparse(url).hostname == "comp.fnguide.com"`인 것이 0건, `01_06`을 포함한 것이 0건이며, 기록된 모든 URL의 `urlparse(url).hostname`이 `"wcomp.fnguide.com"`이고, 총 요청 수가 8건 이하(연간 Income `C`·`B` 판정 2회 — 결정된 유형의 응답은 데이터로 재사용 — + 나머지 재무 5회 + 스냅샷 1회 = 8).
+호스트 판정은 부분 문자열이 아니라 **파싱한 호스트 이름의 정확 비교**다 — 새 호스트 `wcomp.fnguide.com`은 문자열 `comp.fnguide.com`을 품고 있으므로 `"comp.fnguide.com" in url`로 쓰면 정상 요청 전부가 위반이 된다(plan-audit iteration 4 D2; 판정식 실행 결과는 progress.md v0.2.3 자체 점검).
+**되돌림 시 관측값**: `read_consensus` 호출을 되살리면 기록된 URL에 `comp.fnguide.com/SVO2/json/data/01_06/`이 나타난다(호스트 이름 `comp.fnguide.com`, `01_06` 포함 — 두 단언 모두 실패).
 **명령**: `$PY -m pytest tests/fnguide/test_wcomp_snapshot.py -q -p no:cacheprovider -k ac_wc_013`
 **기대 출력**: `2 passed`
 
@@ -200,27 +201,36 @@ fixture는 `tests/fnguide/fixtures/wcomp/`에 **축소본**으로 둔다 — 테
 
 ### AC-WC-015 — 범위 불변과 스위트 무결성 [게이트]
 **Given** run 단계 착수 시점의 기준 커밋 `BASE`(run 착수 직전 `git rev-parse HEAD`, progress.md §E.2에 기록)
-**When** 다음 넷을 실행한다
+**When** 다음 여섯을 실행한다(넷째 명령은 참고용이며, 그 판정은 아래 4번 항목의 AST 프로브가 맡는다)
 ```bash
 git diff --stat "$BASE" -- fnguide/analysis.py fnguide/dashboard.py fnguide/analyzer.py fnguide/parser.py fnguide/__init__.py backend/routers/analysis.py backend/schemas/analysis.py backend/services/analysis_service.py frontend/
 $PY -m pytest tests/fnguide tests/test_analysis_api.py tests/test_analysis_api_wcomp.py -q -p no:cacheprovider
 $PY -m pytest tests/fnguide tests/test_analysis_api.py -q -p no:cacheprovider -m "live or slow" -rs
-grep -nE "comp\.fnguide\.com" fnguide/crawler.py
+grep -nE "//comp\.fnguide\.com" fnguide/crawler.py
+F=tests/fnguide/fixtures/wcomp/README.md; test -s "$F" && grep -qE 'https://wcomp\.fnguide\.com/' "$F" && grep -qE '20[0-9]{2}-[0-9]{2}-[0-9]{2}' "$F" && echo README_OK
+grep -nE "open\([^)]*['\"](w|a|x)b?\+?['\"]|\.to_(csv|pickle|parquet|json|excel|feather|hdf|sql)\(|\.write_(text|bytes)\(|(json|pickle)\.dump\(|shelve\.|sqlite3\." fnguide/crawler.py fnguide/account_alias.py; echo "exit=$?"
 ```
 **Then**
 1. 첫 명령의 출력이 비어 있다.
 2. 둘째 명령: `failed`·`error` 0건, passed 수 ≥ 101 + (§B·§C 기대 출력 하한의 합 1+3+8+2+3+9+7+4+8+4+3+5+2+4 = 63) = **164**. run 단계는 이 합을 손으로 옮기지 말고 §B·§C의 "기대 출력" 줄에서 다시 더해 확인한다(교훈 #10). 기준선 101 passed / 94 deselected는 2026-10-07 plan 단계 실측이다(research.md §R1 F-01).
 3. 셋째 명령(라이브, 네트워크 필요): `error` 0건, `failed` 0건, **skipped ≤ 1**. 허용되는 skip 사유는 하나뿐이다 — `tests/fnguide/test_analysis.py:167`의 `"연도 컬럼이 3개 미만"`(데이터 의존). `-rs`가 출력하는 skip 사유가 이 하나가 아니면 FAIL이다. 이 상한이 성립하려면 M6의 세 과제가 모두 끝나야 한다: (i) `TestReadConsensus`(`test_crawler.py:177-196`, 데코레이터 177·클래스 178~196) **삭제** — 남기면 옛 호스트 요청이 error를 내고, skip으로 바꾸면 허용 목록 밖이라 FAIL. (ii) `IFRS(별도)` 후보 목록 `["003550", "015760", "034020"]`(`test_crawler.py:83`, `test_analysis.py:234`)을 실측 별도 종목 `["403870", "330590", "476830"]`(첫 성공 종목 사용)으로 교체 — 옛 후보는 새 선택 규칙에서 별도로 판정되지 않아 `"IFRS(별도) 종목을 찾지 못함"` skip 4건(`test_crawler.py:96, :103`, `test_analysis.py:248, :258`)을 낸다. (iii) `test_analysis.py:255-268`(`test_characterize_controlling_profit_equals_net_income`) 다시 쓰기 — 지금은 `yearly_cols[-1]`(Trailing 12M으로 덮어쓴 열, 403870에서 857.27)과 `df_fs_ann["당기순이익"]`의 같은 열(누적 YTD, 489.69)을 비교하므로 마지막 연간 열이 부분 연도면 항상 실패한다. 이전에는 별도 후보가 늘 skip이라 드러나지 않았다. 비교 열을 Trailing 보정이 없는 완결 연도 `yearly_cols[-2]`로 바꾼다(403870에서 양쪽 모두 726.62 — 오케스트레이터·감사자 확인). 근거: 현행 테스트의 `pytest.skip(` 실제 호출은 36곳이다(`command grep -rnE --include='*.py' "^\s*pytest\.skip\(" tests/fnguide | wc -l` → `36`, 2026-10-07 재실행. 줄 시작에 앵커하지 않은 이전 프로브의 37에는 `conftest.py:9` docstring 언급 1건이 섞여 있었다). 이 테스트들이 예외를 `pytest.skip`으로 삼키므로 skip 상한이 없으면 장애가 "skipped"로 숨는다. 수정 전 기준선은 `crawler.py:187`에서 25 errors였다(오케스트레이터 조사).
-4. 넷째 명령은 판정에 쓰지 않고 참고로만 남긴다(`read_consensus`가 남아 있으므로 그 상수 줄이 나온다). 판정은 다음 AST 프로브로 한다. 검사 대상은 **문자열 상수 노드**뿐이다 — docstring은 제외하고(주석은 AST에 없으므로 자동 제외), 모듈 최상위의 일반 대입·주석 달린 대입(`AnnAssign`)·다른 모듈에서 가져온 이름(`from … import`)을 따라간다. **docstring이나 주석에서 옛 호스트를 언급하는 것은 허용된다.** 출력은 (옛 호스트 문자열을 담은 모듈 이름 목록, 그런 문자열이나 이름을 쓰는 최상위 함수 목록)이다.
+4. 넷째 명령은 판정에 쓰지 않고 참고로만 남긴다(`read_consensus`가 남아 있으므로 그 상수 줄이 나온다. 패턴 앞의 `//` 때문에 새 호스트 `wcomp.fnguide.com` 줄은 나오지 않는다). 판정은 다음 AST 프로브로 한다. 검사 대상은 **문자열 상수 노드**뿐이다 — docstring은 제외하고(주석은 AST에 없으므로 자동 제외), 모듈 최상위의 일반 대입·주석 달린 대입(`AnnAssign`)·다른 모듈에서 가져온 이름(`from … import`)을 따라간다. **docstring이나 주석에서 옛 호스트를 언급하는 것은 허용된다.** 옛 호스트 판정은 부분 문자열이 아니라 **파싱한 호스트 이름의 정확 비교**(`urllib.parse.urlparse(…).hostname == "comp.fnguide.com"`, 스킴이 없는 문자열은 `//`를 붙여 파싱)이며, 문자열 상수 분기와 `from … import` 분기가 같은 판정 함수 `old`를 쓴다. 그래서 **새 호스트 `wcomp.fnguide.com`은 옛 호스트로 잡히지 않는다** — v0.2.2까지의 부분 문자열 판정(`H in value`)은 `wcomp.fnguide.com`을 쓰는 올바른 구현도 위반으로 판정했다(plan-audit iteration 4 D1). 출력은 (옛 호스트 문자열을 담은 모듈 이름 목록, 그런 문자열이나 이름을 쓰는 최상위 함수 목록)이다. 판정 대상 파일은 첫 인자로 바꿀 수 있고, 인자가 없으면 `fnguide/crawler.py`다.
 ```bash
 $PY - <<'EOF'
-import ast, importlib
+import ast, importlib, sys
+from urllib.parse import urlparse
 H = "comp.fnguide.com"
-s = open("fnguide/crawler.py", encoding="utf-8").read(); t = ast.parse(s)
+p = sys.argv[1] if len(sys.argv) > 1 else "fnguide/crawler.py"
+def old(v):
+    if not isinstance(v, str): return False
+    v = v.strip()
+    try: return urlparse(v if "://" in v else "//" + v).hostname == H
+    except ValueError: return False
+s = open(p, encoding="utf-8").read(); t = ast.parse(s)
 docs = {id(n.body[0].value) for n in ast.walk(t)
         if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
         and n.body and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
-hc = lambda node: any(isinstance(n, ast.Constant) and isinstance(n.value, str) and H in n.value and id(n) not in docs for n in ast.walk(node))
+hc = lambda node: any(isinstance(n, ast.Constant) and old(n.value) and id(n) not in docs for n in ast.walk(node))
 tainted = set()
 for n in t.body:
     if isinstance(n, ast.Assign) and hc(n):
@@ -230,12 +240,14 @@ for n in t.body:
     elif isinstance(n, ast.ImportFrom):
         try: mod = importlib.import_module(("fnguide." if n.level else "") + (n.module or ""))
         except Exception: continue
-        tainted |= {a.asname or a.name for a in n.names if H in str(getattr(mod, a.name, ""))}
+        tainted |= {a.asname or a.name for a in n.names if old(getattr(mod, a.name, None))}
 print(sorted(tainted), sorted(n.name for n in t.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
       and (hc(n) or any(isinstance(x, ast.Name) and x.id in tainted for x in ast.walk(n)))))
 EOF
 ```
-   기대 출력(구현 후): `['_CONS_B_URL', '_CONS_D_URL'] ['read_consensus']` — 옛 호스트는 호출되지 않는 `read_consensus`와 그 두 상수에만 남고, `read_fs`·`read_snapshot`·`get_fnguide`와 보조 함수에는 없다(REQ-WC-001 범위와 일치). 이 출력에 도달하려면 M3·M5가 `_FS_URL`·`_SNAP_URL`을 삭제해야 한다. plan 단계 현행 코드 실행 결과: `['_CONS_B_URL', '_CONS_D_URL', '_FS_URL', '_SNAP_URL'] ['read_consensus', 'read_fs', 'read_snapshot']`(수정 전이므로 불일치가 정상).
+   기대 출력(구현 후): `['_CONS_B_URL', '_CONS_D_URL'] ['read_consensus']` — 옛 호스트는 호출되지 않는 `read_consensus`와 그 두 상수에만 남고, `read_fs`·`read_snapshot`·`get_fnguide`와 보조 함수에는 없다(REQ-WC-001 범위와 일치). 이 출력에 도달하려면 M3·M5가 `_FS_URL`·`_SNAP_URL`을 삭제해야 한다. plan 단계 실측(progress.md v0.2.3 자체 점검에 축자 기록): (가) 현행 코드 → `['_CONS_B_URL', '_CONS_D_URL', '_FS_URL', '_SNAP_URL'] ['read_consensus', 'read_fs', 'read_snapshot']`(수정 전이므로 불일치가 정상, v0.2.2 프로브와 같은 출력) (나) `wcomp.fnguide.com`만 쓰고 `_CONS_D_URL`·`_CONS_B_URL`·`read_consensus`를 남긴 준수 가짜 크롤러 → 기대 출력과 정확히 같음 (다) `read_fs`가 옛 호스트 URL을 직접 쓰는 위반 가짜 크롤러 → `['_CONS_B_URL', '_CONS_D_URL'] ['read_consensus', 'read_fs']`(옛 호스트 사용을 여전히 잡음).
+5. 다섯째 명령의 출력이 정확히 `README_OK`다(REQ-WC-016 "출처와 캡처 시각은 그 디렉터리의 README에"): README가 비어 있지 않고, 원본 URL(`https://wcomp.fnguide.com/…`)과 `YYYY-MM-DD` 형식의 캡처 날짜를 각각 한 번 이상 담는다. 출력이 비면 FAIL이다. plan 단계에서는 README가 아직 없어 출력이 비는 것이 정상이며, 판정 방식은 출처·날짜를 담은 표본에서 `README_OK`, 제목만 있는 표본에서 빈 출력으로 확인했다(progress.md v0.2.3 자체 점검).
+6. 여섯째 명령의 출력이 정확히 `exit=1` 한 줄이다(REQ-WC-015 "TTL 캐시 밖에 저장하지 않음"의 정적 판정): `fnguide/crawler.py`·`fnguide/account_alias.py` 어디에도 쓰기 모드 `open(…, "w"|"a"|"x"…)`, `DataFrame.to_csv`·`to_pickle` 등 `to_*` 내보내기, `write_text`·`write_bytes`, `json.dump`·`pickle.dump`, `shelve`, `sqlite3`가 없다. 일치하는 줄이 나오거나 `exit=2`(파일 없음 — `account_alias.py`는 M2가 만든다)이면 FAIL이다. 이는 정적 검사라 동적으로 조립한 쓰기 경로까지 증명하지는 못한다(잔여 위험). plan 단계 실측: 명령을 그대로 실행하면 `account_alias.py`가 아직 없어 `exit=2`(M2 전이므로 정상), 현행 `crawler.py`만 넣으면 일치 0건(`exit=1`), 네 가지 쓰기 형태를 담은 대조 파일은 네 줄 모두 일치(`exit=0`).
 
 ### AC-WC-016 — 라이브 HTTP 결과표와 되돌림 관측 기록 [게이트 · 라이브]
 **Given** 백엔드를 올바른 실행환경으로 재시작한다(메모리 `project_server_runtime_env.md`: cwd와 venv가 다름)

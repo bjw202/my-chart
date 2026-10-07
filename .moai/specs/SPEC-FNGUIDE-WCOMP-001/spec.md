@@ -1,7 +1,7 @@
 ---
 id: SPEC-FNGUIDE-WCOMP-001
 title: "FnGuide 신사이트(wcomp) 이전 대응 — 재무제표·스냅샷 수집층 재작성, 분석 로직 불변"
-version: "0.2.2"
+version: "0.2.3"
 status: draft
 created: 2026-10-07
 updated: 2026-10-07
@@ -23,6 +23,7 @@ depends_on: [SPEC-DASHBOARD-002]
 
 | 버전 | 날짜 | 변경 |
 |---|---|---|
+| 0.2.3 | 2026-10-07 | plan-audit iteration 4(FAIL 0.84 — 3회 상한을 넘긴 추가 감사, 사용자 승인) 대응. **D1(차단)**: AC-WC-015 4번 AST 프로브가 옛 호스트를 부분 문자열 `comp.fnguide.com`으로 찾아 새 호스트 `wcomp.fnguide.com`까지 잡던 결함을 호스트 이름 정확 비교(`urlparse(…).hostname == "comp.fnguide.com"`)로 교체(문자열 상수 분기·`from … import` 분기 모두), 참고용 grep을 `//comp\.fnguide\.com`으로, 현행 코드와 준수 가짜 크롤러 두 경우의 출력을 재기록. **D2(차단)**: AC-WC-013의 URL 단언을 같은 호스트 이름 비교로 교체하고 모든 요청의 호스트가 `wcomp.fnguide.com`이라는 긍정 단언 추가. **D3**: `dashboard.py:342` → `:343`, `:348-350` → `:349-351`. **D4**: D7·REQ-WC-011 (c)의 정합성 합산 대상(소비 자산 19개·소비 부채 20개)을 `fs_analysis` 기준으로 열거, 부재 계정은 0으로 합산. **D5**: REQ-WC-015 저장 금지·REQ-WC-016 README 조항의 기계 판정 명령을 AC-WC-015 5·6번으로 병합. **D6**: REQ-WC-013·014 본문의 `crawler.py` 줄 번호를 함수·동작 이름으로 바꾸고 줄 번호는 근거 주석으로 이동. **D7**: progress.md lint 서술을 실제 출력으로 교체. REQ 16 / AC 16 유지 |
 | 0.2.2 | 2026-10-07 | plan-audit iteration 3(FAIL 0.83 strict, 마지막 감사 — 차단 1건 수정 시 PASS-WITH-DEBT 권고) 대응. **D-I3-1**: 라이브 게이트가 통과할 수 있도록 M6에 `test_analysis.py:255-268` 비교 열 수정(`yearly_cols[-2]`)과 별도 후보 교체(`403870, 330590, 476830`)를 명시하고 AC-WC-015 3번 근거에 반영. **S1**: AC-WC-015 4번 AST 프로브를 문자열 상수 노드 기준(docstring 제외, `AnnAssign`·`from … import` 추적)으로 교체, M3·M5에 `_FS_URL`·`_SNAP_URL` 삭제. **S2**: `read_snapshot` 시그니처·반환 형태 고정(REQ-WC-013). **M1~M8**: `TestReadConsensus` 줄 범위 177-196, skip 실제 호출 36, `자산총계` 단언 문구 삭제, progress.md 오래된 서술 갱신, AC-WC-003 (d) VAL4 모두 null 사례, git diff 게이트에 `analyzer.py`·`parser.py`·`__init__.py` 추가, 요청 상한 8을 REQ-WC-004로 올림, 선택 판정 응답의 실패 판정 범위 명시(REQ-WC-002) |
 | 0.2.1 | 2026-10-07 | plan-audit iteration 2(FAIL 0.80) 대응. **D-N1**: AC-WC-003 요청 구분 규칙을 "(getFinIncome, Y) 외 다섯 쌍은 결정 유형, (getFinIncome, Y)는 {C, B} 안에서 결정 유형 포함, 데이터 출처는 반환 값으로 증명"으로 교체, 요청 예산(연간 Income C·B 2 + 재무 5 + 스냅샷 1 = 8)을 §5·AC-WC-013에 일치. **D-N2**: REQ-WC-001의 옛 호스트 금지 범위를 `read_fs`·`read_snapshot`·`get_fnguide`와 보조 함수로 한정(`read_consensus`는 남기되 호출하지 않음), AC-WC-015 4번을 AST 판정으로 교체, M6에 `TestReadConsensus` 삭제 추가. **D-N3**: 응답별 검사(REQ-WC-002)가 정렬 검사(REQ-WC-005 (b))보다 먼저, 정렬 비교는 정규화된 `YYYY/MM` 값으로. **D-N4**: `df_yoy_base_ann` 행 라벨도 정규화·별칭. **D-N5~N12**: skip 개수 프로브 교체(재실행 37), 자사주 판별 사례 명시, AC-WC-009 대조를 `read_fs` 수준으로, 경고 토큰 고정, REQ-WC-005·011 하위 조항 (a)(b)(c), 001750 C·B 캡처 목록, `read_fs` 반환 순서 고정, iteration-1 D19 처분 기록 |
 | 0.2.0 | 2026-10-07 | plan-audit iteration 1(FAIL 0.78) 대응과 사용자 결정 반영. **사용자 결정**: Q-G 접기는 승인 계획대로 전부 `기타*`(D6·REQ-WC-011에서 금융 계정 분기 삭제), Q-I 명시 목록 유지, Q-D 결산 기간 4개 미만은 `ValueError`(404), Q-F 축소 fixture 커밋, Q-A 수치 전후 비교 불가는 수용한 잔여 위험. **감사 결함**: D2 실패 판정을 본문 기준으로(Content-Type 미관측), D3 접기·정합성 가드를 연간·분기 두 표에 적용하고 차이를 `자산 − 소비 계정 합`으로 정의, D4 접기 목적지·합계 행 부재 시 경고 후 건너뜀, D5 2xx 밖 상태는 `ConnectionError`(503), D6 `depends_on`을 completed인 SPEC-DASHBOARD-002만 남김, D7 "모달 회사명이 코드로 보였다" 주장 삭제, D8 세 재무제표 기간 불일치는 `RuntimeError` 계열(503), D10 옛 이어 붙이기 순서 서술 정정, D16 종목별 데이터 성질은 `While`/`When`, D18 선택 규칙의 "값" 정의, D19b 대시보드 전용 계정까지 부재 경고, D20 종목 코드 ASCII 검증과 쿼리 파라미터 전달. REQ 16 / AC 16 유지 |
@@ -107,6 +108,13 @@ ENGINE-001은 YAML frontmatter가 없고, 본문 메타데이터 표의 상태 �
 ### D7 — 정합성 가드는 경고만, 허용오차 0.1억원
 분석 코드가 소비하는 자산 계정의 합과 `자산`, 부채 계정의 합과 `부채`의 차이(`자산 − 소비 자산 계정 합`, `부채 − 소비 부채 계정 합`)를 **연간·분기 두 표의 모든 열**에서 검사하고, 절댓값이 0.1억원을 넘으면 경고 로그만 남긴다(분석은 계속). 승인 계획의 0.01억원은 소수 둘째 자리 반올림 잔차만으로 정상 종목에서 경고를 낸다 — 403870 B의 2024/12 자산 잔차가 −0.02억원으로 관측됐다(`research.md` §R5). 이 가드는 합계를 볼 뿐 어느 계정으로 접었는지는 구별하지 못한다 — 행 누락을 잡는 장치이지 분류 정확성을 보증하지 않는다. 접기 목적지 행이나 `자산`·`부채` 행 자체가 없으면 예외를 내지 않고 경고를 남긴 뒤 해당 접기·검사를 건너뛴다(예외가 새면 지금과 같은 503이 되므로).
 
+**합산 대상(v0.2.3 고정)**: "소비 계정"은 `fnguide/analysis.py`의 `fs_analysis`가 `df_fs_ann.loc[...]`로 더하는 대차대조표 계정이며, 두 목록은 `fnguide/account_alias.py`에 이름 붙은 목록으로 한 번만 둔다(D1 단일 출처).
+
+- **소비 자산 계정 19개** — `df_invest`의 설비투자·운전자산·금융투자·여유자금·기타 다섯 행이 더하는 계정, 소스 순서: `유형자산`, `무형자산`, `비유동생물자산`, `재고자산`, `유동생물자산`, `매출채권및기타유동채권`, `당기법인세자산`, `기타유동자산`, `장기매출채권및기타비유동채권`, `이연법인세자산`, `장기당기법인세자산`, `기타비유동자산`, `투자부동산`, `장기금융자산`, `관계기업등지분관련투자자산`, `현금및현금성자산`, `유동금융자산`, `매각예정비유동자산및처분자산집단`, `기타금융업자산`.
+- **소비 부채 계정 20개** — `df_financing`의 신용조달·외부차입·기타 세 행이 더하는 계정(자본 쪽 행인 유보이익·주주투자·비지배주주지분은 제외), 소스 순서: `매입채무및기타유동채무`, `유동종업원급여충당부채`, `기타단기충당부채`, `당기법인세부채`, `기타유동부채`, `장기매입채무및기타비유동채무`, `비유동종업원급여충당부채`, `기타장기충당부채`, `이연법인세부채`, `장기당기법인세부채`, `기타비유동부채`, `단기사채`, `단기차입금`, `유동성장기부채`, `유동금융부채`, `사채`, `장기차입금`, `비유동금융부채`, `매각예정으로분류된처분자산집단에포함된부채`, `기타금융업부채`.
+- 목록의 계정이 표에 없으면 그 계정은 합에 0으로 들어간다. 그러면 차이가 빠진 금액만큼 드러나 경고가 되므로 행 누락을 잡는 이 가드의 목적과 맞고, 예외도 나지 않는다. 계정 부재 자체는 REQ-WC-010이 따로 경고한다.
+- 근거: 두 목록은 `fs_analysis` 본문을 AST로 읽어 뽑은 것이며, AC-WC-007의 고정값(접기 시 경고 0건, 접기를 빼면 8건)을 만든 감사자 독립 재구현(`scratchpad/auditor/indep.py`)의 `ASSETS`·`LIABS`와 순서까지 같다(progress.md v0.2.3 자체 점검).
+
 ### D8 — 0 행 보충은 명시 목록만 (사용자 결정 Q-I)
 일반 레이아웃에서 분석 코드가 필수로 찾는데 새 응답에 대응이 없는 계정은 **`account_alias.py`의 명시 목록에 든 것만** 0 행으로 보충한다. 현재 목록은 `관계기업등지분관련투자자산` 하나다 — 그 값은 별칭 `투자자산→장기금융자산`이 이미 담고 있어 0으로 두면 합이 보존된다(`research.md` §R5). 목록 밖의 필수 계정(분석 코드 계정과 대시보드 전용 계정 `매출총이익`·`매출원가`·`영업활동으로인한현금흐름` 포함)이 사라지면 0을 지어내지 않고 경고 로그를 남긴 채 그대로 둔다 — 그래야 해당 섹션이 `None`으로 드러난다.
 
@@ -143,7 +151,7 @@ The financial-statement reader shall satisfy the following clauses.
 - (c) When the normalized fourth quarterly period differs from the normalized fourth annual period, the reader shall log a warning and continue.
 
 #### REQ-WC-006 — 전년동기 열 분리
-The financial-statement reader shall exclude `VAL5` and `VAL6` from `df_fs_ann` and `df_fs_quar`; while the annual income header `VAL4` carries the `(최근분기)` marker, it shall return `df_yoy_base_ann` as a one-column DataFrame built from the annual income `VAL5` whose column label contains `전년동기` and whose row labels are normalized per REQ-WC-007 and, while the general layout applies, aliased per REQ-WC-009 (so that `dashboard.py:342` finds `매출액`), and while the marker is absent, it shall return `None`.
+The financial-statement reader shall exclude `VAL5` and `VAL6` from `df_fs_ann` and `df_fs_quar`; while the annual income header `VAL4` carries the `(최근분기)` marker, it shall return `df_yoy_base_ann` as a one-column DataFrame built from the annual income `VAL5` whose column label contains `전년동기` and whose row labels are normalized per REQ-WC-007 and, while the general layout applies, aliased per REQ-WC-009 (so that `dashboard.py:343` finds `매출액`), and while the marker is absent, it shall return `None`.
 
 #### REQ-WC-007 — 값 변환과 이름 정규화
 The financial-statement reader shall convert each `VAL1`..`VAL5` cell to `float`, mapping JSON null and any non-numeric string to `0.0`, and shall derive each row label from `NAME` by removing every space and non-breaking space (`\xa0`) character, without using `AC_CODE` as a cross-layout identifier.
@@ -164,7 +172,7 @@ While the general layout applies, the financial-statement reader shall satisfy t
 
 - (a) The reader shall add the values of every LVL2 row under the current-asset, non-current-asset, current-liability and non-current-liability subtotals that is neither an alias source nor a required label into that parent's `기타유동자산`, `기타비유동자산`, `기타유동부채` or `기타비유동부채` row respectively.
 - (b) When a fold destination row or the `자산` or `부채` row is absent, the reader shall log a warning containing the code, the row name and the fixed token `행 없음`, and shall skip that fold or check without raising.
-- (c) When, for any column of either frame, `자산` minus the sum of the consumed asset labels or `부채` minus the sum of the consumed liability labels exceeds 0.1 (억원) in absolute value, the reader shall log one warning per mismatch containing the code, the frame, the column and the signed difference, and shall not raise.
+- (c) When, for any column of either frame, `자산` minus the sum of the 19 consumed asset labels or `부채` minus the sum of the 20 consumed liability labels exceeds 0.1 (억원) in absolute value (both label lists are defined solely in `fnguide/account_alias.py`, are exactly the asset and liability labels summed by `fs_analysis` in `fnguide/analysis.py` as enumerated in §3 D7, and a listed label absent from the frame contributes 0 to the sum), the reader shall log one warning per mismatch containing the code, the frame, the column and the signed difference, and shall not raise.
 
 ### D. 스냅샷
 
@@ -172,12 +180,16 @@ While the general layout applies, the financial-statement reader shall satisfy t
 When the hidden `#cmp_cd` value in the snapshot response is absent or differs from the requested code, the snapshot reader shall raise `ValueError` whose message contains the requested code.
 
 #### REQ-WC-013 — report 키, 종목명, 자기주식
-The snapshot reader shall keep the signature `read_snapshot(code, account_type="IFRS(연결)")` (the `account_type` argument is accepted and ignored, so the existing call at `crawler.py:286` stays valid) and return the three-element tuple `(report, empty DataFrame, empty DataFrame)`, with `report` containing the keys `시가총액(상장예정포함,억원)`, `발행주식수(보통주)`, `발행주식수(우선주)`, `자기주식`, `베타(1년)`, `PER`, `12M PER`, `업종 PER`, `PBR`, `배당수익률`, `Summary` and `종목명`, taking `베타(1년)` from the row labelled `52주베타`, `종목명` from the text of `#giName`, and `자기주식` from the shareholder-table row labelled exactly `자사주` (or `0` when absent), and shall map an unparseable numeric field to `0` exactly as the existing `to_num` helper (`parser.py:89-101`) does.
+The snapshot reader shall keep the signature `read_snapshot(code, account_type="IFRS(연결)")` (the `account_type` argument is accepted and ignored, so the existing `read_snapshot(code, account_type)` call inside `get_fnguide` stays valid) and return the three-element tuple `(report, empty DataFrame, empty DataFrame)`, with `report` containing the keys `시가총액(상장예정포함,억원)`, `발행주식수(보통주)`, `발행주식수(우선주)`, `자기주식`, `베타(1년)`, `PER`, `12M PER`, `업종 PER`, `PBR`, `배당수익률`, `Summary` and `종목명`, taking `베타(1년)` from the row labelled `52주베타`, `종목명` from the text of `#giName`, and `자기주식` from the shareholder-table row labelled exactly `자사주` (or `0` when absent), and shall map an unparseable numeric field to `0` exactly as the existing `to_num` helper (`parser.py:89-101`) does.
+
+> 근거(줄 번호는 plan 단계 기준이며 `fnguide/crawler.py`는 재작성 후 무효): 위의 `get_fnguide` 안 `read_snapshot(code, account_type)` 호출은 `crawler.py:286`이다.
 
 ### E. 통합과 불변
 
 #### REQ-WC-014 — 8-튜플 계약과 금융 레이아웃 [HARD]
-The `get_fnguide` function shall keep its single parameter `code` and its eight-element return order `(df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report, account_type, df_yoy_base_ann)`, shall return empty DataFrames in the `df_snap`, `df_snap_ann` and `df_cons` positions without requesting consensus data, shall keep `read_fs(code)` returning the four-element tuple `(account_type, df_fs_ann, df_fs_quar, df_yoy_base_ann)` in that order (`crawler.py:215`; `test_crawler.py:87` reads `result[0]`), and while the financial layout applies shall return without raising so that `GET /api/analysis/{code}` responds 200 with the sections the unchanged dashboard cannot compute set to null.
+The `get_fnguide` function shall keep its single parameter `code` and its eight-element return order `(df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report, account_type, df_yoy_base_ann)`, shall return empty DataFrames in the `df_snap`, `df_snap_ann` and `df_cons` positions without requesting consensus data, shall keep `read_fs(code)` returning the four-element tuple `(account_type, df_fs_ann, df_fs_quar, df_yoy_base_ann)` in that order (the order the current `read_fs` returns, on which the existing live crawler test relies by reading `result[0]` as `account_type`), and while the financial layout applies shall return without raising so that `GET /api/analysis/{code}` responds 200 with the sections the unchanged dashboard cannot compute set to null.
+
+> 근거(줄 번호는 plan 단계 기준이며 `fnguide/crawler.py`는 재작성 후 무효): 현행 `read_fs`의 반환문은 `crawler.py:215`, 반환 첫 원소를 읽는 라이브 테스트는 `test_crawler.py:87`이다.
 
 #### REQ-WC-015 — 분석 계층과 저장 자세 불변
 The implementation shall not modify `fnguide/analysis.py`, `fnguide/dashboard.py`, `backend/routers/analysis.py`, `backend/schemas/analysis.py`, `backend/services/analysis_service.py` or any file under `frontend/`, and the crawler shall not persist fetched FnGuide content anywhere other than the existing in-process five-minute TTL cache (`analysis_service.py:17-18`).

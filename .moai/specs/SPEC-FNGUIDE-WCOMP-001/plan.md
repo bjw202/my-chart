@@ -2,6 +2,14 @@
 
 > 원천 계획: `.moai/plans/wondrous-noodling-coral.md`(승인됨). 이 문서는 그 계획을 run 단계의 실행 순서로 옮기고, plan 단계 계측에서 드러난 정정과 사용자 결정을 앞에 모은다. 시간 추정은 쓰지 않는다. v0.2.0에서 미확정 항목은 모두 사용자 결정 또는 M1 확인 과제로 해소했다.
 
+## HISTORY
+
+현재 버전: **0.2.3** (spec.md와 같은 번호를 쓴다. 0.2.2 이전 변경은 spec.md HISTORY에 함께 적혀 있다.)
+
+| 버전 | 날짜 | 변경 |
+|---|---|---|
+| 0.2.3 | 2026-10-07 | plan-audit iteration 4(FAIL 0.84) 대응. M5의 AST 확인을 호스트 이름 정확 비교 프로브로 바꿈(새 호스트 `wcomp.fnguide.com`은 옛 호스트로 잡히지 않음 — D1). M2 `account_alias.py` 목록에 정합성 가드용 소비 자산 19개·소비 부채 20개 목록 추가(D4, spec D7). M6 게이트에 fixture README와 저장 금지 정적 판정(AC-WC-015 5·6번) 추가(D5). §D 단일 출처 목록 갱신 |
+
 ## §A 맥락
 
 ### §A.1 위치와 산출물
@@ -101,8 +109,9 @@ grep -n "^status" .moai/specs/SPEC-DASHBOARD-002/spec.md         # depends_on �
 - 코드 주석은 한국어(`language.yaml code_comments: ko`), 커밋 메시지는 한국어(`git_commit_messages: ko`), Conventional Commits + `🗿 MoAI <email@mo.ai.kr>` 끝줄.
 - 커밋 메시지 본문에 `--no-verify` 문자열을 쓰지 않는다(pre-commit 가드 오탐 — 메모리 `feedback_precommit_guard_false_positive.md`).
 - 새 워크트리에서 pre-commit 백엔드 pytest가 운영 DB 부재로 실패할 수 있다(메모리 `project_worktree_precommit_db_trap.md`).
-- `account_alias.py`가 유일한 계정명 출처다(별칭표, 0 행 보충 목록, 필수 계정 목록, 재무제표 한정 개명표, 다중 행 필요 목록, 접기 부모 코드 → `기타*` 대응). `crawler.py`에 계정명 문자열을 흩뿌리지 않는다.
-- fixture는 축소본만 커밋하고, `tests/fnguide/fixtures/wcomp/README.md`에 원본 URL·캡처 시각·축소 방법을 적는다.
+- `account_alias.py`가 유일한 계정명 출처다(별칭표, 0 행 보충 목록, 필수 계정 목록, 재무제표 한정 개명표, 다중 행 필요 목록, 접기 부모 코드 → `기타*` 대응, 정합성 가드용 소비 자산·부채 목록). `crawler.py`에 계정명 문자열을 흩뿌리지 않는다.
+- fixture는 축소본만 커밋하고, `tests/fnguide/fixtures/wcomp/README.md`에 원본 URL(`https://wcomp.fnguide.com/…`)·캡처 시각(`YYYY-MM-DD` 날짜 포함)·축소 방법을 적는다(AC-WC-015 5번이 URL과 날짜를 기계 판정).
+- 크롤러와 `account_alias.py`는 파일·DB에 쓰지 않는다 — 수집 결과는 기존 5분 TTL 캐시에만 남는다(REQ-WC-015, AC-WC-015 6번 정적 판정).
 - @MX: `read_fs`, `read_snapshot`, `get_fnguide`에 `@MX:ANCHOR`(호출부 고정 계약) + `@MX:REASON`. 중복 행 보정 지점에 `@MX:WARN`(분석 코드의 암묵 가정에 묶인 구조) + `@MX:REASON`. 주석 언어 한국어.
 
 ---
@@ -145,7 +154,7 @@ grep -n "^status" .moai/specs/SPEC-DASHBOARD-002/spec.md         # depends_on �
 | V-4 | `단기충당부채→기타단기충당부채`, `장기충당부채→기타장기충당부채` 의미 일치(구 Q-E) | `$PY -c "import json;d=json.load(open('<005930 Balance Y C fixture>',encoding='utf-8-sig'))['dataset']['data'];print([(r['P_AC_CODE'],r['NAME'].strip()) for r in d if '충당부채' in r['NAME']])"` 를 005930 C와 403870 B에 실행 | 부모 131580·130010 아래 충당부채 행이 각각 `종업원급여충당부채` 1개 + `단기충당부채`/`장기충당부채` 1개뿐(plan 단계 005930 C 관측: `[('131580','유동종업원급여충당부채'),('131580','단기충당부채'),('130010','비유동종업원급여충당부채'),('130010','장기충당부채')]`). 즉 종업원급여가 아닌 충당부채가 한 행씩이라 옛 이름 `기타…충당부채`(종업원급여 외 충당부채)와 같은 범위 |
 
 **M2 — 계정명 단일 출처 (Priority High)**
-- `fnguide/account_alias.py`: 일반 레이아웃 별칭표(승인 계획 22개), 0 행 보충 목록(`관계기업등지분관련투자자산`), 필수 계정 목록(분석 코드 계정 + `매출총이익`·`매출원가`·`영업활동으로인한현금흐름`), 재무제표 한정 개명표(현금흐름표 `당기순이익→당기순손익`), 다중 행 필요 목록(`이자비용`, `법인세비용`), 접기 부모 코드 → `기타*` 대응.
+- `fnguide/account_alias.py`: 일반 레이아웃 별칭표(승인 계획 22개), 0 행 보충 목록(`관계기업등지분관련투자자산`), 필수 계정 목록(분석 코드 계정 + `매출총이익`·`매출원가`·`영업활동으로인한현금흐름`), 재무제표 한정 개명표(현금흐름표 `당기순이익→당기순손익`), 다중 행 필요 목록(`이자비용`, `법인세비용`), 접기 부모 코드 → `기타*` 대응, 정합성 가드용 소비 자산 계정 목록(19개)·소비 부채 계정 목록(20개) — 두 목록의 내용과 순서는 spec D7 "합산 대상"이 정본이며 `fs_analysis`가 더하는 대차대조표 계정과 같다(REQ-WC-011 (c)).
 
 **M3 — `read_fs` 재작성 (Priority High)**
 - 옛 URL 상수 `_FS_URL`·`_SNAP_URL`(`crawler.py:27-34`) 삭제. `_CONS_D_URL`·`_CONS_B_URL`은 호출되지 않는 `read_consensus`를 위해 남긴다(AC-WC-015 4번 기대 출력에 도달하는 조건).
@@ -158,7 +167,7 @@ grep -n "^status" .moai/specs/SPEC-DASHBOARD-002/spec.md         # depends_on �
 - AC-WC-011, AC-WC-012 GREEN.
 
 **M5 — `get_fnguide` 정리 (Priority Medium)**
-- 컨센서스 호출 제거, 위치 2·3·4 빈 DataFrame, 8-튜플 유지. `_FS_URL`·`_SNAP_URL`이 M3·M4에서 지워졌는지 AC-WC-015 4번 AST 프로브로 확인(`_CONS_*` 두 상수와 `read_consensus`만 남아야 함).
+- 컨센서스 호출 제거, 위치 2·3·4 빈 DataFrame, 8-튜플 유지. `_FS_URL`·`_SNAP_URL`이 M3·M4에서 지워졌는지 AC-WC-015 4번 AST 프로브로 확인(`_CONS_*` 두 상수와 `read_consensus`만 남아야 함). 이 프로브는 옛 호스트를 파싱한 호스트 이름의 정확 비교(`hostname == "comp.fnguide.com"`)로 찾으므로 새 상수가 `wcomp.fnguide.com`을 써도 잡히지 않는다 — 부분 문자열로 찾는 판정을 run 단계에서 다시 만들지 않는다(plan-audit iteration 4 D1).
 - AC-WC-013, AC-WC-014 GREEN.
 
 **M6 — 기존 테스트 정리와 게이트 (Priority Medium)**
@@ -166,7 +175,7 @@ grep -n "^status" .moai/specs/SPEC-DASHBOARD-002/spec.md         # depends_on �
 - `IFRS(별도)` 후보 목록 `["003550", "015760", "034020"]`(`test_crawler.py:83`, `test_analysis.py:234`)을 실측 별도 종목 `["403870", "330590", "476830"]`로 교체. 옛 후보는 새 선택 규칙에서 별도로 판정되지 않아 `"IFRS(별도) 종목을 찾지 못함"` skip 4건(`test_crawler.py:96, :103`, `test_analysis.py:248, :258`)을 낸다 — AC-WC-015 3번의 skip 상한 1을 넘는다.
 - `test_analysis.py:255-268`(`test_characterize_controlling_profit_equals_net_income`) 다시 쓰기: 지금은 `yearly_cols[-1]`(Trailing 12M으로 덮어쓴 열)의 `지배주주순이익`과 같은 열의 `df_fs_ann["당기순이익"]`(누적 YTD)을 비교해 마지막 연간 열이 부분 연도면 항상 실패한다(403870: 857.27 대 489.69 — 오케스트레이터 확인). 후보가 늘 skip이라 지금까지 숨어 있었다. 비교 열을 Trailing 보정이 없는 완결 연도 `yearly_cols[-2]`로 바꾼다(403870 양쪽 726.62). 이것은 테스트의 결함 수정이며 `fnguide/analysis.py`는 건드리지 않는다.
 - **`TestReadConsensus`(`test_crawler.py:177-196` — 데코레이터 177, 클래스 178, 마지막 단언 196; `@pytest.mark.live`) 삭제.** 이 클래스는 `read_consensus("005930")`으로 옛 호스트 `comp.fnguide.com/SVO2/json/data/01_06/…`(`crawler.py:35-36`)를 요청하고, 그 호스트는 안내 페이지만 돌려주므로 fixture 단계에서 error가 난다 — AC-WC-015 3번(라이브 error 0)이 통과할 수 없고, 컨센서스를 쓰지 않는 새 계약(REQ-WC-014)과도 맞지 않는다. skip으로 바꾸는 대안은 택하지 않는다(허용 skip 목록에 없으므로 AC-WC-015 FAIL).
-- 대조 AC 13개 RED 관측, 커버리지, 라이브 HTTP 결과표(AC-WC-016), AC-WC-015 게이트(라이브 skip ≤ 1).
+- 대조 AC 13개 RED 관측, 커버리지, 라이브 HTTP 결과표(AC-WC-016), AC-WC-015 게이트(라이브 skip ≤ 1, 5번 fixture README에 원본 URL·캡처 날짜, 6번 `crawler.py`·`account_alias.py`에 파일 쓰기 호출 0건).
 
 ---
 

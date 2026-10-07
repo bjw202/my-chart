@@ -10,9 +10,9 @@
 
 | 파일 | 상태 |
 |---|---|
-| `spec.md` | v0.2.2 — 결정 D1~D9, REQ-WC-001~016(16개, Tier M 상한 16), Out of Scope 5개 소절 |
-| `plan.md` | v0.2.2 — 계획 정정 C-1~C-5, 사용자 결정 5건(Q-G, Q-I, Q-D, Q-F, Q-A), M1 확인 과제 V-1~V-4, 마일스톤 M1~M6(M6에 라이브 게이트 선행 과제 3건), 미확정 표지 0건 |
-| `acceptance.md` | v0.2.2 — AC-WC-001~016(16개, Tier M 상한 16): 대조 13 / 불변 1 / 게이트 2 |
+| `spec.md` | v0.2.3 — 결정 D1~D9(D7에 정합성 합산 대상 39개 계정 열거), REQ-WC-001~016(16개, Tier M 상한 16), Out of Scope 5개 소절 |
+| `plan.md` | v0.2.3 — HISTORY 신설, 계획 정정 C-1~C-5, 사용자 결정 5건(Q-G, Q-I, Q-D, Q-F, Q-A), M1 확인 과제 V-1~V-4, 마일스톤 M1~M6(M6에 라이브 게이트 선행 과제 3건), 미확정 표지 0건 |
+| `acceptance.md` | v0.2.3 — AC-WC-001~016(16개, Tier M 상한 16): 대조 13 / 불변 1 / 게이트 2. AC-WC-015는 판정 6항목(호스트 이름 정확 비교 AST 프로브, fixture README, 저장 금지 정적 판정 포함) |
 | `research.md` | 작성 완료 — 계측 사실 F-01~F-23, 계정 대응표 60행(스크립트 생성), 구조 비교, 중복 행 결함 실측, 정합성 검산 |
 | `progress.md` | 본 파일 |
 
@@ -59,6 +59,7 @@ ID 중복 확인: `ls .moai/specs | grep -c "SPEC-FNGUIDE-WCOMP"` → `0`(작성
 | iter1 | FAIL 0.78 (Tier M 통과선 0.80) | v0.2.0으로 개정 — 아래 처분표 |
 | iter2 | FAIL 0.80 (새 차단 결함 2건 D-N1·D-N2, iteration-1 개정이 유입) | v0.2.1로 개정 — 아래 iter2 처분표 |
 | iter3 | FAIL 0.83 (strict, 마지막 허용 감사) — 차단 1건(D-I3-1) 수정 시 PASS-WITH-DEBT 권고, 네 번째 감사 없음 | v0.2.2로 개정 — 아래 iter3 처분표 |
+| iter4 | FAIL 0.84 (Tier M 통과선 0.80 이상이나 차단 결함 1건, 근원 1개 = D1·D2) — 3회 상한을 넘긴 추가 감사(사용자가 상한 초과 진행을 명시 승인). 보고서 `.moai/reports/plan-audit/SPEC-FNGUIDE-WCOMP-001-review-4.md` | v0.2.3으로 개정 — 아래 iter4 처분표. 재감사 범위는 감사 권고대로 D1·D2 차분 |
 
 ### iter1 결함·결정 처분표 (v0.2.0)
 
@@ -124,13 +125,58 @@ ID 중복 확인: `ls .moai/specs | grep -c "SPEC-FNGUIDE-WCOMP"` → `0`(작성
 | M7 | 수정 — 선택 응답 재사용과 요청 상한 8을 REQ-WC-004로 올림 | spec.md REQ-WC-004 |
 | M8 | 수정 — REQ-WC-002 검사 대상을 결정 유형의 데이터 응답 여섯으로 한정, 비결정 유형 선택 응답 실패는 "값 없음"으로 처리(두 유형 모두 실패 시 `ValueError`). 관측한 별도 종목 `C` 응답은 모두 56행(값 전부 null)이라 빈 `C`는 미관측 — plan §B.3에 기록 | spec.md REQ-WC-002; plan.md §B.3 |
 
+### iter4 결함 처분표 (v0.2.3)
+
+| 항목 | 처분 | 변경 위치 |
+|---|---|---|
+| D1 (차단) | 수정 — AC-WC-015 4번 AST 프로브의 옛 호스트 판정을 부분 문자열(`H in n.value`, `H in str(getattr(...))`)에서 파싱한 호스트 이름 정확 비교(`urlparse(v).hostname == "comp.fnguide.com"`, 스킴 없는 문자열은 `//`를 붙여 파싱)로 교체. 문자열 상수 분기와 `from … import` 분기가 같은 판정 함수 `old`를 씀. `wcomp.fnguide.com`은 잡히지 않는다는 문장 추가, 판정 대상 파일을 첫 인자로 받게 함(기본 `fnguide/crawler.py`). 참고용 grep을 `//comp\.fnguide\.com`으로. 현행 코드·준수 가짜·위반 가짜 세 경우의 출력을 아래 v0.2.3 자체 점검에 축자 기록. plan.md M5에 같은 판정 기준과 "부분 문자열 판정을 다시 만들지 않는다" 명시 | acceptance.md AC-WC-015 When·4.; plan.md M5·HISTORY |
+| D2 (차단) | 수정 — AC-WC-013 Then의 "URL에 `comp.fnguide.com` 포함 0건"을 "`urlparse(url).hostname == "comp.fnguide.com"`인 것 0건, `01_06` 포함 0건, 모든 URL의 호스트가 `wcomp.fnguide.com`"으로 교체하고 부분 문자열을 쓰면 안 되는 이유를 한 문장으로 남김. 되돌림 관측값(`read_consensus` 부활 시 실패)은 유지 | acceptance.md AC-WC-013 |
+| D3 | 수정 — 프로브로 확인 후 `dashboard.py:342` → `:343`(`base_revenue = float(base_series.at["매출액"])`), `:348-350` → `:349-351`(`except (KeyError, IndexError, ValueError):` ~ `pass`) | spec.md REQ-WC-006; acceptance.md AC-WC-006 되돌림 관측값 |
+| D4 | 수정 — spec D7에 "합산 대상" 단락 신설: 소비 자산 19개(`df_invest` 다섯 행), 소비 부채 20개(`df_financing`의 신용조달·외부차입·기타, 자본 쪽 행 제외)를 소스 순서로 열거, 두 목록은 `account_alias.py`에 이름 붙은 목록으로, 목록에 있으나 표에 없는 계정은 합에 0. REQ-WC-011 (c)가 이 목록을 가리킴. plan.md M2·§D 단일 출처 목록에 추가. research.md는 이번 개정 범위 밖이라 손대지 않고 spec D7을 정본으로 둠 | spec.md D7·REQ-WC-011 (c); plan.md M2·§D |
+| D5 | 수정 — AC-WC-015에 5번(fixture README에 비어 있지 않음 + `https://wcomp.fnguide.com/` URL + `YYYY-MM-DD` 날짜 → `README_OK`)과 6번(`crawler.py`·`account_alias.py`에 쓰기 모드 `open`·`to_*` 내보내기·`write_text/bytes`·`json/pickle.dump`·`shelve`·`sqlite3` 0건 → `exit=1`)을 병합. 새 AC 없음(AC 16 유지), REQ 문구는 그대로 | acceptance.md AC-WC-015 When·5.·6.; plan.md M6·§D |
+| D6 | 수정 — REQ-WC-013의 `crawler.py:286`을 "`get_fnguide` 안의 `read_snapshot(code, account_type)` 호출"로, REQ-WC-014의 `crawler.py:215`·`test_crawler.py:87`을 "현행 `read_fs`가 돌려주는 순서, 라이브 크롤러 테스트가 `result[0]`을 `account_type`으로 읽음"으로 바꿈. 줄 번호는 각 REQ 아래 `> 근거` 주석으로 옮기고 재작성 후 무효임을 적음. REQ 본문(영문 GEARS 줄)에 `crawler.py:` 0건(프로브 아래) | spec.md REQ-WC-013·014 |
+| D7 | 수정 — v0.2.2 자체 점검의 "lint 무결" 행을 정정 표기로 바꾸고, 실제 출력은 아래 v0.2.3 자체 점검에 축자 기록. frontmatter `status: draft`는 그대로(실제로 draft — 감사 판단과 같음) | progress.md 본 절 |
+
+### v0.2.3 자체 점검
+
+모든 명령은 저장소 루트에서 2026-10-07에 실행했다. `$D`는 이번 세션의 scratchpad(`/private/tmp/claude-501/-Users-byunjungwon-Dev-my-project-01-my-chart/e0b7b6de-2a3d-487d-923f-28f6082e8044/scratchpad`, 저장소 밖)다. 가짜 크롤러 두 개와 대조용 쓰기 파일·README 표본은 확인 후 삭제했다(아래 마지막 행).
+
+| 항목 | 결과 |
+|---|---|
+| REQ / AC 개수 | 16 / 16 — `grep -cE '^#### REQ-WC-[0-9]{3}' spec.md` → `16`, `grep -cE '^### AC-WC-[0-9]{3}' acceptance.md` → `16` |
+| frontmatter | 12개 필드 → `12`, `version: "0.2.3"`, `updated: 2026-10-07`, `tier: M`, `depends_on: [SPEC-DASHBOARD-002]` |
+| 미확정 표지 | `grep -rn '\[NEEDS CLARIFICATION' spec.md plan.md acceptance.md research.md progress.md` → 출력 없음, rc=1 |
+| D1 프로브 동일성 | acceptance.md에서 `$PY - <<'EOF'` ~ `EOF`를 추출한 파일과 시험한 프로브 파일을 `diff` → `identical` |
+| D1 프로브 (1) 현행 `fnguide/crawler.py` | `$PY - < probe_from_doc.py` → `['_CONS_B_URL', '_CONS_D_URL', '_FS_URL', '_SNAP_URL'] ['read_consensus', 'read_fs', 'read_snapshot']` (수정 전이므로 기대값과 불일치가 정상, v0.2.2 프로브 출력과 같음) |
+| D1 프로브 (2) 준수 가짜 크롤러 | `$D/fake_crawler_ok.py`: `_WCOMP_BASE = "https://wcomp.fnguide.com/CompanyInfo/"`, `_SNAPSHOT_URL: str = "https://wcomp.fnguide.com/CompanyInfo/Snapshot"`(`AnnAssign`), `Referer: https://wcomp.fnguide.com/` 헤더, `from .parser import to_num`, docstring의 `comp.fnguide.com` 언급, `_CONS_D_URL`·`_CONS_B_URL`·`read_consensus`를 둠. `$PY - $D/fake_crawler_ok.py < probe_from_doc.py` → `['_CONS_B_URL', '_CONS_D_URL'] ['read_consensus']` (기대 출력과 정확히 같음) |
+| D1 프로브 (3) 위반 가짜 크롤러 (대조) | `$D/fake_crawler_bad.py`(`read_fs`가 `http://comp.fnguide.com/SVO2/asp/SVD_Finance.asp`를 직접 요청) → `['_CONS_B_URL', '_CONS_D_URL'] ['read_consensus', 'read_fs']` (옛 호스트 사용을 여전히 잡음) |
+| D1 결함 재현 (v0.2.2 프로브) | 같은 준수 가짜에 v0.2.2 프로브(파일 경로만 인자로 바꿈) → `['_CONS_B_URL', '_CONS_D_URL', '_HEADERS', '_SNAPSHOT_URL', '_WCOMP_BASE'] ['_get', 'read_consensus', 'read_fs', 'read_snapshot']` — 감사 보고 D1과 같은 오판 |
+| D1 참고용 grep | `grep -nE "//comp\.fnguide\.com" $D/fake_crawler_ok.py` → `11:_CONS_D_URL = …01_06/01_A{code}_A_D.json"`, `12:_CONS_B_URL = …01_06/01_A{code}_A_B.json"` 두 줄뿐(같은 파일의 `wcomp.fnguide.com` 줄 3개는 나오지 않음) |
+| D2 판정식 | `$PY -c '…'`로 네 URL 평가. `https://wcomp.fnguide.com/CompanyInfo/getFinIncome \| substring: True \| hostname==: False \| 01_06: False` / `https://wcomp.fnguide.com/CompanyInfo/Snapshot \| substring: True \| hostname==: False \| 01_06: False` / `http://comp.fnguide.com/SVO2/json/data/01_06/01_A005930_A_D.json \| substring: True \| hostname==: True \| 01_06: True` / `https://comp.fnguide.com/SVO2/asp/SVD_Main.asp \| substring: True \| hostname==: True \| 01_06: False` — 부분 문자열은 wcomp에서도 `True`(결함), 호스트 이름 비교는 wcomp `False`·comp `True` |
+| D3 프로브 | `grep -n 'base_series.at\["매출액"\]' fnguide/dashboard.py` → `343:            base_revenue = float(base_series.at["매출액"])`; `sed -n '338,353p'`로 `except (KeyError, IndexError, ValueError):`가 349, 주석 350, `pass` 351임을 확인 |
+| D4 목록 출처 | `fs_analysis` 본문을 AST로 읽어 `df_invest`(설비투자·운전자산·금융투자·여유자금·기타)와 `df_financing`(신용조달·외부차입·기타)이 더하는 `df_fs_ann.loc[...]` 이름을 소스 순서로 추출 → `assets 19 same_order True same_set True`, `liabs 20 same_order True same_set True` (비교 대상: 감사자 독립 재구현 `scratchpad/auditor/indep.py`의 `ASSETS`·`LIABS` — AC-WC-007 고정값을 만든 목록) |
+| D5 README 판정 | acceptance.md 다섯째 명령을 그대로 실행 → 출력 없음, rc=1(README 미작성, plan 단계 정상). 출처 URL·`2026-10-07` 날짜를 담은 표본 → `README_OK`, 제목만 있는 표본 → 출력 없음 |
+| D5 저장 금지 판정 | acceptance.md 여섯째 명령을 그대로 실행 → `grep: fnguide/account_alias.py: No such file or directory` / `exit=2`(M2 전, 정상). `fnguide/crawler.py`만 → 출력 없음, `exit=1`. 네 쓰기 형태 대조 파일(`df.to_csv(p)`, `open(p, "w", …)`, `open(p, mode="wb")` + `pickle.dump`, `json.dump(d, open(p, "a"))`) → 3·4·5·6번 줄 모두 일치, `exit=0` |
+| D6 | `grep -nE '^(The\|When\|While\|Where\|- \()' spec.md \| grep -c 'crawler\.py:'` → `0` |
+| D7 lint | `moai spec lint .moai/specs/SPEC-FNGUIDE-WCOMP-001/spec.md` → 아래 블록. 경고 원인은 감사 보고의 진단대로 plan 커밋 제목이 정본 형식(`feat(SPEC-{ID}): plan-phase artifacts (…)`)이 아니기 때문으로 본다 — `git log --format='%h %s' -- …/spec.md` → `e0ee022 feat(SPEC-FNGUIDE-WCOMP-001): plan 산출물 5종 추가 (Tier M, PASS-WITH-DEBT)`. 판정 엔진 내부는 직접 보지 않았다. `status: draft`는 실제 상태이므로 frontmatter는 바꾸지 않는다 |
+| 임시 파일 정리 | `rm` 후 `ls $D` → 이번 개정에서 만든 파일(`probe_*.py`, `fake_crawler_ok.py`, `fake_crawler_bad.py`, `fake_writer.py`, `README_ok.md`, `README_bad.md`) 없음. 기존에 있던 다른 세션 파일(`ast_probe.py`, `ast_probe_fake.py`, `fake_crawler.py`, `p000660`)은 손대지 않음 |
+
+```
+$ moai spec lint .moai/specs/SPEC-FNGUIDE-WCOMP-001/spec.md
+SEVERITY  CODE                  FILE                                        LINE  MESSAGE
+--------  ----                  ----                                        ----  -------
+WARNING   StatusGitConsistency  .moai/specs/SPEC-FNGUIDE-WCOMP-001/spec.md  1     SPEC SPEC-FNGUIDE-WCOMP-001 frontmatter status 'draft' disagrees with git-implied status 'implemented'
+
+0 error(s), 1 warning(s)
+```
+
 ### v0.2.2 자체 점검
 
 | 항목 | 결과 |
 |---|---|
 | REQ / AC 개수 | 16 / 16 (새 사례는 기존 AC에 병합) |
 | 미확정 표지 | 다섯 파일 모두 0건 |
-| lint | `moai spec lint` 무결 |
+| lint | (v0.2.3 정정) 당시 "`moai spec lint` 무결"로 적었으나 plan 커밋 `e0ee022` 이후 실측은 0 errors, 1 warning(`StatusGitConsistency`) — 축자 출력은 v0.2.3 자체 점검 참조(plan-audit iteration 4 D7) |
 | AC-WC-015 4번 프로브 | acceptance.md에서 추출해 그대로 실행 — 현행 코드 출력 `['_CONS_B_URL', '_CONS_D_URL', '_FS_URL', '_SNAP_URL'] ['read_consensus', 'read_fs', 'read_snapshot']`(수정 전이므로 기대값과 불일치가 정상) |
 | 라이브 skip 상한 일관성 | 허용 1건, 옛 별도 후보 skip 4건과 `TestReadConsensus` error는 M6 과제로 제거 |
 
