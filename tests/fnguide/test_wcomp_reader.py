@@ -575,6 +575,14 @@ def test_ac_wc_009_redirect_followed_error_html_is_value_error(monkeypatch):
     assert any("/Error/InvalidCompany" in u for u in seen), "리디렉션을 따라가지 않았다"
 
 
+def test_ac_wc_009_malformed_json_body_is_value_error(site):
+    """HTML이 아닌데 형식이 다른 본문(dataset 키 없음)도 ValueError(404)다."""
+    for consol in ("C", "B"):
+        site["override"][("getFinIncome", "005930", "Y", consol)] = (200, b'{"x": 1}')
+    with pytest.raises(ValueError, match="005930"):
+        read_fs("005930")
+
+
 def test_ac_wc_009_contrast_no_dataset_check(site, monkeypatch):
     monkeypatch.setattr(crawler, "_check_dataset", lambda *a, **k: None)
     try:
