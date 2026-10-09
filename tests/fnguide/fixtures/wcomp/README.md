@@ -18,6 +18,10 @@ FnGuide 신사이트(`https://wcomp.fnguide.com/`)의 실제 응답을 테스트
 | 원본 그대로 (바이트가 판정에 쓰임) | `legacy_stub_1829.html`(1,829바이트, 표 1개), `getFinIncome_999999_Y_C.html`(1,668바이트, 본문이 `\r\n\n<!DOCTYPE`로 시작), `getFinIncome_005935_Y_C.json`(263바이트, `data=[]`), `snapshot_999999_object_moved.html`(193바이트, 302 응답 본문) |
 | 응답 헤더 (`HEADERS_*.txt`) | `curl -s -D - -o /dev/null`의 출력 그대로(plan.md §F.1 V-1). `HEADERS_999999_follow.txt`만 `curl -sL`(리디렉션 추종)로 받았다 |
 
+M3에서 대조 테스트(AC-WC-003 "항상 `C`", "항상 `B`" 되돌림)가 결정되지 않은 유형의 재무제표 전체를 요청하므로, plan 표본에 있던 403870 `C`와 005930 `B`의 나머지 다섯 응답을 같은 방법으로 추가했다(라이브 요청 없음).
+
+005935·999999는 `consol_typ=C`의 Income Y 응답만 있다. 테스트는 이 두 코드의 모든 요청에 같은 응답을 돌려준다 — 다른 엔드포인트·유형에서 사이트가 같은 본문을 주는지는 관측하지 않았다(M1 V-1에서 005935의 Balance·CashFlow 응답은 `content-length: 174`로 Income의 263바이트와 달랐다. 본문은 받지 않아 내용은 모른다).
+
 표본에 있었으나 이 SPEC의 테스트가 쓰지 않는 종목(000220 등 17종목의 Income, `consol_typ=P|I` 응답, `page_*.html`, 컨센서스·재무비율 페이지)은 넣지 않았다.
 
 ## 파일 목록 (원본 URL · 출처 · 캡처 시각, KST)
@@ -74,6 +78,16 @@ FnGuide 신사이트(`https://wcomp.fnguide.com/`)의 실제 응답을 테스트
 | `Snapshot_330590.html` | https://wcomp.fnguide.com/CompanyInfo/Snapshot?cmp_cd=330590 | M1 라이브 | 2026-10-07T23:15:58+09:00 |
 | `snapshot_005935_served_as_005930.html` | https://wcomp.fnguide.com/CompanyInfo/Snapshot?cmp_cd=005935 (사이트가 005930 페이지를 내줌) | plan 표본 | 2026-10-07T00:09:20+09:00 |
 | `snapshot_999999_object_moved.html` | https://wcomp.fnguide.com/CompanyInfo/Snapshot?cmp_cd=999999 (리디렉션을 따라가지 않은 302 본문) | plan 표본 | 2026-10-07T00:09:19+09:00 |
+| `getFinIncome_403870_Q_C.json` | https://wcomp.fnguide.com/CompanyInfo/getFinIncome?cmp_cd=403870&freq_typ=Q&consol_typ=C | plan 표본(M3 추가) | 2026-10-07T00:06:06+09:00 |
+| `getFinBalance_403870_Y_C.json` | https://wcomp.fnguide.com/CompanyInfo/getFinBalance?cmp_cd=403870&freq_typ=Y&consol_typ=C | plan 표본(M3 추가) | 2026-10-07T00:06:09+09:00 |
+| `getFinBalance_403870_Q_C.json` | https://wcomp.fnguide.com/CompanyInfo/getFinBalance?cmp_cd=403870&freq_typ=Q&consol_typ=C | plan 표본(M3 추가) | 2026-10-07T00:06:11+09:00 |
+| `getFinCashFlow_403870_Y_C.json` | https://wcomp.fnguide.com/CompanyInfo/getFinCashFlow?cmp_cd=403870&freq_typ=Y&consol_typ=C | plan 표본(M3 추가) | 2026-10-07T00:06:13+09:00 |
+| `getFinCashFlow_403870_Q_C.json` | https://wcomp.fnguide.com/CompanyInfo/getFinCashFlow?cmp_cd=403870&freq_typ=Q&consol_typ=C | plan 표본(M3 추가) | 2026-10-07T00:06:15+09:00 |
+| `getFinIncome_005930_Q_B.json` | https://wcomp.fnguide.com/CompanyInfo/getFinIncome?cmp_cd=005930&freq_typ=Q&consol_typ=B | plan 표본(M3 추가) | 2026-10-07T00:04:53+09:00 |
+| `getFinBalance_005930_Y_B.json` | https://wcomp.fnguide.com/CompanyInfo/getFinBalance?cmp_cd=005930&freq_typ=Y&consol_typ=B | plan 표본(M3 추가) | 2026-10-07T00:05:00+09:00 |
+| `getFinBalance_005930_Q_B.json` | https://wcomp.fnguide.com/CompanyInfo/getFinBalance?cmp_cd=005930&freq_typ=Q&consol_typ=B | plan 표본(M3 추가) | 2026-10-07T00:04:56+09:00 |
+| `getFinCashFlow_005930_Y_B.json` | https://wcomp.fnguide.com/CompanyInfo/getFinCashFlow?cmp_cd=005930&freq_typ=Y&consol_typ=B | plan 표본(M3 추가) | 2026-10-07T00:05:03+09:00 |
+| `getFinCashFlow_005930_Q_B.json` | https://wcomp.fnguide.com/CompanyInfo/getFinCashFlow?cmp_cd=005930&freq_typ=Q&consol_typ=B | plan 표본(M3 추가) | 2026-10-07T00:04:58+09:00 |
 | `HEADERS_005930.txt` | 세 엔드포인트, `cmp_cd=005930&freq_typ=Y&consol_typ=C` | M1 라이브(V-1) | 2026-10-07T23:16:20+09:00 |
 | `HEADERS_005935.txt` | 세 엔드포인트, `cmp_cd=005935&freq_typ=Y&consol_typ=C` | M1 라이브(V-1) | 2026-10-07T23:16:20+09:00 |
 | `HEADERS_999999.txt` | 세 엔드포인트, `cmp_cd=999999&freq_typ=Y&consol_typ=C` | M1 라이브(V-1) | 2026-10-07T23:16:20+09:00 |

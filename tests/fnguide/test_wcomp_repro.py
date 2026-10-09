@@ -53,14 +53,6 @@ def test_legacy_stub_fixture_is_the_observed_page():
     assert body.count(b"<table") == 1
 
 
-# M1은 수정 전 RED만 고정한다. 현재 코드는 parser.py:38에서 IndexError를 낸다.
-# strict=True이므로 M3에서 read_fs가 고쳐져 통과하면 XPASS가 실패로 바뀌어
-# 이 표지를 지우도록 강제한다. raises=IndexError라 다른 실패는 숨기지 않는다.
-@pytest.mark.xfail(
-    raises=IndexError,
-    strict=True,
-    reason="M1 RED 고정: read_fs 재작성(M3) 전까지 옛 안내 페이지에서 IndexError",
-)
 def test_ac_wc_001_legacy_stub_raises_value_error_with_code(legacy_stub_everywhere):
     """옛 안내 페이지를 받으면 read_fs가 종목 코드를 담은 ValueError를 낸다."""
     with pytest.raises(ValueError) as excinfo:
