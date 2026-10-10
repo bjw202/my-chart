@@ -706,6 +706,132 @@ TOTAL                        294    103    65%
 - 005935·999999는 Income Y `C` 응답 하나를 모든 요청에 돌려줬다(README).
 - `ruff`가 없어 새 코드 린트를 돌리지 못했다.
 
+### M4 — `read_snapshot` 재작성 (2026-10-10)
+
+#### M4 증거
+
+착수 기준: HEAD `3041d46`(M3), 같은 워크트리. GREEN 커밋 `9cb4b7c`.
+
+- `fnguide/crawler.py`: `read_snapshot(code, account_type="IFRS(연결)")`를 Snapshot HTML 1회 요청 리더로 바꿨다. 요청은 M3의 `_fetch`를 그대로 쓴다(재무제표 전용이던 `freq`·`consol` 인자를 선택 인자로 바꿈 — 타임아웃·헤더·상태 판정·리디렉션 기본값이 공용). 보조 함수는 `_label`, `_row_value`, `_check_snapshot_code`. 표 머리글은 숨은 설명 `<dl>`을 뺀 보이는 글자를 공백 없이 정확히 비교한다. 반환은 `(report, 빈 DataFrame, 빈 DataFrame)`이고 `account_type`은 받기만 한다.
+- `report` 키는 REQ-WC-013의 12개다(분석 코드가 읽는 키도 이 12개뿐 — `grep -n 'report\[\|report.get' fnguide/*.py backend -r | grep -v crawler.py` 결과 analyzer.py 165-169·229·257-261, dashboard.py 552·934·986). 옛 report에만 있던 `52주.최고가`·`거래대금(억원)`·`시가총액(보통주,억원)`·`액면가`·`유통주식수`·`유통주식비율`은 소비처가 없어 만들지 않는다. 페이지 라벨(`자사주`·`52주베타` 등)은 crawler.py 상단 상수로 두었고 `account_alias.py`는 바꾸지 않았다.
+- 옛 스냅샷 파서 전용이던 `_extract_snap_table`과 그 때문에만 쓰이던 `StringIO`·`lxml.html` import를 지웠다(`grep -rn -E "_extract_snap_table|read_snapshot|StringIO|BeautifulSoup|html\.fromstring|lxml" fnguide backend tests` 결과 `_extract_snap_table`·`StringIO`·`lxml`의 사용처는 옛 `read_snapshot` 본문뿐이었다).
+- 테스트: `tests/fnguide/test_wcomp_snapshot.py` 13건(AC-WC-011 3, AC-WC-012 9, 코드 형식 검증 1).
+- `analyze_dashboard("005930").company_name` 단언은 `get_fnguide`가 M5 전까지 옛 호스트 `read_consensus`를 부르므로, 그 두 테스트에서만 `crawler.read_consensus`를 빈 DataFrame을 돌려주는 함수로 바꿨다(소비처 없음 — spec §1.3). M5에서 호출이 사라지면 이 대체를 지운다.
+
+RED(구현 전, 테스트만 추가 — `git diff --stat -- fnguide` 출력 없음):
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_snapshot.py -q -p no:cacheprovider --tb=line -W ignore::UserWarning | grep -E "^E |^/|FAILED|passed|failed" | sort | uniq -c | sort -rn
+   9 E   NameError: name '_SNAP_URL' is not defined
+   9 /Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/fnguide/crawler.py:68: NameError: name '_SNAP_URL' is not defined
+   1 E   AttributeError: <module 'fnguide.crawler' …> has no attribute '_row_value'
+   1 E   AttributeError: <module 'fnguide.crawler' …> has no attribute '_NAME_ID'
+   1 E   AttributeError: <module 'fnguide.crawler' …> has no attribute '_check_snapshot_code'
+   (FAILED 줄 12개 생략 — 테스트 12건 모두)
+   1 12 failed in 0.58s
+```
+
+GREEN:
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_snapshot.py -q -p no:cacheprovider --tb=short -W ignore::UserWarning
+............                                                             [100%]
+12 passed in 1.13s
+$ … -k ac_wc_011 | tail -1
+3 passed, 9 deselected in 0.23s
+$ … -k ac_wc_012 | tail -1
+9 passed, 3 deselected in 1.15s
+```
+
+(코드 형식 검증 테스트는 GREEN 뒤 커버리지에서 `read_snapshot`의 검증 줄이 비어 추가했다 — 13건.)
+
+fixture로 `read_fs` + `read_snapshot`을 이어 부른 요청 기록(AC-WC-013 예산 8의 사전 확인, `get_fnguide` 수준 단언은 M5):
+
+```text
+read_snapshot ok: 삼성전자 1.27893 True True
+requests: 8 [('getFinIncome', 'Y', 'C'), ('getFinIncome', 'Y', 'B'), ('getFinIncome', 'Q', 'C'), ('getFinBalance', 'Y', 'C'), ('getFinBalance', 'Q', 'C'), ('getFinCashFlow', 'Y', 'C'), ('getFinCashFlow', 'Q', 'C'), ('Snapshot', None, None)]
+PER '42.05'
+12M PER '4.34'
+업종 PER '33.64'
+PBR '4.31'
+배당수익률 '0.60 %'
+```
+
+#### RED 관측 — AC-WC-011
+
+되돌림: `read_snapshot`의 `_check_snapshot_code(soup, code)` 호출을 `pass`로. 명령 `pytest tests/fnguide/test_wcomp_snapshot.py -k "ac_wc_011 and not contrast" --tb=line`, 이어서 같은 상태에서 005935 fixture로 직접 호출.
+
+```text
+E   Failed: DID NOT RAISE <class 'ValueError'>
+/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/tests/fnguide/test_wcomp_snapshot.py:87: Failed: DID NOT RAISE <class 'ValueError'>
+E   Failed: DID NOT RAISE <class 'ValueError'>
+/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/tests/fnguide/test_wcomp_snapshot.py:92: Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_011_served_as_other_company_raises
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_011_missing_cmp_cd_raises
+2 failed, 10 deselected in 0.21s
+probe read_snapshot("005935") 종목명 = 삼성전자
+$ git status --short
+?? .moai/logs/
+```
+
+예측("`#cmp_cd` 검사를 빼면 (a)가 예외 없이 `report["종목명"] == "삼성전자"`")과 일치. 999999(`#cmp_cd` 없는 302 본문)도 예외 없이 반환된다(반환된 report 내용은 출력하지 않았다).
+
+#### RED 관측 — AC-WC-012
+
+되돌림 1: `종목명` 대입을 `if False and …`로(채우지 않음). 되돌림 2(판별력 확인): `_row_value`의 정확 일치를 `startswith`로. 명령 `-k "ac_wc_012 and not contrast" --tb=line`, `-k ac_wc_012_treasury --tb=line`.
+
+```text
+(되돌림 1)
+E   AssertionError: assert {'12M PER', '...식수(우선주)', ...} >= {'12M PER', '...식수(우선주)', ...}
+E   KeyError: '종목명'   (company_name 4종목 각각)
+E   AssertionError: assert '005930' == '삼성전자'
+/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/tests/fnguide/test_wcomp_snapshot.py:143: AssertionError: assert '005930' == '삼성전자'
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_report_values_005930
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_company_name[403870-HPSP]
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_company_name[105560-KB금융]
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_company_name[001750-한양증권]
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_company_name[330590-롯데리츠]
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_analyze_dashboard_company_name
+6 failed, 1 passed, 5 deselected in 0.69s
+(되돌림 2)
+E   assert 1 == 0
+/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/tests/fnguide/test_wcomp_snapshot.py:134: assert 1 == 0
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_treasury_exact_row_only
+1 failed, 11 deselected in 0.22s
+$ git status --short
+?? .moai/logs/
+$ git diff --stat
+(출력 없음)
+```
+
+예측("`종목명`을 채우지 않으면 `company_name == "005930"`")과 일치. 판별력 근거로 적힌 "접두어 일치 구현은 조작본에서 `133670794` 또는 `1`"도 `1`(정확 `자사주` 행을 지운 뒤 `자사주(자사주+자사주신탁)` 행의 첫 칸 보유자 수)로 관측했다.
+
+#### 커버리지
+
+```text
+$ .venv/bin/python -m coverage run --data-file=<scratchpad>/.coverage --source=fnguide -m pytest tests/fnguide -q -p no:cacheprovider | tail -1
+170 passed, 94 deselected, 1 warning in 1.99s
+$ .venv/bin/python -m coverage report --data-file=<scratchpad>/.coverage --include='fnguide/crawler.py,fnguide/account_alias.py' -m
+Name                       Stmts   Miss  Cover   Missing
+--------------------------------------------------------
+fnguide/account_alias.py      13      0   100%
+fnguide/crawler.py           246     16    93%   438-461
+--------------------------------------------------------
+TOTAL                        259     16    94%
+```
+
+미달 438-461은 호출되지 않는 `read_consensus` 본문이다. 두 파일 모두 85% 이상.
+
+#### M4 발견 사항
+
+- `배당수익률` 값은 페이지 글자 그대로 `'0.60 %'`(퍼센트 기호 포함)다. 옛 값의 형태는 관측할 수 없고 analyzer는 `str(...)`로만 쓴다. `PER` 등도 문자열이다(옛 코드도 문자열).
+- 999999 스냅샷 fixture는 리디렉션을 따라가지 않은 302 본문이다. 실제 `requests`는 302를 따라가므로 운영에서 받는 최종 본문은 관측하지 않았다(research.md F-17 "추정, 미관측"). 어느 쪽이든 `#cmp_cd`가 요청 코드와 같을 수 없다는 가정에 기댄다.
+
+#### M4 미검증(Gaps)
+
+- `ruff` 없음(린트 미실행).
+- 001750·330590·105560 스냅샷은 회사명과 키 존재만 단언했고 수치는 고정하지 않았다(acceptance가 고정하지 않음).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

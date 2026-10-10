@@ -99,6 +99,13 @@ def test_ac_wc_011_contrast_no_cmp_cd_check(site, monkeypatch):
     assert report["종목명"] == "삼성전자"
 
 
+def test_snapshot_code_validation_no_request(site):
+    """REQ-WC-001: 코드 형식이 틀리면 요청 없이 ValueError."""
+    with pytest.raises(ValueError):
+        read_snapshot("00593a")
+    assert site["calls"] == []
+
+
 # ───────────────────────── AC-WC-012 ─────────────────────────
 
 
