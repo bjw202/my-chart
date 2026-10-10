@@ -201,6 +201,56 @@ WARNING   StatusGitConsistency  .moai/specs/SPEC-FNGUIDE-WCOMP-001/spec.md  1   
 plan_complete_at: 2026-10-07
 plan_status: audit-ready
 
+## §F Phase 4 Mode Selection
+
+기록 시점: 2026-10-07, 첫 run 단계 `Agent()` 호출 전. 선택 주체: 오케스트레이터(자율 결정, 질문 없음).
+
+### Phase 1 계획 감사 관문 결과
+
+| 항목 | 값 |
+|---|---|
+| 판정 | PASS 0.92 (iter5, Tier M 통과선 0.80) |
+| 보고서 | `.moai/reports/plan-audit/SPEC-FNGUIDE-WCOMP-001-review-5.md` (iter4 `review-4.md`는 FAIL 0.84, D1·D2 차단) |
+| 감사 대상 커밋 | `d6ed32e` (spec v0.2.3) |
+| 캐시 | 미스 (감사 보고서가 디스크에 없어 신규 실행) |
+| 선행 SPEC | SPEC-DASHBOARD-002 `status: completed` (grep으로 확인) |
+| 감사 3회 상한 | 초과(iter4·iter5). 사용자가 "SPEC 수정 후 재감사"를 선택해 명시적으로 계속 진행 |
+
+### 착수 승인 (Implementation Kickoff Approval)
+
+사용자 승인 완료(2026-10-07): 착수 / 현재 체크아웃 + 경로 지정 커밋 / 반자동(마일스톤마다 확인) / SPEC 수정분은 구현 전 커밋(`d6ed32e`), 푸시는 마지막.
+
+### 입력 매개변수
+
+| 항목 | 값 |
+|---|---|
+| tier | M |
+| 범위(파일 수) | 10개 이상 (`crawler.py` 재작성, 신규 `account_alias.py`, 신규 테스트 4개와 fixture, 기존 테스트 2개 수정) |
+| 영역 수 | 1 (파이썬 `fnguide/` 수집층) |
+| 파일 언어 구성 | 파이썬 + JSON fixture |
+| 동시 실행 이득 | 낮음 (코딩 중심, 마일스톤 간 의존) |
+| 개발 방법론 | `quality.yaml` `development_mode: tdd` |
+
+### 모드 평가표
+
+| 모드 | 판정 | 근거 |
+|---|---|---|
+| direct | 선택 안 함 | 사소한 수정이 아님 |
+| serial | **선택** | 코딩 중심 + 단일 영역, 마일스톤 M1~M6가 앞 결과에 의존 |
+| fanout | 선택 안 함 | 다영역 조사가 아니라 구현 작업 |
+| sweep | 선택 안 함 | 균일한 기계적 변환이 아니고 30개 파일 미만 |
+
+Decision: serial
+
+Justification: 작업이 단일 영역의 코딩 중심이며 M1(fixture·재현) 결과가 M2~M6 전부의 입력이 된다. Anthropic의 코딩 작업 병렬성 주의에 따라 마일스톤마다 `manager-develop` 한 개를 순차 호출한다. 진행 방식은 반자동이므로 마일스톤이 끝날 때마다 증거를 읽고 사용자에게 계속 여부를 묻는다. `/moai goal`은 무장하지 않는다(조건 선언형 연속 실행이 아니라 오케스트레이터가 직접 확인 단계를 둠).
+
+### 실행 환경
+
+- 작업 위치: primary 체크아웃, 브랜치 `main`, BASE `d6ed32e`. 경로 지정 스테이징만 사용(`git add -A` 금지).
+- 다른 세션: 살아 있는 세션 없음(세션 `caa73033`의 PID 48389 종료 확인).
+- 파이썬: `/Users/byunjungwon/Dev/my_chart/.venv/bin/python`.
+- 정정(2026-10-11): 위 '작업 위치' 줄은 계획 당시 서술이다. 실제 구현은 런타임이 구현 에이전트를 격리한 워크트리 브랜치 `worktree-agent-a20b6e0f16e957192`에서 수행됐고(BASE `d6ed32e`), 사용자 결정에 따라 모든 마일스톤과 감사 보강이 끝난 뒤 `main`에 `--ff-only`로 반영한다. 푸시는 별도 결정(공개 저장소)으로 보류했다. 이 §F 섹션 자체는 구현 전 `main` 체크아웃에서 작성돼 미커밋 상태였고, 반영 시점에 이 브랜치로 옮겨 보존했다.
+
 ## §E.2 Run-phase Evidence
 
 ### M1 — 재현, fixture, 확인 과제 (2026-10-07)
