@@ -10,12 +10,10 @@ import json
 import logging
 import re
 import time
-from io import StringIO
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from lxml import html
 
 from . import account_alias as aa
 from .parser import (
@@ -42,6 +40,22 @@ _STATEMENT_ORDER = _ENDPOINTS
 _RECENT_MARK = "(최근분기)"  # 연간 VAL4가 누적 YTD라는 사이트 표지 (spec D5)
 _BALANCE_TOLERANCE = 0.1  # 억원 (spec D7)
 
+# Snapshot HTML (REQ-WC-012·013). 표 머리글은 페이지 라벨이며 공백을 지운 뒤 정확히 비교한다.
+_CODE_ID = "cmp_cd"  # 페이지 종목 코드 hidden input
+_NAME_ID = "giName"  # 종목명
+_MARKET_CAP_LABEL = "시가총액(상장예정포함,억원)"
+_SHARES_LABEL = "발행주식수(보통주/우선주)"
+_TREASURY_LABEL = "자사주"
+_BETA_LABEL = "52주베타"
+# 설명 버튼 id → report 키
+_VALUATION_IDS = {
+    "h_per": "PER",
+    "h_12m": "12M PER",
+    "h_u_per": "업종 PER",
+    "h_pbr": "PBR",
+    "h_rate": "배당수익률",
+}
+
 # 옛 호스트 컨센서스 URL — read_consensus 전용으로 남김(호출되지 않음, spec §6)
 _CONS_D_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_D.json"
 _CONS_B_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_B.json"
@@ -49,145 +63,102 @@ _CONS_B_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_B.json"
 _CRAWL_DELAY = 0.1
 
 
+def _label(th) -> str:
+    """표 행 머리글의 보이는 글자만(숨은 설명 <dl> 제외) 공백 없이 반환한다."""
+    text = "".join(s for s in th.find_all(string=True) if s.find_parent("dl") is None)
+    return re.sub(r"\s+", "", text)
+
+
+def _row_value(soup: BeautifulSoup, label: str) -> str | None:
+    """머리글이 label과 정확히 같은 첫 행의 바로 옆 값 칸 글자. 그런 행이 없으면 None."""
+    for th in soup.find_all("th"):
+        if _label(th) == label:
+            td = th.find_next_sibling("td")
+            return td.get_text(strip=True) if td is not None else ""
+    return None
+
+
+def _check_snapshot_code(soup: BeautifulSoup, code: str) -> None:
+    """hidden #cmp_cd가 없거나 요청 코드와 다르면 ValueError(404) — 우선주 요청에 보통주
+    페이지를 내주는 둔갑을 막는다(REQ-WC-012, research.md F-15)."""
+    tag = soup.find(id=_CODE_ID)
+    page_code = tag.get("value") if tag is not None else None
+    if page_code != code:
+        raise ValueError(f"FnGuide 스냅샷이 요청 종목의 페이지가 아님 ({code}, 페이지 코드 {page_code})")
+
+
+# @MX:ANCHOR: [AUTO] 스냅샷 리더 — 시그니처와 report 키가 호출부 계약이다
+# @MX:REASON: get_fnguide가 read_snapshot(code, account_type)으로 부르고 dashboard·analyzer가 report의 키 이름(베타(1년)·종목명·Summary 등)을 그대로 읽는다. 키가 바뀌면 자기자본비용·회사명이 조용히 기본값이 된다
+# @MX:SPEC: SPEC-FNGUIDE-WCOMP-001
 def read_snapshot(
     code: str,
     account_type: str = "IFRS(연결)",
 ) -> tuple[dict, pd.DataFrame, pd.DataFrame]:
-    """FnGuide 스냅샷 페이지를 크롤링한다.
+    """FnGuide 신사이트(wcomp) Snapshot HTML을 한 번 요청해 report를 만든다.
 
     Args:
-        code: 종목 코드 (6자리 숫자 문자열)
-        account_type: 'IFRS(연결)' 또는 'IFRS(별도)'
+        code: 종목 코드(6자리 숫자 문자열)
+        account_type: 기존 호출부 호환용으로 받기만 하고 쓰지 않는다(REQ-WC-013)
 
     Returns:
-        (report, df_snap, df_snap_ann)
-        - report: 종가, 시가총액, 발행주식수 등 주요 지표 dict
-        - df_snap: 분기 스냅샷 DataFrame
-        - df_snap_ann: 연간 예상 포함 스냅샷 DataFrame
+        (report, 빈 DataFrame, 빈 DataFrame) — 스냅샷 시계열은 소비처가 없어 비운다(spec §6)
+
+    Raises:
+        ValueError: 코드 형식 오류, 페이지의 #cmp_cd가 없거나 요청 코드와 다름 — 라우터 404
+        ConnectionError: 전송 실패·2xx 밖 상태 — 라우터 503
     """
-    snap_url = _SNAP_URL.format(code=code)
-    snap_page = requests.get(snap_url)
-    snap_tables = pd.read_html(StringIO(snap_page.text))
-
-    # tbody.text 파싱: 이름/값 교대 구조
-    soup = BeautifulSoup(snap_page.text, "html.parser")
-    tbody = soup.tbody
-    if tbody is None:
-        raise ValueError(f"FnGuide 스냅샷 페이지에서 tbody를 찾을 수 없습니다: {code}")
-    temp = tbody.text.split("\n")
-
-    cnt = 0
-    name: list[str] = []
-    value: list[str] = []
-    for txt in temp:
-        if txt != "":
-            if cnt % 2 == 0:
-                name.append(txt)
-            else:
-                value.append(txt)
-            cnt += 1
-
-    # 이름-값 쌍을 dict로 변환하여 위치 의존성 제거
-    nv_lookup: dict[str, str] = {}
-    for n, v in zip(name, value):
-        nv_lookup[n] = v
+    if not isinstance(code, str) or not _CODE_RE.fullmatch(code):
+        raise ValueError(f"종목 코드 형식 오류(6자리 숫자): {code!r}")
+    resp = _fetch("Snapshot", code)
+    soup = BeautifulSoup(resp.content.decode("utf-8", errors="replace"), "html.parser")
+    _check_snapshot_code(soup, code)
 
     report: dict = {}
+    report["시가총액(상장예정포함,억원)"] = to_num(_row_value(soup, _MARKET_CAP_LABEL) or "")
+    shares = (_row_value(soup, _SHARES_LABEL) or "").split("/")
+    report["발행주식수(보통주)"] = to_num(shares[0].strip())
+    report["발행주식수(우선주)"] = to_num(shares[1].strip()) if len(shares) > 1 else 0
+    # 정확히 '자사주'인 행만 쓴다. '자사주(자사주+자사주신탁)' 행은 첫 칸이 보유자 수다.
+    treasury = _row_value(soup, _TREASURY_LABEL)
+    report["자기주식"] = to_num(treasury) if treasury is not None else 0
+    report["베타(1년)"] = to_num(_row_value(soup, _BETA_LABEL) or "")
 
-    # 이름 기반 탐색 (위치 의존성 제거)
-    def _find_value(keyword: str) -> str:
-        """이름에 keyword를 포함하는 첫 번째 값을 반환한다."""
-        for n, v in zip(name, value):
-            if keyword in n:
-                return v
-        return ""
+    # PER 등은 corp_group2의 설명 버튼이 든 <li> 다음 <li>에 값이 있다
+    for button_id, key in _VALUATION_IDS.items():
+        button = soup.find(id=button_id)
+        item = button.find_parent("li") if button is not None else None
+        value = item.find_next_sibling("li") if item is not None else None
+        report[key] = value.get_text(strip=True) if value is not None else ""
 
-    high_low = _find_value("52주")
-    if "/" in high_low:
-        high, low = high_low.split("/")
-        report["52주.최고가"] = to_num(high)
-        report["52주.최저가"] = to_num(low)
+    summary = soup.find(id="bizSummaryContent")
+    report["Summary"] = "\n" + "".join(
+        li.get_text().replace("\xa0", " ") + "   "
+        for li in (summary.find_all("li") if summary is not None else [])
+    )
 
-    report["거래대금(억원)"] = to_num(_find_value("거래대금"))
-    report["시가총액(상장예정포함,억원)"] = to_num(_find_value("시가총액(상장예정포함"))
-    report["베타(1년)"] = to_num(_find_value("베타"))
-    report["시가총액(보통주,억원)"] = to_num(_find_value("시가총액(보통주)"))
-    report["액면가"] = to_num(_find_value("액면가"))
+    name = soup.find(id=_NAME_ID)
+    if name is not None:
+        report["종목명"] = name.get_text(strip=True)
 
-    shares_str = _find_value("발행주식수")
-    if "/" in shares_str:
-        botong, usun = shares_str.split("/")
-        report["발행주식수(보통주)"] = to_num(botong)
-        report["발행주식수(우선주)"] = to_num(usun)
-    else:
-        report["발행주식수(보통주)"] = to_num(shares_str)
-        report["발행주식수(우선주)"] = 0
-
-    udong_str = _find_value("유동주식수")
-    if "/" in udong_str:
-        udong, udong_ratio = udong_str.split("/")
-        report["유통주식수"] = to_num(udong)
-        report["유통주식비율"] = to_num(udong_ratio)
-    else:
-        report["유통주식수"] = to_num(udong_str)
-        report["유통주식비율"] = 0
-
-    # 사업 요약 (bizSummaryContent)
-    ul = soup.find(id="bizSummaryContent")
-    summary = "\n"
-    if ul is not None:
-        for element in ul.find_all("li"):
-            summary += element.text.replace("\xa0", " ") + "   "
-    report["Summary"] = summary
-
-    # 자기주식 (tables[4] 기준)
-    tables = soup.find_all("table")
-    treasury_table = tables[4] if len(tables) > 4 else None
-    td: list[list[str]] = []
-    if treasury_table is not None:
-        for row in treasury_table.find_all("tr"):
-            cols = row.find_all("td")
-            td.append([x.text.strip() for x in cols])
-    report["자기주식"] = to_num(td[5][1]) if len(td) > 5 else 0
-
-    # PER/PBR 등 valuation 지표 (lxml XPath)
-    tree = html.fromstring(snap_page.content)
-    report["PER"] = snap_tables[8].iloc[4, 1]
-    report["12M PER"] = tree.xpath('//*[@id="corp_group2"]/dl[2]/dd/text()')[0]
-    report["업종 PER"] = tree.xpath('//*[@id="corp_group2"]/dl[3]/dd/text()')[0]
-    report["PBR"] = tree.xpath('//*[@id="corp_group2"]/dl[4]/dd/text()')[0]
-    report["배당수익률"] = tree.xpath('//*[@id="corp_group2"]/dl[5]/dd/text()')[0]
-
-    # 연결/별도에 따라 스냅샷 테이블 인덱스 다름
-    if account_type == "IFRS(연결)":
-        df_snap = _extract_snap_table(snap_tables[10])
-        df_snap_ann = _extract_snap_table(snap_tables[11])
-    else:
-        df_snap = _extract_snap_table(snap_tables[13])
-        df_snap_ann = _extract_snap_table(snap_tables[14])
-
-    return report, df_snap, df_snap_ann
+    return report, pd.DataFrame(), pd.DataFrame()
 
 
-def _extract_snap_table(df_temp: pd.DataFrame) -> pd.DataFrame:
-    """멀티레벨 컬럼을 가진 스냅샷 테이블을 정리한다."""
-    col_name1, col_name2 = df_temp.columns[0]
-    new_index = df_temp[col_name1][col_name2]
-    df_temp = df_temp.set_index(new_index)
-    return df_temp.drop((col_name1, col_name2), axis=1)  # type: ignore[arg-type]
-
-
-def _fetch(endpoint: str, code: str, freq: str, consol: str) -> requests.Response:
-    """재무제표 JSON 한 건을 요청한다.
+def _fetch(
+    endpoint: str, code: str, freq: str | None = None, consol: str | None = None
+) -> requests.Response:
+    """wcomp 페이지 한 건을 요청한다(재무제표 JSON은 freq·consol, 스냅샷은 코드만).
 
     전송 실패와 2xx 밖 상태는 ConnectionError(라우터 503)로 바꾼다(REQ-WC-003).
     리디렉션은 requests 기본값대로 따라간다 — 없는 종목은 302 뒤 200 HTML 오류
     페이지가 오며, 이 본문이 ValueError(404)가 되어야 한다(M1 V-1).
     """
+    params = {"cmp_cd": code}
+    if freq is not None:
+        params.update(freq_typ=freq, consol_typ=consol)
     try:
         resp = requests.get(
             _WCOMP_BASE + endpoint,
-            params={"cmp_cd": code, "freq_typ": freq, "consol_typ": consol},
+            params=params,
             headers=_HEADERS,
             timeout=_TIMEOUT,
         )
