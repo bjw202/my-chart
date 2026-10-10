@@ -630,6 +630,36 @@ $ git status --short
 
 예측("`read_fs("005935")`가 `ValueError`를 내지 않는다 — 다른 예외로 샘")과 일치: null 기간이 `_period`의 정규식에서 `TypeError`로 샌다(라우터는 503이 된다). (a) HTML·(e) 코드 검증·리디렉션 사례는 이 검사와 무관해 통과했다.
 
+**2026-10-11 재관측(감사 보강 F10 뒤, 커밋 `7ba072a` 위).** 스위트의 대조 `test_ac_wc_009_contrast_no_dataset_check`가 이제 `pytest.raises(TypeError)`만 인정한다(전에는 `ValueError`가 아닌 모든 예외를 통과시켰다). 되돌림: `_parse`의 `_check_dataset(...)` 호출을 `pass`로. 명령 `pytest tests/fnguide/test_wcomp_reader.py tests/test_analysis_api_wcomp.py -k ac_wc_009 -rA --tb=line`.
+
+```text
+E   TypeError: expected string or bytes-like object, got 'NoneType'   (3회)
+<py>/re/__init__.py:167: TypeError: expected string or bytes-like object, got 'NoneType'
+E   assert 503 == 404
+tests/test_analysis_api_wcomp.py:123: assert 503 == 404
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_a_error_html
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_e_code_validation_no_request[00593a]
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_e_code_validation_no_request[０05930]
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_e_code_validation_no_request[5930]
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_redirect_followed_error_html_is_value_error
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_malformed_json_body_is_value_error
+PASSED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_contrast_no_dataset_check
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_009_router_error_page_and_empty_dataset_are_404[999999]
+FAILED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_b_empty_dataset - T...
+FAILED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_c_null_header_checked_before_alignment
+FAILED tests/fnguide/test_wcomp_reader.py::test_ac_wc_009_d_fewer_than_four_periods
+FAILED tests/test_analysis_api_wcomp.py::test_ac_wc_009_router_error_page_and_empty_dataset_are_404[005935]
+4 failed, 8 passed, 50 deselected in 0.75s
+(복원 후)
+$ git status --short
+?? .moai/logs/
+?? .moai/reports/sync-audit/
+$ git diff --stat
+(출력 없음)
+```
+
+긍정 테스트 3건이 M3 기록과 같은 `TypeError`로 실패했고, M5에서 생긴 라우터 사례(005935)도 404 대신 503으로 실패했다(실패 4건 — M3 시점에는 라우터 테스트가 없었다). 고친 대조는 통과했다.
+
 #### RED 관측 — AC-WC-010
 
 되돌림: `_fetch`의 `requests.get`에서 `timeout=_TIMEOUT` 인자를 지움. 명령 `-k "ac_wc_010 and not contrast" --tb=line`.
@@ -937,6 +967,24 @@ $ git diff --stat -- fnguide
 
 예측("기록된 URL에 `comp.fnguide.com/SVO2/json/data/01_06/`이 나타난다 — 호스트 이름 `comp.fnguide.com`, `01_06` 포함, 두 단언 모두 실패")과 일치: 옛 호스트 판정(`old_host`)과 `01_06` 판정이 같은 URL 하나로 함께 실패했고, 새 호스트 밖 요청 판정(`not_new_host`)도 실패했다. 복원 직후 `git status`의 테스트 세 파일 수정은 이 관측 당시 아직 커밋 전이던 M6 테스트 정리이며(곧 `0219614`로 커밋), `fnguide/`의 변경은 없었다.
 
+**2026-10-11 재관측(감사 보강 F9 뒤, 커밋 `7ba072a` 위).** 스위트의 대조 `test_ac_wc_013_contrast_consensus_request_is_caught`가 이제 `read_consensus`를 따로 부르지 않고, `get_fnguide`가 부르는 `crawler.read_snapshot`을 감싸 실제 `get_fnguide` 경로에서 컨센서스 요청이 나가게 한 뒤 판정한다. 되돌림: `get_fnguide`의 `df_cons = pd.DataFrame()`을 `time.sleep(_CRAWL_DELAY)` + `df_cons = read_consensus(code, account_type)`로. 명령 `pytest tests/fnguide/test_wcomp_snapshot.py -k ac_wc_013 -rA --tb=line`.
+
+```text
+E   AssertionError: assert {'01_06': ['h...30_A_D.json']} == {'01_06': [],...old_host': []}
+tests/fnguide/test_wcomp_snapshot.py:205: AssertionError: assert {'01_06': ['h...30_A_D.json']} == {'01_06': [],...old_host': []}
+PASSED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_013_contrast_consensus_request_is_caught
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_013_eight_tuple_and_no_consensus_request
+1 failed, 1 passed, 13 deselected in 0.91s
+(복원 후)
+$ git status --short
+?? .moai/logs/
+?? .moai/reports/sync-audit/
+$ git diff --stat
+(출력 없음)
+```
+
+긍정 테스트는 앞의 기록과 같이 URL 판정에서 실패했고, 고친 대조는 통과했다.
+
 #### M5 미검증(Gaps)
 
 - AC-WC-013 되돌림 관측은 M5에서 예외가 URL 단언보다 먼저 났다 — M6에서 테스트 순서를 고쳐 다시 관측했다(위).
@@ -1107,6 +1155,63 @@ TOTAL                        258     11    96%
 - 라우터의 동기 크롤링(최악 8회 × 10초)과 `robots.txt` `Disallow: /`는 바꾸지 않은 기존 자세다(spec §5, plan §B.3).
 - `ruff`가 없어 린트를 돌리지 못했다.
 
+#### 독립 감사 결과와 부채
+
+- 감사: sync-auditor, 대상 HEAD `8dfc739`(기준 `d6ed32e`). 판정 **PASS-WITH-DEBT**, 차단 결함 없음.
+- 점수: Functionality 92, Security 88, Craft 86, Consistency 92 — 가중 89.8, 조화 평균 89.4. TRUST 5 종합 WARNING(Unified만 WARNING — `ruff` 부재).
+- 보고서: `.moai/reports/sync-audit/SPEC-FNGUIDE-WCOMP-001-run-review-1.md` — 워크트리의 로컬 미추적 산출물이며 커밋하지 않는다.
+- 아래 보강 커밋(`7ba072a` 이후)은 감사 대상 HEAD 뒤에 나왔다. 감사는 이 보강을 보지 않았다.
+
+| ID | 등급 | 내용(요약) | 처분 |
+|---|---|---|---|
+| F1 | suggestion | `_fetch`가 다른 호스트로의 리디렉션 끝 응답을 믿는다 | **이번에 수정**(`7ba072a`) — 최종 URL 호스트를 `wcomp.fnguide.com`과 정확히 비교, 다르면 `ConnectionError` |
+| F2 | suggestion | 응답 본문 크기 상한 없음 | 수용한 부채 — 요청 시에만 받는 응답(관측 최대: 재무제표 약 40KB, 스냅샷 약 160KB), 감사도 "지금은 불필요" |
+| F3 | suggestion | 경고 로그에 응답 유래 행 이름이 그대로 들어가 줄바꿈 삽입 가능 | 수용한 부채 — 상류 침해가 전제, 로그 형식 변경은 이번 범위 밖 |
+| F4 | suggestion | 예외 메시지에 상류 예외 글자가 들어가고 라우터가 그대로 내보냄 | 수용한 부채 — 내보내는 쪽은 라우터이며 REQ-WC-015가 라우터 수정을 금지, 비밀 노출 없음 |
+| F5 | suggestion | `_to_float`가 `NaN`·`inf`·`1_000`을 받아들임 | 수용한 부채 — 관측한 셀 19,685개가 모두 숫자 문자열 또는 null(감사 집계), 추측성 |
+| F6 | suggestion | 다중 행 보정이 0행일 때는 채우지 않음(REQ-WC-008 문구와 차이) | 수용한 부채 — M3 발견 사항에 기록한 의도된 선택(D8과 정합), 문구 정정은 sync 때 manager-spec 판단 |
+| F7 | suggestion | `#giName`이 없으면 `종목명` 키를 빼서 REQ-WC-013 문구와 차이 | 수용한 부채 — `dashboard.py:934`의 코드 대체값이 키 부재에 기대므로 현재 동작이 낫다(감사 동의) |
+| F8 | suggestion | 테스트 세 파일의 가짜 사이트 헬퍼 중복 | 수용한 부채 — 테스트 구조 정리는 이번 보강 범위 밖 |
+| F9 | warning | AC-WC-013 대조가 운영 경로를 되돌리지 않음 | **이번에 수정**(`7ba072a`) — `get_fnguide`가 부르는 `read_snapshot`을 감싸 실제 경로에서 컨센서스 요청 |
+| F10 | suggestion | AC-WC-009 대조가 모든 예외를 삼킴 | **이번에 수정**(`7ba072a`) — `pytest.raises(TypeError)`만 인정 |
+| F11 | suggestion | 별칭 테스트가 상수를 다시 적고 spec.md를 실행 시 읽음(SPEC 이동 시 깨짐) | 수용한 부채 — spec.md D7과의 일치가 이 테스트의 목적, SPEC 보관 시 다시 판단 |
+| F12 | warning | `ruff` 미설치로 린트·포맷 미실행 | 수용한 부채 — 이 환경에 ruff가 없고 공용 venv에 설치하지 않는다는 원칙 |
+
+감사의 Gaps(감사자가 관측하지 않은 것): 라이브 게이트(AC-WC-015 3번, AC-WC-016)는 네트워크 금지로 재현하지 않고 기록만 읽음. 사용자 몫 수동 확인 2건(005930 지표 화면 대조, HPSP 모달). 대조 AC의 소스 되돌림은 AC-WC-001·005·007·009 네 건만 독립 재현(나머지는 스위트 `_contrast`와 이 기록에 기댐). 린트·포맷 미실행. 교차 모델 의견 없음. 2026-10-07 캡처 밖의 실사이트 동작(다른 호스트 리디렉션 포함)과 12월 결산 직후 실물 열 모양.
+
+#### 감사 보강 증거
+
+착수 기준: HEAD `8dfc739`. 보강 커밋 `7ba072a`. 라이브 요청 없음.
+
+F1 RED(호스트 검사 추가 전, 테스트만 추가 — `git diff --stat -- fnguide` 출력 없음). 가짜 전송층이 wcomp 요청에 `https://example.com/…`로 302를 주고, 그 호스트가 정상 JSON fixture를 돌려준다. `requests`의 실제 리디렉션 처리를 거친다.
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide/test_wcomp_reader.py -q -p no:cacheprovider -k redirect_to_other_host --tb=line -p no:logging -W ignore::UserWarning | tail -5
+005930 정합성 검사 건너뜀: 분기 표에 '부채' 행 없음
+/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-a20b6e0f16e957192/tests/fnguide/test_wcomp_reader.py:596: Failed: DID NOT RAISE <class 'ConnectionError'>
+=========================== short test summary info ============================
+FAILED tests/fnguide/test_wcomp_reader.py::test_ac_wc_010_redirect_to_other_host_is_connection_error
+1 failed, 52 deselected in 0.22s
+```
+
+다른 호스트의 본문이 데이터로 받아들여져 예외 없이 반환됐다(경고는 모든 요청이 같은 연간 손익 본문을 받아 생긴 것).
+
+F1 GREEN(`_fetch`에 최종 URL 호스트 정확 비교 추가 — 8줄):
+
+```text
+$ … -k redirect | tail -2
+..                                                                       [100%]
+2 passed, 51 deselected in 0.22s
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests/test_analysis_api.py tests/test_analysis_api_wcomp.py -q -p no:cacheprovider | tail -1
+198 passed, 92 deselected, 1 warning in 3.48s
+```
+
+기존 999999 리디렉션 테스트(같은 호스트의 `/Error/InvalidCompany` → 200 HTML → `ValueError`)도 함께 통과했다. F9·F10 뒤 문서화된 명령: `-k ac_wc_013` → `2 passed, 13 deselected`, AC-WC-009 두 파일 `-k ac_wc_009` → `12 passed, 50 deselected`(테스트 수 변화 없음), AC-WC-010 두 파일 → `8 passed, 54 deselected`(F1 테스트 1건 추가로 7 → 8).
+
+커버리지(워크트리 `.venv`): `fnguide/account_alias.py 13 0 100%`, `fnguide/crawler.py 249 11 96%`(남은 11줄은 호출되지 않는 `read_consensus`).
+
+미검증: F1은 오프라인에서만 확인했다. 실사이트에 대고 다시 확인하지 않았다(이번 회차는 라이브 요청 금지). M6 라이브 실행의 302 두 건은 모두 같은 호스트 안의 리디렉션이었다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 **작성자**: manager-develop (run 단계)
@@ -1116,7 +1221,7 @@ TOTAL                        258     11    96%
 run_complete_at: 2026-10-11
 run_status: audit-ready
 run_base_sha: d6ed32e
-run_commit_sha: 3cb5168   # §E.2·§E.3을 담은 M6 커밋(SHA는 후속 커밋에서 채움)
+run_commit_sha: pending-backfill   # 감사 보강 기록을 담은 마지막 progress.md 커밋(후속 커밋에서 채움)
 run_branch: worktree-agent-a20b6e0f16e957192   # main 통합·push 전
 m1_to_mN_commit_strategy: milestone별 커밋, main 직접 커밋 대신 격리 워크트리 브랜치(통합은 마지막에 사용자 결정)
 run_commits:
@@ -1129,10 +1234,16 @@ run_commits:
   - b4bf7ba  # M5 get_fnguide 정리
   - 5d021cb  # M5 증거
   - 0219614  # M6 테스트 정리·AC-WC-013 보강
+  - 3cb5168  # M6 게이트·라이브 결과
+  - 8dfc739  # M6 run_commit_sha 채움 (감사 대상 HEAD)
+  - 7ba072a  # 감사 보강 F1·F9·F10
 ac_pass_count: 16
 ac_fail_count: 0
 red_observation_headings: 13   # AC-WC-001~013
-offline_suite: "197 passed, 92 deselected"
+offline_suite: "198 passed, 92 deselected"
+audit_verdict: PASS-WITH-DEBT   # sync-auditor, HEAD 8dfc739, 가중 89.8
+audit_report: .moai/reports/sync-audit/SPEC-FNGUIDE-WCOMP-001-run-review-1.md (local, untracked)
+audit_debt_accepted: [F2, F3, F4, F5, F6, F7, F8, F11, F12]
 live_suite: "92 passed, 188 deselected, skipped 0, 요청 80건"
 coverage: {crawler.py: 96%, account_alias.py: 100%}
 new_warnings_or_lints_introduced: unknown   # ruff 미설치로 미측정
