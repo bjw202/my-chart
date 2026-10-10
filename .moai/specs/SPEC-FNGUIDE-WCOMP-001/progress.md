@@ -1116,7 +1116,7 @@ TOTAL                        258     11    96%
 run_complete_at: 2026-10-11
 run_status: audit-ready
 run_base_sha: d6ed32e
-run_commit_sha: pending-backfill   # 이 기록을 담은 M6 마지막 커밋 — 커밋 자신의 SHA는 담을 수 없어 보고서와 다음 커밋에서 채운다
+run_commit_sha: 3cb5168   # §E.2·§E.3을 담은 M6 커밋(SHA는 후속 커밋에서 채움)
 run_branch: worktree-agent-a20b6e0f16e957192   # main 통합·push 전
 m1_to_mN_commit_strategy: milestone별 커밋, main 직접 커밋 대신 격리 워크트리 브랜치(통합은 마지막에 사용자 결정)
 run_commits:
