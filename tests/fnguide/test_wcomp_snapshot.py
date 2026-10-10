@@ -195,14 +195,22 @@ def test_ac_wc_013_eight_tuple_and_no_consensus_request(site):
     from fnguide.crawler import get_fnguide
 
     assert list(inspect.signature(get_fnguide).parameters) == ["code"]
-    result = get_fnguide("005930")
+    error: Exception | None = None
+    try:
+        result = get_fnguide("005930")
+    except Exception as e:  # noqa: BLE001 — 요청 기록 판정을 먼저 보고 아래에서 다시 던진다
+        error = e
+    # 호스트 판정은 예외 여부와 무관하게 먼저 본다: 옛 호스트 요청이 끼면 그 응답을
+    # 파싱하다 예외가 나기 쉬워, 예외부터 보면 URL 단언이 가려진다.
+    assert _host_violations(site["calls"]) == {"old_host": [], "01_06": [], "not_new_host": []}
+    assert len(site["calls"]) <= 8
+    if error is not None:
+        raise error
     assert len(result) == 8
     for pos in (2, 3, 4):
         assert isinstance(result[pos], pd.DataFrame) and result[pos].empty
     assert result[6] == "IFRS(연결)"
     assert isinstance(result[7], pd.DataFrame)
-    assert _host_violations(site["calls"]) == {"old_host": [], "01_06": [], "not_new_host": []}
-    assert len(site["calls"]) <= 8
 
 
 def test_ac_wc_013_contrast_consensus_request_is_caught(site):

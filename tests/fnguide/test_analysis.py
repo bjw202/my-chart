@@ -231,7 +231,8 @@ class TestFsAnalysisSeparate:
         """IFRS(별도) 재무 분석 결과"""
         from fnguide.crawler import read_fs
 
-        candidates = ["003550", "015760", "034020"]
+        # 신사이트 선택 규칙(SPEC-FNGUIDE-WCOMP-001 REQ-WC-004)에서 별도로 판정되는 실측 종목
+        candidates = ["403870", "330590", "476830"]
         for code in candidates:
             try:
                 account_type, df_fs_ann, df_fs_quar, _ = read_fs(code)
@@ -258,8 +259,9 @@ class TestFsAnalysisSeparate:
             pytest.skip("IFRS(별도) 종목을 찾지 못함")
         df_anal, df_fs_ann = separate_analysis
         yearly_cols = [c for c in df_anal.columns if "/" in str(c)]
-        # 최근 연도 기준 비교
-        col = yearly_cols[-1]
+        # 완결 연도 기준 비교: 마지막 열은 fs_analysis가 Trailing 12M으로 덮어쓰고
+        # df_fs_ann의 같은 열은 누적 YTD라, 마지막 연간 열이 부분 연도면 두 값이 다르다
+        col = yearly_cols[-2]
         controlling = df_anal.loc["지배주주순이익", col]
         # IFRS(별도) 는 당기순이익 = 지배주주순이익
         net_income = df_fs_ann.loc["당기순이익", col]

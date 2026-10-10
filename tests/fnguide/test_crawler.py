@@ -79,8 +79,8 @@ class TestReadFsSeparate:
     @pytest.fixture(scope="class")
     def separate_fs(self):
         """IFRS(별도) 종목 재무제표 — 후보 코드 중 별도 종목을 탐색"""
-        # LG 등 별도 회계 가능성이 높은 후보들을 시도
-        candidates = ["003550", "015760", "034020"]
+        # 신사이트 선택 규칙(SPEC-FNGUIDE-WCOMP-001 REQ-WC-004)에서 별도로 판정되는 실측 종목
+        candidates = ["403870", "330590", "476830"]
         for code in candidates:
             try:
                 result = read_fs(code)
@@ -159,41 +159,14 @@ class TestReadSnapshot:
         for key in required_keys:
             assert key in report, f"report 에 '{key}' 키가 없음"
 
-    def test_characterize_snap_dataframes_not_empty(self, samsung_snapshot):
-        """스냅샷 DataFrame 이 비어 있지 않음"""
+    def test_characterize_snap_dataframes_are_empty(self, samsung_snapshot):
+        """스냅샷 시계열은 소비처가 없어 빈 DataFrame으로 반환된다(SPEC-FNGUIDE-WCOMP-001 REQ-WC-013)"""
         result, error = samsung_snapshot
         if result is None:
             pytest.skip(f"read_snapshot 호환성 문제로 스킵: {error[:100] if error else ''}")
-        _, df_snap, df_snap_ann = result
-        assert df_snap.shape[0] > 0
-        assert df_snap_ann.shape[0] > 0
-
-
-# ─────────────────────────────────────────────────────────────
-# REQ-C-004: read_consensus 컨센서스 데이터
-# ─────────────────────────────────────────────────────────────
-
-
-@pytest.mark.live
-class TestReadConsensus:
-    """REQ-C-004: 삼성전자 컨센서스 크롤링 특성 테스트"""
-
-    @pytest.fixture(scope="class")
-    def samsung_consensus(self):
-        """삼성전자 컨센서스 DataFrame"""
-        from fnguide.crawler import read_consensus
-        return read_consensus("005930")
-
-    def test_characterize_not_empty(self, samsung_consensus):
-        """컨센서스 DataFrame 이 비어 있지 않음"""
-        assert samsung_consensus.shape[0] > 0
-        assert samsung_consensus.shape[1] > 0
-
-    def test_characterize_column_format_yyyy_mm(self, samsung_consensus):
-        """컬럼명이 'YYYY/MM' 형식"""
-        for col in samsung_consensus.columns:
-            parts = str(col).split("/")
-            assert len(parts) == 2
+        report, df_snap, df_snap_ann = result
+        assert df_snap.empty and df_snap_ann.empty
+        assert report["종목명"] == "삼성전자"
 
 
 # ─────────────────────────────────────────────────────────────
