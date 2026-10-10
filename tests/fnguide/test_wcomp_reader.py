@@ -637,3 +637,13 @@ def test_ac_wc_010_contrast_no_timeout(site, monkeypatch):
     monkeypatch.setattr(crawler, "_TIMEOUT", None)
     read_fs("005930")
     assert ("timeout", None) in _hygiene_violations(site["calls"], "005930")
+
+
+# ───────────────────────── AC-WC-014 (불변) ─────────────────────────
+
+
+@pytest.mark.parametrize("code,account_type", [("105560", "IFRS(연결)"), ("001750", "IFRS(별도)")])
+def test_ac_wc_014_financial_layout_reads_without_alias(site, code, account_type):
+    result = read_fs(code)
+    assert len(result) == 4 and result[0] == account_type
+    assert "매출액" not in result[1].index  # 금융 레이아웃에는 별칭을 적용하지 않는다

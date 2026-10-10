@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 import pytest
@@ -55,6 +57,9 @@ def site(monkeypatch):
 
     def fake_request(self, method, url, **kwargs):
         state["calls"].append({"url": url, **kwargs})
+        if urlparse(url).hostname != "wcomp.fnguide.com":
+            # 옛 호스트는 어떤 URL에도 1,829바이트 안내 페이지를 돌려준다(AC-WC-001 fixture)
+            return _resp((FIXTURE_DIR / "legacy_stub_1829.html").read_bytes(), url)
         p = kwargs.get("params") or {}
         endpoint, code = url.rsplit("/", 1)[-1], p.get("cmp_cd")
         if endpoint == "Snapshot":
@@ -141,12 +146,9 @@ def test_ac_wc_012_treasury_exact_row_only(site):
     assert report["자기주식"] == 0
 
 
-def test_ac_wc_012_analyze_dashboard_company_name(site, monkeypatch):
+def test_ac_wc_012_analyze_dashboard_company_name(site):
     from fnguide.dashboard import analyze_dashboard
 
-    # get_fnguide는 M5 전까지 옛 호스트 컨센서스를 부른다. 컨센서스는 소비처가 없으므로
-    # 이 테스트에서만 빈 DataFrame으로 대체한다(M5에서 호출 자체가 사라지면 이 대체를 지운다).
-    monkeypatch.setattr(crawler, "read_consensus", lambda *a, **k: pd.DataFrame())
     assert analyze_dashboard("005930").company_name == "삼성전자"
 
 
@@ -167,6 +169,48 @@ def test_ac_wc_012_contrast_prefix_match_treasury(site, monkeypatch):
 def test_ac_wc_012_contrast_no_company_name(site, monkeypatch):
     from fnguide.dashboard import analyze_dashboard
 
-    monkeypatch.setattr(crawler, "read_consensus", lambda *a, **k: pd.DataFrame())
     monkeypatch.setattr(crawler, "_NAME_ID", "__absent__")
     assert analyze_dashboard("005930").company_name == "005930"
+
+
+# ───────────────────────── AC-WC-013 ─────────────────────────
+
+OLD_HOST = "comp.fnguide.com"
+NEW_HOST = "wcomp.fnguide.com"
+
+
+def _host_violations(calls):
+    """옛 호스트·컨센서스 경로·새 호스트 밖 요청을 찾는다. 호스트는 파싱한 이름을 정확히
+    비교한다 — 'wcomp.fnguide.com'은 문자열 'comp.fnguide.com'을 품고 있어 부분 문자열
+    판정은 정상 요청을 모두 위반으로 잡는다(plan-audit iteration 4 D2)."""
+    urls = [c["url"] for c in calls]
+    return {
+        "old_host": [u for u in urls if urlparse(u).hostname == OLD_HOST],
+        "01_06": [u for u in urls if "01_06" in u],
+        "not_new_host": [u for u in urls if urlparse(u).hostname != NEW_HOST],
+    }
+
+
+def test_ac_wc_013_eight_tuple_and_no_consensus_request(site):
+    from fnguide.crawler import get_fnguide
+
+    assert list(inspect.signature(get_fnguide).parameters) == ["code"]
+    result = get_fnguide("005930")
+    assert len(result) == 8
+    for pos in (2, 3, 4):
+        assert isinstance(result[pos], pd.DataFrame) and result[pos].empty
+    assert result[6] == "IFRS(연결)"
+    assert isinstance(result[7], pd.DataFrame)
+    assert _host_violations(site["calls"]) == {"old_host": [], "01_06": [], "not_new_host": []}
+    assert len(site["calls"]) <= 8
+
+
+def test_ac_wc_013_contrast_consensus_request_is_caught(site):
+    """대조: 컨센서스 요청이 끼면 같은 판정이 옛 호스트와 01_06 경로를 잡는다."""
+    from fnguide.crawler import get_fnguide, read_consensus
+
+    get_fnguide("005930")
+    with pytest.raises(Exception):  # 옛 호스트는 안내 페이지라 파싱에서 실패한다
+        read_consensus("005930")
+    found = _host_violations(site["calls"])
+    assert len(found["old_host"]) == 1 and len(found["01_06"]) == 1

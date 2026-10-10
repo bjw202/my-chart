@@ -461,6 +461,9 @@ def read_consensus(
     return df_cons
 
 
+# @MX:ANCHOR: [AUTO] FnGuide 수집 진입점 — 8-튜플 순서가 호출부 계약이다
+# @MX:REASON: dashboard.analyze_dashboard와 analyzer.analyze_comp가 위치로 풀어 쓴다(위치 2·3·4는 버림). 순서나 길이가 바뀌면 두 호출부가 조용히 다른 값을 읽는다
+# @MX:SPEC: SPEC-FNGUIDE-WCOMP-001
 def get_fnguide(
     code: str,
 ) -> tuple[
@@ -473,10 +476,10 @@ def get_fnguide(
     str,
     pd.DataFrame | None,
 ]:
-    """FnGuide 전체 데이터를 수집하는 통합 함수.
+    """FnGuide 전체 데이터를 수집하는 통합 함수(REQ-WC-014).
 
-    read_fs → read_snapshot → read_consensus 순서로 호출하며,
-    각 요청 사이 0.1초 대기한다.
+    read_fs(요청 최대 7회) → read_snapshot(1회) 순서로 호출하며 그 사이 0.1초 대기한다.
+    컨센서스는 소비처가 없어 요청하지 않는다(read_consensus는 남기되 부르지 않음, spec §6).
 
     Args:
         code: 종목 코드 (6자리)
@@ -484,6 +487,7 @@ def get_fnguide(
     Returns:
         (df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report,
          account_type, df_yoy_base_ann)
+        - df_snap, df_snap_ann, df_cons: 빈 DataFrame
         - df_yoy_base_ann: 전년동기 절대값 데이터 (불완전 연도가 없으면 None)
     """
     time.sleep(_CRAWL_DELAY)
@@ -492,7 +496,5 @@ def get_fnguide(
     time.sleep(_CRAWL_DELAY)
     report, df_snap, df_snap_ann = read_snapshot(code, account_type)
 
-    time.sleep(_CRAWL_DELAY)
-    df_cons = read_consensus(code, account_type)
-
+    df_cons = pd.DataFrame()
     return df_fs_ann, df_fs_quar, df_snap, df_snap_ann, df_cons, report, account_type, df_yoy_base_ann
