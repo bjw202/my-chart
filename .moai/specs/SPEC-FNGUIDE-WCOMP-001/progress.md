@@ -905,33 +905,239 @@ AC-WC-014(불변): `read_fs` 2건(105560 `IFRS(연결)`, 001750 `IFRS(별도)`, 
 
 #### RED 관측 — AC-WC-013
 
-되돌림: `get_fnguide`의 `df_cons = pd.DataFrame()`을 원래의 `time.sleep(_CRAWL_DELAY)` + `df_cons = read_consensus(code, account_type)`로 되살림. 명령 `pytest tests/fnguide/test_wcomp_snapshot.py -k "ac_wc_013 and not contrast" --tb=line`, 이어서 같은 상태에서 요청 URL을 기록하는 직접 호출.
+(M6에서 다시 관측해 이 절의 내용을 바꿨다.) M5 첫 관측에서는 되살린 `read_consensus`가 옛 호스트 안내 페이지를 JSON으로 파싱하다 `JSONDecodeError`를 내 URL 단언에 닿지 못했다. M6에서 테스트를 고쳐(커밋 `0219614`) `get_fnguide`의 예외를 잡아 두고 요청 URL 판정을 먼저 한 뒤 예외를 다시 던지게 했다. 가짜 컨센서스 JSON fixture는 만들지 않았다.
+
+되돌림: `get_fnguide`의 `df_cons = pd.DataFrame()`을 원래의 `time.sleep(_CRAWL_DELAY)` + `df_cons = read_consensus(code, account_type)`로 되살림(M6, HEAD `5d021cb`에 고친 테스트를 아직 커밋하지 않은 상태 — 고친 테스트는 직후 `0219614`로 커밋). 명령 `pytest tests/fnguide/test_wcomp_snapshot.py -k "ac_wc_013 and not contrast" --tb=short`.
 
 ```text
-E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-/Users/byunjungwon/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/json/decoder.py:363: json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_ac_wc_013_eight_tuple_and_no_consensus_request ______________
+tests/fnguide/test_wcomp_snapshot.py:205: in test_ac_wc_013_eight_tuple_and_no_consensus_request
+    assert _host_violations(site["calls"]) == {"old_host": [], "01_06": [], "not_new_host": []}
+E   AssertionError: assert {'01_06': ['h...30_A_D.json']} == {'01_06': [],...old_host': []}
+E     
+E     Differing items:
+E     {'not_new_host': ['http://comp.fnguide.com/SVO2/json/data/01_06/01_A005930_A_D.json']} != {'not_new_host': []}
+E     {'old_host': ['http://comp.fnguide.com/SVO2/json/data/01_06/01_A005930_A_D.json']} != {'old_host': []}
+E     {'01_06': ['http://comp.fnguide.com/SVO2/json/data/01_06/01_A005930_A_D.json']} != {'01_06': []}
+E     Use -v to get more diff
+=========================== short test summary info ============================
 FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_013_eight_tuple_and_no_consensus_request
-1 failed, 14 deselected in 0.59s
-get_fnguide raised JSONDecodeError
-recorded 9
-old-host urls: ['http://comp.fnguide.com/SVO2/json/data/01_06/01_A005930_A_D.json']
+1 failed, 14 deselected in 0.56s
+(복원 후)
 $ git status --short
+ M tests/fnguide/test_analysis.py
+ M tests/fnguide/test_crawler.py
+ M tests/fnguide/test_wcomp_snapshot.py
 ?? .moai/logs/
-$ git diff --stat
+$ git diff --stat -- fnguide
 (출력 없음)
 ```
 
-예측("기록된 URL에 `comp.fnguide.com/SVO2/json/data/01_06/`이 나타난다 — 호스트 이름 `comp.fnguide.com`, `01_06` 포함")은 직접 호출의 URL 기록(9건 중 1건, 파싱한 호스트 `comp.fnguide.com`, 경로 `01_06`)으로 관측했다. **다른 점**: 테스트는 URL 단언에 닿기 전에 `JSONDecodeError`로 실패한다. 가짜 사이트가 옛 호스트에 실제로 그 호스트가 돌려주는 1,829바이트 안내 페이지를 주므로 `read_consensus`의 JSON 파싱이 먼저 깨지기 때문이다(정상 컨센서스 JSON fixture는 없고 라이브 캡처는 금지). 그래서 "두 단언 모두 실패"를 테스트 출력으로는 보지 못했다. 같은 판정 함수가 옛 호스트 요청을 실제로 잡는다는 점은 스위트의 `test_ac_wc_013_contrast_consensus_request_is_caught`(`get_fnguide` 뒤에 `read_consensus`를 불러 `old_host` 1건·`01_06` 1건을 잡음)가 단언한다.
+예측("기록된 URL에 `comp.fnguide.com/SVO2/json/data/01_06/`이 나타난다 — 호스트 이름 `comp.fnguide.com`, `01_06` 포함, 두 단언 모두 실패")과 일치: 옛 호스트 판정(`old_host`)과 `01_06` 판정이 같은 URL 하나로 함께 실패했고, 새 호스트 밖 요청 판정(`not_new_host`)도 실패했다. 복원 직후 `git status`의 테스트 세 파일 수정은 이 관측 당시 아직 커밋 전이던 M6 테스트 정리이며(곧 `0219614`로 커밋), `fnguide/`의 변경은 없었다.
 
 #### M5 미검증(Gaps)
 
-- AC-WC-013 되돌림 관측은 위처럼 예외가 URL 단언보다 먼저 났다(발견 사항).
+- AC-WC-013 되돌림 관측은 M5에서 예외가 URL 단언보다 먼저 났다 — M6에서 테스트 순서를 고쳐 다시 관측했다(위).
 - 라이브 결과표(AC-WC-016)와 005930 핵심 지표의 FnGuide 화면 눈대조는 M6 몫이다.
 - `ruff` 없음(린트 미실행).
 
+### M6 — 기존 테스트 정리, 게이트, 라이브 확인 (2026-10-11)
+
+#### M6 증거 — 테스트 정리
+
+착수 기준: HEAD `5d021cb`(M5). 테스트 정리 커밋 `0219614`. 줄 번호는 편집 전 `cat -n`·`grep -n`으로 다시 확인했다(test_crawler.py 83행 후보, 162-169행 스냅샷 단언, 172-197행 `TestReadConsensus`; test_analysis.py 234행 후보, 255-268행 비교 테스트 — plan의 인용과 같았다).
+
+- `tests/fnguide/test_crawler.py`: 별도 후보 `["003550", "015760", "034020"]` → `["403870", "330590", "476830"]`. `df_snap`·`df_snap_ann`이 비어 있지 않다는 단언을 "둘 다 빈 DataFrame, `report["종목명"] == "삼성전자"`"로 바꿨다. `자산`·`부채`·`자본` 인덱스 단언(44행)은 그대로. `TestReadConsensus`(섹션 머리글·데코레이터·클래스 전체)를 삭제했다(skip으로 바꾸지 않음).
+- `tests/fnguide/test_analysis.py`: 별도 후보 교체, `test_characterize_controlling_profit_equals_net_income`의 비교 열을 `yearly_cols[-1]` → `yearly_cols[-2]`(완결 연도). `fnguide/analysis.py`는 무수정.
+- `tests/fnguide/test_wcomp_snapshot.py`: AC-WC-013 긍정 테스트가 `get_fnguide`의 예외를 잡아 두고 요청 URL 판정을 먼저 한 뒤 다시 던지게 순서를 바꿨다(위 `#### RED 관측 — AC-WC-013` 재관측).
+
+#### AC-WC-015 게이트 (이번 실행, 이 트리, HEAD `0219614` — 라이브 확인 뒤 코드 변경 없음)
+
+```text
+$ git diff --stat d6ed32e -- fnguide/analysis.py fnguide/dashboard.py fnguide/analyzer.py fnguide/parser.py fnguide/__init__.py backend/routers/analysis.py backend/schemas/analysis.py backend/services/analysis_service.py frontend/
+(출력 없음)                                                     ← 1번 통과
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests/test_analysis_api.py tests/test_analysis_api_wcomp.py -q -p no:cacheprovider | tail -1
+197 passed, 92 deselected, 1 warning in 3.48s                   ← 2번: 197 ≥ 164, failed·error 0
+(3번 라이브 — 아래 절)
+$ grep -nE "//comp\.fnguide\.com" fnguide/crawler.py             ← 4번 참고용
+60:_CONS_D_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_D.json"
+61:_CONS_B_URL = "http://comp.fnguide.com/SVO2/json/data/01_06/01_A{code}_A_B.json"
+$ <acceptance.md AC-WC-015 4번 AST 프로브 그대로>
+['_CONS_B_URL', '_CONS_D_URL'] ['read_consensus']               ← 4번 통과(기대 출력과 정확히 같음)
+$ F=tests/fnguide/fixtures/wcomp/README.md; test -s "$F" && grep -qE 'https://wcomp\.fnguide\.com/' "$F" && grep -qE '20[0-9]{2}-[0-9]{2}-[0-9]{2}' "$F" && echo README_OK
+README_OK                                                       ← 5번 통과
+$ grep -nE "open\([^)]*['\"](w|a|x)b?\+?['\"]|…|sqlite3\." fnguide/crawler.py fnguide/account_alias.py; echo "exit=$?"
+exit=1                                                          ← 6번 통과
+```
+
+2번 하한 164는 §B·§C 기대 출력 줄의 합 1+3+8+2+3+9+7+4+8+4+3+5+2+4 = 63을 acceptance.md에서 다시 더해 확인했다. deselected가 94 → 92로 준 것은 `TestReadConsensus` 라이브 테스트 2건을 지웠기 때문이다.
+
+#### AC-WC-015 3번 — 라이브 스위트 (사용자 승인, 1회 실행)
+
+실행: 2026-10-11T00:35:58+09:00 ~ 00:36:08+09:00, 순차(병렬 워커 없음), 재실행 없음. acceptance 명령과 같은 pytest 인자를 요청 계수기로 감싼 실행기(`Output/m6_scripts/live_suite.py`, gitignore 경로, 커밋하지 않음)로 돌렸다. 계수기는 `requests.Session.request`를 감싸 요청마다 URL·상태·리디렉션을 기록하고, 403·429가 나오거나 400건을 넘으면 즉시 멈추도록 했다(발동하지 않음). 타임아웃·캐시는 그대로다.
+
+```text
+$ python Output/m6_scripts/live_suite.py <로그> -- tests/fnguide tests/test_analysis_api.py -q -p no:cacheprovider -m "live or slow" -rs
+........................................................................ [ 78%]
+....................                                                     [100%]
+=============================== warnings summary ===============================
+tests/fnguide/test_analysis.py::TestFsAnalysisStructure::test_characterize_pandas3_compatibility
+  …/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. …
+92 passed, 188 deselected, 1 warning in 8.67s
+REQUESTS_TOTAL 80
+exit=0
+(요청 기록 집계)
+n 80
+status Counter({200: 80})
+history Counter({(): 78, (302,): 2})
+hosts Counter({'wcomp.fnguide.com': 80})
+codes Counter({'005930': 48, '000660': 16, '403870': 14, '999999': 2})
+endpoints Counter({'getFinIncome': 32, 'getFinBalance': 20, 'getFinCashFlow': 20, 'Snapshot': 8})
+max sec 0.108 sum sec 6.01
+```
+
+판정: error 0, failed 0, skipped 0(허용 상한 1, `-rs` 출력에 skip 사유 없음) — 통과. 실제 요청 수는 80건(오케스트레이터 상한 추정 약 750건). 302 두 건은 999999 요청이 오류 페이지로 리디렉션된 것으로 M1 V-1 관측과 같다.
+
+#### AC-WC-016 — 라이브 HTTP 결과표
+
+백엔드를 이 워크트리 코드로 띄웠다. acceptance의 명령은 공용 체크아웃(`cd /Users/byunjungwon/Dev/my-project-01/my_chart`)에서 8000 포트를 쓰지만, 8000에는 사용자가 띄워 둔 공용 체크아웃 개발 서버(옛 코드, PID 42977)가 떠 있어 건드리지 않고, 워크트리에서 같은 venv 파이썬으로 8001 포트에 띄웠다(`Output/m6_scripts/live_server.py` — 작업 디렉터리를 `sys.path` 맨 앞에 넣고 `uvicorn.run("backend.main:app", host="127.0.0.1", port=8001, workers=1)`, 요청 계수기 포함). 측정 뒤 이 서버만 종료했다(8000 서버는 그대로).
+
+```text
+$ for c in 403870 005930 330590 001750 105560 005935 999999; do printf "%s " "$c"; curl -s -o …/wc_$c.json -w '%{http_code} %{time_total}s ' "http://127.0.0.1:8001/api/analysis/$c"; jq -c '[.company_name, (.business_performance|type), (.health_indicators|type), (.five_questions|type)]' …/wc_$c.json 2>/dev/null || echo; done
+403870 200 0.835063s ["HPSP","object","object","object"]
+005930 200 0.995425s ["삼성전자","object","object","object"]
+330590 200 0.924373s ["롯데리츠","object","object","object"]
+001750 200 0.975311s ["한양증권","null","null","null"]
+105560 200 0.914744s ["KB금융","null","null","null"]
+005935 404 0.249999s [null,"null","null","null"]
+999999 404 0.227742s [null,"null","null","null"]
+```
+
+| 코드 | 상태 | company_name | business_performance | health_indicators | five_questions | 기대와 일치 |
+|---|---|---|---|---|---|---|
+| 403870 | `200` | `HPSP` | `object` | `object` | `object` | 예 |
+| 005930 | `200` | `삼성전자` | `object` | `object` | `object` | 예 |
+| 330590 | `200` | `롯데리츠`(비어 있지 않음, 코드와 다름) | `object` | `object` | `object` | 예 |
+| 001750 | `200` | `한양증권`(비어 있지 않음, 코드와 다름) | `null` | `null` | `null` | 예 |
+| 105560 | `200` | `KB금융` | `null` | `null` | `null` | 예 |
+| 005935 | `404` | — | — | — | — | 예 |
+| 999999 | `404` | — | — | — | — | 예 |
+
+서버 요청 기록: 45건 — wcomp 44건(모두 HTTP 200, 리디렉션 302 두 건은 999999), 종목별 403870·005930·330590·001750·105560 각 8건, 005935·999999 각 2건. 나머지 1건은 앱 시작 시 `data.krx.co.kr` 요청으로 이 SPEC과 무관하다. 서버 로그에 `WARNING`·`ERROR`·`Traceback` 0줄(접기·필수 계정·정합성 경고 없음). 표의 세 섹션 외에도, 응답 JSON에서 001750·105560은 Sections 1–7 전부 `null`, 005930은 Sections 1–7 전부 `object`임을 확인했다.
+
+되돌림 관측 기록의 집합 비교:
+
+```text
+$ diff <(grep -oE '^#### RED 관측 — AC-WC-[0-9]{3}' .moai/specs/SPEC-FNGUIDE-WCOMP-001/progress.md | grep -oE 'AC-WC-[0-9]{3}' | sort -u) <(printf 'AC-WC-%03d\n' $(seq 1 13)); echo "diff-rc=$?"
+diff-rc=0
+$ grep -cE '^#### RED 관측' .moai/specs/SPEC-FNGUIDE-WCOMP-001/progress.md
+13
+```
+
+#### 005930 캐시 미스 소요 시간
+
+새로 띄운 서버 프로세스에서 005930의 첫 요청(캐시 미스): `curl` 총 소요 `0.995425s`, 그 안의 FnGuide 요청 8건이 0.826초 구간에 걸쳤다(요청별 소요 합 0.688초, `get_fnguide`의 0.1초 대기 2회 포함 전 구간). 기준선 기록용이며 성능 목표는 없다(spec §5).
+
+#### 커버리지 (acceptance §E DoD 명령, 워크트리 `.venv`)
+
+```text
+$ .venv/bin/python -m coverage run --source=fnguide -m pytest tests/fnguide -q -p no:cacheprovider | tail -1
+174 passed, 92 deselected, 1 warning in 2.35s
+$ .venv/bin/python -m coverage report --include='fnguide/crawler.py,fnguide/account_alias.py'
+Name                       Stmts   Miss  Cover
+----------------------------------------------
+fnguide/account_alias.py      13      0   100%
+fnguide/crawler.py           245     11    96%
+----------------------------------------------
+TOTAL                        258     11    96%
+```
+
+두 파일 모두 85% 이상. 남은 11줄은 호출되지 않는 `read_consensus` 본문이다(M4 측정의 438-461 범위).
+
+#### 수용한 잔여 위험의 완화 기록 (acceptance §E DoD)
+
+- 정합성 가드 경고 0건: 오프라인 AC-WC-007(`test_ac_wc_007_fold_keeps_balance_guard_silent`), 라이브 서버 로그의 crawler 경고 0줄.
+- 지배주주지분 = 주주몫 교차 확인: AC-WC-002 `3532337.75`.
+- **005930 핵심 지표 — 사용자 눈대조 대기(pending user comparison).** 아래는 라이브 서버 응답(`GET /api/analysis/005930`)에서 읽은 값이며, FnGuide 화면과의 비교는 하지 않았다(사용자만 할 수 있음).
+  - 영업이익률(`business_performance.opm`, 기간 `2023/12, 2024/12, 2025/12, 2026/06`): `0.02536, 0.10877, 0.13070, 0.48048`(마지막 열은 2026/06 누적 YTD)
+  - 부채비율(`health_indicators` 「부채비율」): `0.31885`
+  - 이자보상배율(`health_indicators` 「이자보상배율」): `236.78`
+  - 비교할 FnGuide 페이지: `https://wcomp.fnguide.com/CompanyInfo/Snapshot?cmp_cd=005930`(이번 SPEC이 요청한 주소). 재무비율 메뉴의 정확한 주소는 확인하지 않았다.
+- HPSP(403870): `GET /api/analysis/403870`이 라이브에서 `200`, 표의 세 열(Sections 1·2·7) `object`. 오프라인에서도 fixture 기반 `analyze_dashboard("403870")`이 8개 섹션 모두 채워졌다(M5 증거). **브라우저에서 재무 분석 모달이 열리는지는 확인하지 않았다(사용자 확인 대기).**
+
+#### AC-WC-001 ~ 016 판정표 (이번 실행, 이 트리, HEAD `0219614`)
+
+| AC | 상태 | 명령 | 실제 출력 |
+|---|---|---|---|
+| 001 | PASS | `pytest tests/fnguide/test_wcomp_repro.py -k ac_wc_001` | `1 passed, 1 deselected` |
+| 002 | PASS | `pytest tests/fnguide/test_wcomp_reader.py -k ac_wc_002` | `3 passed, 49 deselected` |
+| 003 | PASS | 같은 파일 `-k ac_wc_003` | `8 passed, 44 deselected` |
+| 004 | PASS | `-k ac_wc_004` | `2 passed, 50 deselected` |
+| 005 | PASS | `-k ac_wc_005` | `3 passed, 49 deselected` |
+| 006 | PASS | `pytest tests/fnguide/test_wcomp_reader.py tests/test_analysis_api_wcomp.py -k ac_wc_006` | `9 passed, 52 deselected` |
+| 007 | PASS | `pytest tests/fnguide/test_wcomp_reader.py -k ac_wc_007` | `8 passed, 44 deselected` (하한 7) |
+| 008 | PASS | `-k ac_wc_008` | `4 passed, 48 deselected` |
+| 009 | PASS | 두 파일 `-k ac_wc_009` | `12 passed, 49 deselected` (하한 8) |
+| 010 | PASS | 두 파일 `-k ac_wc_010` | `7 passed, 54 deselected` (하한 4) |
+| 011 | PASS | `pytest tests/fnguide/test_wcomp_snapshot.py -k ac_wc_011` | `3 passed, 12 deselected` |
+| 012 | PASS | 같은 파일 `-k ac_wc_012` | `9 passed, 6 deselected` (하한 5) |
+| 013 | PASS | 같은 파일 `-k ac_wc_013` | `2 passed, 13 deselected` |
+| 014 | PASS | 두 파일 `-k ac_wc_014` | `4 passed, 57 deselected` |
+| 015 | PASS | 위 「AC-WC-015 게이트」 여섯 항목 | 1 빈 출력 / 2 `197 passed` / 3 `92 passed`, skip 0 / 4 기대 출력 일치 / 5 `README_OK` / 6 `exit=1` |
+| 016 | PASS | 위 「AC-WC-016」 명령 + 집합 비교 | 표 7행 모두 기대와 일치, `diff-rc=0` |
+
+대조 AC 13개(001~013)의 RED 관측은 모두 이 절 위쪽의 `#### RED 관측 — AC-WC-0NN` 머리글 아래에 있다. AC-WC-014는 불변 AC라 머리글이 없다(M5 증거).
+
+#### M1 확인 과제 V-1 ~ V-4 결과 요약
+
+- V-1(응답 헤더): M1 완료 — 모순 없음. 오류 응답의 첫 홉은 302이고 리디렉션을 따라가면 200 HTML. 라이브 스위트·서버에서도 999999의 302 → 200이 같게 관측됐다.
+- V-2(이자비용·법인세비용 첫 행): M3 통과 — 202560 `9302.53`, 203130 `-44808.35`.
+- V-3(12월 결산 직후 열 모양): M3 통과(합성 fixture). 실물은 다음 결산 공시 이후 확인 가능(Gaps).
+- V-4(충당부채 별칭 범위): M1 통과 — 005930 C, 403870 B 모두 종업원급여 외 충당부채가 한 행씩.
+
+#### M6 미검증(Gaps)과 잔여 위험
+
+- 005930 지표의 FnGuide 화면 눈대조, HPSP 모달 브라우저 확인: 사용자 확인 대기.
+- AC-WC-016은 8000이 아닌 8001 포트의 워크트리 서버로 측정했다(명령의 포트·작업 디렉터리만 다름). main에 통합된 뒤 8000 개발 서버를 재시작하면 같은 결과가 나와야 하지만 관측하지 않았다.
+- 라이브 값은 2026-10-07 캡처 fixture와 같았다(005930 부채비율 `0.3188`·이자보상배율 `236.7768`이 M5 오프라인 결과와 일치) — 그 사이 수치 정정은 없었던 것으로 보이나 전 계정을 대조하지는 않았다.
+- 476830은 라이브 별도 후보 목록에만 있고 첫 후보 403870이 성공해 실제로 요청되지 않았다(요청 기록의 코드 집계에 없음).
+- 이자비용·법인세비용 "첫 행"이 옛 화면과 같았는지, 접기 분류가 옛 사이트와 같았는지는 옛 사이트 소멸로 확인할 수 없다(spec Q-A 수용 위험).
+- 라우터의 동기 크롤링(최악 8회 × 10초)과 `robots.txt` `Disallow: /`는 바꾸지 않은 기존 자세다(spec §5, plan §B.3).
+- `ruff`가 없어 린트를 돌리지 못했다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+**작성자**: manager-develop (run 단계)
+**일자**: 2026-10-11
+
+```yaml
+run_complete_at: 2026-10-11
+run_status: audit-ready
+run_base_sha: d6ed32e
+run_commit_sha: pending-backfill   # 이 기록을 담은 M6 마지막 커밋 — 커밋 자신의 SHA는 담을 수 없어 보고서와 다음 커밋에서 채운다
+run_branch: worktree-agent-a20b6e0f16e957192   # main 통합·push 전
+m1_to_mN_commit_strategy: milestone별 커밋, main 직접 커밋 대신 격리 워크트리 브랜치(통합은 마지막에 사용자 결정)
+run_commits:
+  - 3bfddcf  # M1 재현 테스트·축소 fixture
+  - 9f5b03d  # M2 account_alias.py
+  - 2adc99f  # M3 read_fs 재작성
+  - 3041d46  # M3 되돌림 관측
+  - 9cb4b7c  # M4 read_snapshot 재작성
+  - ae69a93  # M4 되돌림 관측
+  - b4bf7ba  # M5 get_fnguide 정리
+  - 5d021cb  # M5 증거
+  - 0219614  # M6 테스트 정리·AC-WC-013 보강
+ac_pass_count: 16
+ac_fail_count: 0
+red_observation_headings: 13   # AC-WC-001~013
+offline_suite: "197 passed, 92 deselected"
+live_suite: "92 passed, 188 deselected, skipped 0, 요청 80건"
+coverage: {crawler.py: 96%, account_alias.py: 100%}
+new_warnings_or_lints_introduced: unknown   # ruff 미설치로 미측정
+manual_pending: [005930 지표 FnGuide 화면 대조, HPSP 모달 브라우저 확인]
+```
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
