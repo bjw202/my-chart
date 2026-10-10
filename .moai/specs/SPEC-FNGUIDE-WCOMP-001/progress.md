@@ -832,6 +832,103 @@ TOTAL                        259     16    94%
 - `ruff` 없음(린트 미실행).
 - 001750·330590·105560 스냅샷은 회사명과 키 존재만 단언했고 수치는 고정하지 않았다(acceptance가 고정하지 않음).
 
+### M5 — `get_fnguide` 정리 (2026-10-10)
+
+#### M5 증거
+
+착수 기준: HEAD `ae69a93`(M4), 같은 워크트리. GREEN 커밋 `b4bf7ba`.
+
+- `fnguide/crawler.py`: `get_fnguide`가 `read_fs` → `read_snapshot`만 부르고 위치 4(`df_cons`)를 빈 DataFrame으로 반환한다(위치 2·3은 `read_snapshot`이 돌려주는 빈 DataFrame). 시그니처·8-튜플 순서는 그대로이고 `@MX:ANCHOR`를 달았다. `read_consensus`와 두 상수는 정의만 남아 있다(`fnguide/__init__.py` 무수정).
+- M4가 `test_wcomp_snapshot.py`의 `analyze_dashboard` 테스트 두 곳에 넣은 `read_consensus` 임시 대체를 지웠다. 두 테스트는 대체 없이 통과한다(`-k "analyze_dashboard or no_company_name"` → `2 passed, 13 deselected`).
+- 새 테스트: `tests/test_analysis_api_wcomp.py` 9건(라우터·`get_fnguide` 수준, 실제 `get_dashboard` → `analyze_dashboard` → `get_fnguide` 경로, 맨 아래 `requests.Session.request`만 fixture로 대체, 테스트마다 서비스 5분 캐시 비움), `test_wcomp_snapshot.py`에 AC-WC-013 2건, `test_wcomp_reader.py`에 AC-WC-014 `read_fs` 2건.
+
+RED(구현 전, 테스트만 추가·대체 제거 — `git diff --stat -- fnguide` 출력 없음):
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/test_analysis_api_wcomp.py tests/fnguide/test_wcomp_snapshot.py tests/fnguide/test_wcomp_reader.py -q -p no:cacheprovider --tb=line -W ignore::UserWarning
+(실패 원인 집계)
+   4 E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+   3 E   assert 503 == 200
+   1 E   AssertionError: fixture 없음: 01_A005930_A_D.json_None_None_None.json
+FAILED tests/test_analysis_api_wcomp.py::test_ac_wc_010_get_fnguide_request_hygiene
+FAILED tests/test_analysis_api_wcomp.py::test_ac_wc_014_router_financial_layout_is_200_with_null_sections[105560]
+FAILED tests/test_analysis_api_wcomp.py::test_ac_wc_014_router_financial_layout_is_200_with_null_sections[001750]
+FAILED tests/test_analysis_api_wcomp.py::test_general_layout_005930_router_returns_filled_sections
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_analyze_dashboard_company_name
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_012_contrast_no_company_name
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_013_eight_tuple_and_no_consensus_request
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_013_contrast_consensus_request_is_caught
+8 failed, 68 passed in 4.38s
+```
+
+`get_fnguide`가 옛 호스트 컨센서스를 요청해 안내 페이지를 JSON으로 파싱하다 실패하고, 라우터는 그 예외를 503으로 바꾼다. 수정 전에도 통과한 라우터 사례(AC-WC-006 (d) 503, 009 (a)(b) 404, 010 (가)(나) 503)는 `read_fs` 단계에서 이미 끝나 컨센서스에 닿지 않는 경우다 — 이 사례들은 M3의 `read_fs` 수정이 만든 동작이며 M5의 대조가 아니다. AC-WC-014의 `read_fs` 2건도 M3 코드로 이미 통과한다(불변 AC).
+
+GREEN:
+
+```text
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/test_analysis_api_wcomp.py tests/fnguide/test_wcomp_snapshot.py tests/fnguide/test_wcomp_reader.py -q -p no:cacheprovider --tb=short -W ignore::UserWarning
+........................................................................ [ 94%]
+....                                                                     [100%]
+76 passed in 3.37s
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/test_analysis_api_wcomp.py -q -p no:cacheprovider -rA -W ignore::UserWarning | grep -E "^PASSED|passed|failed"
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_006_d_router_period_misalignment_is_503
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_009_router_error_page_and_empty_dataset_are_404[999999]
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_009_router_error_page_and_empty_dataset_are_404[005935]
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_010_get_fnguide_request_hygiene
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_010_router_transport_timeout_is_503
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_010_router_http_500_is_503
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_014_router_financial_layout_is_200_with_null_sections[105560]
+PASSED tests/test_analysis_api_wcomp.py::test_ac_wc_014_router_financial_layout_is_200_with_null_sections[001750]
+PASSED tests/test_analysis_api_wcomp.py::test_general_layout_005930_router_returns_filled_sections
+9 passed in 1.94s
+$ … tests/fnguide/test_wcomp_reader.py tests/fnguide/test_wcomp_snapshot.py tests/test_analysis_api_wcomp.py -k ac_wc_013 | tail -1
+2 passed, 74 deselected in 0.80s
+$ … -k ac_wc_014 | tail -1
+4 passed, 72 deselected in 0.87s
+```
+
+AC-WC-014(불변): `read_fs` 2건(105560 `IFRS(연결)`, 001750 `IFRS(별도)`, 둘 다 `매출액` 행 없음)과 라우터 2건(200, Sections 1–7 `null`, 105560 `company_name == "KB금융"`, 001750은 비어 있지 않고 코드와 다름)이 통과 — `4 passed`. 불변 AC라 되돌림 관측 머리글을 두지 않는다.
+
+끝까지 이어 본 결과(fixture 가짜 사이트, 실제 `analyze_dashboard` → `get_fnguide`):
+
+```text
+005930 삼성전자 requests 8 {'business_performance': 'filled', 'health_indicators': 'filled', 'balance_sheet': 'filled', 'rate_decomposition': 'filled', 'profit_waterfall': 'filled', 'trend_signals': 'filled', 'five_questions': 'filled', 'activity_ratios': 'filled'}
+001750 한양증권 requests 8 {'business_performance': 'None', 'health_indicators': 'None', 'balance_sheet': 'None', 'rate_decomposition': 'None', 'profit_waterfall': 'None', 'trend_signals': 'None', 'five_questions': 'None', 'activity_ratios': 'filled'}
+403870 HPSP requests 8 {… 8개 섹션 모두 'filled'}
+330590 롯데리츠 requests 8 {… 8개 섹션 모두 'filled'}
+105560 KB금융 requests 8 {… Sections 1–7 'None', 'activity_ratios': 'filled'}
+005930 health: [('외부차입/자기자본', 0.0397), ('부채비율', 0.3188), ('차입금의존도', 0.0295), ('순차입금의존도', -0.2206), ('이자보상배율', 236.7768)]
+005930 opm last: 0.4805 periods ['2023/12', '2024/12', '2025/12', '2026/06']
+```
+
+금융 레이아웃의 `activity_ratios`가 값이 모두 null인 객체로 채워지는 것은 research.md §R3 각주와 같다(acceptance가 단언하지 않음). 위 005930 지표 값은 기록용이며, FnGuide 화면과의 눈대조(acceptance §E DoD)는 아직 하지 않았다.
+
+#### RED 관측 — AC-WC-013
+
+되돌림: `get_fnguide`의 `df_cons = pd.DataFrame()`을 원래의 `time.sleep(_CRAWL_DELAY)` + `df_cons = read_consensus(code, account_type)`로 되살림. 명령 `pytest tests/fnguide/test_wcomp_snapshot.py -k "ac_wc_013 and not contrast" --tb=line`, 이어서 같은 상태에서 요청 URL을 기록하는 직접 호출.
+
+```text
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+/Users/byunjungwon/.local/share/uv/python/cpython-3.13.11-macos-aarch64-none/lib/python3.13/json/decoder.py:363: json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+FAILED tests/fnguide/test_wcomp_snapshot.py::test_ac_wc_013_eight_tuple_and_no_consensus_request
+1 failed, 14 deselected in 0.59s
+get_fnguide raised JSONDecodeError
+recorded 9
+old-host urls: ['http://comp.fnguide.com/SVO2/json/data/01_06/01_A005930_A_D.json']
+$ git status --short
+?? .moai/logs/
+$ git diff --stat
+(출력 없음)
+```
+
+예측("기록된 URL에 `comp.fnguide.com/SVO2/json/data/01_06/`이 나타난다 — 호스트 이름 `comp.fnguide.com`, `01_06` 포함")은 직접 호출의 URL 기록(9건 중 1건, 파싱한 호스트 `comp.fnguide.com`, 경로 `01_06`)으로 관측했다. **다른 점**: 테스트는 URL 단언에 닿기 전에 `JSONDecodeError`로 실패한다. 가짜 사이트가 옛 호스트에 실제로 그 호스트가 돌려주는 1,829바이트 안내 페이지를 주므로 `read_consensus`의 JSON 파싱이 먼저 깨지기 때문이다(정상 컨센서스 JSON fixture는 없고 라이브 캡처는 금지). 그래서 "두 단언 모두 실패"를 테스트 출력으로는 보지 못했다. 같은 판정 함수가 옛 호스트 요청을 실제로 잡는다는 점은 스위트의 `test_ac_wc_013_contrast_consensus_request_is_caught`(`get_fnguide` 뒤에 `read_consensus`를 불러 `old_host` 1건·`01_06` 1건을 잡음)가 단언한다.
+
+#### M5 미검증(Gaps)
+
+- AC-WC-013 되돌림 관측은 위처럼 예외가 URL 단언보다 먼저 났다(발견 사항).
+- 라이브 결과표(AC-WC-016)와 005930 핵심 지표의 FnGuide 화면 눈대조는 M6 몫이다.
+- `ruff` 없음(린트 미실행).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
