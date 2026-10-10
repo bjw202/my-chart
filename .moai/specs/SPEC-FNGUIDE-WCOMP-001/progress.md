@@ -1221,7 +1221,7 @@ $ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/fnguide tests
 run_complete_at: 2026-10-11
 run_status: audit-ready
 run_base_sha: d6ed32e
-run_commit_sha: pending-backfill   # 감사 보강 기록을 담은 마지막 progress.md 커밋(후속 커밋에서 채움)
+run_commit_sha: ba1665f   # 감사 보강 기록을 담은 progress.md 커밋(SHA는 후속 커밋에서 채움)
 run_branch: worktree-agent-a20b6e0f16e957192   # main 통합·push 전
 m1_to_mN_commit_strategy: milestone별 커밋, main 직접 커밋 대신 격리 워크트리 브랜치(통합은 마지막에 사용자 결정)
 run_commits:
