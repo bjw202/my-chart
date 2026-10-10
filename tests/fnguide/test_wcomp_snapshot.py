@@ -213,12 +213,23 @@ def test_ac_wc_013_eight_tuple_and_no_consensus_request(site):
     assert isinstance(result[7], pd.DataFrame)
 
 
-def test_ac_wc_013_contrast_consensus_request_is_caught(site):
-    """대조: 컨센서스 요청이 끼면 같은 판정이 옛 호스트와 01_06 경로를 잡는다."""
-    from fnguide.crawler import get_fnguide, read_consensus
+def test_ac_wc_013_contrast_consensus_request_is_caught(site, monkeypatch):
+    """대조: 실제 get_fnguide가 컨센서스를 다시 요청하게 되돌리면 같은 판정이
+    옛 호스트와 01_06 경로를 잡는다. get_fnguide가 부르는 read_snapshot을 감싸
+    원래 스냅샷 뒤에 read_consensus를 부르게 한다(sync-audit F9)."""
+    from fnguide.crawler import get_fnguide
 
-    get_fnguide("005930")
-    with pytest.raises(Exception):  # 옛 호스트는 안내 페이지라 파싱에서 실패한다
-        read_consensus("005930")
+    original = crawler.read_snapshot
+
+    def snapshot_then_consensus(code, account_type="IFRS(연결)"):
+        result = original(code, account_type)
+        crawler.read_consensus(code, account_type)
+        return result
+
+    monkeypatch.setattr(crawler, "read_snapshot", snapshot_then_consensus)
+    try:
+        get_fnguide("005930")
+    except Exception:  # noqa: BLE001 — 옛 호스트는 안내 페이지라 파싱에서 실패한다. 판정은 요청 기록으로 한다
+        pass
     found = _host_violations(site["calls"])
-    assert len(found["old_host"]) == 1 and len(found["01_06"]) == 1
+    assert len(found["old_host"]) == 1 and len(found["01_06"]) == 1, found

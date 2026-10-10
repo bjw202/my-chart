@@ -575,6 +575,29 @@ def test_ac_wc_009_redirect_followed_error_html_is_value_error(monkeypatch):
     assert any("/Error/InvalidCompany" in u for u in seen), "리디렉션을 따라가지 않았다"
 
 
+def test_ac_wc_010_redirect_to_other_host_is_connection_error(monkeypatch):
+    """리디렉션이 wcomp.fnguide.com 밖으로 가면 그 본문을 믿지 않고 ConnectionError(503).
+    최종 응답 URL의 호스트를 정확히 비교한다(sync-audit F1). 리디렉션 추종 자체는 유지한다."""
+    seen = []
+
+    def fake_send(self, request, **kwargs):
+        seen.append(request.url)
+        if request.url.startswith("https://wcomp.fnguide.com/"):
+            r = _resp(b"<html>Object moved</html>", request.url, 302)
+            r.headers["Location"] = "https://example.com/CompanyInfo/getFinIncome"
+        else:
+            # 다른 호스트가 정상처럼 보이는 실응답 본문을 돌려주는 경우
+            r = _resp((FIXTURE_DIR / "getFinIncome_005930_Y_C.json").read_bytes(), request.url, 200)
+        r._content_consumed = True
+        r.request = request
+        return r
+
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", fake_send)
+    with pytest.raises(ConnectionError, match="005930"):
+        read_fs("005930")
+    assert any(u.startswith("https://example.com/") for u in seen), "리디렉션을 따라가지 않았다"
+
+
 def test_ac_wc_009_malformed_json_body_is_value_error(site):
     """HTML이 아닌데 형식이 다른 본문(dataset 키 없음)도 ValueError(404)다."""
     for consol in ("C", "B"):
@@ -584,13 +607,12 @@ def test_ac_wc_009_malformed_json_body_is_value_error(site):
 
 
 def test_ac_wc_009_contrast_no_dataset_check(site, monkeypatch):
+    """대조: 빈 data·null 머리글 검사를 빼면 read_fs("005935")가 ValueError(404) 대신
+    null 기간을 정규식에 넘기다 TypeError로 샌다(라우터 503). 그 TypeError만 인정한다 —
+    fixture 누락 AssertionError나 ValueError로는 통과하지 않는다(sync-audit F10)."""
     monkeypatch.setattr(crawler, "_check_dataset", lambda *a, **k: None)
-    try:
+    with pytest.raises(TypeError):
         read_fs("005935")
-    except ValueError:
-        pytest.fail("검사를 빼도 ValueError가 났다 — 대조 불성립")
-    except Exception:  # noqa: BLE001 — 다른 예외로 새는 것도 되돌림 관측값이다
-        pass
 
 
 # ───────────────────────── AC-WC-010 ─────────────────────────

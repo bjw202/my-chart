@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import time
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
@@ -26,7 +27,8 @@ from .parser import (
 logger = logging.getLogger(__name__)
 
 # wcomp 재무제표 JSON API (SPEC-FNGUIDE-WCOMP-001 REQ-WC-001)
-_WCOMP_BASE = "https://wcomp.fnguide.com/CompanyInfo/"
+_WCOMP_HOST = "wcomp.fnguide.com"
+_WCOMP_BASE = f"https://{_WCOMP_HOST}/CompanyInfo/"
 _HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "X-Requested-With": "XMLHttpRequest",
@@ -166,6 +168,10 @@ def _fetch(
         raise ConnectionError(f"FnGuide 요청 실패 ({code}, {endpoint}): {e}") from e
     if not 200 <= resp.status_code < 300:
         raise ConnectionError(f"FnGuide 응답 상태 {resp.status_code} ({code}, {endpoint})")
+    # 리디렉션 끝의 호스트가 wcomp가 아니면 본문을 믿지 않는다. 부분 문자열이 아니라
+    # 파싱한 호스트 이름을 정확히 비교한다('wcomp.fnguide.com'은 'comp.fnguide.com'을 품는다).
+    if urlparse(resp.url).hostname != _WCOMP_HOST:
+        raise ConnectionError(f"FnGuide 응답이 다른 호스트에서 옴 ({code}, {endpoint})")
     return resp
 
 
