@@ -1,0 +1,86 @@
+{
+  "isSuccess": true,
+  "detailCode": "",
+  "message": "",
+  "result": {
+    "sectors": [
+      {
+        "code": "472",
+        "name": "2차전지(전고체)",
+        "changeRate": 0.11,
+        "risingCount": 22,
+        "unchangedCount": 0,
+        "fallingCount": 8,
+        "topItems": [
+          {
+            "code": "267320",
+            "name": "나인테크",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock267320.svg"
+          },
+          {
+            "code": "317330",
+            "name": "덕산테코피아",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock317330.svg"
+          },
+          {
+            "code": "083930",
+            "name": "아바코",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock083930.svg"
+          }
+        ]
+      },
+      {
+        "code": "180",
+        "name": "석유화학",
+        "changeRate": 0.05,
+        "risingCount": 13,
+        "unchangedCount": 1,
+        "fallingCount": 4,
+        "topItems": [
+          {
+            "code": "025000",
+            "name": "KPX케미칼",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock025000.svg"
+          },
+          {
+            "code": "009830",
+            "name": "한화솔루션",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock009830.svg"
+          },
+          {
+            "code": "161000",
+            "name": "애경케미칼",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock161000.svg"
+          }
+        ]
+      },
+      {
+        "code": "63",
+        "name": "제지",
+        "changeRate": 0.04,
+        "risingCount": 8,
+        "unchangedCount": 2,
+        "fallingCount": 4,
+        "topItems": [
+          {
+            "code": "002870",
+            "name": "신풍",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock002870.svg"
+          },
+          {
+            "code": "009460",
+            "name": "한창제지",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock009460.svg"
+          },
+          {
+            "code": "034810",
+            "name": "해성산업",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock034810.svg"
+          }
+        ]
+      }
+    ],
+    "hasNext": false,
+    "cursor": null
+  }
+}

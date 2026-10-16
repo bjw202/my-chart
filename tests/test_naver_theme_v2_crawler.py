@@ -63,7 +63,7 @@ def test_crawler_headers_anonymous():
         "backend.services.naver_theme_v2.crawler.requests.Session.get",
         return_value=_ok_list_response(),
     ) as mocked_get:
-        crawler.fetch_theme_list(page=1, page_size=50)
+        crawler.fetch_theme_list(page_size=50)
 
     call_args = mocked_get.call_args
     sent_headers = call_args.kwargs.get("headers", {})
@@ -105,8 +105,8 @@ def test_crawler_sleep_policy():
         "backend.services.naver_theme_v2.crawler.requests.Session.get",
         side_effect=fake_get,
     ):
-        crawler.fetch_theme_list(page=1, page_size=50)
-        crawler.fetch_theme_list(page=2, page_size=50)
+        crawler.fetch_theme_list(page_size=50)
+        crawler.fetch_theme_list(cursor="Mzc5LDQuMDM", page_size=50)
 
     assert len(call_times) == 2
     gap = call_times[1] - call_times[0]
@@ -176,4 +176,39 @@ def test_crawler_content_type_validation():
         side_effect=html_response,
     ):
         with pytest.raises(ValueError):
-            crawler.fetch_theme_list(page=1, page_size=50)
+            crawler.fetch_theme_list(page_size=50)
+
+
+# ---------------------------------------------------------------------------
+# 2026-10 라이브 스키마 회귀 — list 페이지네이션이 page 번호 → cursor로 바뀜
+# (라이브 실측: page=2는 page=1과 50/50 동일 항목 반환, cursor는 다음 50건 반환)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_fetch_theme_list_first_page_has_no_cursor():
+    """첫 페이지 호출은 cursor·page 파라미터 없이 보낸다."""
+    with mock.patch(
+        "backend.services.naver_theme_v2.crawler.requests.Session.get",
+        return_value=_ok_list_response(),
+    ) as mocked_get:
+        crawler.fetch_theme_list()
+
+    sent = mocked_get.call_args.kwargs["params"]
+    assert "cursor" not in sent
+    assert "page" not in sent
+    assert sent["pageSize"] == config.LIST_PAGE_SIZE
+
+
+@pytest.mark.unit
+def test_fetch_theme_list_sends_cursor():
+    """다음 페이지 호출은 직전 응답의 cursor를 query param으로 되돌려 보낸다."""
+    with mock.patch(
+        "backend.services.naver_theme_v2.crawler.requests.Session.get",
+        return_value=_ok_list_response(),
+    ) as mocked_get:
+        crawler.fetch_theme_list(cursor="Mzc5LDQuMDM")
+
+    sent = mocked_get.call_args.kwargs["params"]
+    assert sent["cursor"] == "Mzc5LDQuMDM"
+    assert "page" not in sent

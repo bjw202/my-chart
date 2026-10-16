@@ -44,8 +44,13 @@ def _verify_content_type(response: requests.Response) -> None:
         raise ValueError(f"Unexpected Content-Type: {ct!r}")
 
 
-def fetch_theme_list(page: int, page_size: int = config.LIST_PAGE_SIZE) -> dict:
-    """List endpoint 호출. 5xx/timeout → 1회 retry. 영속 실패 시 raise."""
+def fetch_theme_list(cursor: Optional[str] = None, page_size: int = config.LIST_PAGE_SIZE) -> dict:
+    """List endpoint 호출. 5xx/timeout → 1회 retry. 영속 실패 시 raise.
+
+    2026-10 스키마 변경: page 번호는 서버가 무시함(page=2도 첫 페이지 반환) —
+    다음 페이지는 직전 응답의 result.cursor를 cursor query param으로 되돌려 보내 받는다.
+    첫 페이지는 cursor 없이 호출.
+    """
     # @MX:WARN: 비공식 endpoint 재시도 — endpoint URL 변경 시 schema_validation 필요
     # @MX:REASON: research.md §5 R-1, R-3 위험 mitigation
     url = (
@@ -58,9 +63,10 @@ def fetch_theme_list(page: int, page_size: int = config.LIST_PAGE_SIZE) -> dict:
         "businessDayCategory": "daily",
         "sectorSortType": "CHANGE_RATE",
         "nationType": "domestic",
-        "page": page,
         "pageSize": page_size,
     }
+    if cursor:
+        params["cursor"] = cursor
 
     _enforce_sleep_policy()
     session = _get_session()

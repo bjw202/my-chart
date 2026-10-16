@@ -1,0 +1,136 @@
+{
+  "isSuccess": true,
+  "detailCode": "",
+  "message": "",
+  "result": {
+    "sectors": [
+      {
+        "code": "18",
+        "name": "전자파",
+        "changeRate": 9.08,
+        "risingCount": 11,
+        "unchangedCount": 0,
+        "fallingCount": 0,
+        "topItems": [
+          {
+            "code": "042700",
+            "name": "한미반도체",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock042700.svg"
+          },
+          {
+            "code": "052710",
+            "name": "아모텍",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock052710.svg"
+          },
+          {
+            "code": "053610",
+            "name": "프로텍",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock053610.svg"
+          }
+        ]
+      },
+      {
+        "code": "149",
+        "name": "원격진료/비대면진료(U-Healthcare)",
+        "changeRate": 7.24,
+        "risingCount": 21,
+        "unchangedCount": 0,
+        "fallingCount": 1,
+        "topItems": [
+          {
+            "code": "290660",
+            "name": "다이나믹솔루션",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock290660.svg"
+          },
+          {
+            "code": "458870",
+            "name": "씨어스",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock458870.svg"
+          },
+          {
+            "code": "041830",
+            "name": "인바디",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock041830.svg"
+          }
+        ]
+      },
+      {
+        "code": "513",
+        "name": "미용기기",
+        "changeRate": 6.96,
+        "risingCount": 17,
+        "unchangedCount": 0,
+        "fallingCount": 2,
+        "topItems": [
+          {
+            "code": "219750",
+            "name": "한국비티비",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock219750.svg"
+          },
+          {
+            "code": "483650",
+            "name": "달바글로벌",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock483650.svg"
+          },
+          {
+            "code": "278470",
+            "name": "에이피알",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock278470.svg"
+          }
+        ]
+      },
+      {
+        "code": "543",
+        "name": "의료AI",
+        "changeRate": 6.94,
+        "risingCount": 26,
+        "unchangedCount": 0,
+        "fallingCount": 3,
+        "topItems": [
+          {
+            "code": "458870",
+            "name": "씨어스",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock458870.svg"
+          },
+          {
+            "code": "347700",
+            "name": "스피어",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock347700.svg"
+          },
+          {
+            "code": "382150",
+            "name": "온코크로스",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock382150.svg"
+          }
+        ]
+      },
+      {
+        "code": "92",
+        "name": "통신장비",
+        "changeRate": 6.65,
+        "risingCount": 43,
+        "unchangedCount": 0,
+        "fallingCount": 3,
+        "topItems": [
+          {
+            "code": "088280",
+            "name": "쏘닉스",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock088280.svg"
+          },
+          {
+            "code": "046970",
+            "name": "우리로",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock046970.svg"
+          },
+          {
+            "code": "178320",
+            "name": "서진시스템",
+            "itemLogoUrl": "https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock178320.svg"
+          }
+        ]
+      }
+    ],
+    "hasNext": true,
+    "cursor": "Mzc5LDQuMDM"
+  }
+}

@@ -3,14 +3,11 @@
   "detailCode": "ok",
   "message": "OK",
   "result": {
-    "sectorCode": "178",
-    "sectorName": "전선",
-    "sectorDescription": "각종 전선 및 전람(電纜)제조 관련 종목 (synthetic)",
-    "changeRate": 9.2,
-    "totalMarketCap": 40485714,
-    "risingCount": 8,
-    "unChangedCount": 0,
-    "fallingCount": 0,
+    "sectorInfo": {
+      "sectorName": "전선",
+      "sectorDescription": "각종 전선 및 전람(電纜)제조 관련 종목 (synthetic)",
+      "changeRate": 9.2
+    },
     "items": [
       {
         "name": "KBI메탈",
@@ -81,6 +78,7 @@
         "itemCode": "111111",
         "description": "전선 케이블 생산 전문 기업"
       }
-    ]
+    ],
+    "hasNext": false
   }
 }

@@ -15,6 +15,7 @@ for _mod in ("pykrx", "pykrx.stock"):
         import types
         sys.modules[_mod] = types.ModuleType(_mod)
 
+from backend.services.naver_theme_v2 import parser as nt2_parser
 from backend.services.naver_theme_v2.parser import parse_theme_list, parse_theme_detail
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures" / "naver_theme_v2"
@@ -31,7 +32,7 @@ def _load(name: str) -> dict:
 
 @pytest.mark.unit
 def test_parse_theme_list_basic():
-    """list_synthetic.json → list[dict] 반환. theme_id int, theme_name str, sectorDescription 없음."""
+    """list_synthetic.json → list[dict] 반환. theme_id int, theme_name str, theme_description 없음."""
     data = _load("list_synthetic.json")
     result = parse_theme_list(data)
 
@@ -44,7 +45,7 @@ def test_parse_theme_list_basic():
     assert isinstance(first["theme_name"], str)
     assert first["theme_name"] == "전선"
 
-    # list 응답의 sectorDescription은 항상 null (research.md §2.1)
+    # list 응답에는 테마 설명이 없음 (research.md §2.1)
     for theme in result:
         assert "theme_description" in theme
         assert theme["theme_description"] is None
@@ -110,13 +111,13 @@ def test_parse_theme_detail_null_stock_description():
 
 @pytest.mark.unit
 def test_parse_theme_detail_null_description():
-    """sectorDescription=null 케이스: theme_description=None 처리 (AC-3)."""
-    # list 응답의 sectorDescription은 null이지만, detail 응답에서도 null인 경우 대비
+    """sectorInfo.sectorDescription=null 케이스: theme_description=None 처리 (AC-3)."""
+    # detail 응답에서도 테마 설명이 null인 경우 대비
     data = _load("detail_synthetic.json")
-    # result를 복사하여 sectorDescription을 null로 수정
+    # result를 복사하여 sectorInfo.sectorDescription을 null로 수정
     import copy
     modified = copy.deepcopy(data)
-    modified["result"]["sectorDescription"] = None
+    modified["result"]["sectorInfo"]["sectorDescription"] = None
 
     result = parse_theme_detail(modified, theme_id=178)
     assert result is not None
@@ -147,3 +148,67 @@ def test_parse_theme_detail_items_fields():
         assert "inclusion_reason" in item
         assert "stock_description" in item
         assert item["theme_id"] == 178
+
+
+# ---------------------------------------------------------------------------
+# 2026-10 라이브 스키마 회귀 — 라이브 응답을 잘라 저장한 fixture 기준
+# (list: code/name/unchangedCount + hasNext/cursor, detail: result.sectorInfo)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_parse_theme_list_live_schema():
+    """list_live.json(2026-10-16 라이브 캡처) → code/name/unchangedCount 매핑."""
+    result = parse_theme_list(_load("list_live.json"))
+
+    assert len(result) == 5
+    first = result[0]
+    assert first["theme_id"] == 18
+    assert first["theme_name"] == "전자파"
+    assert first["change_pct"] == pytest.approx(9.08)
+    assert first["change_rate"] == pytest.approx(9.08)
+    assert (first["up_count"], first["flat_count"], first["down_count"]) == (11, 0, 0)
+
+    by_id = {t["theme_id"]: t for t in result}
+    assert by_id[513]["down_count"] == 2
+    for theme in result:
+        assert theme["theme_description"] is None
+
+
+@pytest.mark.unit
+def test_parse_theme_list_live_unchanged_count():
+    """unchangedCount(소문자 c)가 flat_count로 매핑되는지 — 마지막 페이지 라이브 캡처 기준."""
+    result = parse_theme_list(_load("list_live_last.json"))
+
+    by_id = {t["theme_id"]: t for t in result}
+    assert by_id[180]["flat_count"] == 1
+    assert by_id[63]["flat_count"] == 2
+
+
+@pytest.mark.unit
+def test_parse_list_next_cursor():
+    """hasNext=true면 cursor 반환, 마지막 페이지(hasNext=false, cursor=null)·실패 응답이면 None."""
+    assert nt2_parser.parse_list_next_cursor(_load("list_live.json")) == "Mzc5LDQuMDM"
+    assert nt2_parser.parse_list_next_cursor(_load("list_live_last.json")) is None
+    assert nt2_parser.parse_list_next_cursor(_load("error_5xx_response.json")) is None
+
+
+@pytest.mark.unit
+def test_parse_theme_detail_live_schema():
+    """detail_live.json(2026-10-16 라이브 캡처) → result.sectorInfo의 이름·설명 매핑."""
+    result = parse_theme_detail(_load("detail_live.json"), theme_id=18)
+
+    assert result is not None
+    assert result["theme_description"].startswith("전자파 인체보호 기준")
+
+    items = result["items"]
+    assert len(items) == 3
+    first = items[0]
+    assert first["theme_name"] == "전자파"
+    assert first["stock_code"] == "042700"
+    assert first["stock_name"] == "한미반도체"
+    assert first["change_pct"] == pytest.approx(9.52)
+    assert first["market_cap"] == 20063218000000
+    assert first["volume"] == 675737
+    assert first["trade_value"] == 136811000000
+    assert first["stock_description"].startswith("전자파 차폐")

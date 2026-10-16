@@ -14,19 +14,20 @@ def parse_theme_list(response_json: dict) -> list[dict]:
     sectors = response_json.get("result", {}).get("sectors", [])
     parsed = []
     for sec in sectors:
-        # sectorCode는 string-of-int — int 정규화 (V1 theme_id: int 호환)
-        theme_id = int(sec["sectorCode"])
+        # 2026-10 스키마 변경: sectorCode/sectorName/unChangedCount → code/name/unchangedCount
+        # code는 string-of-int — int 정규화 (V1 theme_id: int 호환)
+        theme_id = int(sec["code"])
         parsed.append(
             {
                 "theme_id": theme_id,
-                "theme_name": sec["sectorName"],
+                "theme_name": sec["name"],
                 # V1 analyzer는 change_pct 컬럼 사용 — 모바일 changeRate와 매핑
                 "change_pct": float(sec["changeRate"]),
                 # V1 analyzer breadth_ratio: up_count / (up + flat + down)
                 "up_count": int(sec["risingCount"]),
-                "flat_count": int(sec["unChangedCount"]),
+                "flat_count": int(sec["unchangedCount"]),
                 "down_count": int(sec["fallingCount"]),
-                # NOTE: list 응답의 sectorDescription은 항상 null (research.md §2.1)
+                # NOTE: list 응답에는 테마 설명이 없음 — detail 응답에서 머지 (research.md §2.1)
                 "theme_description": None,
                 # V1 호환 alias — change_rate도 노출 (REQ-NT2-008)
                 "change_rate": float(sec["changeRate"]),
@@ -37,15 +38,30 @@ def parse_theme_list(response_json: dict) -> list[dict]:
     return parsed
 
 
+def parse_list_next_cursor(response_json: dict) -> Optional[str]:
+    """list 응답의 다음 페이지 cursor. 마지막 페이지(hasNext=false, cursor=null)·실패 응답이면 None.
+
+    2026-10 스키마 변경: page 번호 페이지네이션 → hasNext + cursor (page 파라미터는 무시됨).
+    """
+    if not response_json.get("isSuccess"):
+        return None
+    result = response_json.get("result") or {}
+    if not result.get("hasNext"):
+        return None
+    return result.get("cursor") or None
+
+
 def parse_theme_detail(response_json: dict, theme_id: int) -> Optional[dict]:
     """Detail endpoint 응답을 V1 stocks_df row dict 리스트로 변환."""
     if not response_json.get("isSuccess"):
         return None
 
     result = response_json.get("result", {})
+    # 2026-10 스키마 변경: 테마 이름·설명이 result 직속 → result.sectorInfo 하위로 이동
+    sector_info = result.get("sectorInfo") or {}
     # nullable — research.md §2.2
-    theme_description: Optional[str] = result.get("sectorDescription")
-    theme_name: str = result.get("sectorName", "")
+    theme_description: Optional[str] = sector_info.get("sectorDescription")
+    theme_name: str = sector_info.get("sectorName", "")
 
     items_parsed = []
     for item in result.get("items", []):

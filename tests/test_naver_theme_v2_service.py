@@ -51,19 +51,19 @@ def _load(name: str) -> dict:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
-def _mock_list_response(page: int, page_size: int) -> mock.MagicMock:
-    """페이지 1에만 데이터, 이후 빈 sectors 반환."""
+def _mock_list_response(cursor, page_size: int) -> mock.MagicMock:
+    """첫 페이지(cursor 없음)에만 데이터(hasNext=false), cursor가 오면 빈 sectors 반환."""
     resp = mock.MagicMock()
     resp.status_code = 200
     resp.headers = {"Content-Type": "application/json; charset=utf-8"}
-    if page == 1:
+    if cursor is None:
         resp.json.return_value = _load("list_synthetic.json")
     else:
         resp.json.return_value = {
             "isSuccess": True,
             "detailCode": "ok",
             "message": "OK",
-            "result": {"totalRisingCount": 0, "totalUnChangedCount": 0, "totalFallingCount": 0, "sectors": []},
+            "result": {"sectors": [], "hasNext": False, "cursor": None},
         }
     return resp
 
@@ -81,8 +81,7 @@ def _make_service_mock():
     def side_effect_get(url, params=None, headers=None, timeout=None):
         params = params or {}
         if "sectors/all" in url:
-            page = params.get("page", 1)
-            return _mock_list_response(page, params.get("pageSize", 50))
+            return _mock_list_response(params.get("cursor"), params.get("pageSize", 50))
         elif "sector/item/list" in url:
             theme_id = int(params.get("sectorCode", 178))
             return _mock_detail_response(theme_id)
@@ -206,8 +205,7 @@ def test_errors_dict_shape():
     def side_effect_get(url, params=None, headers=None, timeout=None):
         params = params or {}
         if "sectors/all" in url:
-            page = params.get("page", 1)
-            return _mock_list_response(page, 50)
+            return _mock_list_response(params.get("cursor"), 50)
         elif "sector/item/list" in url:
             call_count["n"] += 1
             # 항상 5xx 반환 → service가 errors[]에 기록
@@ -292,8 +290,7 @@ def test_5xx_retry_then_partial_failure():
     def always_5xx_detail(url, params=None, headers=None, timeout=None):
         params = params or {}
         if "sectors/all" in url:
-            page = params.get("page", 1)
-            return _mock_list_response(page, 50)
+            return _mock_list_response(params.get("cursor"), 50)
         resp = mock.MagicMock()
         resp.status_code = 503
         resp.headers = {"Content-Type": "application/json"}
@@ -467,6 +464,78 @@ def test_empty_result_has_v1_alias():
 
     # errors 기록됨
     assert len(metadata["errors"]) >= 1
+
+
+# ---------------------------------------------------------------------------
+# 2026-10 라이브 스키마 회귀 — cursor 페이지네이션 (라이브 캡처 fixture 기준)
+# ---------------------------------------------------------------------------
+
+
+def _json_resp(payload: dict) -> mock.MagicMock:
+    resp = mock.MagicMock()
+    resp.status_code = 200
+    resp.headers = {"Content-Type": "application/json; charset=utf-8"}
+    resp.json.return_value = payload
+    return resp
+
+
+@pytest.mark.unit
+def test_list_pagination_follows_cursor():
+    """첫 응답의 cursor로 다음 페이지를 받고, hasNext=false에서 멈춘다 (5 + 3 = 8 테마)."""
+    first = _load("list_live.json")
+    last = _load("list_live_last.json")
+    sent_cursors: list = []
+
+    def side_effect_get(url, params=None, headers=None, timeout=None):
+        params = params or {}
+        if "sectors/all" in url:
+            cursor = params.get("cursor")
+            sent_cursors.append(cursor)
+            if cursor is None:
+                return _json_resp(first)
+            if cursor == first["result"]["cursor"]:
+                return _json_resp(last)
+            raise AssertionError(f"unexpected cursor {cursor!r}")
+        raise AssertionError("detail은 skip_details=True라 호출되면 안 됨")
+
+    with mock.patch(
+        "backend.services.naver_theme_v2.crawler.requests.Session.get",
+        side_effect=side_effect_get,
+    ):
+        result = collect_and_analyze_v2(top_n_themes=5, skip_details=True)
+
+    assert sent_cursors == [None, "Mzc5LDQuMDM"]
+    assert result.metadata["errors"] == []
+    assert result.metadata["theme_count"] == 8
+    assert set(result.themes_df["theme_id"]) == {18, 149, 513, 543, 92, 472, 180, 63}
+
+
+@pytest.mark.unit
+def test_list_pagination_hard_cap():
+    """서버가 hasNext=true를 끝없이 돌려줘도 LIST_MAX_PAGES에서 멈춘다."""
+    from backend.services.naver_theme_v2 import config as _nt2_config
+
+    template = _load("list_live.json")
+    calls = {"n": 0}
+
+    def side_effect_get(url, params=None, headers=None, timeout=None):
+        calls["n"] += 1
+        payload = json.loads(json.dumps(template))
+        # 페이지마다 고유한 테마 코드·cursor를 만들어 중복 없이 끝없는 서버를 흉내낸다
+        for i, sec in enumerate(payload["result"]["sectors"]):
+            sec["code"] = str(calls["n"] * 100 + i)
+        payload["result"]["hasNext"] = True
+        payload["result"]["cursor"] = f"c{calls['n']}"
+        return _json_resp(payload)
+
+    with mock.patch(
+        "backend.services.naver_theme_v2.crawler.requests.Session.get",
+        side_effect=side_effect_get,
+    ):
+        result = collect_and_analyze_v2(top_n_themes=5, skip_details=True)
+
+    assert calls["n"] == _nt2_config.LIST_MAX_PAGES
+    assert result.metadata["theme_count"] == 5 * _nt2_config.LIST_MAX_PAGES
 
 
 # ---------------------------------------------------------------------------

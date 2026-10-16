@@ -44,16 +44,18 @@ def collect_and_analyze_v2(
     errors: list[dict] = []
     _start_time = time.monotonic()  # elapsed_sec 측정 시작 (REQ-NT3-005)
 
-    # Phase A: list endpoint 페이지네이션
+    # Phase A: list endpoint cursor 페이지네이션 (hasNext=false 또는 LIST_MAX_PAGES에서 종료)
     all_themes: list[dict] = []
+    cursor: Optional[str] = None
     for page in range(1, config.LIST_MAX_PAGES + 1):
         try:
-            list_resp = crawler.fetch_theme_list(page=page, page_size=config.LIST_PAGE_SIZE)
+            list_resp = crawler.fetch_theme_list(cursor=cursor, page_size=config.LIST_PAGE_SIZE)
             page_themes = parser.parse_theme_list(list_resp)
             if not page_themes:
                 break
             all_themes.extend(page_themes)
-            if len(page_themes) < config.LIST_PAGE_SIZE:
+            cursor = parser.parse_list_next_cursor(list_resp)
+            if cursor is None:
                 break
         except (requests.RequestException, json.JSONDecodeError, KeyError, ValidationError, ValueError) as e:
             errors.append(

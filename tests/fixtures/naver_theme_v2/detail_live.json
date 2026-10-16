@@ -1,0 +1,90 @@
+{
+  "isSuccess": true,
+  "detailCode": "",
+  "message": "",
+  "result": {
+    "sectorInfo": {
+      "sectorName": "전자파",
+      "sectorDescription": "전자파 인체보호 기준 법제화로 부각된 테마. 전세계적으로 전자파에 대한 법적 규제가 강화되고 있어 전자파 장해 대책용 부품들의 수요가 확대될 것으로 전망됨. 다만, 인체 유/무해 여부에 대한 논쟁은 지속중임.",
+      "changeRate": 9.08
+    },
+    "items": [
+      {
+        "feModelType": "domestic",
+        "id": "042700",
+        "name": "한미반도체",
+        "stockEndType": "stock",
+        "stockExchangeType": "KRX",
+        "marketType": "KOSPI",
+        "itemCode": "042700",
+        "currentPrice": 210500,
+        "fluctuationsType": "RISING",
+        "fluctuations": "18300",
+        "fluctuationsRatio": "9.52",
+        "accumulatedTradingVolume": 675737,
+        "accumulatedTradingValue": 136811000000,
+        "miniImageChartUrl": "https://financial-vn.pstatic.net/chart/mobile/mini/krx/042700_interest.png",
+        "tradableStatus": "tradable",
+        "marketValue": 20063218000000,
+        "newlyListed": false,
+        "isNxt": false,
+        "krxNxtIntegratedPriceInfo": {
+          "accumulatedTradingVolume": 1121562,
+          "accumulatedTradingValue": 227464000000
+        },
+        "description": "전자파 차폐(EMI Shielding) 기술 공정 처리 장비 생산 및 판매업체."
+      },
+      {
+        "feModelType": "domestic",
+        "id": "052710",
+        "name": "아모텍",
+        "stockEndType": "stock",
+        "stockExchangeType": "KRX",
+        "marketType": "KOSDAQ",
+        "itemCode": "052710",
+        "currentPrice": 18930,
+        "fluctuationsType": "RISING",
+        "fluctuations": "1350",
+        "fluctuationsRatio": "7.68",
+        "accumulatedTradingVolume": 696351,
+        "accumulatedTradingValue": 12665529000,
+        "miniImageChartUrl": "https://financial-vn.pstatic.net/chart/mobile/mini/krx/052710_interest.png",
+        "tradableStatus": "tradable",
+        "marketValue": 353627000000,
+        "newlyListed": false,
+        "isNxt": false,
+        "krxNxtIntegratedPriceInfo": {
+          "accumulatedTradingVolume": 696351,
+          "accumulatedTradingValue": 12665529000
+        },
+        "description": "전자기기 정전기/전자파 방지용 Chip 부품(칩 바리스터, EMI Filter, CMF 등) 제조 및 판매. NFC+MST+무선충전 모듈과 같이 제공되는 전자파 차폐기능을 지닌 차폐용 Sheet를 자체 개발 및 조달."
+      },
+      {
+        "feModelType": "domestic",
+        "id": "053610",
+        "name": "프로텍",
+        "stockEndType": "stock",
+        "stockExchangeType": "KRX",
+        "marketType": "KOSDAQ",
+        "itemCode": "053610",
+        "currentPrice": 66200,
+        "fluctuationsType": "RISING",
+        "fluctuations": "2800",
+        "fluctuationsRatio": "4.42",
+        "accumulatedTradingVolume": 42009,
+        "accumulatedTradingValue": 2747930000,
+        "miniImageChartUrl": "https://financial-vn.pstatic.net/chart/mobile/mini/krx/053610_interest.png",
+        "tradableStatus": "tradable",
+        "marketValue": 595800000000,
+        "newlyListed": false,
+        "isNxt": false,
+        "krxNxtIntegratedPriceInfo": {
+          "accumulatedTradingVolume": 59680,
+          "accumulatedTradingValue": 3907882000
+        },
+        "description": "17년 전자기기에서 여러 반도체 칩간에 전자파 간섭으로 인한 오작동을 막기 위한 전자파 차폐(EMI)용 스프레이 타입의 디스펜서를 출시."
+      }
+    ],
+    "hasNext": false
+  }
+}
