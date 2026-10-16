@@ -487,7 +487,7 @@ G3(런타임 null 빈도)는 현재 라이브 데이터에서 4개 지표 모두
 
 ```yaml
 sync_complete_at: "2026-10-17"
-sync_commit_sha: "pending-backfill"     # 커밋은 자기 SHA를 알 수 없음 — 후속 커밋에서 채움
+sync_commit_sha: "d440b11"              # sync 커밋. 커밋은 자기 SHA를 알 수 없어 후속 커밋에서 채움
 sync_status: "completed"
 f7_live_check: "pass"                    # (a) 결측 20/20 '–' (b) 정상값 무변경
 g3_g4_measured: true                     # strong_themes 20행 null 0/20 ×4필드, top_stocks_preview 키 부재 20/20
