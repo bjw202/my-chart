@@ -497,8 +497,8 @@ backend_suite: "1034 passed, 1 skipped, 93 deselected, 1 xpassed"
 frontend_theme_common: "8 files, 80 tests passed"
 follow_up_cards: ["t14", "t15"]
 b12_self_test_a: "grep -c THEME-DISPLAY-UNIFY CHANGELOG.md → 0 (emission 전)"
-b12_self_test_b: "acceptance.md AC-TDU-001~015 = 15건 (고유 토큰 17 중 AC-001·AC-004는 타 SPEC 참조)"
-b12_self_test_c: "CHANGELOG 언급 경로 6건 ls 확인"
+b12_self_test_b: "acceptance.md AC-TDU-001~015 = 15건 (고유 토큰 17 중 AC-001·AC-004는 같은 SPEC의 AC-TDU-001·004 약칭 — acceptance.md:93·:181)"
+b12_self_test_c: "CHANGELOG 언급 경로 10건 ls 확인"
 changelog_entry_position: "[Unreleased] 최상단 2건"
 frontmatter_status_transitions:
   spec_md: "in-progress → completed"     # plan.md·acceptance.md는 status 필드 없음
