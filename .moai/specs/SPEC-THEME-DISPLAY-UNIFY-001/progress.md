@@ -383,7 +383,7 @@ F4 해석: 파일 실패 2건은 M1 기준선의 `e2e/ai-report-deep.spec.ts`·`
 
 ```yaml
 run_complete_at: "2026-08-20"
-run_commit_sha: "PENDING-ORCHESTRATOR-COMMIT"   # run 세션은 커밋 금지(리드 지시) — 오케스트레이터 검증 후 단일 커밋
+run_commit_sha: "44ce058"                       # run 세션은 커밋 금지(리드 지시) — 오케스트레이터 검증 후 단일 커밋. PR #13 squash 머지 SHA로 sync 단계에서 채움(2026-10-17)
 run_status: "complete-with-gaps"                # F1~F6 전부 PASS, F7(라이브 확인) Gaps — 리드 운영 제약
 ac_pass_count: 15                               # AC-TDU-001~015 전부 (대조 8 + 불변 7)
 ac_fail_count: 0
@@ -414,6 +414,8 @@ m1_to_mN_commit_strategy: "single-commit"       # M1~M6 산출물 + 본 기록�
 1. **F7 라이브 확인 미수행** — 리드 운영 제약("백그라운드 프로세스 생성 금지")으로 dev 서버 재시작이 불가하여 acceptance §F F7(재시작 후 육안 확인)를 수행하지 못했다. 이는 DoD 미충족 항목이 아니라 **이월 항목**이다: 리드 또는 사용자가 `npm run dev` 재시작 후 테마 분석 탭 순위표에서 (a) 결측 칸 `–` (b) 정상값 칸 무변경을 확인해야 한다. G3(런타임 null 빈도)·G4(결측 발생률) 실측도 이 절차에서 함께 가능하다.
 2. 백엔드 스위트 미실행 — 카드 범위 밖(리드 지시: push 후 처리).
 
+> **[sync 단계 해소 기록 2026-10-17]** 위 Gap 1·2는 sync 단계에서 해소됐다. 원문은 run 단계 기록으로 그대로 보존한다. Gap 1(F7 라이브 확인 + G3/G4 실측) → 2026-10-17 headless Chromium 라이브 확인으로 해소. 단, 선행 조건으로 네이버 모바일 테마 API 스키마 변경 대응 수정(`4f3d3e1`)이 필요했다. Gap 2(백엔드 스위트) → `pytest tests -m "not live"` 1034 passed로 해소. 상세는 §E.4 참조.
+
 ### 잔여 공존 재확인 (spec.md §5 — 숨기지 않음)
 
 본 SPEC 종료 후에도 ThemeAnalysis 탭 전체로는 `–`(순위표)와 `-`(ThemeDetailPanel·다중테마표)가 공존한다 — A.3의 의도된 귀결이며 후속 백로그 소관이다.
@@ -422,4 +424,82 @@ m1_to_mN_commit_strategy: "single-commit"       # M1~M6 산출물 + 본 기록�
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+**작성자**: manager-docs (sync 단계) · **일자**: 2026-10-17 · **칸반**: t13 · **위치**: 공용 체크아웃 `main` (HEAD `4f3d3e1`)
+
+### 선행 조건 — 네이버 테마 API 스키마 변경 대응 (`4f3d3e1`)
+
+F7 라이브 확인은 처음에 진행할 수 없었다. 테마 API가 테마 0건을 돌려줬기 때문이다. 원인은 네이버 모바일 테마 API의 스키마 변경이었다.
+
+- 목록 필드명 변경: `sectorCode`/`sectorName`/`unChangedCount` → `code`/`name`/`unchangedCount`
+- 페이지 방식 변경: `page` 번호 → `cursor` 기반
+- 상세 필드 위치 이동: `result.sectorInfo` 아래로 이동
+
+`4f3d3e1` `fix(naver-theme-v2): 네이버 모바일 테마 API 스키마 변경 대응 — 0건 수집 복구`에서 `backend/services/naver_theme_v2/parser.py`·`crawler.py`·`service.py`와 픽스처·테스트를 함께 고쳤다. 수정 후 라이브 수집 결과는 테마 264건, 종목 574건, errors `[]`이다. 이 수정이 없으면 순위표가 빈 상태로 렌더되므로 결측 칸과 정상값 칸을 실데이터로 대조할 방법이 없었다. 이 수정은 본 SPEC의 범위가 아니며, 순위표 표시 코드(`44ce058`)는 이 사이에 바뀌지 않았다.
+
+### F7 라이브 확인 (2026-10-17)
+
+실행 환경: 백엔드는 `4f3d3e1` 기준으로 23:47에 재시작했다. vite는 23:13에 시작했는데, 이는 `44ce058` 이후이며 그 뒤로 프론트 변경은 없다. headless Chromium(Playwright)으로 테마 분석 탭을 열고 순위표 20행 전체를 읽었다.
+
+| 항목 | 관측 결과 | 판정 |
+|---|---|---|
+| (a) 결측 칸 | 대표종목 열 20/20 칸이 `–`(en dash). 모든 열에서 `-`·`NaN`·`null`·`undefined`·`+Infinity%` 0건 | PASS |
+| (b) 정상값 칸 | 예: `+9.08%`, `0.00%`, `5.45`, `100.0%`. 변경 전 포맷터(`44ce058^`의 `formatPct`/`formatBreadth`/`formatMomentum`)와 비교해 부호·소수 자릿수·`%` 표기가 `percent2` / `(n*100).toFixed(1)%` / `toFixed(2)`와 같다 | PASS — 정상값 무변경 |
+
+### G3/G4 실측 (라이브 `/api/themes/v2/snapshot`)
+
+`strong_themes`(순위표가 렌더하는 배열, 20행) 기준:
+
+| 필드 | null 건수 | 비고 |
+|---|---|---|
+| `change_pct` | 0/20 | |
+| `change_pct_3d` | 0/20 | |
+| `momentum_score` | 0/20 | |
+| `breadth_ratio` | 0/20 | |
+| `top_stocks_preview` | 키 부재 20/20 | 항상 `–`로 렌더된다 |
+
+`themes` 배열(264행) 기준: `change_pct`·`change_pct_3d` null 0/264.
+
+G3(런타임 null 빈도)는 현재 라이브 데이터에서 4개 지표 모두 0건이다. AC-TDU-005의 null 내성은 빈도 주장이 아니라 가능성에 대한 대비이므로 이 관측과 충돌하지 않는다. G4(결측 발생률)는 수치 지표 0%, `top_stocks_preview` 100%다.
+
+### 관측 사항 (본 SPEC 결함 아님 — 기존 상태)
+
+- `change_pct_3d`는 백엔드가 채우는 0.0 자리표시값이다. 모바일 API가 이 값을 제공하지 않아 모든 행이 `0.00%`로 표시된다. → 백로그 카드 **t14**
+- `top_stocks_preview`는 한 번도 채워지지 않는다. → 백로그 카드 **t15**
+
+두 항목 모두 본 SPEC 이전부터 있던 데이터 공급 문제이며, 표시 계층은 받은 값을 정확히 렌더하고 있다.
+
+### sync 게이트 증거
+
+| 게이트 | 명령 | 결과 (축자) |
+|---|---|---|
+| 백엔드 스위트 (§E.3 Gap 2 해소) | `pytest tests -m "not live"` | `1034 passed, 1 skipped, 93 deselected, 1 xpassed` |
+| 프론트 테마·공용 | `vitest run --root frontend src/components/ThemeAnalysis src/components/common` | `Test Files 8 passed (8)` / `Tests 80 passed (80)` |
+
+### 증거 위치
+
+`.moai/state/verify/8c9ed526/` (git 미추적, 영구 보존) — `f7-table.png`, `f7-cells.json`, `f7check.cjs`, `t13-snapshot-before-fix.json`, `t13-snapshot-after-fix.json`, `sync-pytest.log`, `sync-vitest-theme.log`, `sync-gate.log`, `t13-commit-attempt1.log`
+
+### Gaps (sync 단계 미검증)
+
+- F7은 headless 브라우저로 확인했다. 사람이 직접 화면을 본 확인은 아니다.
+- G3/G4는 2026-10-17 하루치 스냅샷 1회의 관측이다. 장중·다른 날짜의 결측 분포는 측정하지 않았다.
+- 프론트 전체 스위트·`tsc -b`·lint는 sync 단계에서 다시 실행하지 않았다. 표시 코드가 run 이후 바뀌지 않았으므로 §E.2 M5의 F4~F6 결과를 근거로 삼는다.
+
+```yaml
+sync_complete_at: "2026-10-17"
+sync_commit_sha: "pending-backfill"     # 커밋은 자기 SHA를 알 수 없음 — 후속 커밋에서 채움
+sync_status: "completed"
+f7_live_check: "pass"                    # (a) 결측 20/20 '–' (b) 정상값 무변경
+g3_g4_measured: true                     # strong_themes 20행 null 0/20 ×4필드, top_stocks_preview 키 부재 20/20
+prerequisite_fix_commit: "4f3d3e1"       # 네이버 모바일 테마 API 스키마 변경 대응
+run_gaps_resolved: [1, 2]                # §E.3 Gap 1(F7) · Gap 2(백엔드 스위트)
+backend_suite: "1034 passed, 1 skipped, 93 deselected, 1 xpassed"
+frontend_theme_common: "8 files, 80 tests passed"
+follow_up_cards: ["t14", "t15"]
+b12_self_test_a: "grep -c THEME-DISPLAY-UNIFY CHANGELOG.md → 0 (emission 전)"
+b12_self_test_b: "acceptance.md AC-TDU-001~015 = 15건 (고유 토큰 17 중 AC-001·AC-004는 타 SPEC 참조)"
+b12_self_test_c: "CHANGELOG 언급 경로 6건 ls 확인"
+changelog_entry_position: "[Unreleased] 최상단 2건"
+frontmatter_status_transitions:
+  spec_md: "in-progress → completed"     # plan.md·acceptance.md는 status 필드 없음
+```

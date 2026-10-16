@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (네이버 모바일 테마 API 스키마 변경 대응 — 테마 수집 0건 복구, 2026-10-17)
+
+- **테마 분석 화면이 테마 0건을 받던 문제 해소** — 네이버 모바일 테마 API의 스키마가 바뀌어 수집 결과가 0건이 됐다. 목록 필드명이 `sectorCode`/`sectorName`/`unChangedCount` → `code`/`name`/`unchangedCount`로 바뀌었고, 페이지 방식이 `page` 번호에서 `cursor` 기반으로 바뀌었으며, 상세 필드가 `result.sectorInfo` 아래로 옮겨졌다. 세 변경에 맞춰 파서·크롤러·서비스를 고쳤다 (Kanban t13 선행 수정 — SPEC 없음)
+  - **변경** (`4f3d3e1`, 12파일 +587/−109): `backend/services/naver_theme_v2/parser.py` · `crawler.py` · `service.py` + 라이브 응답 픽스처(`tests/fixtures/naver_theme_v2/list_live.json`·`list_live_last.json`·`detail_live.json`) 신설과 합성 픽스처 갱신 + 테스트 3종 보강
+  - **관측**: 수정 후 라이브 수집 테마 264건 · 종목 574건 · errors `[]` (수정 전 0건) — 백엔드 `pytest tests -m "not live"` `1034 passed, 1 skipped, 93 deselected, 1 xpassed`
+  - **남은 데이터 공급 문제 (기존 상태, 후속 카드)**: `change_pct_3d`는 모바일 API가 제공하지 않아 백엔드가 0.0 자리표시값을 채우므로 모든 행이 `0.00%`로 표시된다(t14) · `top_stocks_preview`는 채워지지 않는다(t15)
+
+### Changed (SPEC-THEME-DISPLAY-UNIFY-001 v0.2.1 — 테마 순위표 결측 표기 `–` 통일, 2026-10-17)
+
+- **테마 순위표의 결측 표기를 `–`(en dash)로 통일하고 표시 포맷을 `MetricCell` 단일 출처로 흡수** — `ThemeRankingTable.tsx`의 지역 포맷터 3종(`formatPct`/`formatBreadth`/`formatMomentum`)을 제거하고 등락률·3일등락률·모멘텀점수·상승비율 4개 지표 셀을 `MetricCell` + `toMetricValue` 경유로 바꿨다. 대표종목 칸은 `MetricCell`을 거치지 않고 `MISSING_TEXT` 상수만 공유한다. 선행 `SPEC-SECTOR-DISPLAY-UNIFY-001`이 백로그로 넘긴 항목(G-F2, Kanban t8)의 인수 SPEC
+  - **결함 해소**: 결측 칸이 `-`(hyphen)로 찍히던 것을 섹터 화면과 같은 `–`로 통일 · `change_pct`가 `Infinity`이면 `+Infinity%`가 새던 경로와, 런타임 `null`이 `null.toFixed` TypeError로 표를 깨뜨리던 경로를 `toMetricValue`가 결측으로 접어 차단
+  - **변경** (`44ce058`, PR #13): `frontend/src/components/ThemeAnalysis/ThemeRankingTable.tsx` 1파일 +14/−22 · 신규 테스트 `frontend/src/components/ThemeAnalysis/__tests__/ThemeRankingTable.display.test.tsx`(21 it — AC 15 + 경계 E1~E6) · `frontend/src/components/common/MetricCell.tsx` 무변경
+  - **검증**: AC-TDU-001~015 **15/15 PASS** — 대조 8종 전부 되돌림 RED 실측, AC-TDU-004는 되돌림 `'-'` / 불완전 구현 `'+Infinity%'` / 완전 구현 `'–'` 세 상태 모두 실행 관측 · `tsc -b` exit 0 · eslint 델타 0 · vitest 전체 760 passed(파일 실패 2건은 기존 e2e 수집 오류)
+  - **라이브 확인 (F7, 2026-10-17)**: headless Chromium으로 순위표 20행 확인 — 대표종목 열 20/20 `–`, 모든 열에서 `-`·`NaN`·`null`·`undefined`·`+Infinity%` 0건, 정상값(`+9.08%`·`0.00%`·`5.45`·`100.0%`)은 변경 전 포맷과 같다. 라이브 snapshot 20행 기준 4개 지표 null 0/20. 이 확인은 위 네이버 스키마 대응 수정(`4f3d3e1`) 이후에야 가능했다. sync 게이트: vitest ThemeAnalysis+common 8파일 80테스트 통과
+  - **잔여**: ThemeAnalysis 탭 전체로는 `–`(순위표)와 `-`(ThemeDetailPanel·다중테마표)가 공존한다 — 의도된 범위 경계(spec.md §5)
+  - **근거**: `.moai/specs/SPEC-THEME-DISPLAY-UNIFY-001/progress.md` §E.2~§E.4 · `.moai/state/verify/8c9ed526/`
+
 ### Changed (SectorAnalysis 기간 조인 단일 순회 통합 — 술어 중복 제거, 2026-08-19)
 
 - **기간 순위 조인의 성공 판정이 두 곳에 중복 인코딩돼 있던 구조를 제거** — `SectorAnalysis.tsx` 의 두 useMemo 가 각각 `sectors[]`·`data[]` 를 따로 순회하며 "조인 성공 = 이름 일치 AND `d.rank != null`" 을 각자 인코딩했다. 여기서 나온 `periodRankingActive`·`partialFallbackCount` 가 `(순위 기준)` 마커·폴백 캡션·부분 고지를 결정하므로, 한쪽 정의만 바뀌면 표의 행과 그 아래 고지가 서로 다른 말을 하고 어느 쪽도 오류를 내지 않는다 (chore 카드 t7 — SPEC 없음, 운영자 승인)

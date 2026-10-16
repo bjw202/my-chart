@@ -2,9 +2,9 @@
 id: SPEC-THEME-DISPLAY-UNIFY-001
 title: ThemeRankingTable 표시 통일 — 지역 포맷터 3종을 MetricCell 단일 출처로 흡수
 version: "0.2.1"
-status: in-progress
+status: completed
 created: 2026-08-20
-updated: 2026-08-20
+updated: 2026-10-17
 author: manager-spec
 priority: P3
 phase: "v0.5.1 target"
