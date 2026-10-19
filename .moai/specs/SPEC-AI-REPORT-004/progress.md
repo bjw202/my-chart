@@ -16,6 +16,227 @@
 - audit_at: 2026-10-19
 - blocking 결함 0건, 선택 결함 R4-1~R4-9(SHOULD-FIX 3: R4-1·R4-3·R4-7). M1 차단 결함 없음.
 
+### M1 스파이크 관측
+
+- 일시: 2026-10-19 (KST), manager-develop. 기준: 이 실행, 이 트리, HEAD `11f3e16`(branch `main`). 모든 관측은 아래 명령을 이번에 직접 실행한 출력이다.
+- `claude --version` → `2.1.303 (Claude Code)` (research.md는 2.1.302 기준). `--help`에서 `--setting-sources`, `--permission-mode`, `--output-format`, `--no-session-persistence`, `--plugin-dir`, `--append-system-prompt`, `--restricted`, `--tools`, `--strict-mcp-config`, `--settings` 확인. 2.1.303의 `--restricted`는 "user, project, local 설정 파일을 무시"하고 프로젝트 스킬도 빠진다(아래 P2 보조 탐침).
+- 실행기: 스크래치의 `run_goose.py`(design §3.1 argv + 환경 변수 허용 목록 + `start_new_session=True` + 시간 상한 후 `killpg`). 넘긴 환경 변수: `["HOME","LANG","PATH","SHELL","TMPDIR","USER"]`(`LC_ALL`·`TZ`는 부모 셸에 없음).
+- 하네스: `backend/goose_harness/`(리포 위치, 커밋 안 함)와 상위에 CLAUDE.md가 없는 스크래치 복사본 `<scratch>/p2/harness`(이하 "리포 밖 위치"). 부모 경로 스캔 `ls <dir>/CLAUDE.md <dir>/CLAUDE.local.md <dir>/.claude/CLAUDE.md`(루트까지) → 출력 없음. 단 `~/.claude/CLAUDE.md`(사용자 전역)는 존재한다.
+
+#### 사전 점검 — goose 배포물 sha256
+
+```
+$ python3 -I shacheck.py ~/Downloads/goose        # DISTRIBUTION.json files[] 30개 대조
+listed=30 mismatch_or_missing=0 unlisted_extra=['.DS_Store', 'workflows/.DS_Store']
+$ python3 -I shacheck.py backend/goose_harness/.claude/skills/goose   # rsync --exclude .DS_Store 후 재대조
+listed=30 mismatch_or_missing=0 unlisted_extra=[]
+```
+
+불일치 0건. 목록 밖 파일은 `.DS_Store` 2개뿐이며 벤더링에서 제외했다.
+
+#### P0 (G1) — 인증
+
+명령: 하네스 cwd에서 `claude -p "ok라고만 답하세요" --setting-sources project --output-format stream-json --verbose --permission-mode dontAsk --no-session-persistence --model sonnet` (허용 목록 환경 변수만 전달).
+
+```
+리포 위치:   is_error False subtype success turns 1 dur_ms 2496  apiKeySource none  model claude-sonnet-5-5
+리포 밖 위치: is_error False subtype success turns 1 dur_ms 2959  apiKeySource none
+```
+
+`result.is_error=false`. 구독(OAuth) 인증이 위 6개 환경 변수만으로 동작했다(`apiKeySource: none`, API 키 불필요).
+
+#### P1 (G3) — `system/init` 목록
+
+- 두 위치 모두 `skills`에 `goose`가 있고 `slash_commands`에 `goose`가 있다. 내장 스킬(`deep-research`, `design`, `dataviz`, `code-review`, `loop`, `schedule` 등)은 위치와 무관하게 항상 있다.
+- **리포 위치에서 누수 확인**: `skills`에 `agency`, `moai`, `moai-domain-design-dna`, `moai-domain-html-report`, `moai-domain-svg-infographic`, `codemaps-extract`, `plan-research-fanout`, `sync-audit-4dim`; `slash_commands`에 `moai:*` 16개; `agents`에 MoAI 에이전트 17개(`manager-*`, `plan-auditor`, `builder`, `copywriter` 등); `mcp_servers`에 리포 `.mcp.json`의 `context7`·`moai`·`sequential-thinking`; `memory_paths.auto`가 리포 메모리(`…-my-chart/memory/`).
+- 리포 밖 위치: `agents ['claude','Explore','general-purpose','Plan','statusline-setup','web-fetch']`, MoAI 스킬·에이전트 없음. 사용자 전역 플러그인(moai-business 등)은 두 위치 모두 없음(`--setting-sources project` 효과).
+- 두 위치 모두 **claude.ai 계정 커넥터 MCP**(Gmail·Google Drive·Calendar·Notion·Slack·Claude Docs, 쓰기 도구 포함)가 붙었다. `--strict-mcp-config`를 주면 `mcp_servers []`가 된다(P2c).
+- 도구 목록에 `Agent`(표기 `Task`), `Bash`, `Read`, `Write`, `Edit`, `Skill`, `WebSearch`는 있으나 **`WebFetch`·`Glob`·`Grep`는 메인 도구 목록에 없다**. WebFetch는 내장 `web-fetch` 서브에이전트 안에서 쓰였다(P5).
+
+#### P2 (G2) — 입력 토큰 비교
+
+```
+p0_repo           cache_create 115950  cache_read 11227  cost 0.4650
+p0_scratch        cache_create  13028  cache_read 11228  cost 0.0533
+p2b_repo  (--restricted --strict-mcp-config --settings <harness>)  cache_create 6160  → skills에 goose 없음
+p2c_scratch (--strict-mcp-config, autoMemoryEnabled:false)          cache_create 6851  → goose 있음, mcp_servers [], memory_paths None
+```
+
+- 리포 위치는 같은 프롬프트에서 캐시 생성 토큰이 약 8.9배(115,950 vs 13,028)다. P1의 누수 목록과 합쳐 **오염 확인**.
+- `--restricted`는 오염을 없애지만 goose 스킬도 사라져 대안이 되지 않는다.
+- 결정: **하네스를 리포 밖에 둔다**(`AI_REPORT_GOOSE_HARNESS_DIR`). 추가로 `--strict-mcp-config`, 설정 `autoMemoryEnabled: false`.
+- 부수 관측: 리포 안에 하네스를 두면 MoAI 세션 자신도 `backend/goose_harness/.claude/skills`의 `goose` 스킬을 새로 발견한다(이 세션에 "New skills discovered" 알림 수신). 리포 밖 이전의 근거가 하나 더 있다.
+
+#### P3 (G6) — 음성 탐침 (리포 밖 위치, 허용 규칙 활성 상태)
+
+1차(P3, 허용 규칙이 무시된 상태)와 2차(P3b, `--settings <harness>/.claude/settings.json`로 허용 규칙 활성)를 모두 실행했다. 판정은 2차 기준이다. `../../.env`는 리포 밖 위치에서 스크래치의 카나리 파일(`CANARY_ONLY=m1-p3-not-a-secret`)로 해석되도록 배치했고, 실제 프로젝트 파일은 대상이 아니다.
+
+```
+USE Bash  python3 .claude/skills/goose/workflows/../../../runs/x.py
+RES err=True Permission to use Bash with command python3 .claude/skills/goose/workflows/../../../runs/x.py has been denied.
+USE Write <H>/probe-outside-runs.txt
+RES err=True Permission to use Write has been denied because Claude Code is running in don't ask mode. …
+USE Edit  <H>/.claude/skills/goose/SKILL.md
+RES err=True <tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>
+USE Read  <scratch>/.env            (모델이 ../../.env를 절대 경로로 바꿔 호출)
+RES err=True Permission to use Read has been denied because Claude Code is running in don't ask mode. …
+USE Bash  python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py --output-dir ../../probe-out   (추가 탐침 5)
+RES err=True Permission to use Bash with command … --output-dir ../../probe-out has been denied.
+RESULT permission_denials: 5건 (Bash, Write, Edit, Read, Bash)
+```
+
+파일 증거:
+
+```
+$ python3 -I treehash.py <H> <scratch>/.env > p3b_before.json; (탐침 실행); … > p3b_after.json
+$ cmp p3b_before.json p3b_after.json && echo HASH_IDENTICAL
+HASH_IDENTICAL
+$ find <scratch> -newer p3b_marker -not -path "<scratch>/logs*"
+(출력 없음)
+$ ls <H>/probe-outside-runs.txt <scratch>/probe-out → No such file or directory
+```
+
+AC-003 요구 4종 + 추가 1종 모두 거부, 파일 변화 0. 양성 대조(같은 설정): `Write runs/pos/ok.txt` 성공, `WebSearch` 성공.
+
+#### P4 (G4·G5·G7·G8·G9) — 실제 분석 1회 (하나기술 299030, sonnet)
+
+- 1차 실행(`p4_run1`): 24.7초에 끝남, 보고서 없음. 원인 = stderr `Ignoring 11 permissions.allow entries from .claude/settings.json: this workspace has not been trusted.` 리포 밖 디렉터리는 신뢰(trust) 대화상자를 거치지 않아 프로젝트 설정의 **allow 항목이 무시**되고 deny만 적용된다(WebSearch·Write·Bash 거부 3건). 하네스 원인이므로 계획의 대체 경로에 따라 1회 재시도했다.
+- 수정: `--settings <harness>/.claude/settings.json`을 argv에 추가(같은 경고는 계속 나오지만 플래그 설정의 allow는 적용됨, 양성 대조로 확인). 또 `-p` 세션의 Bash 도구가 부모 `PATH`를 쓰지 않아 `python3`를 찾지 못했다(`(eval):1: command not found: python3`, `command -v sh` → exit 1, 환경 변수 59개를 넘겨도 동일, 리포 위치도 동일). 설정 `"env": {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"}`로 해결(`command -v sh` → `/bin/sh`, `python3 --version` → `Python 3.9.6`).
+- 2차 실행(`p4_run2`, 최종 관측): 프롬프트는 design §3.2 형식, 기준일 `2026-10-19T16:25:56+09:00`, 작업 디렉터리 `runs/m1p4`.
+
+```
+run_goose.py meta: {"rc": 0, "timed_out": false, "wall_s": 354.0, "env_names_passed": ["HOME","LANG","PATH","SHELL","TMPDIR","USER"]}
+RESULT is_error False success turns 23 dur_ms 352808 cost 0.7648 term completed
+USAGE {"input_tokens": 28, "output_tokens": 30106, "cache_creation_input_tokens": 76978, "cache_read_input_tokens": 791837}
+ASK(AskUserQuestion tool_use) 0
+```
+
+- 사람 입력 없이 종료: 예(exit 0, 질문 도구 호출 0건, 결과는 질문이 아니라 요약).
+- `runs/m1p4/assumptions.md`: 있음, 1,842바이트, 비어 있지 않음(대상 식별·기준일·범위·순차 수행·DART 미열람·집계사 수치 사용 등 11개 항목).
+- 시간 상한 안에서 끝남(352.8초).
+
+#### P5 (G4) — Agent 사용
+
+```
+AGENT_CALLS 3
+   ('web-fetch', 'DART 하나기술 공시 열람', main)
+   ('web-fetch', '하나기술 실적·IR·뉴스 열람', main)
+   ('web-fetch', 'DART rcpNo 및 본문 접근 재시도', main)
+SUBAGENT_STATS {"spawned": 3, "max_depth": 1, "completed": 3, "failed": 0, "by_type": {"web-fetch": 3}}
+SUB_TOOLS {'WebFetch': 18}
+서브에이전트 쪽 거부: 0건 (parent_tool_use_id가 있는 거부 결과 없음)
+```
+
+goose는 finance/news/industry/review 역할을 서브에이전트로 나누지 않았다. 역할은 메인 대화에서 순차 수행했고("역할 분업은 같은 대화에서 순차 수행", assumptions.md에도 기록), 서브에이전트는 원문 열람용 내장 `web-fetch` 3회뿐이다. 메인 쪽 거부 1건: `curl -s -m 20 "https://dart.fss.or.kr/…" | grep …`(허용 목록 밖, 정상 거부).
+
+#### P6 (G7) — 산출물
+
+```
+$ find <H>/runs -type f
+runs/m1p4/input.json                      40402
+runs/m1p4/assumptions.md                  1842
+runs/m1p4/draft/report.html               961688
+runs/m1p4/draft/report-input.json         40402
+runs/m1p4/draft/source-ledger.json        8651
+runs/m1p4/draft/render-validation.json    7718
+$ python3 -c "…json.load(render-validation.json)…"
+{'delivery_allowed': False, 'delivery_status': 'draft_pending_audit'}
+```
+
+- `draft/` 있음, `final/` 없음, `delivery-audit.json` 없음(`audit_report.py`와 `--final`을 실행하지 않음 → `decision` 값 관측 불가).
+- 미완 사유(세션 결과 문구): DART 뷰어가 JS 렌더링이라 본문을 못 읽음, 브라우저가 없어 visual을 통과로 기록하지 않음.
+- 하네스 무결성(design §6.1): `treehash.py <H>/.claude <H>/CLAUDE.md`를 실행 전후 비교 → `HARNESS_HASH_IDENTICAL`.
+
+#### P7 (G9) — 이벤트·도구 빈도 (`p4_run2`, 196줄)
+
+| 이벤트 타입 | 개수 | 도구(메인) | 개수 | 도구(서브에이전트) | 개수 |
+|---|---|---|---|---|---|
+| system/thinking_tokens | 64 | Read | 6 | WebFetch | 18 |
+| assistant | 55 | Bash | 5 | | |
+| user | 43 | WebSearch | 4 | | |
+| system/task_progress | 18 | Agent | 3 | | |
+| system/task_started | 3 | Write | 2 | | |
+| system/task_updated | 3 | ToolSearch | 1 | | |
+| system/task_notification | 3 | Edit | 1 | | |
+| rate_limit_event | 2 | | | | |
+| tool_progress | 2 | | | | |
+| system/init · system/permission_denied · result/success | 1 · 1 · 1 | | | | |
+
+메인 순서: `init` → GUIDE·references Read 6회 → WebSearch 3회 → Agent(web-fetch) 2회 → WebSearch → Agent 1회 → (거부된 curl) → `render_report.py --help` → Write `assumptions.md` → Write `input.json` → `render_report.py --input … --output-dir runs/m1p4/draft` → Edit `input.json` → 렌더 재실행 → `result`.
+
+부수 관측: 허용 목록에 없는 읽기 전용 Bash(`ls runs …`, `render_report.py --help 2>&1 | head -30; wc -l …`)는 거부되지 않았다. dontAsk에서도 읽기 전용 명령은 자동 허용되는 것으로 보인다. design §2.2의 "그 외 전부 거부"는 쓰기·실행 명령에 한해 성립한다.
+
+#### 판정: 조건부 GO
+
+| GO 조건 (plan M1) | 관측 | 충족 |
+|---|---|---|
+| P0 인증 성공, P1 `goose` 발견 | `is_error=false`, `skills`에 `goose` | 예 |
+| P3 4종 거부 + 파일 변화 0 | 허용 규칙 활성 상태에서 5/5 거부, `HASH_IDENTICAL` | 예 |
+| P4 사람 입력 없이 종료 + `report.html` 생성 | exit 0, 질문 0, `draft/report.html` (D7에 따라 초안도 GO) | 예 |
+| P2 오염 시 리포 밖 이전 또는 `--restricted` 재탐침 | 리포 위치 오염 확인 → 리포 밖 위치에서 P3·P4 통과. `--restricted`는 goose를 잃어 탈락 | 조건 충족(리포 밖) |
+
+조건부인 이유: 위 통과는 **리포 밖 하네스 + `--settings <harness>/.claude/settings.json` + `--strict-mcp-config` + 설정 `env.PATH`·`autoMemoryEnabled:false`** 조합에서만 관측했다. design §2·§3.1의 기본안(리포 안, 플래그 없음)으로는 통과하지 않는다. 이 조합을 design에 반영하기 전에는 M2에 들어가지 않는다.
+
+#### M1 산출값
+
+| 항목 | 값 |
+|---|---|
+| `AI_REPORT_GOOSE_TIMEOUT` 기본값 | 352.8초 × 2 = 705.6초 → 5분 단위 올림 **900초**. 단 표본 1회이고, DART 본문을 못 읽어 초안에서 멈춘 실행이다(감사·`--final` 미실행). 전체 경로는 더 길 수 있다. |
+| 결과 파일 위치 (작업 디렉터리 기준) | `draft/report.html`, `draft/report-input.json`, `draft/source-ledger.json`, `draft/render-validation.json`, 최상위 `assumptions.md`, 최상위 `input.json`(모델이 쓴 렌더 입력, 복사 허용 목록 밖). `final/`·`delivery-audit.json`은 관측 못 함 |
+| 하네스 위치 | 리포 밖(`AI_REPORT_GOOSE_HARNESS_DIR` 필수). 리포 안 기본값 폐기 |
+| 동작한 권한 규칙 문법 | `"Read(./**)"`, `"Write(./runs/**)"`, `"Edit(./runs/**)"`, `"Bash(python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py:*)"`, deny `"Bash(*..*)"`, `"Edit(./.claude/**)"`, `"Read(../**)"`, `"Read(**/.env)"`. 리포 밖에서는 `--settings <harness>/.claude/settings.json`로 넣어야 allow가 적용됨 |
+| 추가 argv | `--strict-mcp-config`, `--settings <harness>/.claude/settings.json` |
+| 추가 설정 키 | `"env": {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"}`, `"autoMemoryEnabled": false`, `"disableAllHooks": true` |
+| 인증용 환경 변수 | 추가 변수 없음. `HOME`, `USER`, `PATH`, `SHELL`, `TMPDIR`, `LANG`만으로 `apiKeySource: none` 인증 성공 |
+| 녹화 픽스처 | `backend/tests/fixtures/goose_stream_299030.jsonl` (196줄, 스크럽: 하네스 경로 32곳 → `/HARNESS`, `/Users/<계정>` 9곳 → `/HOME`, 계정명 9곳 → `user`, 기사 본문의 기자 이메일 3건 → `redacted@example.invalid`, 비밀 패턴 0건. `grep -c byunjungwon` → 0. `api[_-]?key|token…` 패턴 1건은 `"apiKeySource":"none"` 필드명) |
+
+진행 단계 대응표 (관측 기반, design §3.5 대체안)
+
+| 관측 이벤트 | 진행 단계 |
+|---|---|
+| `system/init` | `goose_start` |
+| 메인 `Read` `.claude/skills/goose/workflows/**` | `plan`(지침 읽기) |
+| 메인 `WebSearch` | `research_tick` |
+| `Agent`(subagent_type `web-fetch`) 또는 `system/task_started` | `fetch_start`(description 표시) |
+| 서브에이전트 `WebFetch` (`parent_tool_use_id` 있음) | `research_tick` |
+| `system/task_notification` | `fetch_done` |
+| `Write runs/{job}/input.json` | `compose` |
+| `Bash render_report.py` (`--final` 없음, `--help` 제외) | `render_draft` |
+| `Bash audit_report.py` | `audit` (미관측) |
+| `Bash render_report.py --final` | `render_final` (미관측) |
+| `system/permission_denied` | 단계 변화 없음(경고 로그) |
+| `result` | `session_end` |
+
+역할별(finance/news/industry/review) 단계는 관측되지 않았다. goose가 역할을 메인에서 순차 수행했기 때문이다.
+
+#### design.md §9 변경 필요 목록 (manager-spec 재위임용)
+
+| 항목 | 잠정값 | 측정값 |
+|---|---|---|
+| 하네스 위치 | `backend/goose_harness` | 리포 밖 필수(오염: cache_create 115,950 vs 13,028, MoAI 스킬·에이전트·MCP 누수). `AI_REPORT_GOOSE_HARNESS_DIR` 기본값을 리포 밖 경로로 |
+| 권한 규칙 문법 | §2.2 | §2.2 문법 그대로 동작. 단 리포 밖에서는 신뢰 대화상자가 없어 프로젝트 allow가 무시되므로 `--settings`로 같은 파일을 넘김. 읽기 전용 Bash는 자동 허용됨을 §2.2에 명시. `WebFetch`·`Glob`·`Grep`는 메인 도구 목록에 없음 |
+| argv (§3.1) | `-p … --setting-sources project --permission-mode dontAsk --no-session-persistence --model` | 위에 `--strict-mcp-config`, `--settings <harness>/.claude/settings.json` 추가 |
+| 설정 파일 키 | 권한, hooks 없음 | `env.PATH`, `autoMemoryEnabled: false`, `disableAllHooks: true` 추가 |
+| 인증 관련 환경 변수 (§3.3) | 미정 | 추가 변수 불필요(`HOME`·`USER` 포함 기본 목록으로 충분) |
+| 시간 상한 기본값 | 3600초(임시) | 900초(352.8초×2, 5분 올림). 표본 1회·초안 종료 실행이라는 한계 기록 필요 |
+| 진행 단계 대응표 (§3.5) | Agent 설명의 역할 키워드 | 위 관측 기반 표로 교체(역할 단계 없음, web-fetch 시작/완료와 compose 추가) |
+| 작업 디렉터리 하위 폴더·산출물 위치 (§5.2) | `draft/`, `final/` | `draft/` 확인, `final/` 미관측. `input.json`은 작업 디렉터리 최상위 |
+| 근거 파일 허용 목록 (§5.2) | report·report-input·source-ledger·render-validation·delivery-audit | draft에서 앞의 4개 확인. `delivery-audit.json` 미관측 |
+| `assumptions.md` 작성 여부 | §2.1 규칙 | 작성됨(1,842바이트). 규칙 유지 |
+| 스크립트 출력 점검 방식 (§6.1) | 미정 | 실행 전후 `.claude/**`+`CLAUDE.md` sha256 트리 비교로 충분히 감지(P3b·P4 모두 동일) |
+| `--no-session-persistence`의 범위 (§3.2 표 의미) | 디스크 저장 안 함 | 서브에이전트 메타 파일 3개(각 223~230바이트, `~/.claude/projects/<하네스 경로>/<세션>/subagents/*.meta.json`)는 남음. 대화 본문은 남지 않음 |
+| claude.ai 커넥터 MCP | 언급 없음 | 계정 커넥터(Gmail 전송 등)가 기본으로 붙음 → `--strict-mcp-config`로 제거(§6 보안 경계에 추가) |
+
+#### 관측하지 못한 것 (Gaps)
+
+- `final/`, `delivery-audit.json`, `audit_report.py`·`render_report.py --final` 실행 경로: 이번 실행이 초안에서 멈춰 관측하지 못했다.
+- 서브에이전트가 같은 권한 규칙을 따르는지: 서브에이전트는 허용된 WebFetch만 써서 거부 사례가 없었다. 서브에이전트 쪽 음성 탐침은 하지 않았다.
+- `~/.claude/CLAUDE.md`(사용자 전역 메모리)가 로드되는지: 두 위치에 똑같이 영향을 주므로 P2 비교로는 구분되지 않는다.
+- 리포 위치 실행(P0·P2b·diag)에서 리포 hooks가 실행됐는지: `.moai/state`에 다른 세션 흔적은 보이지 않았으나 직접 확인하지 않았다.
+- `USER` 등 개별 환경 변수를 뺐을 때의 인증 결과, `-p` Bash가 부모 `PATH`를 무시하는 원인.
+- 최종 하네스 위치(리포 밖 영구 경로)에서의 재관측: 이번 리포 밖 위치는 세션 스크래치였다.
+- 시간 상한 값의 대표성: 표본 1회.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
