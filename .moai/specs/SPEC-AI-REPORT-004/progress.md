@@ -15,6 +15,7 @@
 - audit_report: .moai/reports/plan-audit/SPEC-AI-REPORT-004-review-4.md
 - audit_at: 2026-10-19
 - blocking 결함 0건, 선택 결함 R4-1~R4-9(SHOULD-FIX 3: R4-1·R4-3·R4-7). M1 차단 결함 없음.
+- M1 이후 재감사: review-5 FAIL 0.83(v0.4.0, M2 차단 4건) → 1회 수정(v0.4.1, 3271d38) → review-6 PASS 0.90 (`.moai/reports/plan-audit/SPEC-AI-REPORT-004-review-6.md`). 남은 선택 결함 N1(설치본 `.DS_Store`)·N2(AC-003 탐침 명령 문자열 일치)·N3(리포 내 하네스 경로 거부 시 처리)는 M2 위임 지시에서 해소.
 
 ### M1 스파이크 관측
 
