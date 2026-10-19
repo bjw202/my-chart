@@ -8,7 +8,13 @@
 
 ## §E.2 Run-phase Evidence
 
-_<pending run-phase>_
+### Phase 1 Plan Audit Gate (run 진입, 2026-10-19)
+
+- audit_verdict: PASS
+- audit_score: 0.93 (Tier L 기준 0.85)
+- audit_report: .moai/reports/plan-audit/SPEC-AI-REPORT-004-review-4.md
+- audit_at: 2026-10-19
+- blocking 결함 0건, 선택 결함 R4-1~R4-9(SHOULD-FIX 3: R4-1·R4-3·R4-7). M1 차단 결함 없음.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
@@ -17,6 +23,22 @@ _<pending run-phase>_
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase>_
+
+---
+
+## §F Phase 4 Mode Selection
+
+- 입력: tier L, 범위 약 40파일(신규·수정·삭제), 도메인 4(backend·frontend·하네스 설정·테스트), 언어 Python+TypeScript+markdown, 동시 실행 이득 낮음(코딩 중심).
+- 착수 승인(2026-10-19): M1 스파이크만 먼저 실행, GO/NO-GO 보고 후 M2 진입 재확인. SHOULD-FIX R4-1·R4-3·R4-7은 M1 직후 §9 갱신 manager-spec 위임에 묶어 문서에서 수정.
+
+| 모드 | 선택 | 근거 |
+|---|---|---|
+| direct | 아님 | 다파일·다도메인 구현 |
+| serial | **선택** | 코딩 중심 작업, M1 결과가 이후 값을 고정하므로 순차 진행 |
+| fanout | 아님 | 연구가 아닌 구현; 쓰기 에이전트 동시 실행 금지 |
+| sweep | 아님 | 기계적 일괄 변환 아님 |
+
+Decision: serial (manager-develop, 마일스톤 단위 순차 위임; manager-lead 진입 조건은 충족하나 M1 go/no-go 게이트 때문에 오케스트레이터가 직접 순차 진행)
 
 ---
 
