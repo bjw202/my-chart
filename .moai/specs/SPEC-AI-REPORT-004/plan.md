@@ -1,9 +1,9 @@
 # SPEC-AI-REPORT-004 구현 계획 — Deep 모드를 goose 하네스로 교체
 
-> 상태: **in-progress**(run 단계, M1 완료) · 버전 0.4.0 · 작성 2026-10-19 · 작성 manager-spec · Tier L(사용자 확정)
+> 상태: **in-progress**(run 단계, M1 완료) · 버전 0.4.1 · 작성 2026-10-19 · 작성 manager-spec · Tier L(사용자 확정)
 > 승인된 기획: `.moai/plans/ai-refactored-snowglobe.md`
 > 관련 문서: `spec.md`(요구사항), `acceptance.md`(인수 기준), `design.md`(구조·보안 경계), `research.md`(조사), `spec-compact.md`(압축본)
-> 감사 이력: plan-audit 1회차 FAIL 0.78 → v0.3.0 반영, 2회차 FAIL 0.90 → v0.3.1 반영, 3회차 FAIL 0.91 → 사용자 부채 수용 → v0.3.2 반영, 4회차(run 단계 Phase 1) PASS 0.93 → 선택 결함 일부를 M1 관측과 함께 v0.4.0에서 반영(§2.3, §2.4). 감사 결함 ID는 회차 접두어(`R1-`~`R4-`)를 붙여 결정 ID(D1~D10, T1~T11)와 구분한다.
+> 감사 이력: plan-audit 1회차 FAIL 0.78 → v0.3.0 반영, 2회차 FAIL 0.90 → v0.3.1 반영, 3회차 FAIL 0.91 → 사용자 부채 수용 → v0.3.2 반영, 4회차(run 단계 Phase 1) PASS 0.93 → 선택 결함 일부를 M1 관측과 함께 v0.4.0에서 반영(§2.3, §2.4), 5회차(v0.4.0 delta) FAIL 0.83(점수 하락 → STOP, 단일 수정) → v0.4.1 반영(§2.4). 감사 결함 ID는 회차 접두어(`R1-`~`R5-`)를 붙여 결정 ID(D1~D10, T1~T11)와 구분한다.
 
 ---
 
@@ -45,7 +45,7 @@
 | T8 | 프로세스 종료 유예 시간은 실행기 인자(기본 15초), 테스트는 0.5초 주입 | R1-D9 | REQ-006, AC-005, design §3.4 |
 | T9 | 모달을 다시 열면 새 `EventSource`가 헤더 없이 전체 재생을 받는다. `Last-Event-ID`는 같은 객체의 자동 재접속에만 쓰인다(설계 설명 정정) | R1-D8 | design §4.4, §8 |
 | T10 | 시간 초과·비정상 종료·취소·서버 종료(best-effort)로 끝났지만 선택 가능한 리포트(대개 `draft/report.html`)가 있으면, 종료 상태·오류 종류는 분류대로(`error/timeout`, `error/exit_error`, `cancelled`) 두고 리포트는 허용 목록 방식으로 보관하며 `interrupted: true`를 기록한다. 전달 상태는 선택 규칙 결과 그대로(`final` 조건이 맞으면 `final`, 아니면 `draft`, 사용자 결정 R3-M2). 화면은 `draft`면 초안 배너, `interrupted`면 상태와 상관없이 중단 안내. 기록 항목에 `interrupted: true`. 근거: 결정 D7(비용이 든 초안을 버리지 않는다) | R2-N4 | REQ-007, 014, 017, 019, AC-014(e)(f)(g), 017, 019, design §4.1, §4.4, §4.6, §5.2, §5.3, §7.1 |
-| T11 | **하네스는 리포 밖에서 실행하고, 리포에는 추적 원본만 둔다.** 원본 `backend/goose_harness_src/`는 `.claude`·`CLAUDE.md`라는 이름을 쓰지 않고(`harness-instructions.md`, `claude-settings.json`, `skills/goose/`), 리포의 `goose-manifest.json`이 설치본 경로 기준 sha256을 고정한다. 서버 시작 시 원본을 매니페스트로 대조해 맞을 때만 `~/.goose-harness`(`AI_REPORT_GOOSE_HARNESS_DIR`)에 설치하고(`runs/` 보존), 작업 시작마다 설치본을 같은 매니페스트로 검사한다(목록 밖 `.claude/` 파일도 실패). 매니페스트 범위는 `CLAUDE.md`·`settings.json`·스킬 전체. **근거**: (1) 리포 안 실행은 오염된다(M1 P2: 캐시 생성 115,950 대 13,028, MoAI 스킬·에이전트 17개·MCP 서버·리포 메모리 누수). (2) 리포 안에 `.claude/skills`가 있으면 이 리포의 MoAI 세션이 goose 스킬을 발견한다(M1 부수 관측). 이름을 바꾼 원본은 발견 대상이 아니다. (3) 원본을 리포에 두어 벤더링 내역이 버전 관리되고, 매니페스트가 설치본 밖(리포)에 있어 설치본을 바꾼 쪽이 기준값까지 바꿀 수 없으므로 REQ-001 검사가 의미를 가진다. **기각한 대안**: (a) 리포에 사본 없이 수동 배치 — 벤더링 이력과 설정 파일 원본이 추적되지 않고 새 환경에서 재현할 수 없다. (b) 원본을 `.claude/` 이름 그대로 리포에 두고 복사 — (2)의 발견 문제가 남는다. (c) `--restricted` — goose 스킬도 사라진다(M1 P2b) | M1 판정(조건부 GO), 사용자 결정 2026-10-19 | REQ-001, 002, 022, AC-001, 002, 023, design §2, §2.3, §3.1, §6 |
+| T11 | **하네스는 리포 밖에서 실행하고, 리포에는 추적 원본만 둔다.** 원본 `backend/goose_harness_src/`는 `.claude`·`CLAUDE.md`라는 이름을 쓰지 않고(`harness-instructions.md`, `claude-settings.json`, `skills/goose/`), 리포의 `goose-manifest.json`이 설치본 경로 기준 sha256을 고정한다. 서버 시작 시 원본을 매니페스트로 대조해 맞을 때만 `~/.goose-harness`(`AI_REPORT_GOOSE_HARNESS_DIR`)에 설치하고(`runs/` 보존), 작업 시작마다 설치본을 같은 매니페스트로 검사한다(목록 밖 `.claude/` 파일도 실패). 원본 대조가 실패하면 그 서버 실행 동안 모든 작업이 `integrity`로 끝난다(기존 설치본이 맞아도 — 닫힌 실패, v0.4.1 사용자 결정). 매니페스트 범위는 `CLAUDE.md`·`settings.json`·스킬 전체. **근거**: (1) 리포 안 실행은 오염된다(M1 P2: 캐시 생성 115,950 대 13,028, MoAI 스킬·에이전트 17개·MCP 서버·리포 메모리 누수). (2) 리포 안에 `.claude/skills`가 있으면 이 리포의 MoAI 세션이 goose 스킬을 발견한다(M1 부수 관측). 이름을 바꾼 원본은 발견 대상이 아니다. (3) 원본을 리포에 두어 벤더링 내역이 버전 관리되고, 매니페스트가 설치본 밖(리포)에 있어 설치본을 바꾼 쪽이 기준값까지 바꿀 수 없으므로 REQ-001 검사가 의미를 가진다. **기각한 대안**: (a) 리포에 사본 없이 수동 배치 — 벤더링 이력과 설정 파일 원본이 추적되지 않고 새 환경에서 재현할 수 없다. (b) 원본을 `.claude/` 이름 그대로 리포에 두고 복사 — (2)의 발견 문제가 남는다. (c) `--restricted` — goose 스킬도 사라진다(M1 P2b) | M1 판정(조건부 GO), 사용자 결정 2026-10-19 | REQ-001, 002, 022, AC-001, 002, 023, design §2, §2.3, §3.1, §6 |
 
 ### 2.4 감사 결함 처리 내역
 
@@ -109,6 +109,21 @@
 | R4-7 design §8 라우터가 4~6단계 판정 | SHOULD-FIX | 반영 — design §8을 “router 1~3단계 → service.start()가 잠금 안에서 4~8단계” |
 | R4-8 progress.md §G “verification pending” | MINOR | 반영 — 해당 줄을 “검증 완료, 독립 재감사는 review-4”로 갱신 |
 | R4-9 AC-014에 exit 7 + 초안 경우 없음 | MINOR | 보류 — R4-6과 같은 이유. M4·M5 위임 프롬프트에서 명시 권장 |
+
+5회차(`.moai/reports/plan-audit/SPEC-AI-REPORT-004-review-5.md`, FAIL 0.83, v0.4.0 delta) — 점수 하락에 따른 STOP 신호로 한 번만 수정, v0.4.1, 재번호 없음. 보고서의 결함 번호 D1~D10을 `R5-1`~`R5-10`으로 적는다
+
+| 결함 | 분류 | 처리 |
+|---|---|---|
+| R5-1 원본 대조 실패 + 기존 설치본이 있을 때 동작 미정 | blocking | 반영 — 사용자 결정(2026-10-19): 닫힌 실패. 시작 시 실패를 기록하고 이후 작업은 기존 설치본이 맞아도 `error`/`integrity`. REQ-001·008, design §2.3·§4.1·§4.3, AC-001 (2b) |
+| R5-2 원본 쪽 목록 밖 파일 규칙이 매니페스트 파일 자체와 충돌, REQ에 없음 | blocking | 반영 — 제외 목록(`goose-manifest.json`, `.DS_Store`)을 REQ-001·design §2.3에 명시, AC-001 (1) 제외 파일 조건과 (2c) 목록 밖 원본 파일 |
+| R5-3 AC-003 (6)이 `cat` 한 형태만 시험 | blocking | 반영 — (6a)~(6f): `cat`·`head`·`grep` 절대 경로, `~`·`$HOME` 경로, 허용 스크립트 뒤 복합 명령. 거부 11건. REQ-003 둘째 절과 design §2.2 표를 맞춤 |
+| R5-4 "M1이 변경 감지를 확인" 과장 | blocking | 반영 — design §6.1·§9 행을 "오탐 없음 관측, 감지는 AC-001 (3)(4)"로. progress.md 관측 기록은 그대로 두고 아래에 정정 줄 추가 |
+| R5-5 design §2.2 표 제목이 미실행 규칙까지 덮음 | optional | 반영 — 제목 변경, `audit_report.py` 허용·`CLAUDE.md` 거부에 [미관측] |
+| R5-6 리포 아래 `<H>` 거부가 REQ·AC에 없음 | optional | 보류 — M2 위임 프롬프트에서 결과(설치 안 함 → R5-1 규칙에 따라 작업은 `integrity`)를 명시 권장 |
+| R5-7 research.md 낡은 cwd 설명 | optional | 반영 — §2.5·§5.3 두 곳에 T11 대체 표시 |
+| R5-8 AC-012 기대 순서 리터럴 미고정 | optional | 보류 — M3 위임 프롬프트에서 녹화 기준 리터럴을 테스트에 직접 적도록 명시 권장 |
+| R5-9 acceptance 머리말 변경 목록에 AC-025 누락 | optional | 반영 |
+| R5-10 설치본 최상위 기타 파일(`CLAUDE.local.md` 등) 미검사 | optional | 보류 — M2 재관측 때 `CLAUDE.local.md` 로드 여부를 함께 확인 권장 |
 
 ### 2.5 Tier
 
@@ -178,9 +193,9 @@ M1 산출값: `AI_REPORT_GOOSE_TIMEOUT` 기본값(P4 측정값×2, 5분 단위 �
 ### M2 — 하네스 원본·설치·재탐침 (Priority High)
 
 - 추적 원본 `backend/goose_harness_src/` 작성(T11, design §2): goose 벤더링(`.DS_Store` 제외) → `skills/goose/`, `harness-instructions.md`(design §2.1, 가정 기록 규칙 포함), `claude-settings.json`(design §2.2: 권한 + `env.PATH` + `autoMemoryEnabled: false` + `disableAllHooks: true`), `goose-manifest.json`(설치본 경로 기준, `CLAUDE.md`·`.claude/settings.json`·`.claude/skills/goose/**` 전체).
-- 원본 대조·설치 함수(서버 시작 시, `runs/` 보존, 리포 아래 경로 거부)와 설치본 무결성 검사 함수(목록 밖 `.claude/` 파일 포함) — design §2.3, AC-001.
+- 원본 대조·설치 함수(서버 시작 시, `runs/` 보존, 리포 아래 경로 거부, `goose-manifest.json`·`.DS_Store` 제외, 대조 실패 시 실패 기록 → 이후 작업은 기존 설치본과 상관없이 `integrity`)와 설치본 무결성 검사 함수(목록 밖 `.claude/` 파일 포함) — design §2.3, AC-001.
 - M1 임시 `backend/goose_harness/`(미추적) 삭제. `git ls-files backend`에 `.claude`·`CLAUDE.md` 없음 확인(AC-023 일부).
-- 최종 위치 `~/.goose-harness`에서 재관측: P0·P1(`goose` 발견, MoAI 항목 없음, `mcp_servers []`, `~/.claude/CLAUDE.md` 로드 여부 확인 시도), AC-003 음성 탐침 (1)~(6). (6) 하네스 밖 절대 경로 읽기 전용 Bash가 거부되지 않으면 거부 규칙을 보강해 재탐침하고, 막을 수 없으면 차단 보고(M3 진입 금지).
+- 최종 위치 `~/.goose-harness`에서 재관측: P0·P1(`goose` 발견, MoAI 항목 없음, `mcp_servers []`, `~/.claude/CLAUDE.md` 로드 여부 확인 시도), AC-003 음성 탐침 (1)~(5)와 (6a)~(6f). (6a)~(6f) 중 하나라도 하네스 밖 읽기 전용 Bash가 거부되지 않으면 거부 규칙을 보강해 재탐침하고, 막을 수 없으면 차단 보고(M3 진입 금지).
 
 ### M3 — 실행기 `goose_runner.py` (Priority High)
 
@@ -244,7 +259,7 @@ research.md §7을 따른다. 특히:
 
 | REQ | 요지 | AC |
 |---|---|---|
-| 001 | 서버 시작 시 원본 대조 후 설치(`runs/` 보존) / 무결성 실패(목록 밖 파일 포함) → `error/integrity`, 미실행·미등록·쿼터 미차감 | 001 |
+| 001 | 서버 시작 시 원본 대조 후 설치(`runs/` 보존, 매니페스트·`.DS_Store` 제외) / 무결성 실패(목록 밖 파일, 시작 시 원본 대조 실패 기록 포함) → `error/integrity`, 미실행·미등록·쿼터 미차감 | 001 |
 | 002 | argv(`--settings`·`--strict-mcp-config` 포함)·cwd `~/.goose-harness`·모델 기본 `sonnet`·우회 플래그 금지·설정 키 3개 | 002 |
 | 003 | 허용 목록 밖 거부 + 하네스 밖 읽기 전용 Bash 거부 | 003 |
 | 004 | 환경 변수 허용 목록 | 004 |

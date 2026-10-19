@@ -116,6 +116,7 @@ industry(peer-compare, analyze)   ┘
 
 - 인터뷰: `goose-agent.md`는 맥락이 부족하면 “한 번에 1~3개 질문”을 하도록 한다. 헤드리스에는 답할 사람이 없으므로 하네스 지침에서 금지하고, 프롬프트에 종목·코드·기준일·범위·출력 위치를 모두 넣어 “이미 아는 정보는 묻지 않는다” 규칙이 작동하게 한다.
 - 스크립트 경로: 지침은 스킬 루트 기준 상대경로(`python3 workflows/...`)를 쓴다. 하네스 cwd가 `backend/goose_harness/`이면 실제 경로는 `.claude/skills/goose/workflows/...`가 되므로, 권한 허용 규칙과 하네스 CLAUDE.md의 명령 형식을 일치시켜야 한다. 모델이 다른 형식(`cd` 후 실행 등)을 쓰면 거부된다 → M1에서 확인.
+  - (v0.4.0 정정: 리포 안 cwd `backend/goose_harness/`는 plan T11로 대체됐다. 하네스는 리포 밖 `~/.goose-harness`에서 실행하며, 그 아래 `.claude/skills/goose/workflows/...` 경로 형식은 같다.)
 
 ---
 
@@ -212,6 +213,7 @@ M1에서 객관적으로 측정하는 방법: 같은 하네스를 (a) 리포 안
 ### 5.3 쓰기 범위
 
 - 모델이 쓰는 위치와 사용자에게 보관하는 위치를 분리하는 방안을 권장한다: 세션은 하네스 안의 작업 전용 디렉터리(`backend/goose_harness/runs/<job_id>/`, gitignore)에만 쓰고, 성공하면 **백엔드가** 허용된 파일명만 `backend/reports/<종목명>/goose/YYYY-MM-DD[_N]/`로 복사한다. 이렇게 하면 다른 종목의 리포트가 있는 `backend/reports/`를 세션에 노출하지 않고, 쓰기 허용 규칙도 상대경로 하나로 끝난다. 최종 보관 위치는 승인 기획 §4와 같다.
+  - (v0.4.0 정정: 작업 디렉터리는 plan T11에 따라 리포 밖 `~/.goose-harness/runs/<job_id>/`로 대체됐다. 리포 밖이라 gitignore가 필요 없다.)
 - 단, 스크립트가 쓰는 위치는 Write 권한 규칙이 아니라 `--output-dir` 인자로 정해진다. 허용 규칙을 정확한 스크립트 경로로 고정해도 인자는 모델이 정한다 → 작업 종료 후 백엔드가 작업 디렉터리 밖 변경 여부를 점검하는 방법을 M1에서 검토한다(예: 하네스 트리의 실행 전후 파일 목록 비교).
 - 모델이 출력한 “report.html 경로” 문자열은 믿지 않는다(LLM05). 백엔드는 `runs/<job_id>/` 아래 `final/report.html`, 없으면 `draft/report.html`을 스스로 찾는다. 탐색 위치는 M1 관측으로 확정한다.
 

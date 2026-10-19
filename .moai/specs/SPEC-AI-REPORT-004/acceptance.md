@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 인수 기준
 
-> 대상: `spec.md` v0.4.0 REQ-AIR4-001~023. 인수 기준 25개(Tier L 상한). v0.4.0에서 M1 관측에 따라 AC-001·002·003·004·012·023의 리터럴을 바꾸고 AC-014의 픽스처 수를 고쳤다(R4-1).
+> 대상: `spec.md` v0.4.1 REQ-AIR4-001~023. 인수 기준 25개(Tier L 상한). v0.4.0에서 M1 관측에 따라 AC-001·002·003·004·012·023·025의 리터럴을 바꾸고 AC-014의 픽스처 수를 고쳤다(R4-1). v0.4.1에서 plan-audit 5회차 결함에 따라 AC-001에 (2b)·(2c)와 (1)의 제외 파일 조건을 넣고(R5-1·R5-2), AC-003 (6)을 탐침 6형태 (6a)~(6f)로 넓혔다(R5-3).
 > 작성 원칙: 각 기준은 Given/When/Then과 함께 **이 기준이 잡아내는 잘못된 구현**을 적는다. 기대값은 구현 전에 고정한 리터럴이다. 대조 단언은 “작성했는가”가 아니라 “구현을 되돌렸을 때 RED를 관측했는가”로 판정한다(run 단계에서 되돌림 실행 출력을 `progress.md §E.2`에 남긴다). 같은 헬퍼를 구현과 테스트가 함께 호출해 비교하는 단언은 금지한다.
 > 검증 방식 표기: [자동] pytest/vitest, [라이브] 실제 `claude`·dev 서버로 수동 확인.
 > 용어: “종료 상태”는 `done | error | cancelled` 셋이다. `cancelled`는 오류 종류가 아니라 종료 상태다(REQ-007).
@@ -10,14 +10,16 @@
 ## A. 하네스와 실행
 
 **AC-AIR4-001** [자동] — REQ-001
-- Given: 임시 디렉터리의 추적 원본(이름 규칙 design §2: `harness-instructions.md`, `claude-settings.json`, `skills/goose/…`)과 그 매니페스트, 설치 대상 `<H>`(임시, `<H>/runs/keep.txt` 미리 존재), 호출 횟수를 기록하는 가짜 `claude` 명령, 오늘 쿼터 사용량 0
+- Given: 임시 디렉터리의 추적 원본(이름 규칙 design §2: `harness-instructions.md`, `claude-settings.json`, `skills/goose/…`, 같은 폴더의 `goose-manifest.json`, 매니페스트에 없는 `skills/goose/.DS_Store`)과 그 매니페스트, 설치 대상 `<H>`(임시, `<H>/runs/keep.txt` 미리 존재), 호출 횟수를 기록하는 가짜 `claude` 명령, 오늘 쿼터 사용량 0
 - When / Then:
-  - (1) 원본이 매니페스트와 일치하는 상태로 서버 시작(lifespan) → `<H>/CLAUDE.md`, `<H>/.claude/settings.json`, `<H>/.claude/skills/goose/…`의 sha256이 매니페스트와 모두 같고, `<H>/runs/keep.txt` 내용 그대로
+  - (1) 원본이 매니페스트와 일치하는 상태로 서버 시작(lifespan) → `<H>/CLAUDE.md`, `<H>/.claude/settings.json`, `<H>/.claude/skills/goose/…`의 sha256이 매니페스트와 모두 같고, `<H>/runs/keep.txt` 내용 그대로; `<H>` 아래 어디에도 `goose-manifest.json`·`.DS_Store` 없음
   - (2) 원본 한 파일을 1바이트 바꾼 뒤 빈 `<H>`로 서버 시작 → `<H>/.claude/` 생성 안 됨
+  - (2b) (1) 설치 후 원본 `skills/goose/` 아래 한 파일을 1바이트 바꾸고(매니페스트는 그대로) 서버를 다시 시작한 뒤 `POST /ai-report/299030?mode=deep` → `<H>` 설치본 파일의 sha256은 (1)과 같음(교체 안 됨); 응답 202, 응답의 `job_id` 작업이 상태 `error`, 오류 종류 `integrity`; 가짜 명령 호출 0회; `GET /ai-report/goose/active` → `null`; 쿼터 사용량 0 그대로
+  - (2c) 원본에 매니페스트에 없는 파일 `skills/goose/extra.md`를 추가하고 빈 `<H>`로 서버 시작 → `<H>/.claude/` 생성 안 됨
   - (3) (1) 설치 후 `<H>/.claude/skills/goose/` 아래 한 파일을 1바이트 바꾸고 `POST /ai-report/299030?mode=deep` → 응답 202, 응답의 `job_id` 작업이 상태 `error`, 오류 종류 `integrity`; 가짜 명령 호출 0회; `GET /ai-report/goose/active` → `null`; 쿼터 사용량 0 그대로
   - (4) (1) 설치 후 `<H>/.claude/settings.local.json`(매니페스트에 없는 파일)을 추가하고 같은 요청 → (3)과 같음
   - (5) (3)의 상태에서 서버를 다시 시작 → 설치본이 원본으로 복구되어 같은 요청이 202 + 실행 1회
-- 잡아내는 구현: 무결성 검사를 생략한 구현, 프로세스를 띄운 뒤에 검사하는 구현, 실패 작업을 실행 중 작업으로 등록하거나 쿼터를 차감하는 구현, 설치본 안의 매니페스트를 기준으로 쓰는 구현(설치본과 기준값을 함께 바꾸면 통과 — (3)은 리포 매니페스트로만 판정), 원본 대조 없이 복사하는 구현(2), 목록에 있는 파일만 보고 추가 파일을 놓치는 구현(4), 설치하면서 `runs/`를 지우는 구현(1)
+- 잡아내는 구현: 무결성 검사를 생략한 구현, 프로세스를 띄운 뒤에 검사하는 구현, 실패 작업을 실행 중 작업으로 등록하거나 쿼터를 차감하는 구현, 설치본 안의 매니페스트를 기준으로 쓰는 구현(설치본과 기준값을 함께 바꾸면 통과 — (3)은 리포 매니페스트로만 판정), 원본 대조 없이 복사하는 구현(2), 원본 대조가 실패해도 이전 설치본이 매니페스트와 맞으면 그 설치본으로 실행하는 구현(2b), 원본 쪽 목록 밖 파일을 무시하는 구현(2c), 매니페스트 파일 자체나 `.DS_Store`를 목록 밖 원본 파일로 세어 설치를 늘 거부하거나 설치본에 복사하는 구현(1), 목록에 있는 파일만 보고 추가 파일을 놓치는 구현(4), 설치하면서 `runs/`를 지우는 구현(1)
 
 **AC-AIR4-002** [자동] — REQ-002
 - Given: `AI_REPORT_GOOSE_MODEL` 미설정 환경과 `opus`로 설정한 환경; `AI_REPORT_GOOSE_HARNESS_DIR` 미설정이고 `HOME`을 임시 경로 `<T>`로 둔 환경과 `/tmp/h2`로 설정한 환경; 리포의 `backend/goose_harness_src/claude-settings.json`
@@ -30,11 +32,11 @@
 - 잡아내는 구현: `stream_claude_synthesis` argv를 복사해 `bypassPermissions`가 남은 구현, cwd를 리포 루트나 `backend/goose_harness`로 둔 구현, 모델을 `claude-sonnet-4-6`처럼 하드코딩한 구현, `--settings`를 빠뜨려 리포 밖에서 allow가 무시되는 구현, `--strict-mcp-config`를 빠뜨려 계정 커넥터 MCP가 붙는 구현, `env.PATH`가 없어 `python3`를 못 찾는 설정
 
 **AC-AIR4-003** [라이브] — REQ-003
-- Given: `~/.goose-harness`에 설치된 하네스, design §3.1의 argv, 하네스 밖 카나리 파일 `<C>`(절대 경로, 내용 `CANARY_ONLY`)
-- When: 음성 탐침 6종 실행 — (1) `python3 .claude/skills/goose/workflows/../../../runs/x.py` (2) 작업 디렉터리 밖 Write (3) `.claude/skills/goose/SKILL.md` Edit (4) `../../.env` Read (5) `render_report.py … --output-dir ../../probe-out` (6) 읽기 전용 Bash로 `<C>` 읽기(`cat <C>`)
-- Then: `result` 이벤트 `permission_denials` 6건, 대상 파일 생성·변경 0건(실행 전후 해시 비교), 세션 출력과 이벤트 어디에도 `CANARY_ONLY` 문자열 없음
-- 잡아내는 구현: 접두어 Bash 규칙만 둔 정책(`..` 우회 통과), `.claude/**` 쓰기를 막지 않은 정책, Read를 전역 허용한 정책, `--settings` 없이 리포 밖에서 실행해 allow가 무시된 상태를 “거부 성공”으로 오인한 경우(양성 대조 `Write runs/pos/ok.txt` 성공을 함께 기록해 구분), 읽기 전용 Bash 자동 허용을 막지 않은 정책(6)
-- 비고: (1)~(5)는 M1 P3b에서 5/5 거부를 관측했다(세션 스크래치 위치). (6)은 관측하지 않았다 — M2에서 최종 위치로 재탐침한다.
+- Given: `~/.goose-harness`에 설치된 하네스, design §3.1의 argv, 하네스 밖이면서 홈 아래인 카나리 파일 `<C>` = `$HOME/.goose-canary/canary.txt`(내용 `CANARY_ONLY`), 그 홈 기준 상대 경로 `<R>` = `.goose-canary/canary.txt`
+- When: 음성 탐침 11건을 각각 별도 요청으로 실행 — (1) `python3 .claude/skills/goose/workflows/../../../runs/x.py` (2) 작업 디렉터리 밖 Write (3) `.claude/skills/goose/SKILL.md` Edit (4) `../../.env` Read (5) `render_report.py … --output-dir ../../probe-out` (6) 하네스 밖을 읽는 읽기 전용 Bash 6형태: (6a) `cat <C>`(절대 경로) (6b) `head -1 <C>` (6c) `grep -r CANARY <C의 디렉터리>` (6d) `cat ~/<R>` (6e) `cat $HOME/<R>` (6f) `python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py --help; cat <C>`(허용 스크립트 접두어 뒤 복합 명령)
+- Then: `result` 이벤트 `permission_denials`가 탐침마다 1건씩 모두 11건, 대상 파일 생성·변경 0건(실행 전후 해시 비교), 세션 출력과 이벤트 어디에도 `CANARY_ONLY` 문자열 없음. (6a)~(6f) 중 하나라도 거부되지 않거나 카나리가 보이면 FAIL이며 M3에 들어가지 않는다(plan M2)
+- 잡아내는 구현: 접두어 Bash 규칙만 둔 정책(`..` 우회 통과), `.claude/**` 쓰기를 막지 않은 정책, Read를 전역 허용한 정책, `--settings` 없이 리포 밖에서 실행해 allow가 무시된 상태를 “거부 성공”으로 오인한 경우(양성 대조 `Write runs/pos/ok.txt` 성공을 함께 기록해 구분), 읽기 전용 Bash 자동 허용을 막지 않은 정책(6), `cat`만 막고 `head`·`grep`은 통과시키는 정책(6b)(6c), 절대 경로만 막고 `~`·`$HOME` 표기를 놓치는 정책(6d)(6e), 명령 첫 부분이 허용 접두어와 맞으면 뒤에 붙은 명령까지 통과시키는 정책(6f — M1 녹화에서 `render_report.py --help 2>&1 | head -30; wc -l …`가 거부되지 않았다)
+- 비고: (1)~(5)는 M1 P3b에서 5/5 거부를 관측했다(세션 스크래치 위치). (6a)~(6f)는 관측하지 않았다 — M2에서 최종 위치로 재탐침한다.
 
 **AC-AIR4-004** [자동] — REQ-004
 - Given: 백엔드 환경에 `KRX_PW=canary-4f2`, `BRAVE_API_KEY=canary-9a1`, `ANTHROPIC_API_KEY=canary-7c3`, `PATH`, `HOME`

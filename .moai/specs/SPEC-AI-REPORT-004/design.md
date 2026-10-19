@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 설계
 
-> 대상 요구사항: `spec.md` v0.4.0 §4. 근거 자료: `research.md`, M1 관측(`progress.md §E.2 ### M1 스파이크 관측`). 결정 기록: `plan.md §2`.
+> 대상 요구사항: `spec.md` v0.4.1 §4. 근거 자료: `research.md`, M1 관측(`progress.md §E.2 ### M1 스파이크 관측`). 결정 기록: `plan.md §2`.
 > v0.4.0에서 M1 잠정값을 측정값으로 바꿨다(§9). **[측정 — M1 Pn]**은 M1 탐침 Pn의 실행 출력에 근거한 값, **[미관측]**은 M1이 보지 못해 run 단계에서 확인할 값, **[M2 재탐침]**은 M2에서 다시 관측해야 확정되는 값이다.
 
 ---
@@ -63,18 +63,18 @@ backend/goose_harness_src/             추적 원본 — 작업 디렉터리로 
 
 ### 2.2 settings.json 권한 정책과 설정 키
 
-| 구분 | 규칙 (M1에서 동작한 문법) | 근거 |
+| 구분 | 규칙 (M1 설정에 사용한 문법. 실행하지 않은 규칙은 [미관측]) | 근거 |
 |---|---|---|
 | 허용 | `WebSearch`, `WebFetch` | goose 조사. 단 메인 도구 목록에는 `WebFetch`·`Glob`·`Grep`가 없고 WebFetch는 내장 `web-fetch` 서브에이전트 안에서 쓰였다 [측정 — M1 P1·P5] |
 | 허용 | `Read(./**)` — 하네스 안 경로만 | 비밀 파일 읽기 차단 |
 | 허용 | `Write(./runs/**)`, `Edit(./runs/**)` | 쓰기 범위 제한 |
 | 허용 | `Agent`, `Skill` | 역할 분배, `/goose` 해석 |
 | 허용 | `Bash(python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py:*)` | 정확한 경로 고정 |
-| 허용 | `Bash(python3 .claude/skills/goose/workflows/fact-check/scripts/audit_report.py:*)` | 정확한 경로 고정 |
-| 거부 | `Edit(./.claude/**)` (+ `CLAUDE.md`) | 스크립트 덮어쓰기 차단 |
+| 허용 | `Bash(python3 .claude/skills/goose/workflows/fact-check/scripts/audit_report.py:*)` | 정확한 경로 고정. **[미관측]** — M1 실행이 감사 단계 전에 멈춰 이 규칙은 쓰이지 않았다 |
+| 거부 | `Edit(./.claude/**)` (+ `CLAUDE.md` **[미관측]** — 탐침하지 않음) | 스크립트 덮어쓰기 차단 |
 | 거부 | `Bash(*..*)` | 경로 탈출 차단 |
 | 거부 | `Read(../**)`, `Read(**/.env)` | 하네스 밖·비밀 파일 읽기 차단 |
-| 거부 | 하네스 밖 절대 경로를 읽는 읽기 전용 Bash(`cat`, `head`, `ls` 등) | REQ-003 둘째 절. 문법 **[M2 재탐침]** |
+| 거부 | 하네스 밖 경로를 읽는 읽기 전용 Bash(`cat`, `head`, `grep`, `ls` 등). 절대 경로·`~`·`$HOME` 표기, 허용 스크립트 뒤에 붙인 복합 명령 포함 | REQ-003 둘째 절, AC-003 (6a)~(6f). 문법 **[M2 재탐침]** |
 | 미허용 | 그 외 쓰기·실행(`portfolio_calc.py` 포함) | `dontAsk`로 조용히 거부 |
 
 설정 키 [측정 — M1 P4·P2c]:
@@ -101,12 +101,15 @@ backend/goose_harness_src/             추적 원본 — 작업 디렉터리로 
 서버 시작(lifespan 시작 단계)
  1. 원본 대조: backend/goose_harness_src/의 각 파일을 설치 경로로 바꿔 매니페스트와 sha256 비교
     (harness-instructions.md → CLAUDE.md, claude-settings.json → .claude/settings.json, skills/** → .claude/skills/**)
-    목록 밖 원본 파일이 있거나 하나라도 다르면 → 설치 안 함, 오류 로그. 이후 작업은 무결성 검사에서 error(integrity)
-    (`.DS_Store`는 대조·설치 모두에서 제외 — M1 배포물에 2개 있었음 [측정 — M1 사전 점검])
+    대조 제외 목록: 원본 폴더의 `goose-manifest.json`(매니페스트 자체), 모든 `.DS_Store`
+    (둘 다 대조·설치 모두에서 제외. `.DS_Store`는 M1 배포물에 2개 있었음 [측정 — M1 사전 점검])
+    제외 목록 밖에서 목록 밖 원본 파일이 있거나 하나라도 다르면 → 설치 안 함, 오류 로그,
+    "시작 시 무결성 실패" 기록(서버 프로세스가 끝날 때까지 유지). 기존 설치본은 그대로 두되 쓰지 않는다(닫힌 실패)
  2. 설치: <H>/CLAUDE.md와 <H>/.claude/를 원본으로 교체(임시 디렉터리에 만든 뒤 이름 바꾸기). <H>/runs/는 건드리지 않음
  3. 설치본을 매니페스트로 다시 검사(1과 같은 함수)
 
-작업 시작 직전(REQ-008 7단계) — 무결성 검사
+작업 시작 직전(REQ-008 7단계) — 무결성 검사 (아래 셋을 모두 통과해야 함)
+ - "시작 시 무결성 실패" 기록이 없음 — 기록이 있으면 설치본이 매니페스트와 맞아도 실패
  - 매니페스트의 모든 경로가 <H>에 있고 sha256 일치
  - <H>/.claude/ 아래에 매니페스트에 없는 파일 없음
  - 실패 → error(integrity), claude 실행 안 함, active 미등록, 쿼터 미차감
@@ -115,6 +118,7 @@ backend/goose_harness_src/             추적 원본 — 작업 디렉터리로 
 ```
 
 - 설치는 서버 시작 때만 한다. 서버 실행 중 설치본이 바뀌면 다음 작업 시작의 무결성 검사가 막는다. 서버를 다시 시작하면 원본으로 복구된다.
+- 닫힌 실패(사용자 결정 2026-10-19, plan-audit 5회차 R5-1): 원본 대조가 실패한 서버에서는 이전 실행이 남긴 정상 설치본이 있어도 goose 작업을 띄우지 않는다. 원본을 고치고 매니페스트를 갱신하지 않은 채 재시작했을 때 goose가 옛 설치본으로 조용히 도는 일을 막는다. 원본(또는 매니페스트)을 바로잡고 서버를 다시 시작하면 풀린다. AC-001 (2b).
 - `<H>`는 `AI_REPORT_GOOSE_HARNESS_DIR`(기본 `~/.goose-harness`, `~`는 실행 사용자의 홈으로 펼침). 리포 경로 아래를 가리키면 설치하지 않고 오류 로그를 남긴다(오염 재발 방지).
 - 추적 원본에 `.claude`·`CLAUDE.md`라는 이름을 쓰지 않는 이유: 리포 안 `backend/goose_harness/.claude/skills`를 이 리포에서 일하는 MoAI 세션이 새 스킬로 발견했다 [측정 — M1 P2 부수 관측]. 하위 폴더의 `CLAUDE.md`도 같은 이유로 피한다. AC-023이 `git ls-files`로 확인한다.
 - 설치본 상위 경로 점검(M2 사전 조건): `~/CLAUDE.md`, `~/CLAUDE.local.md`, `/Users/CLAUDE.md`가 없고 홈이 git 저장소가 아님을 manager-spec이 2026-10-19 이 트리에서 확인했다(`ls` → No such file, `git -C ~ rev-parse` → not a git repository). M2에서 최종 경로로 P0·P1을 다시 실행해 재관측한다. 사용자 전역 `~/.claude/CLAUDE.md`가 로드되는지는 확인하지 못했다 [미관측].
@@ -205,7 +209,7 @@ cwd = <H> (~/.goose-harness), 새 프로세스 그룹(start_new_session)
 | exit 0 + 리포트 선택됨(final 또는 draft) | `done` | — |
 | 취소 요청 | `cancelled` | — |
 | 서버 종료 | `cancelled` | — (로그에 사유 `shutdown`) |
-| 매니페스트 불일치 | `error` | `integrity` |
+| 매니페스트 불일치 또는 서버 시작 원본 대조 실패 기록 | `error` | `integrity` |
 | 실행 파일 없음 | `error` | `binary_missing` |
 | stderr 인증 실패 문구 | `error` | `auth` |
 | 시간 초과 | `error` | `timeout` |
@@ -237,7 +241,7 @@ cwd = <H> (~/.goose-harness), 새 프로세스 그룹(start_new_session)
 4. 같은 code의 작업이 실행 중          → 200 {job_id: 기존}      쿼터 차감 없음
 5. 다른 code의 작업이 실행 중          → 429 {error: "goose_busy", detail: "<종목명> 분석이 진행 중입니다"}
 6. 일일 쿼터 소진                     → 429 {error: "goose_rate_limit"}
-7. 무결성 검사 실패                   → 202 {job_id}, 작업은 즉시 error(integrity)   쿼터 차감 없음, active 미등록
+7. 무결성 검사 실패(시작 시 실패 기록 포함, §2.3) → 202 {job_id}, 작업은 즉시 error(integrity)   쿼터 차감 없음, active 미등록
 8. 그 외                             → 작업 등록 + active 설정 + 쿼터 1 차감 + 백그라운드 태스크 → 202 {job_id}
 ```
 
@@ -339,7 +343,7 @@ X-Content-Type-Options: nosniff
 
 ### 6.1 스크립트 출력 경로 점검
 
-Write 권한 규칙은 스크립트가 `--output-dir`로 쓰는 위치를 막지 못한다. 다만 `..`를 넣은 `--output-dir`는 `Bash(*..*)` 거부로 막혔다 [측정 — M1 P3b 탐침 5]. 보완책은 §2.3의 무결성 검사를 세션 종료 직후에도 한 번 실행해, 실패하면 경고 로그를 남기는 것이다. 매니페스트가 `CLAUDE.md`·`.claude/settings.json`·스킬 전체를 덮으므로(§2), 변경은 다음 작업 시작에서도 막힌다. M1에서는 실행 전후 `.claude/**`+`CLAUDE.md` sha256 트리 비교가 P3b·P4 모두 동일로 나와 이 방식으로 변경을 감지할 수 있음을 확인했다 [측정 — M1 P3b·P6]. 하네스 밖 경로에 대한 절대 경로 출력은 이 검사가 잡지 못한다(acceptance.md §H).
+Write 권한 규칙은 스크립트가 `--output-dir`로 쓰는 위치를 막지 못한다. 다만 `..`를 넣은 `--output-dir`는 `Bash(*..*)` 거부로 막혔다 [측정 — M1 P3b 탐침 5]. 보완책은 §2.3의 무결성 검사를 세션 종료 직후에도 한 번 실행해, 실패하면 경고 로그를 남기는 것이다. 매니페스트가 `CLAUDE.md`·`.claude/settings.json`·스킬 전체를 덮으므로(§2), 변경은 다음 작업 시작에서도 막힌다. M1에서는 실행 전후 `.claude/**`+`CLAUDE.md` sha256 트리 비교가 P3b·P4 모두 동일로 나와, 변경이 없을 때 오탐이 없음을 확인했다 [측정 — M1 P3b·P6]. 변경을 일으켜 잡히는지는 M1에서 관측하지 않았고, AC-001 (3)(4)가 검증한다. 하네스 밖 경로에 대한 절대 경로 출력은 이 검사가 잡지 못한다(acceptance.md §H).
 
 ## 7. 프론트엔드 흐름
 
@@ -408,7 +412,7 @@ v0.3.2의 잠정 목록을 M1 관측(2026-10-19, `claude` 2.1.303, HEAD `11f3e16
 |---|---|---|---|---|
 | 하네스 위치 | `backend/goose_harness` | 리포 밖 `~/.goose-harness`, 리포에는 `.claude`·`CLAUDE.md` 이름 없는 추적 원본 + 서버 시작 시 설치(T11). 리포 위치 오염: 캐시 생성 115,950 대 13,028, MoAI 스킬·에이전트·MCP 누수 | 측정(P1·P2) | §2, §2.3, REQ-001·002·022 |
 | 권한 규칙 문법 | §2.2 | §2.2 문법으로 동작. 리포 밖은 신뢰 대화상자가 없어 `--settings`로 넘김. 읽기 전용 Bash 자동 허용 | 측정(P3b·P4·P7) | §2.2, REQ-003 |
-| 하네스 밖 읽기 전용 Bash 거부 | — | 필요(REQ-003 둘째 절). 거부 문법은 미확정 | M2 재탐침 | §2.2, AC-003 (6) |
+| 하네스 밖 읽기 전용 Bash 거부 | — | 필요(REQ-003 둘째 절). 거부 문법은 미확정 | M2 재탐침 | §2.2, AC-003 (6a)~(6f) |
 | argv (§3.1) | `-p … --setting-sources project --permission-mode dontAsk --no-session-persistence --model` | `--strict-mcp-config`, `--settings <H>/.claude/settings.json` 추가 | 측정(P2c·P4) | §3.1, REQ-002, AC-002 |
 | 설정 파일 키 | 권한, hooks 없음 | `env.PATH`, `autoMemoryEnabled: false`, `disableAllHooks: true` 추가 | 측정(P4·P2c) | §2.2, REQ-002, AC-002 |
 | 인증 관련 환경 변수 (§3.3) | 미정 | 추가 변수 없음(6개로 인증 성공) | 측정(P0·P4) | §3.3 |
@@ -417,7 +421,7 @@ v0.3.2의 잠정 목록을 M1 관측(2026-10-19, `claude` 2.1.303, HEAD `11f3e16
 | 작업 디렉터리 하위 폴더·산출물 위치 (§5.2) | `draft/`, `final/` | `draft/` 확인, `final/` 미관측, `input.json`은 최상위(복사 안 함) | 측정(P6) + 미관측 | §2, §5.2 |
 | 근거 파일 허용 목록 (§5.2) | report·report-input·source-ledger·render-validation·delivery-audit | 앞의 4개 확인, `delivery-audit.json` 미관측 | 측정(P6) + 미관측 | §5.2 |
 | `assumptions.md` 작성 여부 | §2.1 규칙 | 작성됨(1,842바이트, 11개 항목). 규칙 유지 | 측정(P4) | §2.1 |
-| 스크립트 출력 점검 방식 (§6.1) | 미정 | 매니페스트를 `CLAUDE.md`·`settings.json`까지 넓히고 세션 종료 직후에도 검사 | 측정(P3b·P6) | §2, §2.3, §6.1 |
+| 스크립트 출력 점검 방식 (§6.1) | 미정 | 매니페스트를 `CLAUDE.md`·`settings.json`까지 넓히고 세션 종료 직후에도 검사 | 측정(오탐 없음, P3b·P6). 변경 감지는 미관측 → AC-001 (3)(4)가 검증 | §2, §2.3, §6.1 |
 | `--no-session-persistence`의 범위 | 디스크 저장 안 함 | 서브에이전트 메타 파일 3개는 남음, 대화 본문은 남지 않음 | 측정 | §3.1 |
 | claude.ai 계정 커넥터 MCP | 언급 없음 | 기본으로 붙음 → `--strict-mcp-config`로 제거 | 측정(P1·P2c) | §3.1, §6 |
 
@@ -432,5 +436,5 @@ v0.3.2의 잠정 목록을 M1 관측(2026-10-19, `claude` 2.1.303, HEAD `11f3e16
 | 리포 위치 실행에서 리포 hooks 실행 여부 | 리포 밖 실행으로 대상이 사라짐. `disableAllHooks`로 방어 | 해당 없음 |
 | 환경 변수를 하나씩 뺐을 때의 인증 결과 | 허용 목록을 더 줄일 수 있는지 모름 | 범위 밖 |
 | 최종 위치 `~/.goose-harness`에서의 재관측 | M1의 리포 밖 위치는 세션 스크래치였다 | M2(P0·P1·P3 재실행) |
-| 하네스 밖 절대 경로 읽기 전용 Bash가 거부되는지 | REQ-003 둘째 절 충족 여부 | M2 재탐침, AC-003 (6) |
+| 하네스 밖 절대 경로 읽기 전용 Bash가 거부되는지 | REQ-003 둘째 절 충족 여부 | M2 재탐침, AC-003 (6a)~(6f) |
 | 시간 상한의 대표성 | 표본 1회 | AC-025 라이브 재측정 |
