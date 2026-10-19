@@ -1,9 +1,9 @@
 # SPEC-AI-REPORT-004 구현 계획 — Deep 모드를 goose 하네스로 교체
 
-> 상태: **draft** · 버전 0.3.2 · 작성 2026-10-19 · 작성 manager-spec · Tier L(사용자 확정)
+> 상태: **in-progress**(run 단계, M1 완료) · 버전 0.4.0 · 작성 2026-10-19 · 작성 manager-spec · Tier L(사용자 확정)
 > 승인된 기획: `.moai/plans/ai-refactored-snowglobe.md`
 > 관련 문서: `spec.md`(요구사항), `acceptance.md`(인수 기준), `design.md`(구조·보안 경계), `research.md`(조사), `spec-compact.md`(압축본)
-> 감사 이력: plan-audit 1회차 FAIL 0.78 → v0.3.0 반영, 2회차 FAIL 0.90 → v0.3.1 반영(§2.3, §2.4). 감사 결함 ID는 회차 접두어(`R1-`, `R2-`)를 붙여 결정 ID(D1~D10, T1~T10)와 구분한다.
+> 감사 이력: plan-audit 1회차 FAIL 0.78 → v0.3.0 반영, 2회차 FAIL 0.90 → v0.3.1 반영, 3회차 FAIL 0.91 → 사용자 부채 수용 → v0.3.2 반영, 4회차(run 단계 Phase 1) PASS 0.93 → 선택 결함 일부를 M1 관측과 함께 v0.4.0에서 반영(§2.3, §2.4). 감사 결함 ID는 회차 접두어(`R1-`~`R4-`)를 붙여 결정 ID(D1~D10, T1~T11)와 구분한다.
 
 ---
 
@@ -31,7 +31,7 @@
 | D9 | goose 기본 모델 | `AI_REPORT_GOOSE_MODEL` 기본값 `sonnet` | REQ-002 / AC-002 |
 | D10 | goose 작업 전체 동시 실행 개수 | 서버 전체 1개. 다른 종목은 429, 같은 종목은 기존 `job_id` | REQ-008 / AC-007, 008 |
 
-### 2.3 기술 결정 (plan-audit 1·2회차 반영, manager-spec 권한)
+### 2.3 기술 결정 (plan-audit 1~3회차와 M1 관측 반영, manager-spec 권한)
 
 | ID | 결정 | 해결한 감사 결함 | 반영 위치 |
 |---|---|---|---|
@@ -45,6 +45,7 @@
 | T8 | 프로세스 종료 유예 시간은 실행기 인자(기본 15초), 테스트는 0.5초 주입 | R1-D9 | REQ-006, AC-005, design §3.4 |
 | T9 | 모달을 다시 열면 새 `EventSource`가 헤더 없이 전체 재생을 받는다. `Last-Event-ID`는 같은 객체의 자동 재접속에만 쓰인다(설계 설명 정정) | R1-D8 | design §4.4, §8 |
 | T10 | 시간 초과·비정상 종료·취소·서버 종료(best-effort)로 끝났지만 선택 가능한 리포트(대개 `draft/report.html`)가 있으면, 종료 상태·오류 종류는 분류대로(`error/timeout`, `error/exit_error`, `cancelled`) 두고 리포트는 허용 목록 방식으로 보관하며 `interrupted: true`를 기록한다. 전달 상태는 선택 규칙 결과 그대로(`final` 조건이 맞으면 `final`, 아니면 `draft`, 사용자 결정 R3-M2). 화면은 `draft`면 초안 배너, `interrupted`면 상태와 상관없이 중단 안내. 기록 항목에 `interrupted: true`. 근거: 결정 D7(비용이 든 초안을 버리지 않는다) | R2-N4 | REQ-007, 014, 017, 019, AC-014(e)(f)(g), 017, 019, design §4.1, §4.4, §4.6, §5.2, §5.3, §7.1 |
+| T11 | **하네스는 리포 밖에서 실행하고, 리포에는 추적 원본만 둔다.** 원본 `backend/goose_harness_src/`는 `.claude`·`CLAUDE.md`라는 이름을 쓰지 않고(`harness-instructions.md`, `claude-settings.json`, `skills/goose/`), 리포의 `goose-manifest.json`이 설치본 경로 기준 sha256을 고정한다. 서버 시작 시 원본을 매니페스트로 대조해 맞을 때만 `~/.goose-harness`(`AI_REPORT_GOOSE_HARNESS_DIR`)에 설치하고(`runs/` 보존), 작업 시작마다 설치본을 같은 매니페스트로 검사한다(목록 밖 `.claude/` 파일도 실패). 매니페스트 범위는 `CLAUDE.md`·`settings.json`·스킬 전체. **근거**: (1) 리포 안 실행은 오염된다(M1 P2: 캐시 생성 115,950 대 13,028, MoAI 스킬·에이전트 17개·MCP 서버·리포 메모리 누수). (2) 리포 안에 `.claude/skills`가 있으면 이 리포의 MoAI 세션이 goose 스킬을 발견한다(M1 부수 관측). 이름을 바꾼 원본은 발견 대상이 아니다. (3) 원본을 리포에 두어 벤더링 내역이 버전 관리되고, 매니페스트가 설치본 밖(리포)에 있어 설치본을 바꾼 쪽이 기준값까지 바꿀 수 없으므로 REQ-001 검사가 의미를 가진다. **기각한 대안**: (a) 리포에 사본 없이 수동 배치 — 벤더링 이력과 설정 파일 원본이 추적되지 않고 새 환경에서 재현할 수 없다. (b) 원본을 `.claude/` 이름 그대로 리포에 두고 복사 — (2)의 발견 문제가 남는다. (c) `--restricted` — goose 스킬도 사라진다(M1 P2b) | M1 판정(조건부 GO), 사용자 결정 2026-10-19 | REQ-001, 002, 022, AC-001, 002, 023, design §2, §2.3, §3.1, §6 |
 
 ### 2.4 감사 결함 처리 내역
 
@@ -95,6 +96,20 @@
 
 거절한 결함: 없음.
 
+4회차(`.moai/reports/plan-audit/SPEC-AI-REPORT-004-review-4.md`, PASS 0.93, run 단계 Phase 1) — M1 관측 반영과 함께 v0.4.0에서 처리, 재번호 없음
+
+| 결함 | 분류 | 처리 |
+|---|---|---|
+| R4-1 AC-014 “픽스처 4종” | SHOULD-FIX | 반영 — “픽스처 7종 (a)~(g)” |
+| R4-2 REQ-014 “(in practice `draft/report.html`)” | MINOR | 반영 — 괄호 삭제(spec.md, spec-compact.md) |
+| R4-3 M5 항목·추적표 017행에 `interrupted` 없음 | SHOULD-FIX | 반영 — M5 “(+`delivery_status`, `run`, `interrupted`)”, 추적표 017행 |
+| R4-4 추적표 008행에 무결성 단계 없음 | MINOR | 반영 — “…→쿼터 429→무결성 실패 202(쿼터 미차감)→202” |
+| R4-5 머리말 감사 이력·`R3-` 접두어·§2.3 제목 | MINOR | 반영 — 머리말, §2.3 제목 |
+| R4-6 서버 종료 보관 best-effort 판정 불가 | MINOR | 보류 — 이번 위임 범위 밖(R4-1·3·7 필수, 2·4·8 선택) |
+| R4-7 design §8 라우터가 4~6단계 판정 | SHOULD-FIX | 반영 — design §8을 “router 1~3단계 → service.start()가 잠금 안에서 4~8단계” |
+| R4-8 progress.md §G “verification pending” | MINOR | 반영 — 해당 줄을 “검증 완료, 독립 재감사는 review-4”로 갱신 |
+| R4-9 AC-014에 exit 7 + 초안 경우 없음 | MINOR | 보류 — R4-6과 같은 이유. M4·M5 위임 프롬프트에서 명시 권장 |
+
 ### 2.5 Tier
 
 Tier L(사용자 확정). 산출물 5종 + `spec-compact.md` + `progress.md`. 요구사항 23개, 인수 기준 25개(각 상한 25). plan-auditor 통과 기준 0.85.
@@ -103,10 +118,12 @@ Tier L(사용자 확정). 산출물 5종 + `spec-compact.md` + `progress.md`. �
 
 | 구분 | 파일 |
 |---|---|
-| 신규 | `backend/goose_harness/CLAUDE.md`, `backend/goose_harness/.claude/settings.json`, `backend/goose_harness/goose-manifest.json`, `backend/goose_harness/.claude/skills/goose/**`(벤더링, 작성 아님) |
+| 신규(추적 원본, T11) | `backend/goose_harness_src/harness-instructions.md`(→ 설치본 `CLAUDE.md`), `backend/goose_harness_src/claude-settings.json`(→ `.claude/settings.json`), `backend/goose_harness_src/goose-manifest.json`(설치본 경로 기준), `backend/goose_harness_src/skills/goose/**`(벤더링, 작성 아님) |
+| 런타임(리포 밖, 커밋 안 함) | `~/.goose-harness/{CLAUDE.md, .claude/settings.json, .claude/skills/goose/**, runs/}` — 서버 시작 시 설치 |
+| 삭제(미추적) | `backend/goose_harness/` — M1 임시 하네스. 리포 안 `.claude/skills`라 MoAI 세션에 발견됨. M2에서 원본으로 옮긴 뒤 삭제 |
 | 신규 | `backend/services/goose_runner.py`, `backend/services/goose_job_service.py` |
 | 신규 테스트 | `backend/tests/test_goose_runner.py`, `backend/tests/test_goose_job_service.py`, `backend/tests/test_ai_report_router_goose.py`, `backend/tests/fixtures/goose_stream_299030.jsonl`(M1 녹화), `frontend/src/hooks/__tests__/useAiReport.goose.test.ts`, `frontend/src/hooks/__tests__/useGooseActive.test.ts` |
-| 수정 | `backend/routers/ai_report.py`, `backend/services/ai_report_service.py`(기록 `kind`), `backend/schemas/ai_report.py`, **`backend/main.py`**(`:34-36` import, `:76` 프롬프트 로드, `:84` 스테이징 정리 제거 + lifespan 종료 시 작업 정리), **`backend/prompts/__init__.py`**(`:9` 언급 제거), **`backend/prompts/README.md`**(`:11-12` 언급 제거), `.env.example`, `.gitignore` |
+| 수정 | `backend/routers/ai_report.py`, `backend/services/ai_report_service.py`(기록 `kind`), `backend/schemas/ai_report.py`, **`backend/main.py`**(`:34-36` import, `:76` 프롬프트 로드, `:84` 스테이징 정리 제거 + lifespan 종료 시 작업 정리), **`backend/prompts/__init__.py`**(`:9` 언급 제거), **`backend/prompts/README.md`**(`:11-12` 언급 제거), `.env.example`(`.gitignore`는 작업 디렉터리가 리포 밖이라 변경 없음) |
 | 수정 | `frontend/src/components/AiReportModal.tsx`, `frontend/src/components/ProgressPanel.tsx`(5소스 → goose 단계로 교체), `frontend/src/components/ChartGrid/ChartCell.tsx`(활성 표시 + `handleCloseAiReport` `:92-96`), `frontend/src/hooks/useAiReport.ts`, `frontend/src/api/aiReport.ts`, `frontend/src/types/aiReport.ts` |
 | 신규(프론트) | `frontend/src/hooks/useGooseActive.ts`(셀 폴링 훅, 이름은 구현 단계에서 확정) |
 | 수정 테스트 | `frontend/src/components/__tests__/AiReportModal.test.tsx`, `frontend/src/components/__tests__/ProgressPanel.test.tsx` |
@@ -117,9 +134,11 @@ Tier L(사용자 확정). 산출물 5종 + `spec-compact.md` + `progress.md`. �
 
 ## 4. 마일스톤 (결정이 바뀔 가능성이 큰 순서)
 
-우선순위 표기만 쓰고 소요 시간은 적지 않는다. M1의 관측값이 이후 값(시간 상한, 진행 단계 대응표, 하네스 위치, 결과 파일 위치, 권한 규칙 문법)을 확정한다. design.md §9의 잠정 목록은 M1 직후 manager-spec 재위임으로 갱신한다.
+우선순위 표기만 쓰고 소요 시간은 적지 않는다. M1의 관측값이 이후 값(시간 상한, 진행 단계 대응표, 하네스 위치, 결과 파일 위치, 권한 규칙 문법)을 확정한다. design.md §9의 잠정 목록은 M1 직후 manager-spec 재위임으로 갱신했다(v0.4.0, design §9 측정 완료 표와 §9.1 미관측 목록).
 
-### M1 — 스파이크: 헤드리스 goose 실행 가능성 확인 (Priority High, go/no-go)
+### M1 — 스파이크: 헤드리스 goose 실행 가능성 확인 (Priority High, go/no-go) — **완료: 조건부 GO (2026-10-19)**
+
+결과: 리포 밖 하네스 + `--settings` + `--strict-mcp-config` + 설정 `env.PATH`·`autoMemoryEnabled:false` 조합에서만 통과. 측정값과 미관측 항목은 `progress.md §E.2 ### M1 스파이크 관측`과 design §9·§9.1. 아래 준비·탐침 설명은 실행 당시 계획 기록으로 남긴다(“최종 위치 `backend/goose_harness/`”는 T11로 폐기).
 
 목적: research.md §8의 증거 공백 G1~G9를 관측으로 닫는다. 서비스 코드는 바꾸지 않는다.
 
@@ -156,15 +175,16 @@ Tier L(사용자 확정). 산출물 5종 + `spec-compact.md` + `progress.md`. �
 
 M1 산출값: `AI_REPORT_GOOSE_TIMEOUT` 기본값(P4 측정값×2, 5분 단위 올림), 진행 단계 대응표, 결과 파일 탐색 위치, 하네스 위치, 권한 규칙 문법, 인증용 환경 변수, 녹화 픽스처.
 
-### M2 — 하네스 확정과 벤더링 (Priority High)
+### M2 — 하네스 원본·설치·재탐침 (Priority High)
 
-- goose 벤더링 + `goose-manifest.json`(경로·sha256) 커밋, `runs/` gitignore.
-- `settings.json`(design.md §2.2), `CLAUDE.md`(design.md §2.1, 가정 기록 규칙 포함).
-- 무결성 검사 함수(매니페스트 대조) — AC-001.
+- 추적 원본 `backend/goose_harness_src/` 작성(T11, design §2): goose 벤더링(`.DS_Store` 제외) → `skills/goose/`, `harness-instructions.md`(design §2.1, 가정 기록 규칙 포함), `claude-settings.json`(design §2.2: 권한 + `env.PATH` + `autoMemoryEnabled: false` + `disableAllHooks: true`), `goose-manifest.json`(설치본 경로 기준, `CLAUDE.md`·`.claude/settings.json`·`.claude/skills/goose/**` 전체).
+- 원본 대조·설치 함수(서버 시작 시, `runs/` 보존, 리포 아래 경로 거부)와 설치본 무결성 검사 함수(목록 밖 `.claude/` 파일 포함) — design §2.3, AC-001.
+- M1 임시 `backend/goose_harness/`(미추적) 삭제. `git ls-files backend`에 `.claude`·`CLAUDE.md` 없음 확인(AC-023 일부).
+- 최종 위치 `~/.goose-harness`에서 재관측: P0·P1(`goose` 발견, MoAI 항목 없음, `mcp_servers []`, `~/.claude/CLAUDE.md` 로드 여부 확인 시도), AC-003 음성 탐침 (1)~(6). (6) 하네스 밖 절대 경로 읽기 전용 Bash가 거부되지 않으면 거부 규칙을 보강해 재탐침하고, 막을 수 없으면 차단 보고(M3 진입 금지).
 
 ### M3 — 실행기 `goose_runner.py` (Priority High)
 
-- argv(design.md §3.1), 프롬프트(§3.2), 환경 변수 허용 목록(§3.3), 새 프로세스 그룹 + 그룹 단위 종료 + 유예 시간 인자(§3.4), 종료 사유 분류(§4.1 표), stream-json 해석과 진행 단계 대응(§3.5).
+- argv(design §3.1: `--settings <H>/.claude/settings.json`, `--strict-mcp-config` 포함, cwd = `AI_REPORT_GOOSE_HARNESS_DIR` 기본 `~/.goose-harness`), 프롬프트(§3.2), 환경 변수 허용 목록(§3.3, 부모에 있는 8개 중 해당 변수만), 새 프로세스 그룹 + 그룹 단위 종료 + 유예 시간 인자(§3.4), 시간 상한 기본 900초, 종료 사유 분류(§4.1 표), stream-json 해석과 진행 단계 대응(§3.5 측정 표, 녹화 픽스처 `goose_stream_299030.jsonl`).
 - AC-002, 004, 005, 006, 012.
 
 ### M4 — 작업 서비스와 라우터 (Priority High)
@@ -178,20 +198,20 @@ M1 산출값: `AI_REPORT_GOOSE_TIMEOUT` 기본값(P4 측정값×2, 5분 단위 �
 
 - `final` 판정(T7)과 허용 파일 + `assumptions.md` 복사, `job.json`(design.md §5.1-5.2).
 - `GET /ai-report/{code}/goose/{run}/report.html` + CSP(§5.4), 경로 검증.
-- 기록 API: `kind: markdown` + `kind: goose`(+`delivery_status`, `run`), 스키마 확장(§5.3).
+- 기록 API: `kind: markdown` + `kind: goose`(+`delivery_status`, `run`, `interrupted`), 스키마 확장(§5.3).
 - AC-013~017.
 
 ### M6 — 프론트엔드 (Priority Medium)
 
 - `AiReportModal.tsx`: “Goose” 라벨, 진행 패널 + 취소 버튼, iframe(sandbox 값 고정), 초안 배너 “최종 감사 미통과 초안”, 기록 탭 kind별 표시, 429 `goose_busy`/`goose_rate_limit` 안내.
-- `ProgressPanel.tsx`: 5소스 전용 → goose 단계(M1 대응표).
+- `ProgressPanel.tsx`: 5소스 전용 → goose 단계(design §3.5 측정 표: `goose_start`, `plan`, `research_tick`, `fetch_start`, `fetch_done`, `compose`, `render_draft`, `audit`, `render_final`, `session_end`).
 - `useAiReport.ts` / `api/aiReport.ts` / `types/aiReport.ts`: 작업 시작 → `EventSource` 구독, sessionStorage `goose_job:{code}`, 닫기는 구독만 종료.
 - 셀 폴링 훅 + `ChartCell.tsx`: `--active`에 Goose 작업 상태 반영(design §7.2), `handleCloseAiReport` 수정.
 - AC-018~020, 022.
 
 ### M7 — 기존 Deep 파이프라인 정리 (Priority Low, 기계적 작업)
 
-- §3 파일 목록의 삭제·축소 대상 처리, `main.py`·`backend/prompts/__init__.py`·`README.md` 수정, `.env.example`(옛 키·`AI_REPORT_DEEP_*` 제거, `AI_REPORT_GOOSE_MODEL=sonnet`, `AI_REPORT_GOOSE_TIMEOUT`, `AI_REPORT_GOOSE_DAILY_QUOTA=5`, `AI_REPORT_GOOSE_HARNESS_DIR` 추가).
+- §3 파일 목록의 삭제·축소 대상 처리, `main.py`·`backend/prompts/__init__.py`·`README.md` 수정, `.env.example`(옛 키·`AI_REPORT_DEEP_*` 제거, `AI_REPORT_GOOSE_MODEL=sonnet`, `AI_REPORT_GOOSE_TIMEOUT=900`, `AI_REPORT_GOOSE_DAILY_QUOTA=5`, `AI_REPORT_GOOSE_HARNESS_DIR`(주석으로 기본 `~/.goose-harness`) 추가).
 - AC-023, 024. 라이브 AC-025는 M7 이후 dev 서버 재시작 상태에서.
 - SPEC-AI-REPORT-002의 대체 표기는 sync 단계에서.
 
@@ -200,9 +220,11 @@ M1 산출값: `AI_REPORT_GOOSE_TIMEOUT` 기본값(P4 측정값×2, 5분 단위 �
 | 변수 | 기본값 | 근거 |
 |---|---|---|
 | `AI_REPORT_GOOSE_MODEL` | `sonnet` | D9 |
-| `AI_REPORT_GOOSE_TIMEOUT` | M1 측정값 × 2(5분 단위 올림), 측정 전 임시 3600 | M1 P4 |
+| `AI_REPORT_GOOSE_TIMEOUT` | 900(초) | M1 P4 352.8초 × 2, 5분 단위 올림. 표본 1회·초안 종료 실행이라 AC-025에서 재측정 |
 | `AI_REPORT_GOOSE_DAILY_QUOTA` | 5 | 승인 기획 |
-| `AI_REPORT_GOOSE_HARNESS_DIR` | `backend/goose_harness` | M1 P2 오염 시 이동 출구 |
+| `AI_REPORT_GOOSE_HARNESS_DIR` | `~/.goose-harness` (리포 밖) | M1 P2 오염 확인, T11. 리포 아래 경로는 거부 |
+
+하위 프로세스에는 `PATH`·`HOME`·`USER`·`LANG`·`LC_ALL`·`TZ`·`TMPDIR`·`SHELL` 중 부모에 있는 것만 넘긴다. 인증용 추가 변수는 없다(M1 P0: 6개로 구독 인증 성공).
 
 ## 6. 위험과 대응
 
@@ -212,19 +234,24 @@ research.md §7을 따른다. 특히:
 2. **권한 규칙 우회** — 접두어 Bash 규칙은 `..`로 우회된다. 정확한 경로 고정 + 거부 규칙 + M1 음성 탐침.
 3. **삭제 범위 누락** — `main.py`와 `backend/prompts/__init__.py`·`README.md`가 Deep 자산을 언급한다. M7과 AC-023(`git grep`)이 함께 다룬다.
 4. **라우트 가림** — `/ai-report/goose/active`가 `/{code}/{filename}`에 가려질 수 있다. 등록 순서를 지키고 AC-021이 422 여부로 잡는다.
+5. **하네스 밖 읽기 전용 Bash** (M1 관측) — `dontAsk`에서도 읽기 전용 Bash가 자동 허용됐다. 하네스 밖 비밀 파일을 `cat`으로 읽고 WebFetch로 내보내는 주입 경로가 남을 수 있다. M2 재탐침(AC-003 (6))에서 막지 못하면 run 단계를 멈추고 다시 계획한다.
+6. **서브에이전트 권한 상속 미확인** (M1 미관측) — 서브에이전트 쪽 음성 탐침이 없다. 서브에이전트가 메인 권한 규칙을 따르지 않으면 허용 목록 밖 도구를 쓸 수 있다. acceptance.md §H에 남은 위험으로 둔다.
+7. **사용자 전역 `~/.claude/CLAUDE.md` 로드 미확인** (M1 미관측) — 로드되면 사용자 개인 지시가 하네스 세션에 섞인다. M2 재관측에서 확인을 시도한다.
+8. **`-p` Bash `PATH` 원인 미상** (M1 미관측) — `env.PATH` 설정으로 우회했다. `claude` 버전이 바뀌면 동작이 달라질 수 있어 AC-025 라이브 실행이 회귀를 잡는다.
+9. **시간 상한 대표성** — 900초는 초안에서 멈춘 실행 1회 기준이다. 감사·`--final`까지 가면 넘을 수 있어 AC-025에서 다시 잰다.
 
 ## 7. 요구사항·인수 기준 추적
 
 | REQ | 요지 | AC |
 |---|---|---|
-| 001 | 무결성 실패 → `error/integrity`, 미실행·미등록·쿼터 미차감 | 001 |
-| 002 | argv·cwd·모델 기본 `sonnet`·우회 플래그 금지 | 002 |
-| 003 | 허용 목록 밖 거부 | 003 |
+| 001 | 서버 시작 시 원본 대조 후 설치(`runs/` 보존) / 무결성 실패(목록 밖 파일 포함) → `error/integrity`, 미실행·미등록·쿼터 미차감 | 001 |
+| 002 | argv(`--settings`·`--strict-mcp-config` 포함)·cwd `~/.goose-harness`·모델 기본 `sonnet`·우회 플래그 금지·설정 키 3개 | 002 |
+| 003 | 허용 목록 밖 거부 + 하네스 밖 읽기 전용 Bash 거부 | 003 |
 | 004 | 환경 변수 허용 목록 | 004 |
 | 005 | 질문 금지 + `assumptions.md` 기록 | 025 |
 | 006 | 프로세스 그룹 종료(유예 주입) | 005, 011 |
 | 007 | 사유→종료 상태/오류 종류 1개, `cancelled`는 상태, 중단돼도 분류 유지(T10) | 006, 011, 014 |
-| 008 | 시작 판정 순서(422→404→503→같은 종목 200→다른 종목 429→쿼터 429→202) | 007, 008 |
+| 008 | 시작 판정 순서(422→404→503→같은 종목 200→다른 종목 429→쿼터 429→무결성 실패 202(쿼터 미차감)→202) | 007, 008 |
 | 009 | 재생·`Last-Event-ID`·404 | 009 |
 | 010 | 구독 끊겨도 계속 | 010 |
 | 011 | 취소 | 011 |
@@ -233,12 +260,12 @@ research.md §7을 따른다. 특히:
 | 014 | 산출물 탐색·`final` 규칙·허용 복사·`assumptions.md`(있을 때)·중단 시 초안 보관(T10) | 013, 014, 025 |
 | 015 | CSP sandbox | 015 |
 | 016 | 경로 검증 404 | 016 |
-| 017 | 기록 kind markdown + goose | 017, 025 |
+| 017 | 기록 kind markdown + goose(`delivery_status`, `interrupted`) | 017, 025 |
 | 018 | Goose 라벨·iframe sandbox | 018, 025 |
 | 019 | 초안 배너 + 중단 안내 | 019, 025 |
 | 020 | 재구독·닫기는 취소 아님 | 020, 025 |
 | 021 | 같은 탭에서 시작한 작업의 셀 활성 표시(닫은 뒤·새로고침 후·재시작 포함) | 022 |
-| 022 | Deep 자산 제거 | 023 |
+| 022 | Deep 자산 제거 + 추적 backend에 `.claude`·`CLAUDE.md` 없음 | 023 |
 | 023 | Fast 회귀 없음 | 024 |
 
 ## 8. mx_plan (Phase 14 — @MX 태그 계획)
@@ -259,7 +286,8 @@ research.md §7을 따른다. 특히:
 | @MX:NOTE | 실행기의 하네스 권한 대응 주석 | 스크립트 정확한 경로 고정과 `..` 거부 규칙의 이유 |
 | @MX:NOTE | stream-json 진행 단계 대응표 | M1 녹화 기반, 알 수 없는 이벤트 무시 불변 |
 | @MX:NOTE | `AiReportModal`의 iframe `sandbox` 값, 셀 폴링 훅의 중지 조건 | 허용 토큰 3개 고정 근거, 저장값 있는 셀만 폴링하는 이유 |
-| @MX:TODO | M1 잠정값(시간 상한 임시 3600 등)이 코드에 들어가는 위치 | M1 확정 전까지만, 확정 시 제거 |
+| @MX:NOTE | 하네스 설치·무결성 검사 함수 | 매니페스트를 리포에서 읽는 이유(설치본이 기준값을 바꾸지 못하게), 원본에 `.claude` 이름을 쓰지 않는 이유(T11) |
+| @MX:TODO | 시간 상한 기본 900초 상수 | M1 표본 1회·초안 종료 실행 기준. AC-025 라이브 재측정 후 확정되면 제거 |
 
 기존 태그 정리: `deep_research_service.py`·`claude_cli_streamer.stream_claude_synthesis`의 ANCHOR/WARN은 파일·함수 삭제와 함께 사라진다. 남는 `parse_stream_json_line`의 ANCHOR는 호출자가 실행기로 바뀌므로 fan_in을 다시 센다.
 

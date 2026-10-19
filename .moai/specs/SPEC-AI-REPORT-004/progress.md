@@ -319,7 +319,7 @@ ls: .moai/specs/SPEC-AI-REPORT-004: No such file or directory   (작성 전, 중
 ### 개정 기록 — plan-audit 3회차 이후 (v0.3.2, 2026-10-19)
 
 - 입력: `.moai/reports/plan-audit/SPEC-AI-REPORT-004-review-3.md` (FAIL 0.91, 새 결함 M1~M5).
-- plan-audit 부채: **PASS-WITH-DEBT accepted by user after iteration 3; resolved in v0.3.2 without re-audit; orchestrator verification pending.**
+- plan-audit 부채: **PASS-WITH-DEBT accepted by user after iteration 3; resolved in v0.3.2 without re-audit; 오케스트레이터 검증 완료(아래 절), 독립 재감사는 run 단계 Phase 1에서 수행(review-4, PASS 0.93).**
   - R3-M1 — `HistoryItem.interrupted` 추가(spec §3 DELTA, REQ-017, design §5.3·§7.1, AC-017).
   - R3-M2 — 사용자 결정: 중단된 작업은 선택 규칙의 전달 상태(`final`/`draft`)를 그대로 유지, 중단 안내는 상태와 상관없이 표시(REQ-014·019, design §4.4·§5.2, plan T10, AC-014 (g), AC-019).
 - optional R3-M3~M5 반영(서버 종료 보관 best-effort, design §4.1 문구, plan T1 문구). 재번호 없음, 요구사항 23개·인수 기준 25개 유지.
@@ -337,3 +337,13 @@ ls: .moai/specs/SPEC-AI-REPORT-004: No such file or directory   (작성 전, 중
 ### 미결 사항
 
 없음. M1 의존 값은 design.md §9에 잠정으로 표시돼 있으며 M1 관측 후 확정한다.
+
+### M1 이후 문서 개정 (v0.4.0)
+
+- 작성: manager-spec, 2026-10-19, 오케스트레이터 재위임(M1 조건부 GO 수용과 사용자 결정 4건). `status`는 `in-progress` 그대로.
+- 입력: §E.2 `### M1 스파이크 관측`(측정값·§9 변경 목록 13행·판정), `review-4.md`(R4-1~R4-9).
+- 하네스 배치(결정 T11): 리포에는 `.claude`·`CLAUDE.md` 이름이 없는 추적 원본 `backend/goose_harness_src/`와 리포 매니페스트만 두고, 서버 시작 시 원본을 매니페스트로 대조해 `~/.goose-harness`에 설치, 작업 시작마다 설치본을 리포 매니페스트로 검사(목록 밖 `.claude/` 파일 포함). M1 임시 `backend/goose_harness/`는 M2에서 삭제.
+- REQ 변경: 001(설치 + 무결성 범위), 002(argv 2개 + 설정 키 3개), 003(하네스 밖 읽기 전용 Bash 거부), 014(R4-2 괄호 삭제), 022(`.claude`·`CLAUDE.md` 추적 금지). AC 변경: 001, 002, 003(탐침 6종), 004, 012, 014(R4-1), 023, 025. 재번호 없음, REQ 23·AC 25.
+- design §9를 측정 완료 표로 바꾸고 §9.1에 미관측 항목(최종본·감사 경로, 서브에이전트 권한 상속, `~/.claude/CLAUDE.md` 로드, `-p` Bash `PATH` 원인 등)을 사실이 아닌 공백·위험으로 기록.
+- 감사 결함: R4-1·R4-2·R4-3·R4-4·R4-5·R4-7·R4-8 수정, R4-6·R4-9 보류(plan §2.4).
+- M2 진입 조건: 최종 위치 재관측(P0·P1)과 AC-003 (6) 재탐침. (6)을 막지 못하면 차단 보고.

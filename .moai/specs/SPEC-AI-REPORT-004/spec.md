@@ -1,7 +1,7 @@
 ---
 id: SPEC-AI-REPORT-004
 title: "AI 모달 Deep 모드를 goose 스킬 하네스(헤드리스 claude -p)로 교체"
-version: "0.3.2"
+version: "0.4.0"
 status: in-progress
 created: 2026-10-19
 updated: 2026-10-19
@@ -24,6 +24,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 | 0.3.0 | 2026-10-19 | manager-spec | plan-audit 1회차(FAIL 0.78) 반영: 시작 판정 순서를 요구사항 하나로 고정(R1-D1), 실행 중 작업 조회 엔드포인트와 셀 폴링 추가(R1-D2), 정리 범위에 `backend/prompts/__init__.py`·`README.md` 추가와 grep 대상 정정(R1-D3), 프로세스 종료와 종료 상태 기록 분리 + `cancelled`를 종료 상태로 통일(R1-D4), 가정 기록 위치를 `assumptions.md`로 지정(R1-D5), `final` 판정 규칙 단일화(R1-D6), 선택 결함 R1-D7~D14 반영. 요구사항을 1~23으로 다시 번호 매김 |
 | 0.3.1 | 2026-10-19 | manager-spec | plan-audit 2회차(FAIL 0.90) 반영, 재번호 없음: REQ-008 판정 순서에 무결성 실패 단계 추가와 REQ-001 응답 202 명시(R2-N1), REQ-021을 같은 탭에서 시작한 작업으로 한정(R2-N2), AC-011 전제를 순차로(R2-N3), 중단된 작업의 초안 보관 규칙(REQ-014·019, 결정 T10, R2-N4), REQ-007 조건절을 REQ-014 선택 규칙에 맞춤, 선택 결함 R2-N5~N9 반영(감사 결함 ID에 회차 접두어 `R1-`/`R2-`를 붙여 결정 ID D1~D10과 구분) |
 | 0.3.2 | 2026-10-19 | manager-spec | plan-audit 3회차(FAIL 0.91) 후 사용자가 부채 수용(PASS-WITH-DEBT)을 선택, 재감사 없이 수정, 재번호 없음: `HistoryItem`에 `interrupted` 추가(REQ-017, R3-M1), 중단된 작업은 선택된 전달 상태를 그대로 유지하고 중단 안내는 상태와 상관없이 표시(REQ-014·019, 사용자 결정 R3-M2), 서버 종료 시 보관을 best-effort로 명시(R3-M3), design §4.1·plan T1 문구 정정(R3-M4·M5) |
+| 0.4.0 | 2026-10-19 | manager-spec | run 단계 M1 스파이크(조건부 GO) 관측 반영, 재번호 없음(REQ 23·AC 25 유지): 하네스를 리포 밖 `~/.goose-harness`로 옮기고 리포에는 `.claude`·`CLAUDE.md` 이름이 없는 추적 원본만 두어 서버 시작 시 매니페스트 대조 후 설치(결정 T11, REQ-001·022), argv에 `--strict-mcp-config`·`--settings <하네스>/.claude/settings.json` 추가와 설정 키 `disableAllHooks`·`autoMemoryEnabled`·`env.PATH`(REQ-002), 읽기 전용 Bash 자동 허용 관측에 따라 하네스 밖 읽기 거부를 명시(REQ-003), 시간 상한 기본 900초(표본 1회), 진행 단계 대응표·산출물 위치·환경 변수 목록을 측정값으로 확정(design §9). plan-audit 4회차 결함 R4-1·R4-2·R4-3·R4-4·R4-5·R4-7·R4-8 수정 |
 
 관계: 이 SPEC은 **SPEC-AI-REPORT-002**(Deep 5소스 수집 + claude 합성)를 대체한다(supersedes). 002 문서 자체는 수정하지 않으며, 상태 정리는 sync 단계에서 한다. SPEC-AI-REPORT-003(Fast/Codex)은 유지된다.
 
@@ -50,21 +51,23 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 | D9 | `AI_REPORT_GOOSE_MODEL` 기본값 `sonnet` | 사용자 결정 2026-10-19 |
 | D10 | goose 작업은 서버 전체에서 동시에 1개. 다른 종목 시작 요청은 429, 같은 종목은 기존 `job_id` | 사용자 결정 2026-10-19 |
 
-기술 결정 T1~T10(감사 반영)은 `plan.md §2.3`에 기록한다.
+기술 결정 T1~T11(감사·M1 반영)은 `plan.md §2.3`에 기록한다. D3의 “하네스 폴더”는 M1 이후 리포 밖 설치본을 뜻한다(T11).
 
 ## 3. 변경 범위 [DELTA]
 
 | 표기 | 대상 | 내용 |
 |---|---|---|
-| [NEW] | `backend/goose_harness/` | 벤더링 스킬(`.claude/skills/goose/`), 무결성 매니페스트, `.claude/settings.json` 허용 목록, 헤드리스 규칙 `CLAUDE.md`, `runs/`(gitignore) |
+| [NEW] | `backend/goose_harness_src/` | 하네스 추적 원본(작업 디렉터리로 쓰지 않음). 벤더링 스킬, 권한·설정 파일, 헤드리스 규칙, 무결성 매니페스트. `.claude`·`CLAUDE.md`라는 이름을 쓰지 않는다(T11) |
+| [NEW] | `~/.goose-harness/` (리포 밖, `AI_REPORT_GOOSE_HARNESS_DIR`) | 서버 시작 시 설치되는 실행용 하네스(`CLAUDE.md`, `.claude/settings.json`, `.claude/skills/goose/`)와 작업 디렉터리 `runs/` |
 | [NEW] | `backend/services/goose_runner.py` | `claude -p` 실행, 프로세스 그룹 관리, stream-json → 진행 단계 |
-| [NEW] | `backend/services/goose_job_service.py` | 작업 상태·이벤트 로그·시작 판정·산출물 복사 |
+| [NEW] | `backend/services/goose_job_service.py` | 하네스 설치·무결성 검사, 작업 상태·이벤트 로그·시작 판정·산출물 복사 |
 | [MODIFY] | `backend/routers/ai_report.py` | `mode=deep`을 작업 시작으로, 이벤트·취소·실행 중 작업 조회·HTML 서빙 경로 추가 |
 | [MODIFY] | `backend/services/ai_report_service.py` | 기록에 `kind`·전달 상태 포함 |
 | [MODIFY] | `backend/schemas/ai_report.py` | `HistoryItem`에 `kind`, `delivery_status`, `run`, `interrupted`(기본 `false`) |
 | [MODIFY] | `backend/main.py` | Deep 전용 import·시작 시 호출 제거(`:34-36`, `:76`, `:84`), 종료 시 작업 정리 |
 | [MODIFY] | `backend/prompts/__init__.py`, `backend/prompts/README.md` | `stock_synthesis_prompt.md`·`_load_synthesis_prompt` 언급 제거(`__init__.py:9`, `README.md:11-12`) |
-| [MODIFY] | `.env.example`, `.gitignore` | goose 변수 추가, 옛 키 제거, `backend/goose_harness/runs/` 제외 |
+| [MODIFY] | `.env.example` | goose 변수 추가, 옛 키 제거 (작업 디렉터리가 리포 밖이라 `.gitignore` 변경 없음) |
+| [REMOVE] | `backend/goose_harness/` (M1 임시 하네스, 미추적) | 리포 안에서 `.claude/skills`가 MoAI 세션에 발견되므로 M2에서 삭제(T11) |
 | [MODIFY] | `frontend/src/components/AiReportModal.tsx`, `ProgressPanel.tsx`, `ChartGrid/ChartCell.tsx`, `hooks/useAiReport.ts`, `api/aiReport.ts`, `types/aiReport.ts` | Goose 라벨, 작업 구독, iframe, 초안 배너, 취소, 진행 단계, 셀 활성 표시 |
 | [EXISTING] | `backend/services/codex_cli_runner.py`, `stream_codex_fast` | Fast 경로 — 변경 없음, 오류 분류 체계만 참조 |
 | [EXISTING] | `ai_report_service._sanitize_name`, `get_report_content` | 경로 검증 방식 재사용 |
@@ -76,11 +79,11 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 
 ### 4.1 하네스와 실행
 
-**REQ-AIR4-001** — When a goose job is about to start and any vendored goose file's sha256 differs from the committed manifest, the job service shall record the job as `error` with error kind `integrity`, shall not launch `claude`, shall not register the job as the running job, and shall not consume daily quota, and the router shall return 202 with that job's `job_id`.
+**REQ-AIR4-001** — When the server starts, the job service shall verify the tracked harness source against the manifest committed in the repository and, only when every listed file matches, shall install it into the harness directory (`AI_REPORT_GOOSE_HARNESS_DIR`, default `~/.goose-harness`) by replacing the installed `CLAUDE.md` and `.claude/` directory and leaving `runs/` untouched; when the source does not match, it shall not install. When a goose job is about to start and the installed harness fails the integrity check against that committed manifest (a listed file is missing or its sha256 differs, or an unlisted file exists under the harness `.claude/` directory), the job service shall record the job as `error` with error kind `integrity`, shall not launch `claude`, shall not register the job as the running job, and shall not consume daily quota, and the router shall return 202 with that job's `job_id`.
 
-**REQ-AIR4-002** — The goose runner shall launch `claude -p` with the harness directory as working directory, `--setting-sources project`, `--output-format stream-json`, `--permission-mode dontAsk`, and `--model` set to `AI_REPORT_GOOSE_MODEL` (default `sonnet`), and shall not pass `bypassPermissions` or `--dangerously-skip-permissions`.
+**REQ-AIR4-002** — The goose runner shall launch `claude -p` with the harness directory as working directory, `--setting-sources project`, `--settings <harness directory>/.claude/settings.json`, `--strict-mcp-config`, `--output-format stream-json`, `--permission-mode dontAsk`, and `--model` set to `AI_REPORT_GOOSE_MODEL` (default `sonnet`), and shall not pass `bypassPermissions` or `--dangerously-skip-permissions`. The harness settings file shall set `disableAllHooks: true`, `autoMemoryEnabled: false`, and an `env.PATH` naming the system binary directories.
 
-**REQ-AIR4-003** — The harness permission policy shall deny, without prompting, every tool call outside the allowlist: WebSearch, WebFetch, Read/Glob/Grep inside the harness, writes inside the job workspace only, Agent, Skill, and Bash limited to the exact script paths of `render_report.py` and `audit_report.py`.
+**REQ-AIR4-003** — The harness permission policy shall deny, without prompting, every tool call outside the allowlist: WebSearch, WebFetch, Read/Glob/Grep inside the harness, writes inside the job workspace only, Agent, Skill, and Bash limited to the exact script paths of `render_report.py` and `audit_report.py`; the policy shall also deny read-only Bash commands that read a path outside the harness directory, because Claude Code auto-approves some read-only Bash commands in `dontAsk` mode.
 
 **REQ-AIR4-004** — The goose runner shall pass the subprocess only allowlisted environment variables, so that backend secrets are not inherited.
 
@@ -106,7 +109,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 
 ### 4.3 저장과 서빙
 
-**REQ-AIR4-014** — When a job's session ends, the job service shall locate the report itself under the job workspace without following model-printed paths, shall select `final` only when `final/report.html` exists and `final/render-validation.json` has `delivery_allowed: true`, otherwise shall select `draft` when `draft/report.html` exists, and shall copy only allowlisted artifact files of the selected source (plus `assumptions.md` when present; its absence is not an error) to `backend/reports/<sanitized name>/goose/YYYY-MM-DD[_N]/` with the delivery status recorded. When a job ends by timeout, non-zero exit, cancellation, or server shutdown (best-effort for shutdown) and a report is selectable under this rule (in practice `draft/report.html`), the job service shall keep the terminal state and error kind classified by REQ-AIR4-007, and shall still archive that report the same way, keeping the delivery status selected by this rule (`final` or `draft`) and recording `interrupted: true`.
+**REQ-AIR4-014** — When a job's session ends, the job service shall locate the report itself under the job workspace without following model-printed paths, shall select `final` only when `final/report.html` exists and `final/render-validation.json` has `delivery_allowed: true`, otherwise shall select `draft` when `draft/report.html` exists, and shall copy only allowlisted artifact files of the selected source (plus `assumptions.md` when present; its absence is not an error) to `backend/reports/<sanitized name>/goose/YYYY-MM-DD[_N]/` with the delivery status recorded. When a job ends by timeout, non-zero exit, cancellation, or server shutdown (best-effort for shutdown) and a report is selectable under this rule, the job service shall keep the terminal state and error kind classified by REQ-AIR4-007, and shall still archive that report the same way, keeping the delivery status selected by this rule (`final` or `draft`) and recording `interrupted: true`.
 
 **REQ-AIR4-015** — The goose report endpoint shall serve `report.html` with a `Content-Security-Policy` header containing `sandbox` and without `allow-scripts` or `allow-same-origin`.
 
@@ -126,15 +129,16 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 
 ### 4.5 정리와 회귀
 
-**REQ-AIR4-022** — The tracked backend sources shall not contain the deep research service, its collector, the synthesis prompt, or any reference to them or to the Brave/Tavily/Naver/YouTube keys, and the server shall start without them.
+**REQ-AIR4-022** — The tracked backend sources shall not contain the deep research service, its collector, the synthesis prompt, or any reference to them or to the Brave/Tavily/Naver/YouTube keys, shall not contain any directory named `.claude` or file named `CLAUDE.md`, and the server shall start without them.
 
 **REQ-AIR4-023** — The Fast (codex) mode shall keep its current request contract and behavior.
 
 ## 5. 비기능 제약
 
 - 단일 uvicorn 워커 전제(기존 `@MX:WARN` 범위와 같음).
-- `AI_REPORT_GOOSE_TIMEOUT` 기본값은 M1 측정값의 2배를 5분 단위로 올린 값(측정 전 임시값은 design.md에 잠정으로 표시).
-- 하네스 위치는 `AI_REPORT_GOOSE_HARNESS_DIR`(기본 `backend/goose_harness`)로 바꿀 수 있어야 한다(M1에서 상위 CLAUDE.md 오염이 확인될 때의 출구).
+- `AI_REPORT_GOOSE_TIMEOUT` 기본값 900초(M1 P4 실행 352.8초 × 2를 5분 단위로 올림). 표본 1회이고 초안에서 멈춘 실행이라 감사·`--final` 경로 시간이 들어 있지 않다. 라이브 AC-025에서 다시 재고, 더 길면 갱신한다.
+- 하네스 위치는 리포 밖이다. 기본 `~/.goose-harness`, `AI_REPORT_GOOSE_HARNESS_DIR`로 바꿀 수 있다. 리포 안 위치는 M1에서 오염이 확인돼 쓰지 않는다(캐시 생성 토큰 115,950 대 13,028, MoAI 스킬·에이전트·MCP 서버가 세션에 섞임).
+- 인증은 구독(OAuth)이며 추가 환경 변수가 필요 없다(M1 P0, `apiKeySource: none`).
 - 인수 기준: `acceptance.md`. 압축본: `spec-compact.md`.
 
 ## 6. 제외 사항 (Exclusions)

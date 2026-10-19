@@ -1,12 +1,12 @@
 # SPEC-AI-REPORT-004 (압축본)
 
-> 원문: `spec.md` v0.3.2, `acceptance.md`. 요구사항·인수 기준·변경 파일·제외 사항만 담는다.
+> 원문: `spec.md` v0.4.0, `acceptance.md`. 요구사항·인수 기준·변경 파일·제외 사항만 담는다.
 
 ## 요구사항
 
-- REQ-AIR4-001 — When a goose job is about to start and any vendored goose file's sha256 differs from the committed manifest, the job service shall record the job as `error` with error kind `integrity`, shall not launch `claude`, shall not register the job as the running job, and shall not consume daily quota, and the router shall return 202 with that job's `job_id`.
-- REQ-AIR4-002 — The goose runner shall launch `claude -p` with the harness directory as working directory, `--setting-sources project`, `--output-format stream-json`, `--permission-mode dontAsk`, and `--model` set to `AI_REPORT_GOOSE_MODEL` (default `sonnet`), and shall not pass `bypassPermissions` or `--dangerously-skip-permissions`.
-- REQ-AIR4-003 — The harness permission policy shall deny, without prompting, every tool call outside the allowlist: WebSearch, WebFetch, Read/Glob/Grep inside the harness, writes inside the job workspace only, Agent, Skill, and Bash limited to the exact script paths of `render_report.py` and `audit_report.py`.
+- REQ-AIR4-001 — When the server starts, the job service shall verify the tracked harness source against the manifest committed in the repository and, only when every listed file matches, shall install it into the harness directory (`AI_REPORT_GOOSE_HARNESS_DIR`, default `~/.goose-harness`) by replacing the installed `CLAUDE.md` and `.claude/` directory and leaving `runs/` untouched; when the source does not match, it shall not install. When a goose job is about to start and the installed harness fails the integrity check against that committed manifest (a listed file is missing or its sha256 differs, or an unlisted file exists under the harness `.claude/` directory), the job service shall record the job as `error` with error kind `integrity`, shall not launch `claude`, shall not register the job as the running job, and shall not consume daily quota, and the router shall return 202 with that job's `job_id`.
+- REQ-AIR4-002 — The goose runner shall launch `claude -p` with the harness directory as working directory, `--setting-sources project`, `--settings <harness directory>/.claude/settings.json`, `--strict-mcp-config`, `--output-format stream-json`, `--permission-mode dontAsk`, and `--model` set to `AI_REPORT_GOOSE_MODEL` (default `sonnet`), and shall not pass `bypassPermissions` or `--dangerously-skip-permissions`. The harness settings file shall set `disableAllHooks: true`, `autoMemoryEnabled: false`, and an `env.PATH` naming the system binary directories.
+- REQ-AIR4-003 — The harness permission policy shall deny, without prompting, every tool call outside the allowlist: WebSearch, WebFetch, Read/Glob/Grep inside the harness, writes inside the job workspace only, Agent, Skill, and Bash limited to the exact script paths of `render_report.py` and `audit_report.py`; the policy shall also deny read-only Bash commands that read a path outside the harness directory, because Claude Code auto-approves some read-only Bash commands in `dontAsk` mode.
 - REQ-AIR4-004 — The goose runner shall pass the subprocess only allowlisted environment variables, so that backend secrets are not inherited.
 - REQ-AIR4-005 — The headless goose session shall not ask the user questions; it shall proceed with the defaults stated in the prompt and harness instructions and shall write every assumption it made to `assumptions.md` in the job workspace (stating "가정 없음" when there are none).
 - REQ-AIR4-006 — When a job exceeds `AI_REPORT_GOOSE_TIMEOUT`, is cancelled, or the server shuts down, the goose runner shall terminate the whole subprocess group (SIGTERM, then SIGKILL after a configurable grace period).
@@ -17,7 +17,7 @@
 - REQ-AIR4-011 — When `POST /ai-report/jobs/{job_id}/cancel` is received for a running job, the job service shall stop the job and emit a terminal `cancelled` event; for a finished job it shall return the current state unchanged; for an unknown `job_id` it shall return 404.
 - REQ-AIR4-012 — When the runner observes a stream-json event listed in the progress mapping table, the job service shall emit the corresponding phase event; unknown events shall be ignored without raising.
 - REQ-AIR4-013 — When `GET /ai-report/goose/active` is received, the router shall return the running goose job as `{job_id, code, stock_name, status}`, or `null` when no goose job is running.
-- REQ-AIR4-014 — When a job's session ends, the job service shall locate the report itself under the job workspace without following model-printed paths, shall select `final` only when `final/report.html` exists and `final/render-validation.json` has `delivery_allowed: true`, otherwise shall select `draft` when `draft/report.html` exists, and shall copy only allowlisted artifact files of the selected source (plus `assumptions.md` when present; its absence is not an error) to `backend/reports/<sanitized name>/goose/YYYY-MM-DD[_N]/` with the delivery status recorded. When a job ends by timeout, non-zero exit, cancellation, or server shutdown (best-effort for shutdown) and a report is selectable under this rule (in practice `draft/report.html`), the job service shall keep the terminal state and error kind classified by REQ-AIR4-007, and shall still archive that report the same way, keeping the delivery status selected by this rule (`final` or `draft`) and recording `interrupted: true`.
+- REQ-AIR4-014 — When a job's session ends, the job service shall locate the report itself under the job workspace without following model-printed paths, shall select `final` only when `final/report.html` exists and `final/render-validation.json` has `delivery_allowed: true`, otherwise shall select `draft` when `draft/report.html` exists, and shall copy only allowlisted artifact files of the selected source (plus `assumptions.md` when present; its absence is not an error) to `backend/reports/<sanitized name>/goose/YYYY-MM-DD[_N]/` with the delivery status recorded. When a job ends by timeout, non-zero exit, cancellation, or server shutdown (best-effort for shutdown) and a report is selectable under this rule, the job service shall keep the terminal state and error kind classified by REQ-AIR4-007, and shall still archive that report the same way, keeping the delivery status selected by this rule (`final` or `draft`) and recording `interrupted: true`.
 - REQ-AIR4-015 — The goose report endpoint shall serve `report.html` with a `Content-Security-Policy` header containing `sandbox` and without `allow-scripts` or `allow-same-origin`.
 - REQ-AIR4-016 — When the run identifier fails the pattern `^\d{4}-\d{2}-\d{2}(_\d+)?$` or the resolved path falls outside the reports root, the goose report endpoint shall return 404.
 - REQ-AIR4-017 — The history response shall list existing markdown reports with `kind: "markdown"` and goose runs with `kind: "goose"` plus their delivery status (`final` / `draft`) and `interrupted` flag (default `false`).
@@ -25,17 +25,17 @@
 - REQ-AIR4-019 — When the displayed goose report has delivery status `draft`, the modal shall show a visible banner reading "최종 감사 미통과 초안" above the iframe, and when the run is marked `interrupted`, the modal shall show a notice that the analysis was interrupted regardless of its delivery status.
 - REQ-AIR4-020 — When the modal is reopened for a code whose goose job was started earlier in the same browser tab and is still running, the hook shall resubscribe to that job's events without starting a new job; closing the modal shall not cancel the job.
 - REQ-AIR4-021 — While a goose job for the cell's code that was started earlier in the same browser tab is running, the chart cell AI button shall show its active state, including after the modal is closed and after the page is reloaded in the same tab, and shall clear it once the job is no longer running.
-- REQ-AIR4-022 — The tracked backend sources shall not contain the deep research service, its collector, the synthesis prompt, or any reference to them or to the Brave/Tavily/Naver/YouTube keys, and the server shall start without them.
+- REQ-AIR4-022 — The tracked backend sources shall not contain the deep research service, its collector, the synthesis prompt, or any reference to them or to the Brave/Tavily/Naver/YouTube keys, shall not contain any directory named `.claude` or file named `CLAUDE.md`, and the server shall start without them.
 - REQ-AIR4-023 — The Fast (codex) mode shall keep its current request contract and behavior.
 
 ## 인수 기준
 
 | AC | REQ | 요지 |
 |---|---|---|
-| 001 | 001 | 1바이트 변조 → 202, `integrity`, 실행 0회, active `null`, 쿼터 0 |
-| 002 | 002 | argv 리터럴, 모델 기본 `sonnet`, 우회 플래그 없음, cwd 하네스 |
-| 003 | 003 | [라이브] 음성 탐침 4종 거부, 파일 변화 0 |
-| 004 | 004 | canary 비밀 환경 변수 미전달 |
+| 001 | 001 | 서버 시작 시 원본 대조 후 설치(`runs/` 보존), 원본 변조 시 설치 안 함 / 설치본 1바이트 변조·목록 밖 파일 → 202, `integrity`, 실행 0회, active `null`, 쿼터 0 / 재시작 시 복구 |
+| 002 | 002 | argv 리터럴(`--settings <H>/.claude/settings.json`, `--strict-mcp-config` 포함), 모델 기본 `sonnet`, 우회 플래그·`--restricted` 없음, cwd 기본 `~/.goose-harness`(리포 밖), 설정 키 3개 |
+| 003 | 003 | [라이브] 음성 탐침 6종 거부(하네스 밖 읽기 전용 Bash 포함), 파일 변화 0, 카나리 미노출 |
+| 004 | 004 | env 키 ⊆ 허용 목록 8개, canary 비밀 환경 변수 3개 미전달 |
 | 005 | 006 | 유예 0.5초 주입, 3초 안에 자식·손자 종료, `timeout` |
 | 006 | 007 | 오류 종류 4종 분류 |
 | 007 | 008 | 같은 종목 2회 → 202 J1, 200 J1, 실행 1회, 쿼터 1 |
@@ -43,7 +43,7 @@
 | 009 | 009 | 재생 1~5, `Last-Event-ID: 3` → 4,5, 404 |
 | 010 | 010 | 구독 끊김 후 `done` |
 | 011 | 011, 006, 007 | 순차 전제(J1 취소 후 J3): 취소 → 상태 `cancelled`·오류 종류 없음·그룹 소멸, 완료 작업 불변, 404, lifespan 종료 → `cancelled` |
-| 012 | 012 | 녹화 픽스처 → 단계 순서 리터럴, 예외 없음 |
+| 012 | 012 | 녹화 픽스처(196줄) → design §3.5 측정 표 기준 단계 순서 리터럴, 역할 단계 없음, 예외 없음 |
 | 013 | 014 | 허용 파일 + `assumptions.md` + `job.json`만 복사, 모델 경로 무시 |
 | 014 | 014 | final 우선 / draft만 / final 있으나 `delivery_allowed: false` → draft / 없음 → `empty_output` / (e) 시간 초과+초안 → `error/timeout` 유지·초안 보관·`draft`+`interrupted` / (f) 취소+초안 → `cancelled`·동일 보관 / (g) 시간 초과+final 조건 충족 → `final`+`interrupted` |
 | 015 | 015 | CSP 헤더 |
@@ -54,14 +54,16 @@
 | 020 | 020 | 재구독 1회, 시작·취소 POST 0회 |
 | 021 | 013 | `/goose/active` 실행 중 객체 / `null`, 422 아님 |
 | 022 | 021 | 셀 폴링: 닫은 뒤 활성, `null`이면 해제·중지, 새로고침 후 복원, 저장값 없는 셀 폴링 0, 새 작업 시작 시 재개 |
-| 023 | 022 | `git grep -nI` 0줄 + `import backend.main` 성공 |
+| 023 | 022 | `git grep -nI` 0줄 + `git ls-files backend`에 `.claude`·`CLAUDE.md` 0줄 + `import backend.main` 성공 |
 | 024 | 023 | Fast 테스트 무수정 통과 |
-| 025 | 005, 014, 017, 018, 019, 020 | [라이브] 299030 전 과정, `assumptions.md` 존재·비어 있지 않음 |
+| 025 | 005, 014, 017, 018, 019, 020 | [라이브] 299030 전 과정, `assumptions.md` 존재·비어 있지 않음, 실행 시간·`final/` 여부 기록 |
 
 ## 변경 파일
 
-- 신규: `backend/goose_harness/{CLAUDE.md, .claude/settings.json, goose-manifest.json, .claude/skills/goose/**}`, `backend/services/goose_runner.py`, `backend/services/goose_job_service.py`, `frontend/src/hooks/useGooseActive.ts`, 테스트 `test_goose_runner.py`, `test_goose_job_service.py`, `test_ai_report_router_goose.py`, 픽스처 `goose_stream_299030.jsonl`, `useAiReport.goose.test.ts`, `useGooseActive.test.ts`
-- 수정: `backend/routers/ai_report.py`, `backend/services/ai_report_service.py`, `backend/schemas/ai_report.py`, `backend/main.py`, `backend/prompts/__init__.py`, `backend/prompts/README.md`, `.env.example`, `.gitignore`, `frontend/src/components/{AiReportModal.tsx, ProgressPanel.tsx, ChartGrid/ChartCell.tsx}`, `frontend/src/hooks/useAiReport.ts`, `frontend/src/api/aiReport.ts`, `frontend/src/types/aiReport.ts`, 테스트 `AiReportModal.test.tsx`, `ProgressPanel.test.tsx`
+- 신규(추적 원본): `backend/goose_harness_src/{harness-instructions.md, claude-settings.json, goose-manifest.json, skills/goose/**}` — 서버 시작 시 `~/.goose-harness/{CLAUDE.md, .claude/settings.json, .claude/skills/goose/**}`로 설치(리포 밖, 커밋 안 함)
+- 삭제(미추적): M1 임시 `backend/goose_harness/`
+- 신규: `backend/services/goose_runner.py`, `backend/services/goose_job_service.py`, `frontend/src/hooks/useGooseActive.ts`, 테스트 `test_goose_runner.py`, `test_goose_job_service.py`, `test_ai_report_router_goose.py`, 픽스처 `goose_stream_299030.jsonl`, `useAiReport.goose.test.ts`, `useGooseActive.test.ts`
+- 수정: `backend/routers/ai_report.py`, `backend/services/ai_report_service.py`, `backend/schemas/ai_report.py`, `backend/main.py`, `backend/prompts/__init__.py`, `backend/prompts/README.md`, `.env.example`, `frontend/src/components/{AiReportModal.tsx, ProgressPanel.tsx, ChartGrid/ChartCell.tsx}`, `frontend/src/hooks/useAiReport.ts`, `frontend/src/api/aiReport.ts`, `frontend/src/types/aiReport.ts`, 테스트 `AiReportModal.test.tsx`, `ProgressPanel.test.tsx`
 - 축소: `backend/services/claude_cli_streamer.py`, `backend/tests/test_claude_cli_streamer.py`
 - 삭제: `backend/services/deep_research_service.py`, `deep_research_collector.py`, `backend/prompts/stock_synthesis_prompt.md`, `backend/tests/test_deep_research_service.py`, `test_deep_research_collector.py`, `test_ai_report_router_deep_mode.py`(교체)
 

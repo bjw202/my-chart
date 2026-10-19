@@ -141,6 +141,8 @@ industry(peer-compare, analyze)   ┘
 
 ### 3.3 미검증 위험 — 상위 디렉터리 CLAUDE.md
 
+> M1(2026-10-19)에서 이 위험이 확인됐다(리포 위치 캐시 생성 115,950 대 13,028) → 하네스 리포 밖 이전, `plan.md` T11·`progress.md §E.2`.
+
 Claude Code는 cwd에서 위로 올라가며 CLAUDE.md를 찾는다. 하네스가 `my_chart/backend/goose_harness/`에 있으면 `my_chart/CLAUDE.md`(MoAI 지시서)와 `my_chart/CLAUDE.local.md`가 탐색 경로에 있다. `--setting-sources project`가 이 탐색까지 막는지는 도움말에 나오지 않는다 → **[증거 공백] G2**. `--bare`는 이를 막지만 구독 인증을 쓸 수 없다.
 
 M1에서 객관적으로 측정하는 방법: 같은 하네스를 (a) 리포 안 실제 위치와 (b) 상위에 CLAUDE.md가 없는 스크래치 디렉터리에 두고 같은 짧은 프롬프트를 실행해 `result` 이벤트의 입력 토큰을 비교한다. MoAI 지시서는 수만 토큰 규모라 오염되면 차이가 크게 난다. 오염이 확인되면 하네스를 리포 밖(환경 변수로 경로 지정)으로 옮기거나 `--restricted`를 검토한다.
