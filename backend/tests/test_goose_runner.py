@@ -157,6 +157,8 @@ def test_ac002_settings_source_keys():
     path_parts = data["env"]["PATH"].split(":")
     assert "/usr/bin" in path_parts
     assert "/bin" in path_parts
+    # v0.4.2: 사용자 전역 ~/.claude/CLAUDE.md 제외(하네스 CLAUDE.md는 유지)
+    assert "**/.claude/CLAUDE.md" in data["claudeMdExcludes"]
 
 
 def test_build_prompt_follows_design_template(gr):

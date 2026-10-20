@@ -28,6 +28,7 @@
   },
   "disableAllHooks": true,
   "autoMemoryEnabled": false,
+  "claudeMdExcludes": ["**/.claude/CLAUDE.md"],
   "env": {
     "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"
   }
