@@ -8,7 +8,7 @@
 
 격리 원칙:
 - 실제 `claude`·실제 홈·실제 ~/.goose-harness를 쓰지 않는다(tmp_path만).
-- ai_report_service·deep_research_service는 sys.modules 스텁(monkeypatch로 되돌림)으로 대체하고
+- ai_report_service는 sys.modules 스텁(monkeypatch로 되돌림)으로 대체하고
   라우터 파일을 경로로 불러온다. goose 모듈은 가짜 상위 패키지 아래에서 새로 불러온다.
 - HTTP는 httpx.AsyncClient + ASGITransport — 백그라운드 작업이 테스트와 같은 이벤트 루프에서 돈다.
 """
@@ -82,14 +82,7 @@ def env(monkeypatch, tmp_path):
         get_stock_name=lambda code: _NAMES.get(code),
         stream_codex_fast=MagicMock(),
     )
-    deep_stub = types.SimpleNamespace(
-        _active_deep_analyses=set(),
-        DeepRateLimitError=type("DeepRateLimitError", (Exception,), {}),
-        check_deep_rate_limit=MagicMock(),
-        stream_deep_analysis=MagicMock(),
-    )
     monkeypatch.setitem(sys.modules, "backend.services.ai_report_service", fast_stub)
-    monkeypatch.setitem(sys.modules, "backend.services.deep_research_service", deep_stub)
 
     gh = importlib.import_module("backend.services.goose_harness")
     gr = importlib.import_module("backend.services.goose_runner")
@@ -103,7 +96,7 @@ def env(monkeypatch, tmp_path):
     app = FastAPI()
     app.include_router(router_mod.router, prefix="/api")
     ns = types.SimpleNamespace(gh=gh, gr=gr, gjs=gjs, router=router_mod, app=app,
-                               fast=fast_stub, deep=deep_stub, tmp=tmp_path)
+                               fast=fast_stub, tmp=tmp_path)
 
     def use(runner, integrity=None, runs_root=None):
         svc = gjs.GooseJobService(
@@ -201,7 +194,6 @@ async def test_ac008_decision_order(env, monkeypatch, row, running, quota_left, 
     assert len(runner.calls) == calls_before  # 7행: 실행기 추가 호출 0
     # Fast 쿼터 카운터는 건드리지 않는다
     env.fast.check_rate_limit.assert_not_called()
-    env.deep.check_deep_rate_limit.assert_not_called()
     runner.release.set()
     if running_job is not None:
         await _finish(running_job)
@@ -225,21 +217,70 @@ async def test_b5_two_simultaneous_requests_exactly_one_runs(env):
     await _finish(svc.get((r1 if r1.status_code == 202 else r2).json()["job_id"]))
 
 
-async def test_fast_mode_path_is_unchanged_by_goose_routing(env):
-    """mode=fast는 goose 서비스를 거치지 않는다(codex 경로 그대로)."""
+# M7: 옛 test_ai_report_router_deep_mode.py(삭제)의 Fast 경로 시험(mode 없음·fast·perplexity 알리아스,
+# 잘못된 mode 422)을 여기로 옮겼다.
+@pytest.mark.parametrize("params", [{}, {"mode": "fast"}, {"mode": "perplexity"}],
+                         ids=["no-mode", "fast", "perplexity-alias"])
+async def test_fast_mode_path_is_unchanged_by_goose_routing(env, params):
+    """mode 없음·fast·perplexity(옛 알리아스)는 goose 서비스를 거치지 않는다(codex 경로 그대로)."""
     runner = FakeRunner(env.gr)
     env.use(runner)
+    fast_calls: list[str] = []
 
     async def fake_stream(name, code):
+        fast_calls.append(code)
         yield {"event": "done", "data": "ok"}
 
     env.fast.stream_codex_fast = fake_stream
     env.router.stream_codex_fast = fake_stream
     async with _client(env.app) as c:
-        r = await c.post("/api/ai-report/299030", params={"mode": "fast"})
+        r = await c.post("/api/ai-report/299030", params=params)
     assert r.status_code == 200
+    assert "text/event-stream" in r.headers.get("content-type", "")
+    assert fast_calls == ["299030"]
     assert runner.calls == []
     env.fast.check_rate_limit.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "codex,running,limited,expect_status,expect_error",
+    [
+        (False, True, True, 503, "codex_cli_missing"),
+        (True, True, True, 429, "already_running"),
+        (True, False, True, 429, "rate_limit"),
+    ],
+    ids=["503-first", "dup-before-quota", "quota-last"],
+)
+async def test_fast_guard_order_503_then_duplicate_then_quota(env, monkeypatch, codex, running, limited,
+                                                               expect_status, expect_error):
+    """AC-024: Fast 라우터 검사 순서(503 → 429 중복 → 429 쿼터)가 goose 라우팅 추가 뒤에도 그대로다."""
+    runner = FakeRunner(env.gr)
+    env.use(runner)
+    monkeypatch.setattr(env.router.shutil, "which",
+                        lambda name: f"/usr/local/bin/{name}" if codex else None)
+    if running:
+        env.router._active_analyses.add("299030")
+    if limited:
+        env.fast.check_rate_limit.side_effect = env.fast.RateLimitError("limit")
+    try:
+        async with _client(env.app) as c:
+            r = await c.post("/api/ai-report/299030", params={"mode": "fast"})
+    finally:
+        env.router._active_analyses.discard("299030")
+    assert r.status_code == expect_status, r.text
+    assert r.json()["detail"]["error"] == expect_error
+    assert runner.calls == []
+
+
+async def test_invalid_mode_returns_422_without_any_analysis(env):
+    """허용 목록(fast|deep|perplexity) 밖의 mode는 422, Fast·goose 어느 쪽도 시작하지 않는다."""
+    runner = FakeRunner(env.gr)
+    env.use(runner)
+    async with _client(env.app) as c:
+        r = await c.post("/api/ai-report/299030", params={"mode": "unknown"})
+    assert r.status_code == 422
+    assert runner.calls == []
+    env.fast.check_rate_limit.assert_not_called()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

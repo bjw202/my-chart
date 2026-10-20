@@ -32,10 +32,6 @@ from backend.routers.stage import router as stage_router
 from backend.routers.stocks import stocks_router
 from backend.routers.themes import router as themes_router
 from backend.services import goose_harness, goose_job_service
-from backend.services.deep_research_service import (
-    _cleanup_stale_staging_dirs,
-    _load_synthesis_prompt,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -70,28 +66,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 이후 모든 goose 작업이 error/integrity로 끝난다(닫힌 실패).
     goose_harness.install_at_startup()
 
-    # @MX:NOTE Fast/Deep 양모드 lifespan block — codex binary required, claude binary required for Deep.
-    # SPEC-AI-REPORT-003 NFR-001: codex 바이너리 부재 시 Fast Mode 비활성 (경고), claude 없으면 Deep 비활성.
+    # @MX:NOTE Fast/Goose 양모드 lifespan block — codex binary required for Fast, claude binary required for Goose.
+    # SPEC-AI-REPORT-003 NFR-001: codex 바이너리 부재 시 Fast Mode 비활성 (경고), claude 없으면 Goose 비활성.
+    # SPEC-AI-REPORT-004 M7: 옛 Deep 합성 프롬프트 로드·/tmp 스테이징 정리는 Deep 파이프라인과 함께 삭제.
     if shutil.which("codex") is None:
         logger.warning("codex CLI 미설치: Fast Mode 비활성화. `codex login` 이후 사용 가능.")
     if shutil.which("claude") is None:
-        logger.warning("claude CLI 미설치: Deep 분석 모드 비활성화. Fast 모드는 codex 설치 시 정상 운영.")
-
-    # Deep 합성 프롬프트 fail-fast (FR-010): 파일 없으면 서버 시작 즉시 중단
-    try:
-        _load_synthesis_prompt()
-        logger.info("Deep Research 합성 프롬프트 로드 완료")
-    except (FileNotFoundError, ValueError) as e:
-        logger.error("합성 프롬프트 검증 실패: %s", e)
-        raise
-
-    # /tmp 스테이징 디렉토리 정리 (FR-013): 7일 초과 디렉토리 삭제 (best-effort)
-    try:
-        deleted = _cleanup_stale_staging_dirs(max_age_days=7)
-        if deleted > 0:
-            logger.info("오래된 staging 디렉토리 %d개 정리 완료", deleted)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("staging 디렉토리 정리 실패 (무시): %s", e)
+        logger.warning("claude CLI 미설치: Goose 분석 모드 비활성화. Fast 모드는 codex 설치 시 정상 운영.")
 
     yield
     logger.info("Server shutting down.")

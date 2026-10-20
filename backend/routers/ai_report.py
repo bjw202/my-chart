@@ -132,7 +132,7 @@ async def _handle_fast_mode(code: str, stock_name: str) -> EventSourceResponse:
     return EventSourceResponse(event_generator())
 
 
-# @MX:NOTE: SPEC-AI-REPORT-004 — mode=deep는 goose 작업을 시작한다(옛 Deep 파이프라인 미사용, 삭제는 M7).
+# @MX:NOTE: SPEC-AI-REPORT-004 — mode=deep는 goose 작업을 시작한다(옛 Deep 파이프라인은 M7에서 삭제).
 #           라우터는 1~3단계(코드·종목·실행 파일)만 판정하고 4~8단계는 service.start()가 잠금 안에서 판정한다
 #           (design §8). 여기서 4~8단계를 미리 판정하면 동시 요청이 모두 통과한다.
 async def _handle_deep_mode(code: str, stock_name: str) -> Response:
