@@ -340,6 +340,131 @@ registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=052770 종목
 - **AC-RSR-014 목표**: `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db Output/snapshots/weekly_after_rsr.db` → 상위10_지속률 **65.17** (기준선 29.24, 목표 ≥ 60) — **PASS**. 같은 줄: 주수 295, 상위10_초과pp 1.66, 상하위스프레드pp −0.25, IC양수비율 30.85 (`.moai/state/verify/c1bf371e/m2_after_eval.log`)
 - 미반영: `stock_meta.rs_12m`(일봉)은 M4 메타 재구축 전까지 옛 산식 값
 
+### M3 — Stage 2 상수 재보정 (manager-develop, cycle_type=tdd, 2026-10-20)
+
+**작업 위치.** 런타임 L1 워크트리 `.claude/worktrees/agent-ab2bce17db19aa63c`(브랜치 `worktree-agent-ab2bce17db19aa63c`). 기준점 `fd5f11f`에서 `git merge --ff-only main`으로 `305cdcb`까지 빨리 감기한 뒤 작업했다. 커밋은 이 워크트리 브랜치에만 있다. 공용 체크아웃의 `Output/stock_data_{weekly,daily}.db`를 워크트리 `Output/`에 복사했고(게이트용, 원본은 읽기만), 워크트리 `.venv`에 `setuptools<81`을 설치했다(`82.0.1 → 80.10.2`). 이 설치 전 첫 커밋 시도는 게이트에서 `test_ac_sag_045_r4_mut_rs_zero_fill_control` 1건(`ModuleNotFoundError: No module named 'pkg_resources'`)으로 막혔다 — 프로젝트 메모리 `project_worktree_precommit_db_trap`과 같은 원인이다. 우회 플래그는 쓰지 않았다. 프론트 도구는 공용 체크아웃 `frontend/node_modules`를 심볼릭 링크로 연결해 썼다(gitignore 대상).
+
+**커밋.**
+
+| SHA | 내용 | `git show --stat` |
+|---|---|---|
+| `6b09f06` | 측정 도구 + 단일 정의 지점 + 교차 언어 등식 + 테스트 | `backend/services/screen_service.py` 5 (+4 −1), `frontend/src/components/StockExplorer/StockTable.tsx` 9, `frontend/src/utils/__tests__/rsMetrics.test.ts` 34, `frontend/src/utils/rsMetrics.ts` 4, `scripts/rs_eval/stage2_ratio_eval.py` +101, `tests/test_rsr_m3_stage2_ratio_eval.py` +149, `tests/test_rsr_m3_threshold_single_source.py` +43 |
+
+**측정 (AC-RSR-015).** 사본은 측정 전후 모두 `shasum -a 256 … | cut -c1-16` → before `949f29639a86da86`, after `abecc43e98dc47b0`로 같았고, `ls -la Output/snapshots/`에는 두 `.db` 파일뿐이었다(스크립트는 `mode=ro&immutable=1`로만 연다). 명령 형식(워크트리 cwd, `S=/Users/byunjungwon/Dev/my-project-01/my_chart/Output/snapshots`):
+
+```
+/Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stage2_ratio_eval.py --db $S/weekly_<copy>_rsr.db --weeks 12 --mode <conditional|strong> --threshold <t> --ref-db $S/weekly_<other>_rsr.db
+```
+
+`--ref-db`는 W를 두 사본 공통 기준 종목 날짜로 제한한다. 8회 실행 모두 `exit=0`, 출력의 W 줄이 같았다(`grep -h '^W=' … | sort | uniq -c` → `8 W=2026-07-31,2026-08-07,2026-08-14,2026-08-21,2026-08-28,2026-09-04,2026-09-11,2026-09-18,2026-09-23,2026-10-02,2026-10-08,2026-10-16 (n=12)`). 원문 로그: 워크트리 `.moai/state/verify/rsr-m3/cond_{before,after}_{60,70,80}.log`, `strong_{before,after}_60.log`.
+
+(a) 조건부 RS 통과율 — W 평균(마지막 줄 `mean=… n_dates=12` 원문):
+
+| 사본 | c60 | c70 | c80 | 엄격 단조 | c60 − c80 | 0.10 × c70 | 사전 조건 |
+|---|---|---|---|---|---|---|---|
+| 변경 전 | 100.00 | 99.48 | 97.85 | 성립 | 2.15 | 9.948 | **미충족** |
+| 변경 후 | 99.58 | 94.42 | 84.87 | 성립 | 14.71 | 9.442 | **충족** |
+
+날짜별 분모(RS 외 조건 다섯 개 통과 종목 수, T2)와 분자(`num`) — 두 사본의 분모는 날짜마다 같다:
+
+| 날짜 | 분모 | 전·60 | 전·70 | 전·80 | 후·60 | 후·70 | 후·80 |
+|---|---|---|---|---|---|---|---|
+| 2026-07-31 | 16 | 16 | 16 | 15 | 16 | 16 | 14 |
+| 2026-08-07 | 23 | 23 | 23 | 23 | 23 | 23 | 21 |
+| 2026-08-14 | 45 | 45 | 45 | 45 | 44 | 43 | 40 |
+| 2026-08-21 | 16 | 16 | 16 | 16 | 16 | 16 | 16 |
+| 2026-08-28 | 24 | 24 | 24 | 23 | 24 | 23 | 20 |
+| 2026-09-04 | 26 | 26 | 26 | 26 | 26 | 26 | 25 |
+| 2026-09-11 | 28 | 28 | 28 | 28 | 28 | 28 | 26 |
+| 2026-09-18 | 26 | 26 | 26 | 26 | 26 | 25 | 21 |
+| 2026-09-23 | 12 | 12 | 12 | 12 | 12 | 9 | 8 |
+| 2026-10-02 | 35 | 35 | 35 | 34 | 34 | 31 | 28 |
+| 2026-10-08 | 16 | 16 | 15 | 14 | 16 | 14 | 12 |
+| 2026-10-16 | 54 | 54 | 54 | 54 | 54 | 51 | 41 |
+
+변경 전 사본 값은 research.md R15(`60 100.0 / 70 99.48 / 80 97.85`, 분모 `[54, 16, 35, 12, 26, 28, 26, 24, 16, 45, 23, 16]`)와, 변경 후 사본 값은 plan-audit iter-3 모의(`99.58 / 94.42 / 84.87`)와 같다.
+
+(b) Stage 2 강세 비중 — 60 기준:
+
+| 측정 | 사본·상수 | W 평균 |
+|---|---|---|
+| (1) | 변경 전·현행 60 | 33.53 |
+| (2) | 변경 후·현행 60 | 33.72 |
+| (3) | 변경 후·채택 60 | 33.72 (= (2), 채택값이 현행값) |
+
+날짜별 분모(Stage 2 종목 수)는 두 사본에서 같다: `250, 361, 467, 370, 458, 446, 461, 486, 469, 563, 556, 390`. Strong 분자 — 변경 전 `75, 126, 173, 112, 158, 162, 165, 165, 176, 173, 167, 122`, 변경 후 `75, 127, 176, 112, 157, 163, 166, 166, 179, 177, 165, 122`. (1) 33.53은 plan-audit iter-2 기준선, (2) 33.72는 iter-3 부채 T3의 예측값과 같다.
+
+**판정.**
+
+- **70 (`_STAGE2_ENTRY_RS_MIN`)**: 사전 조건은 변경 후 사본에서 충족 → REQ-RSR-018 (a) 적용(두 사본 중 하나라도 충족, T1). 2단계 허용오차 `0.10 × 99.48 = 9.948`. 현행 70의 변경 후 값 `|94.42 − 99.48| = 5.06 <= 9.948` → 허용오차 안이므로 **70 유지**(현행값이 자격을 갖추면 유지). 대조(2단계): 같은 사본의 80은 `|84.87 − 99.48| = 14.61 > 9.948`로 허용오차 밖 — 판별 폭이 실제로 있음을 관측했다. "기록만" 모드는 해당 없음(에스컬레이션 조건 미발생).
+- **60 (`_STAGE2_RS_STRONG`)**: (2) − (1) = 33.72 − 33.53 = 0.19%p `<= 5`%p → **60 유지**. (3) = (2)이고 (3)이 (1)의 ±5%p 안이다. AC 대조 조건 "60을 유지하면 (2)가 (1)과 ±5%p 이내" 충족.
+- **80 (`_RS_TOP_THRESHOLD`/`RS_TOP_THRESHOLD`)**: B-3에 따라 측정 대상 아님, 변경 없음.
+- 결과적으로 `stage_classifier.py`와 `rsMetrics.ts`의 상수 **값은 바뀌지 않았다**. 따라서 plan.md §G의 "M3 — 70/60 값이 바뀌면 경계 기대 재검토" 4개 파일은 기대값을 고칠 근거가 없어 수정하지 않았다.
+
+**RED (구현 전).**
+- 측정 도구: `python -m pytest tests/test_rsr_m3_stage2_ratio_eval.py -q` → `6 failed in 0.55s`, 원문 `can't open file '…/scripts/rs_eval/stage2_ratio_eval.py': [Errno 2] No such file or directory`(증거 `red_eval.log`).
+- T8 단일 정의 지점: `python -m pytest tests/test_rsr_m3_threshold_single_source.py -q` → `1 failed, 1 passed in 0.37s`, 원문 `E       assert not True` / `E        +  where True = _passes_minervini()`(증거 `red_t8.log`) — 상수를 80으로 바꿔도 리터럴 70인 T8이 `rs_12m = 75`를 통과시킨다. 통과한 1건은 현행 상수(70)에서 75가 통과하는지 보는 기준 테스트다.
+- AC-RSR-013 스캔(변경 전): 4줄, acceptance.md의 변경 전 관측과 같다(`StockTable.tsx:32`, `:39`, `:263`, `screen_service.py:61`).
+
+**GREEN (`6b09f06`).**
+
+| AC | 상태 | 명령 | 출력 |
+|---|---|---|---|
+| AC-RSR-013 (스캔) | PASS | `grep -n -E 'rs_12m\s*>=\s*[0-9]\|RS Strong[^"]*[0-9]' backend/services/screen_service.py frontend/src/components/StockExplorer/StockTable.tsx` | 0줄, `exit=1` |
+| AC-RSR-013 (교차 언어·80 유지) | PASS | `npm --prefix frontend exec vitest -- run --root frontend src/utils/__tests__/rsMetrics.test.ts src/components/StockExplorer` | `Test Files 10 passed (10)`, `Tests 74 passed (74)`(증거 `green_fe.log`) |
+| AC-RSR-013 (T8 공유 상수) | PASS | `python -m pytest tests/test_rsr_m3_threshold_single_source.py -q` | `2 passed in 0.30s` |
+| AC-RSR-015 (도구) | PASS | `python -m pytest tests/test_rsr_m3_stage2_ratio_eval.py -v` | `6 passed in 3.46s`(증거 `green_eval.log`) |
+| AC-RSR-015 (측정·판정) | PASS | 위 8회 측정 | 70: (a) 2단계 5.06 <= 9.948, 60: 0.19%p <= 5%p |
+
+**대조 RED (lessons #9).** 실행기 `.moai/state/verify/rsr-m3/contrasts.py`가 회귀를 하나씩 문자열 치환으로 넣고 가드를 돌린 뒤 원본 바이트로 복구했다(대조마다 새 `PYTHONPYCACHEPREFIX`, M2 함정 기록 반영). 15건 모두 RED, 끝줄 `ALL_RED`(원문 `contrasts.log`).
+
+| # | 넣은 회귀 | 가드 | 관측(원문 발췌) |
+|---|---|---|---|
+| A1 | `:263` 라벨을 리터럴 `"RS Strong (≥ 70)"`로 | AC-013 스캔 | `grep lines=1: …StockTable.tsx:264: … label="RS Strong (≥ 70)"` |
+| A2 | 라벨을 재보정 숫자 `"RS Strong (≥ 65)"`로 | AC-013 스캔 | `grep lines=1: … label="RS Strong (≥ 65)"` |
+| A3 | `:39` 술어를 `c.rs_12m >= 70`으로 | AC-013 스캔 | `grep lines=1: …StockTable.tsx:40:    rs: c.rs_12m >= 70,` |
+| A4 | `:32` 주석을 `// rs_12m >= 70`으로 | AC-013 스캔 | `grep lines=1: …StockTable.tsx:33:  rs: boolean    // rs_12m >= 70` |
+| A5 | T8을 리터럴 `" AND rs_12m >= 70"`으로 | AC-013 스캔 | `grep lines=1: backend/services/screen_service.py:64: " AND rs_12m >= 70"  # T8` |
+| A6 | 같은 T8 리터럴 | T8 동작 테스트 | `E       assert not True`, `1 failed, 1 passed` |
+| B1 | 백엔드 `_STAGE2_ENTRY_RS_MIN` 70→65, 거울 그대로 | 교차 언어 | `AssertionError: expected 70 to be 65` |
+| B2 | 백엔드 `_STAGE2_RS_STRONG` 60→65, 거울 그대로 | 교차 언어 | `AssertionError: expected 60 to be 65` |
+| B3 | 거울 `RS_STRONG_THRESHOLD` 70→65, 백엔드 그대로 | 교차 언어 | `AssertionError: expected 65 to be 70` |
+| B4 | 백엔드 `_RS_TOP_THRESHOLD` 80→85 | 등식 + 80 유지 | `2 failed`, `expected 80 to be 85` |
+| B5 | `_RS_TOP_THRESHOLD`·`RS_TOP_THRESHOLD` 함께 80→85 | 80 유지 | `1 failed`, `상위 임계값 80 은 재보정 대상이 아니다 … expected 85 to be 80` |
+| E1 | conditional 분모를 Stage 2 전체로 | 도구 테스트 | `assert {…'2026-01-09': (9, 2)} == {…'2026-01-09': (5, 2)}`, `assert 38.89 == 70.0` |
+| E2 | strong 분자를 `rs_12m >= t`로(경계 포함, detail 무시) | 도구 테스트 | `assert {'2026-01-02': (5, 4)} == {'2026-01-02': (5, 2)}` |
+| E3 | `--ref-db` 교집합 무시 | 도구 테스트 | `assert ['2026-01-16', '2026-01-23'] == ['2026-01-09', '2026-01-16']` |
+| E4 | strong에서 상수 치환 누락 | 도구 테스트 | `assert 40.0 == 20.0` |
+
+추가 대조 — 옛 리터럴 단언의 판별력 부재: `git show HEAD:frontend/src/utils/__tests__/rsMetrics.test.ts`(`305cdcb`판)를 임시 파일로 두고 백엔드 `_STAGE2_ENTRY_RS_MIN`을 65로 바꿔 두 파일을 함께 돌리면 `Tests 1 failed | 6 passed (7)` — 실패는 새 파일의 `RS_STRONG_THRESHOLD === 백엔드 _STAGE2_ENTRY_RS_MIN` 1건뿐이고 옛 판 2건은 통과했다(증거 `contrast_head_literal.log`). 즉 옛 단언은 백엔드 값이 갈라져도 잡지 못했다. 임시 파일은 삭제, `stage_classifier.py`는 사본에서 복구했다.
+
+복구 증명: 대조 직후 `git status --short` → `M` 4개 파일 + `??` 신규 3개 + `?? .moai/logs/`(대조 전과 같은 목록), `git diff --stat` → `4 files changed, 38 insertions(+), 14 deletions(-)`(대조 전과 같음).
+
+**§G "M3" 4개 파일 재실행.**
+- `python -m pytest backend/tests/test_minervini_template.py tests/test_market_breadth.py tests/test_stage_classifier.py -q` → `3 failed, 59 passed`(변경 전 `305cdcb`에서도 같은 3건 `3 failed, 59 passed`, 증거 `baseline_py.log`·`after_py_g.log`). 실패 3건은 `TestGroupC_ScreenService`의 `test_minervini_where_all_conditions_met`·`test_trend_template_score_is_8_for_all_returned_rows`·`test_minervini_with_existing_filters_combined`로, 캡처 로그가 두 실행 모두 `[minervini] required columns missing`(각 3회)이다. 원인 프로브: `_MINERVINI_META_COLS = ("sma150", "low52w", "sma200_20d_ago", "sma5")`(`backend/services/meta_service.py:59`)인데 `grep -cw sma5 backend/tests/test_minervini_template.py` → `0`(픽스처에 `sma5` 컬럼 없음). `sma5`는 `b1dfe17`(`fix(screening): 레거시 stock_meta 자가치유 — SMA5 패턴 0건 반환 해결`)에서 필수 컬럼에 들어갔다. M3와 무관한 기존 결함이며 임계값 변경이 원인이 아니므로 고치지 않았다.
+- `StockTable.test.tsx`: 위 vitest 실행에 포함, 통과(기대값 수정 없음).
+
+**영향 범위 회귀.** `python -m pytest tests/test_rsr_m3_stage2_ratio_eval.py tests/test_rsr_m3_threshold_single_source.py tests/test_rsr_m2_ibd.py tests/test_rsr_m2_eval_production.py tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py tests/test_screen_service.py tests/test_screen_codes_filter.py tests/test_stage_classifier.py tests/test_market_breadth.py tests/test_sector_metrics.py tests/test_universe.py tests/test_consumer_dates.py tests/test_api.py -q` → `177 passed in 5.74s`(증거 `lane.log`). 타입 검사 `npm --prefix frontend exec tsc -- -b frontend/tsconfig.json` → `exit=0`, 출력 없음. 커밋 시 pre-commit 게이트(`moai gate`, 전체 `tests/`)가 통과해 `6b09f06`이 생성됐다(게이트 실패 시 커밋이 막힌다는 것은 첫 시도에서 관측).
+
+**린트.** `uvx ruff check --output-format concise scripts/rs_eval/stage2_ratio_eval.py tests/test_rsr_m3_stage2_ratio_eval.py tests/test_rsr_m3_threshold_single_source.py backend/services/screen_service.py` → `All checks passed!`. `npm --prefix frontend exec eslint -- --config frontend/eslint.config.js <변경된 TS 3개>` → `exit=0`, 출력 없음.
+
+**커버리지.** `coverage run --include='scripts/rs_eval/stage2_ratio_eval.py'`로 스크립트를 변경 후 사본에서 conditional(`--ref-db` 포함)·strong 각 1회 실행 → `scripts/rs_eval/stage2_ratio_eval.py 55 0 100%`. 도구 테스트 6건은 `-I` 서브프로세스로 스크립트를 실행하므로 pytest 커버리지에는 잡히지 않는다. `screen_service.py`의 바뀐 T8 줄은 T8 테스트 2건이 실제 SQLite에서 실행한다.
+
+**코드베이스 주장과 프로브 (lessons #10).**
+- 측정 스크립트는 `-I`로 실행해도 이 저장소의 `my_chart`를 쓴다: 스크립트가 `sys.path.insert(0, str(Path(__file__).resolve().parents[2]))`를 먼저 한다. M2 프로브(`-I`면 `/Users/byunjungwon/Dev/my_chart/my_chart`가 잡힘)와 다른 동작이며, 도구 테스트가 이 경로로 워크트리 코드를 실행해 통과한 것이 근거다(E1~E4 대조가 워크트리 스크립트 수정을 감지).
+- conditional 분모는 `screen_stage2_entry()`를 `_STAGE2_ENTRY_RS_MIN = -inf`로 불러 얻는다 — 조건 5(`if rs < _STAGE2_ENTRY_RS_MIN`, `stage_classifier.py:291`)만 무력화되고 조건 1·2·3·4·6은 프로덕션 코드 그대로다. strong은 `classify_all()`(`:218-234`)을 그대로 부른다. 두 함수의 `sqlite3.connect`는 스크립트가 모듈 속성 `stage_classifier.sqlite3`를 읽기 전용 래퍼로 바꿔 사본을 `mode=ro&immutable=1`로 연다.
+- 등급 행이 없는 종목은 `_load_stocks_for_classification()`의 `LEFT JOIN`과 `float(… or 0.0)`(`:272`)로 RS 0 취급되어 conditional 분모에는 들고 분자에서는 빠진다 — 도구 테스트 픽스처 `P5`가 이 경로를 고정한다.
+
+**미검증 (Gaps).**
+- `backend/tests/test_minervini_template.py`의 Minervini 경로 3건은 기존 픽스처 결함(`sma5` 부재)으로 빈 결과를 내므로, 이 파일로는 T8 동작을 확인하지 못했다. T8은 새 테스트 `tests/test_rsr_m3_threshold_single_source.py`가 대신 고정한다.
+- `backend/tests` 전체 스위트는 돌리지 않았다(게이트는 `tests/`만 수집한다 — 게이트 로그의 `testpaths: tests`).
+- dev 서버 재시작 후 화면 확인은 하지 않았다. 라벨 문자열은 상수가 70인 동안 `RS Strong (≥ 70)`으로 같으며, StockTable 테스트가 통과했다는 것 외의 화면 관측은 없다.
+- `stage2_ratio_eval.py`의 분모 0 날짜 처리(평균에서 제외) 분기는 실데이터·테스트 모두에서 발생하지 않아 관측하지 않았다.
+
+**잔여 위험.**
+- (a)의 분모가 날짜별 12~54개라 상대 ±10%(9.948%p)는 날짜에 따라 종목 1~5개 차이에 해당한다(T2). 70 유지 판정의 여유는 4.89%p(9.948 − 5.06)다.
+- 측정 스크립트는 `stage_classifier`의 모듈 전역(`sqlite3`, 두 상수)을 프로세스 안에서 덮어쓴다. 별도 프로세스로만 실행되므로 서버에는 영향이 없지만, 이 스크립트를 다른 코드에서 import해 `main()`을 부르면 그 프로세스의 상수가 바뀐다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
