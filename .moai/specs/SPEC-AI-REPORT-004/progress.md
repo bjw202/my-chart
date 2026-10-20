@@ -1198,6 +1198,7 @@ AC-004는 `BRAVE_API_KEY=canary-9a1`을 Given으로 못 박고, AC-023은 `backe
 - **라이브 탐침 2회**(실행기의 `build_prompt`·`build_invocation`·`build_env` 그대로, 상한 120초, 증거 `.moai/state/verify/goose-bash-denial/probe{1,2}.json*`): 두 번 모두 120초 안에 `permission_denied`가 없었다. 각 실행의 Bash는 `ls -la runs/ runs/probe-bash-1 2>&1 | head -30`, `ls runs/ runs/probe-bash-2 2>&1 | head; ls .claude/…/references .claude/…/scripts` 하나씩이었고 `dontAsk`에서 자동 허용됐다(읽기 전용 자동 허용, design §2.2 관측과 같음). 탐침 1은 `input.json` 작성 직후 렌더 단계 전에 상한에 걸렸다. 탐침 폴더는 지웠고 `pgrep -fl "claude -p"` 출력 없음.
 - **원인 가설(미검증)**: `mode` 거부 메시지가 "Permission to use Bash has been denied because Claude Code is running in don't ask mode"로 명령이 아니라 도구 단위로 쓰여 있어, 모델이 명령 1건 거부를 "Bash 전체 거부"로 일반화하고 렌더를 시도하지 않았다.
 - **v0.4.4 반영(2026-10-20, manager-develop)**: `harness-instructions.md` 4번 아래에 design §2.1 4-1·4-2를 그대로 추가했고, `stock-report/references/report-input.md` 8-9행을 design §2의 상대 경로 형식(`python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py --input runs/<job_id>/company-input.json …`)으로 바꿨다. `goose-manifest.json`은 `python -m backend.services.goose_harness`로 다시 만들었고 바뀐 항목은 `CLAUDE.md`·`report-input.md` 2개뿐이다. **RED**(수정 전): 새 시험 2건 `2 failed`. **GREEN**: goose 시험 6파일 `201 passed`. `install_at_startup()`으로 `~/.goose-harness`에 재설치 → `installed`, `check_job_integrity()` → `ok`, 설치본 `CLAUDE.md`에 4-1·4-2 있음. 권한 규칙(`claude-settings.json`)은 바꾸지 않았다. 라이브 재실행은 하지 않았다(미관측). 커밋: 이 기록과 같은 커밋(`fix(SPEC-AI-REPORT-004): goose 하네스 지침에 셸 명령 규칙 반영`).
+- **라이브 재실행 관측(2026-10-20, `e59a8d4` 뒤)**: 서버를 재시작(`.dev-server.log` 15:26:39)한 뒤 한빛레이저(452190)를 다시 실행했다. 작업 `1d261a37702c47c4a8987b1dd38938dd`, 15:28:58→15:31:38(160초), `job.json`의 `status: done`·`delivery_status: draft`·`error_kind: null`. 명령 `awk '/15:26:39/{f=1} f' .dev-server.log | grep -c permission_denied` 출력 `0`. 보관 위치 `backend/reports/한빛레이저/goose/2026-10-20/`(`job.json`, `assumptions.md` 1205바이트, `report.html` 등 6개 파일). 앞의 "라이브 재실행은 하지 않았다(미관측)" 서술은 이 관측으로 대체된다.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
@@ -1219,7 +1220,7 @@ evidence: "AC별 증거(명령·출력·기준선)는 §E.2의 M1~M7 절과 '라
 ```
 
 - 위 SHA는 `git log --oneline 11f3e16..b7ba1d1`에서 가져왔다. 같은 범위의 문서 전용 커밋(plan 개정 v0.4.x, 게이트 시간 상한 조정, 타 SPEC plan 산출물)은 위 목록에서 뺐다.
-- 라이브 결함 수정(`e59a8d4`) 뒤 라이브 재실행은 하지 않았다(미관측). 상세는 §E.2 해당 절.
+- 라이브 결함 수정(`e59a8d4`) 뒤 서버를 재시작(`.dev-server.log` 15:26:39)하고 라이브 재실행을 했다: 작업 `1d261a37702c47c4a8987b1dd38938dd`, 한빛레이저(452190), 15:28:58→15:31:38(160초), `status: done`, `delivery_status: draft`. 15:26:39 이후 `.dev-server.log`의 `permission_denied`는 0건이다. 상세는 §E.2 해당 절 끝.
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
