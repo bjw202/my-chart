@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 설계
 
-> 대상 요구사항: `spec.md` v0.4.1 §4. 근거 자료: `research.md`, M1 관측(`progress.md §E.2 ### M1 스파이크 관측`). 결정 기록: `plan.md §2`.
+> 대상 요구사항: `spec.md` v0.4.3 §4. 근거 자료: `research.md`, M1 관측(`progress.md §E.2 ### M1 스파이크 관측`). 결정 기록: `plan.md §2`.
 > v0.4.0에서 M1 잠정값을 측정값으로 바꿨다(§9). **[측정 — M1 Pn]**은 M1 탐침 Pn의 실행 출력에 근거한 값, **[미관측]**은 M1이 보지 못해 run 단계에서 확인할 값, **[M2 재탐침]**은 M2에서 다시 관측해야 확정되는 값이다.
 
 ---
@@ -416,7 +416,7 @@ v0.3.2의 잠정 목록을 M1 관측(2026-10-19, `claude` 2.1.303, HEAD `11f3e16
 | 권한 규칙 문법 | §2.2 | §2.2 문법으로 동작. 리포 밖은 신뢰 대화상자가 없어 `--settings`로 넘김. 읽기 전용 Bash 자동 허용 | 측정(P3b·P4·P7) | §2.2, REQ-003 |
 | 하네스 밖 읽기 전용 Bash 거부 | — | 필요(REQ-003 둘째 절). 거부 문법은 미확정 | M2 재탐침 | §2.2, AC-003 (6a)~(6f) |
 | argv (§3.1) | `-p … --setting-sources project --permission-mode dontAsk --no-session-persistence --model` | `--strict-mcp-config`, `--settings <H>/.claude/settings.json` 추가 | 측정(P2c·P4) | §3.1, REQ-002, AC-002 |
-| 설정 파일 키 | 권한, hooks 없음 | `env.PATH`, `autoMemoryEnabled: false`, `disableAllHooks: true` 추가 | 측정(P4·P2c) | §2.2, REQ-002, AC-002 |
+| 설정 파일 키 | 권한, hooks 없음 | `env.PATH`, `autoMemoryEnabled: false`, `disableAllHooks: true`, `claudeMdExcludes: ["**/.claude/CLAUDE.md"]`(v0.4.2) 4개 추가 | 측정(P4·P2c) | §2.2, REQ-002, AC-002 |
 | 인증 관련 환경 변수 (§3.3) | 미정 | 추가 변수 없음(6개로 인증 성공) | 측정(P0·P4) | §3.3 |
 | 시간 상한 기본값 | 3600초(임시) | 900초. 표본 1회, 초안에서 멈춘 실행 | 측정(P4), 대표성 미확인 | §3.4, spec §5 |
 | 진행 단계 대응표 (§3.5) | Agent 설명의 역할 키워드 | 관측 기반 표(역할 단계 없음, `plan`·`fetch_start`·`fetch_done`·`compose` 추가). `audit`·`render_final`은 미관측 | 측정(P5·P7) | §3.5, AC-012 |

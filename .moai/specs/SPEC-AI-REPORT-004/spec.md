@@ -1,7 +1,7 @@
 ---
 id: SPEC-AI-REPORT-004
 title: "AI 모달 Deep 모드를 goose 스킬 하네스(헤드리스 claude -p)로 교체"
-version: "0.4.2"
+version: "0.4.3"
 status: in-progress
 created: 2026-10-19
 updated: 2026-10-20
@@ -27,6 +27,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 | 0.4.0 | 2026-10-19 | manager-spec | run 단계 M1 스파이크(조건부 GO) 관측 반영, 재번호 없음(REQ 23·AC 25 유지): 하네스를 리포 밖 `~/.goose-harness`로 옮기고 리포에는 `.claude`·`CLAUDE.md` 이름이 없는 추적 원본만 두어 서버 시작 시 매니페스트 대조 후 설치(결정 T11, REQ-001·022), argv에 `--strict-mcp-config`·`--settings <하네스>/.claude/settings.json` 추가와 설정 키 `disableAllHooks`·`autoMemoryEnabled`·`env.PATH`(REQ-002), 읽기 전용 Bash 자동 허용 관측에 따라 하네스 밖 읽기 거부를 명시(REQ-003), 시간 상한 기본 900초(표본 1회), 진행 단계 대응표·산출물 위치·환경 변수 목록을 측정값으로 확정(design §9). plan-audit 4회차 결함 R4-1·R4-2·R4-3·R4-4·R4-5·R4-7·R4-8 수정 |
 | 0.4.1 | 2026-10-19 | manager-spec | plan-audit 5회차(FAIL 0.83, 점수 하락 → 단일 수정) 반영, 재번호 없음(REQ 23·AC 25 유지): 서버 시작 원본 대조가 실패하면 실패를 기록하고 이후 모든 goose 작업을 `error`/`integrity`로 끝냄 — 기존 설치본이 매니페스트와 맞아도 마찬가지(사용자 결정 2026-10-19, 닫힌 실패, R5-1, REQ-001·008, AC-001 (2b)), 원본 쪽 목록 밖 파일 규칙과 제외 목록(`goose-manifest.json`, `.DS_Store`)을 요구사항으로 올림(R5-2, AC-001 (1)(2c)), 하네스 밖 읽기 전용 Bash 탐침을 `cat`·`head`·`grep`·`~`·`$HOME`·허용 스크립트 뒤 복합 명령으로 넓힘(R5-3, REQ-003, AC-003 (6a)~(6f)), M1 해시 비교를 "오탐 없음 관측"으로 정정(R5-4). 선택 결함 R5-5·R5-7·R5-9 반영, R5-6·R5-8·R5-10 보류. 감사 보고서의 결함 번호 D1~D10을 결정 ID와 구분하려고 `R5-1`~`R5-10`으로 적는다 |
 | 0.4.2 | 2026-10-20 | manager-spec | run 단계 M3 차단 보고(B2) 반영, 재번호 없음(REQ 23·AC 25 유지): 사용자 전역 `~/.claude/CLAUDE.md`가 하네스 세션에 로드되는 관측에 따라 하네스 설정 키에 `claudeMdExcludes: ["**/.claude/CLAUDE.md"]`를 추가(사용자 결정 2026-10-20, REQ-002, AC-002, design §2.2·§9.1). 근거: M3 탐침 4회 — 설정 키는 전역 지침만 빼고 하네스 `CLAUDE.md`는 남김, 인증 유지(`progress.md §E.2 ### M3 실행기 goose_runner` E4). 설치본 경로 재탐침은 M4 진입 확인 항목 |
+| 0.4.3 | 2026-10-20 | manager-spec | run 단계 M7 차단(AC-023 (1)과 AC-004 충돌) 반영, 재번호 없음(REQ 23·AC 25 유지): AC-023 첫 `git grep`에서 `backend/tests/test_goose_runner.py`를 제외 — AC-004가 실제 민감 변수 이름을 canary로 써야 하므로(사용자 결정 2026-10-20, 근거 `progress.md §E.2 ### M7 기존 Deep 정리`). v0.4.2 잔여 표기 정리: design·acceptance·spec-compact 머리말 버전, acceptance §H 전역 `CLAUDE.md` 항목을 해소로 표시(M4 1부 설치본 재탐침), design §9 설정 파일 키 행을 4개로 |
 
 관계: 이 SPEC은 **SPEC-AI-REPORT-002**(Deep 5소스 수집 + claude 합성)를 대체한다(supersedes). 002 문서 자체는 수정하지 않으며, 상태 정리는 sync 단계에서 한다. SPEC-AI-REPORT-003(Fast/Codex)은 유지된다.
 

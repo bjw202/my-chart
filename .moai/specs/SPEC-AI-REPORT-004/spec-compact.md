@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 (압축본)
 
-> 원문: `spec.md` v0.4.1, `acceptance.md`. 요구사항·인수 기준·변경 파일·제외 사항만 담는다.
+> 원문: `spec.md` v0.4.3, `acceptance.md`. 요구사항·인수 기준·변경 파일·제외 사항만 담는다.
 
 ## 요구사항
 
@@ -54,7 +54,7 @@
 | 020 | 020 | 재구독 1회, 시작·취소 POST 0회 |
 | 021 | 013 | `/goose/active` 실행 중 객체 / `null`, 422 아님 |
 | 022 | 021 | 셀 폴링: 닫은 뒤 활성, `null`이면 해제·중지, 새로고침 후 복원, 저장값 없는 셀 폴링 0, 새 작업 시작 시 재개 |
-| 023 | 022 | `git grep -nI` 0줄 + `git ls-files backend`에 `.claude`·`CLAUDE.md` 0줄 + `import backend.main` 성공 |
+| 023 | 022 | `git grep -nI` 0줄(`backend/tests/test_goose_runner.py` 제외 — AC-004 canary) + `git ls-files backend`에 `.claude`·`CLAUDE.md` 0줄 + `import backend.main` 성공 |
 | 024 | 023 | Fast 테스트 무수정 통과 |
 | 025 | 005, 014, 017, 018, 019, 020 | [라이브] 299030 전 과정, `assumptions.md` 존재·비어 있지 않음, 실행 시간·`final/` 여부 기록 |
 

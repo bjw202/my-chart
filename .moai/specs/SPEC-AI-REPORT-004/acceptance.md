@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 인수 기준
 
-> 대상: `spec.md` v0.4.1 REQ-AIR4-001~023. 인수 기준 25개(Tier L 상한). v0.4.0에서 M1 관측에 따라 AC-001·002·003·004·012·023·025의 리터럴을 바꾸고 AC-014의 픽스처 수를 고쳤다(R4-1). v0.4.1에서 plan-audit 5회차 결함에 따라 AC-001에 (2b)·(2c)와 (1)의 제외 파일 조건을 넣고(R5-1·R5-2), AC-003 (6)을 탐침 6형태 (6a)~(6f)로 넓혔다(R5-3).
+> 대상: `spec.md` v0.4.3 REQ-AIR4-001~023. 인수 기준 25개(Tier L 상한). v0.4.0에서 M1 관측에 따라 AC-001·002·003·004·012·023·025의 리터럴을 바꾸고 AC-014의 픽스처 수를 고쳤다(R4-1). v0.4.1에서 plan-audit 5회차 결함에 따라 AC-001에 (2b)·(2c)와 (1)의 제외 파일 조건을 넣고(R5-1·R5-2), AC-003 (6)을 탐침 6형태 (6a)~(6f)로 넓혔다(R5-3).
 > 작성 원칙: 각 기준은 Given/When/Then과 함께 **이 기준이 잡아내는 잘못된 구현**을 적는다. 기대값은 구현 전에 고정한 리터럴이다. 대조 단언은 “작성했는가”가 아니라 “구현을 되돌렸을 때 RED를 관측했는가”로 판정한다(run 단계에서 되돌림 실행 출력을 `progress.md §E.2`에 남긴다). 같은 헬퍼를 구현과 테스트가 함께 호출해 비교하는 단언은 금지한다.
 > 검증 방식 표기: [자동] pytest/vitest, [라이브] 실제 `claude`·dev 서버로 수동 확인.
 > 용어: “종료 상태”는 `done | error | cancelled` 셋이다. `cancelled`는 오류 종류가 아니라 종료 상태다(REQ-007).
@@ -182,10 +182,10 @@
 
 **AC-AIR4-023** [자동] — REQ-022
 - Given: M7 완료 트리
-- When: `git grep -nI -e deep_research -e stock_synthesis_prompt -e _load_synthesis_prompt -e BRAVE_API_KEY -e TAVILY_API_KEY -e NAVER_CLIENT -e YOUTUBE_API_KEY -- backend .env.example`, `git ls-files backend | grep -E '(^|/)\.claude/|(^|/)CLAUDE\.md$'`, 그리고 venv 활성화 후 `python -c "import backend.main"`
+- When: `git grep -nI -e deep_research -e stock_synthesis_prompt -e _load_synthesis_prompt -e BRAVE_API_KEY -e TAVILY_API_KEY -e NAVER_CLIENT -e YOUTUBE_API_KEY -- backend .env.example ':!backend/tests/test_goose_runner.py'`, `git ls-files backend | grep -E '(^|/)\.claude/|(^|/)CLAUDE\.md$'`, 그리고 venv 활성화 후 `python -c "import backend.main"`
 - Then: 두 grep 모두 출력 0줄(exit 1), import exit 0
 - 잡아내는 구현: 서비스 파일만 지우고 `main.py` import를 남긴 구현, `backend/prompts/__init__.py:9`·`README.md:11-12` 언급을 남긴 구현, `.env.example` 정리 누락, 하네스 원본을 `.claude/`·`CLAUDE.md` 이름 그대로 커밋해 이 리포의 Claude Code 세션이 goose 스킬을 발견하게 만든 구현(T11)
-- 비고: `git grep`은 추적 파일만 보므로 `__pycache__` 등 미추적 바이너리는 대상이 아니다.
+- 비고: `git grep`은 추적 파일만 보므로 `__pycache__` 등 미추적 바이너리는 대상이 아니다. 첫 grep에서 `backend/tests/test_goose_runner.py`를 빼는 것은 AC-004가 실제 민감 변수 이름(`BRAVE_API_KEY=canary-9a1` 등)을 넣어 걸러지는지 확인해야 하기 때문이다(v0.4.3).
 
 **AC-AIR4-024** [자동] — REQ-023
 - Given: 기존 Fast 테스트 `backend/tests/test_ai_report_service.py`, `test_codex_cli_runner.py`
@@ -232,7 +232,7 @@
 - 서버 재시작 시 진행 중 작업 기록 손실(설계상 한계).
 - 서브에이전트(Agent 도구) 안에서의 권한 적용은 AC-003이 메인 세션 기준으로만 확인한다. M1 P5에서 서브에이전트(`web-fetch` 3회)는 허용된 WebFetch만 써서 거부 사례가 없었고, 서브에이전트 쪽 음성 탐침은 하지 않았다. 서브에이전트가 메인 권한 규칙을 상속하는지는 확인되지 않은 위험이다.
 - goose 스크립트가 `..` 없이 절대 경로 `--output-dir`로 하네스 밖에 쓰는 경우는 AC-003이 직접 다루지 않는다. `..`가 든 경우는 AC-003 (5)가 다룬다. 하네스 안 변경은 design §6.1의 세션 종료 직후 무결성 검사가 경고하지만, 하네스 밖 쓰기는 잡지 못한다.
-- 사용자 전역 `~/.claude/CLAUDE.md`가 하네스 세션에 로드되는지(M1 미관측, M2 재관측에서 확인 시도).
+- (해소, v0.4.2) 사용자 전역 `~/.claude/CLAUDE.md`가 하네스 세션에 로드되는지 — 설정 키 `claudeMdExcludes`로 제외하고, M4 1부에서 설치본 설정 파일로 재탐침해 전역 지침 제외·하네스 규칙 유지를 확인했다(`progress.md §E.2 ### M4 작업 서비스와 라우터` E4).
 - `-p` 세션 Bash가 부모 `PATH`를 무시하는 원인(M1 미관측). `env.PATH` 설정으로 우회하며, `claude` 버전 변경 시 회귀는 AC-025 라이브 실행에서만 드러난다.
 - 서버 종료 시 리포트 보관(REQ-014, best-effort)은 자동 검증하지 않는다(R4-6 보류).
 
