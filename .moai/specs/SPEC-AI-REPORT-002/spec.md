@@ -1,9 +1,9 @@
 ---
 id: SPEC-AI-REPORT-002
-version: 1.0.0
-status: Planned
+version: 1.0.2
+status: superseded
 created: 2026-04-16
-updated: 2026-04-16
+updated: 2026-10-20
 author: manager-spec
 priority: High
 issue_number: null
@@ -18,6 +18,9 @@ lifecycle: spec-first
 |---|---|---|
 | 1.0.0 | 2026-04-16 | 초기 SPEC 작성 — 5소스 병렬 수집 + Claude CLI 합성 파이프라인 |
 | 1.0.1 | 2026-04-16 | 시간 예산 완화 (NFR-002/FR-007: 90/180s → 300/600s), 프론트 라벨 "수분 소요"로 변경. claude CLI 인자 보정 (`--cwd` → `--add-dir`+subprocess `cwd=`+`--permission-mode bypassPermissions`+`--model claude-sonnet-4-6` 명시). collector source별 timeout 분리 (perplexity 120s, tavily 90s, brave/naver/youtube 15s). |
+| 1.0.2 | 2026-10-20 | 상태를 `superseded`로 전환. SPEC-AI-REPORT-004(Deep 모드를 goose 스킬 하네스로 교체, 2026-10-20 completed)가 이 SPEC을 대체한다. 5소스 수집 파이프라인과 관련 키 의존은 004 run 단계 M7에서 삭제됐다. 본문은 기록으로 남기며 수정하지 않는다. 근거: sync 감사 F4(`.moai/reports/sync-audit-SPEC-AI-REPORT-004-20261020.md`) |
+
+> **대체됨(superseded)**: 이 SPEC은 **SPEC-AI-REPORT-004**로 대체됐다(2026-10-20). 현재 Deep 모드의 요구사항은 `.moai/specs/SPEC-AI-REPORT-004/spec.md`를 본다.
 
 ---
 
