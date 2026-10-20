@@ -622,6 +622,15 @@ RED가 나지 않아 손대지 않은 §G "M4 조건부" 파일: `tests/conftest
 
 **미검증(Gaps).** 라이브 dev 서버 화면 확인 미실행(오케스트레이터 몫). 툴팁 배지의 title은 ECharts 툴팁이 기본적으로 마우스 진입을 받지 않아(`enterable: false`) 화면에서 호버로 읽히지 않을 수 있다 — 표시 문구 `열기`는 보인다. 커버리지 수치 미측정.
 
+### M5 (live dev-server check, orchestrator-run, 2026-10-20)
+
+- main `6a68ba8`로 빨리감기 후 백엔드(:8000, venv `/Users/byunjungwon/Dev/my_chart/.venv`, cwd 코드 루트)·vite(:5173) 재시작. 첫 백엔드 재시작은 이전 vite 실행 스크립트의 "Stopping all servers..."에 함께 종료되어(SIGTERM, `.dev-server.log`) 한 번 더 시작함
+- 오케스트레이터 재검증: vitest 전체 `832 passed`, 파일 `95 passed | 1 failed`(사전 존재 `e2e/preset-flow.spec.ts` Playwright 수집 문제), `npm --prefix frontend run typecheck` exit 0 (`m5_vitest_full.log`, `m5_tsc.log`)
+- API(`m5_api_check.log`): `/api/stage/overview` `all_stocks` 2515 중 `rs_1m` 비NULL 2387, `rs_1m>=80` 478 / `/api/sectors/ranking` `sectors` 29개 모두 `rs_med` 존재, 봉투 `data[0].rs_med` = `{"value":47.03,"reason":null}`, 중앙값<평균 섹터 14 / `/api/sectors/방송미디어/bubble` `rs_1m` 57종목
+- 화면(headless Playwright, scratchpad 스크린샷): Stock Explorer `.rs-heat-badge` **478개** 렌더(API 478과 일치), 텍스트 `열기`, title `최근 1개월 RS 80 이상 — 단기 강세(열기)` — AC-RSR-011 라이브 / Sector Analysis → Table 헤더 `… RS Avgⓔ, RS Medⓔ, RS 80+ 비중ⓔ …`, 첫 행 [섹터, RS Avg, RS Med] = PCB 62/74, 방송미디어 28/16, 패션 45/43, 배터리 53/60, 음식료 40/41 — AC-RSR-012 라이브
+- 미확인: 버블 툴팁 배지의 실제 호버 표시(단위 테스트로만 검증)
+- 계획 밖 변경(M5 에이전트 보고, sync에서 SPEC 반영 대상): `er2-screens.test.tsx` 결측 셀 7→8, `SectorRankingTable.m4/.test.tsx` 픽스처·인덱스, `SectorAnalysis.tsx` `rs_med` 정렬 case, `global.css` 배지 규칙 1개
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
