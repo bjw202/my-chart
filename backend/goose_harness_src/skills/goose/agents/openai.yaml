@@ -1,0 +1,8 @@
+interface:
+  display_name: "Goose"
+  short_description: "모두의 주식 · 황금알 낳는 AI 거위. 정보를 모아 인사이트를 만듭니다"
+  icon_small: "./assets/goose.png"
+  icon_large: "./assets/goose.png"
+  default_prompt: "/goose 삼성전자 종목을 분석해줘"
+policy:
+  allow_implicit_invocation: true

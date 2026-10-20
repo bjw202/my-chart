@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "document_type": "briefing",
+  "document": {
+    "title": "시장명 · 정규장 마감 리포트",
+    "subtitle": "거래일과 수집 시각을 실제 값으로 입력합니다.",
+    "context_label": "템플릿 · 실제 시세 없음"
+  },
+  "as_of": "실제 거래일·시간대",
+  "status": "draft",
+  "limitations": [
+    "이 파일은 빈 구조 템플릿입니다. 모든 수치와 출처를 실제 조사 결과로 교체해야 합니다."
+  ],
+  "sources": [],
+  "kpis": [],
+  "summary": [],
+  "sections": [
+    {
+      "title": "주요 지수와 시장 폭",
+      "blocks": []
+    },
+    {
+      "title": "업종·수급",
+      "blocks": []
+    },
+    {
+      "title": "거시 지표와 주요 뉴스",
+      "blocks": []
+    },
+    {
+      "title": "MoAI 오피니언",
+      "blocks": []
+    },
+    {
+      "title": "다음 거래일 확인 조건",
+      "blocks": []
+    },
+    {
+      "title": "팩트체크와 자료 한계",
+      "blocks": []
+    }
+  ],
+  "market_session": {
+    "market": "KR 또는 US",
+    "trade_date": null,
+    "timezone": null,
+    "scheduled_for": null,
+    "collected_at": null,
+    "session_status": "unknown",
+    "execution_mode": "manual_or_scheduled",
+    "schedule_id": null
+  }
+}

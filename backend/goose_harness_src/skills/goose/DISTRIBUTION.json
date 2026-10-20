@@ -1,0 +1,143 @@
+{
+  "schema_version": 2,
+  "name": "goose",
+  "version": "0.1.0",
+  "installed_skills": [
+    "goose"
+  ],
+  "internal_modules": [
+    "goose",
+    "stock-analyst",
+    "stock-report",
+    "peer-compare",
+    "earnings-review",
+    "event-impact",
+    "watchlist-review",
+    "fact-check",
+    "portfolio-review",
+    "market-close"
+  ],
+  "validation_scope": "Archive structure, references and scripts only; host execution is separately tested.",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "4a59b4beca7d29917b8153de52457017574be7b46afdfdef209d9b9b47d58917"
+    },
+    {
+      "path": "VERSION",
+      "sha256": "e9dd8507f4bf0c6f42458e41aea833ad0bd3f6127272335eee9bf4d58541ed67"
+    },
+    {
+      "path": "agents/openai.yaml",
+      "sha256": "83a7540eadc8cb60a7cc04049234778481ec92ace16314c5694b8251aae9ac65"
+    },
+    {
+      "path": "assets/goose.png",
+      "sha256": "70aee54ba1a21f75a50011ef10ab12a19eab75430bd16918e4d3c54cca165b76"
+    },
+    {
+      "path": "workflows/earnings-review/GUIDE.md",
+      "sha256": "e2cb4188339914898dbe50cf7dfe46e8a4fa64a47e60395250a0abf10093bea7"
+    },
+    {
+      "path": "workflows/event-impact/GUIDE.md",
+      "sha256": "db912218669c7028cb3aed5261c221a6473a5c456a16e5c39a081150c5cffc7c"
+    },
+    {
+      "path": "workflows/fact-check/GUIDE.md",
+      "sha256": "f7b5b28142cf75e33b2a3934c86e2f4923c74e4c6b63b1bbcc18d3103c181369"
+    },
+    {
+      "path": "workflows/fact-check/references/delivery-audit.md",
+      "sha256": "6676f73b755ed2f76398e8c2ea685d5e17e291bdca48bf5596d53de1817fc98e"
+    },
+    {
+      "path": "workflows/fact-check/scripts/audit_report.py",
+      "sha256": "4297d90e390f867412b6d9efdb5dcdd3acc67381968a1c958c2eb3a6967a3f95"
+    },
+    {
+      "path": "workflows/goose/GUIDE.md",
+      "sha256": "2f1da6df1d54e48a32eed2b21ab9d05b256d2f89a8f382540e749907e9eb019b"
+    },
+    {
+      "path": "workflows/goose/references/goose-agent.md",
+      "sha256": "f3c14f86f5107d8658074985d6e7302b8d2d43fe6ab2c6bd53dd4037a2bf1235"
+    },
+    {
+      "path": "workflows/market-close/GUIDE.md",
+      "sha256": "d346062e91a477c481b736013c1e3942bae8e481cd6ec3d7f5ce6c0fac98336d"
+    },
+    {
+      "path": "workflows/market-close/references/close-template.json",
+      "sha256": "656d252eca3c401dc6f8a0518a9e835a9feafd8b24ee1a8077b09dd313ba4219"
+    },
+    {
+      "path": "workflows/market-close/references/scheduling.md",
+      "sha256": "b2b73c84697f96eb96b44b8087a91bdbf90e58c47b7b6e110d811d3a31e0fc6e"
+    },
+    {
+      "path": "workflows/peer-compare/GUIDE.md",
+      "sha256": "d1ab1022a7b6208e28e715eabbb0654f44371db3f27d1c997f83db173cd5e20c"
+    },
+    {
+      "path": "workflows/portfolio-review/GUIDE.md",
+      "sha256": "64ab2ecd4c8aac51f67cdf1030ac0237b9fadb542c11f461eee96637c17493e3"
+    },
+    {
+      "path": "workflows/portfolio-review/references/portfolio-input.md",
+      "sha256": "1068f040ee168f6d603436e85b13aabbcb6cb56d16d53a651f3b12485f1ff4af"
+    },
+    {
+      "path": "workflows/portfolio-review/scripts/portfolio_calc.py",
+      "sha256": "a2b657d212eb4650073ec8227451cae80da6b03118be05f85219a4c763ca69d7"
+    },
+    {
+      "path": "workflows/stock-analyst/GUIDE.md",
+      "sha256": "b42c0452b1f3936b4efaa1f81620d9447da9aedec29125c1c40d25b42c8c3490"
+    },
+    {
+      "path": "workflows/stock-report/GUIDE.md",
+      "sha256": "627c91436dc700969ec635bafb48957b191eb39dca210974ac0a2769ebcf9eef"
+    },
+    {
+      "path": "workflows/stock-report/assets/modu-stock-icon.png",
+      "sha256": "cec09b42f766201ee395892a9cbf5b1135151f5cba6eef92ff550b69cccb9e78"
+    },
+    {
+      "path": "workflows/stock-report/assets/modu-stock-wordmark.png",
+      "sha256": "9f859a9d720238dd4edd7f462ca00b16a144eec420b6ca8a6d7eaa5df3ece8af"
+    },
+    {
+      "path": "workflows/stock-report/assets/report.css",
+      "sha256": "4393881528d873a468e7286ca52fbb96a738f292a941867cd30a654b218aaf80"
+    },
+    {
+      "path": "workflows/stock-report/references/agent-team.md",
+      "sha256": "14ab20fecf56845b15e021c46bb5ef013ebd864e9ebb23acf849d24c5bf61cb6"
+    },
+    {
+      "path": "workflows/stock-report/references/report-input.md",
+      "sha256": "0cf708e41fbc87eedb9b1071b2dcaaac71141d1983eed8a50810d4c648855fe5"
+    },
+    {
+      "path": "workflows/stock-report/references/report-standard.md",
+      "sha256": "f888aa088fd4daede30ae956e2d9cad8b5a53a2ce50f8f4b2bc4d0a530908057"
+    },
+    {
+      "path": "workflows/stock-report/references/research-contract.md",
+      "sha256": "3316f4ba42a8b257765449983a5f7835d81533a233150bfe3f5a1aaf42cac8a4"
+    },
+    {
+      "path": "workflows/stock-report/references/workflow-map.json",
+      "sha256": "c559eaf5c4487d796f1462400b65dd087c8084d4b93e2bd8df6ab5070a2e1bf9"
+    },
+    {
+      "path": "workflows/stock-report/scripts/render_report.py",
+      "sha256": "bffdf0516b93d4081eb7d94e3d920b7cd242267a6732c610bbc21570912c6560"
+    },
+    {
+      "path": "workflows/watchlist-review/GUIDE.md",
+      "sha256": "ee6779f470b93f375ca79c711ec607ea884d492806b572085db2abb51cf05c3a"
+    }
+  ]
+}

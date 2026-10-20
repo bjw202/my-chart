@@ -1,0 +1,541 @@
+{
+  "schema_version": 1,
+  "entry_skill": "goose",
+  "kind": "declarative_agent_workflow",
+  "host_api": false,
+  "rules": [
+    "자연어 의도·문맥으로 선택하고 필요한 흐름만 연결",
+    "실행 지도는 총괄만 실행, 모든 하위 호출은 leaf 또는 render",
+    "leaf는 자식 호출 금지·지정 phase 결과만 반환",
+    "작업키(run_id,skill,phase,scope,input_version)로 중복 방지",
+    "조건부 단계 생략은 이유를 명시하고 검토 단계로 전달",
+    "핵심 근거 미해결 시 검증완료 승격 금지"
+  ],
+  "workflows": {
+    "company_report": {
+      "examples": [
+        "SK하이닉스 분석해줘",
+        "이 회사 깊게 조사해줘"
+      ],
+      "required": [
+        "company",
+        "as_of"
+      ],
+      "deliverable": "10장 HTML 기업 보고서 + 12문단 MoAI 오피니언",
+      "nodes": [
+        {
+          "id": "finance",
+          "skill": "earnings-review",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "news",
+          "skill": "event-impact",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "industry",
+          "skill": "peer-compare",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "finance",
+            "news",
+            "industry"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ]
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ]
+        }
+      ]
+    },
+    "peer_comparison": {
+      "examples": [
+        "삼성전자와 마이크론 비교해줘"
+      ],
+      "required": [
+        "companies",
+        "comparison_scope",
+        "as_of"
+      ],
+      "deliverable": "기준을 맞춘 비교표와 분석",
+      "nodes": [
+        {
+          "id": "compare",
+          "skill": "peer-compare",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "compare"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ],
+          "when": "HTML requested"
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ],
+          "when": "HTML requested"
+        }
+      ]
+    },
+    "earnings": {
+      "examples": [
+        "이번 실적 좋아진 거야?"
+      ],
+      "required": [
+        "company",
+        "period"
+      ],
+      "deliverable": "실적·현금흐름·일회성 분석",
+      "nodes": [
+        {
+          "id": "finance",
+          "skill": "earnings-review",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "finance"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ],
+          "when": "HTML requested"
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ],
+          "when": "HTML requested"
+        }
+      ]
+    },
+    "event": {
+      "examples": [
+        "이 공시 영향 분석해줘",
+        "오늘 뉴스가 중요한가?"
+      ],
+      "required": [
+        "company_or_event",
+        "as_of"
+      ],
+      "deliverable": "사실·영향 경로·조건·반론",
+      "nodes": [
+        {
+          "id": "news",
+          "skill": "event-impact",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "news"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ],
+          "when": "HTML requested"
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ],
+          "when": "HTML requested"
+        }
+      ]
+    },
+    "watchlist_update": {
+      "examples": [
+        "지난 보고서 이후 달라진 점 알려줘"
+      ],
+      "required": [
+        "company",
+        "baseline_or_new_baseline",
+        "as_of"
+      ],
+      "deliverable": "기존·현재 근거 차이와 판단 변경 이유",
+      "nodes": [
+        {
+          "id": "baseline",
+          "skill": "watchlist-review",
+          "mode": "leaf",
+          "phase": "baseline",
+          "needs": []
+        },
+        {
+          "id": "news",
+          "skill": "event-impact",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "baseline"
+          ]
+        },
+        {
+          "id": "finance",
+          "skill": "earnings-review",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "baseline"
+          ],
+          "when": "new earnings"
+        },
+        {
+          "id": "industry",
+          "skill": "peer-compare",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "baseline"
+          ],
+          "when": "material competitive change"
+        },
+        {
+          "id": "compose",
+          "skill": "watchlist-review",
+          "mode": "leaf",
+          "phase": "compose",
+          "needs": [
+            "baseline",
+            "news",
+            "finance",
+            "industry"
+          ]
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "compose"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ],
+          "when": "HTML requested"
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ],
+          "when": "HTML requested"
+        }
+      ]
+    },
+    "claim_verification": {
+      "examples": [
+        "HBM 비중이 늘면 무조건 이익이 커져?"
+      ],
+      "required": [
+        "claim"
+      ],
+      "deliverable": "주장별 근거·반증·조건 판정",
+      "nodes": [
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": []
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ],
+          "when": "HTML requested"
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ],
+          "when": "HTML requested"
+        }
+      ]
+    },
+    "portfolio_consultation": {
+      "examples": [
+        "내 보유종목 평단가와 수량으로 점검해줘",
+        "계좌 비중을 조정하고 싶어"
+      ],
+      "required": [
+        "holdings",
+        "coverage",
+        "as_of"
+      ],
+      "before_recommendation": [
+        "objective",
+        "horizon",
+        "cash_needs",
+        "loss_tolerance",
+        "constraints"
+      ],
+      "deliverable": "손익·비중·집중도와 조건부 리밸런싱 시나리오",
+      "nodes": [
+        {
+          "id": "prepare",
+          "skill": "portfolio-review",
+          "mode": "leaf",
+          "phase": "prepare",
+          "needs": []
+        },
+        {
+          "id": "finance",
+          "skill": "earnings-review",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "prepare"
+          ],
+          "when": "material company thesis requires financial analysis"
+        },
+        {
+          "id": "news",
+          "skill": "event-impact",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "prepare"
+          ],
+          "when": "material new events"
+        },
+        {
+          "id": "industry",
+          "skill": "peer-compare",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "prepare"
+          ],
+          "when": "alternative or competitive analysis needed"
+        },
+        {
+          "id": "compose",
+          "skill": "portfolio-review",
+          "mode": "leaf",
+          "phase": "compose",
+          "needs": [
+            "prepare",
+            "finance",
+            "news",
+            "industry"
+          ]
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "compose"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ],
+          "when": "HTML requested"
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ],
+          "when": "HTML requested"
+        }
+      ]
+    },
+    "market_close": {
+      "examples": [
+        "국내 증시 마감 리포트 만들어줘",
+        "미국 증시 마감 보고서를 매일 예약해줘"
+      ],
+      "required": [
+        "market",
+        "trade_date",
+        "timezone"
+      ],
+      "deliverable": "정규장 마감 HTML · 출처 · 검증 · 예약 상태",
+      "nodes": [
+        {
+          "id": "session",
+          "skill": "market-close",
+          "mode": "leaf",
+          "phase": "prepare",
+          "needs": []
+        },
+        {
+          "id": "market",
+          "skill": "market-close",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "session"
+          ]
+        },
+        {
+          "id": "news",
+          "skill": "event-impact",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "session"
+          ]
+        },
+        {
+          "id": "synthesis",
+          "skill": "market-close",
+          "mode": "leaf",
+          "phase": "compose",
+          "needs": [
+            "market",
+            "news"
+          ]
+        },
+        {
+          "id": "review",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "analyze",
+          "needs": [
+            "synthesis"
+          ]
+        },
+        {
+          "id": "report",
+          "skill": "stock-report",
+          "mode": "render",
+          "phase": "render",
+          "needs": [
+            "review"
+          ]
+        },
+        {
+          "id": "delivery_audit",
+          "skill": "fact-check",
+          "mode": "leaf",
+          "phase": "audit",
+          "needs": [
+            "report"
+          ]
+        }
+      ]
+    }
+  },
+  "execution": {
+    "conditional_dependencies": "Skipped nodes deliver a structured skipped result with reason; pending required input is not skipped as complete.",
+    "fanout": "For multiple tickers scope each independent node by ticker; reuse matching inputs.",
+    "composition": "Union compatible workflows and deduplicate by work key. No descendant invokes goose or stock-analyst.",
+    "failure": "Return to owning node only for specific fix/new evidence; unchanged blocked input cannot loop.",
+    "delivery": "After rendering, audit the current input and actual preview. Only a pass may produce final output. Revise findings at their owner, change input_version, rerender and reaudit; after three unsuccessful rounds or unchanged blocking evidence, return an explicitly incomplete draft and reasons."
+  },
+  "entry_aliases": {
+    "goose": "goose",
+    "stock-analyst": "goose"
+  },
+  "installed_skill": "goose",
+  "module_base": "workflows"
+}

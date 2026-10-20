@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Agent",
+      "Skill",
+      "Read(./**)",
+      "Write(./runs/**)",
+      "Edit(./runs/**)",
+      "Bash(python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py:*)",
+      "Bash(python3 .claude/skills/goose/workflows/fact-check/scripts/audit_report.py:*)"
+    ],
+    "deny": [
+      "Write(./.claude/**)",
+      "Edit(./.claude/**)",
+      "Write(./CLAUDE.md)",
+      "Edit(./CLAUDE.md)",
+      "Bash(*..*)",
+      "Bash(* /*)",
+      "Bash(*~*)",
+      "Bash(*$*)",
+      "Read(../**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ]
+  },
+  "disableAllHooks": true,
+  "autoMemoryEnabled": false,
+  "env": {
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"
+  }
+}
