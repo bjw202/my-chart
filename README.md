@@ -28,6 +28,7 @@ Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
 | SPEC-MINERVINI-001 | Mark Minervini Trend Template (8조건 strict gate, P1, v1.0.3) |
 | SPEC-PRESET-001 | 프리셋 필터 시스템 (사용자 정의 필터 저장) |
 | SPEC-SMA5-FILTER-001 | SMA5 지표 필터 추가 + ChartGrid 토글 노출 |
+| SPEC-RS-REBALANCE-001 | RS 등급 12개월 중심 재가중(IBD식) + 종목 표·버블 툴팁의 열기 배지(최근 1개월 RS 80 이상) |
 | 내장 필터 | 시가총액, 기간수익률(1D/1W/1M/3M), 기술적 패턴 빌더 (3조건 AND/OR), RS점수, 시장(KOSPI/KOSDAQ), 섹터 멀티셀렉트 |
 
 ### 📊 차트 시각화
@@ -53,6 +54,7 @@ Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
 | SPEC-NAVER-THEME-003 | V2 amendment 체인 (description tooltip, 종목 편입설명, localStorage 캐시) |
 | SPEC-NAVER-THEME-CONSOLIDATED | 시리즈 통합 retrospective + lessons (2026-05-27) |
 | SPEC-SECTOR-MINOR-COLOR-001 | StockBubbleChart 산업명(중) 색상·동적 범례 (2026-05-27 ship #9) |
+| SPEC-RS-REBALANCE-001 | 섹터 랭킹 표 RS Med 열(섹터 RS 중앙값, RS Avg 옆) |
 
 ### 💰 재무·기업 분석
 

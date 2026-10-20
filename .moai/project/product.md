@@ -53,6 +53,8 @@
    - **저장**: `backend/reports/{종목명}/{YYYY-MM-DD}.md` (동일 날짜는 `_N` 시퀀스)
    - **엔드포인트**: POST `/api/ai-report/{code}?mode=perplexity|deep`, GET `/api/ai-report/{code}/history`, GET `/api/ai-report/{code}/{filename}`
 
+12. **RS Rating Rebalance & Heat Badge** - 종목 RS 등급(`RS_12M_Rating`, 일봉 `stock_meta.rs_12m`)을 IBD식 비율 가중(최근 분기 40% + 이전 세 분기 각 20%)으로 산출하고, 지수·거래량 0·우선주·스팩·결측 행을 순위 분모에서 뺀다 (SPEC-RS-REBALANCE-001). 1개월 신호는 등급과 분리해 `rs_1m` 필드로 내보내고, Stock Explorer 종목 표와 섹터 버블 툴팁에 **열기 배지**(`rs_1m >= 80`, `RS_TOP_THRESHOLD`)로 표시한다. 섹터 랭킹 표에는 **RS Med**(섹터 RS 중앙값, `rs_med`) 열이 RS Avg와 RS 80+ 비중 사이에 있다. Stage 2 RS 임계값 70/60은 새 등급으로 재측정해 유지했다.
+
 ## Target Users
 
 - Korean stock market investors running a local screening tool on their machine

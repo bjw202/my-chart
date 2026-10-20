@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (SPEC-RS-REBALANCE-001 v0.4.0 — RS 타임라인 재조정, 2026-10-20)
+
+- **종목 RS 등급(`RS_12M_Rating`)을 IBD식 비율 가중으로 바꿨다** — 예전 산식은 1개월 수익률 순위에 큰 비중을 둬 상위 종목 명단이 몇 주 만에 크게 바뀌었다. 이제 최근 분기(3M) 40%와 이전 세 분기 각 20%를 수익률 비율로 합친 점수의 순위를 쓴다. 1개월 신호는 등급에서 떼어 별도의 "열기" 배지로 보여 준다 (`my_chart/db/weekly.py`)
+  - **효과 (같은 측정 스크립트로 변경 전·후 DB 사본을 비교, 295주)**: 상위 10% 종목이 4주 뒤에도 상위 10%에 남는 비율 29.24% → 65.17%(목표 60% 이상). 상위 10%의 향후 4주 수익 − 유니버스 평균은 −0.55 → −0.52pp로 사실상 그대로다 — 수익 예측력은 바뀌지 않았고 명단 안정성만 올랐다 (`scripts/rs_eval/stock_rs_eval.py 4 --production`)
+  - **순위 분모 정리와 낡은 행 제거**: 지수(KOSPI·KOSDAQ), 거래량 0 행, 우선주(코드 끝자리 ≠ 0)·스팩, `1+R ≤ 0` 행, 결측 행을 순위 분모에서 뺀다. 재생성 때 이번 실행이 쓰지 않은 `relative_strength` 행은 모두 지운다 — 라이브 주봉 DB에서 짝 없는 행 119,881 → 0, 지수 행 692 → 0, 거래량 0 짝 행 16,369 → 0, 기준 종목 날짜가 아닌 행 5 → 0. 기준 종목 행이 0개면 아무것도 지우지 않고 경고만 남긴다
+  - **새 필드 `rs_1m`** (주간 `RS_1M_Rating`): `StageStock`·`StockBubbleItem` 응답과 일봉 `stock_meta`의 마지막 컬럼(멱등 ALTER — 기존 테이블 끝에 열 추가) (`my_chart/analysis/stage_classifier.py`, `my_chart/analysis/sector_advanced.py`, `backend/services/meta_service.py`, `backend/services/stage_service.py`, `backend/services/sector_advanced_service.py`, `backend/schemas/stage.py`, `backend/schemas/sector_advanced.py`)
+  - **새 필드 `rs_med`** (섹터 RS 중앙값): 섹터 랭킹 항목과 봉투 `data[]`. 결측은 0으로 채우지 않고 `null`로 둔다 (`my_chart/analysis/sector_metrics.py`, `my_chart/analysis/aggregate_types.py`, `backend/services/sector_ranking_service.py`, `backend/schemas/sector.py`, `backend/schemas/envelope.py`)
+  - **화면**: Stock Explorer 종목 표와 섹터 버블 툴팁에 열기 배지(`rs_1m >= RS_TOP_THRESHOLD`, 80 — 섹터 화면의 RS 80+ 비중과 같은 상수) · 섹터 랭킹 표에 `RS Med` 열(RS Avg → RS Med → RS 80+ 비중 순서, 정렬 지원) (`frontend/src/utils/rsMetrics.ts`, `frontend/src/components/StockExplorer/StockTable.tsx`, `frontend/src/components/SectorAnalysis/StockBubbleChart.tsx`, `frontend/src/components/SectorAnalysis/SectorRankingTable.tsx`, `frontend/src/components/SectorAnalysis/SectorAnalysis.tsx`, `frontend/src/styles/global.css`, `frontend/src/types/stage.ts`·`bubble.ts`·`market.ts`)
+  - **Stage 2 임계값 70/60은 실측으로 유지**: 새 등급으로 다시 쟀다 — 70(진입 RS 하한)은 조건부 RS 통과율 99.48 → 94.42로 허용오차(9.948) 안, 60(Strong)은 Strong 비중 33.53 → 33.72%로 ±5%p 안. 상수 값은 그대로 두고, `backend/services/screen_service.py`와 `StockTable.tsx`에 흩어져 있던 리터럴 70을 상수 참조로 바꿨다. 측정 도구 `scripts/rs_eval/stage2_ratio_eval.py` 신설
+  - **데이터 주의**: 컬럼 이름은 그대로지만 주봉 `RS_12M_Rating`과 일봉 `stock_meta.rs_12m`에 든 값은 이제 새 산식 값이다. 2026-10-20 라이브 주봉 DB의 RS를 재생성하고 일봉 DB의 `stock_meta`를 재구축했다. 백업: `Output/stock_data_weekly.db.bak_20261020`, `Output/stock_data_daily.db.bak_20261020_m4`. 최신 주차(2026-10-16) 등급 종목은 2,490 → 2,387(거래량 0 101 + 지수 2 제외), 그중 열기 배지 478
+  - **검증**: 인수 기준 AC-RSR-001~018 + 008b 19개 중 FAIL 0, 라이브 단계까지 관측한 것 8개(001·002·007·011·012·014·015·017). sync 게이트: `tests/` 1070 passed · vitest 832 passed · `tsc -b` exit 0 · ruff 새 지적 0(변경 전 41 = 변경 후 41). `backend/tests`의 4 failed / 58 errors와 vitest `e2e/preset-flow.spec.ts` 수집 실패는 이 SPEC 이전부터 있던 것이다(실패 노드 ID가 기준선과 같음). sync 4차원 감사 PASS(조화평균 0.891)
+  - **알려진 한계** (spec.md §7): (a) 버블 툴팁의 열기 배지는 라이브 화면에서 호버로 보지 않았다(단위 테스트로만 검증). ECharts 툴팁 기본값(`enterable: false`) 때문에 배지 title이 화면에서 읽히지 않을 수 있다 · (b) sync 감사 minor 12건은 기록만 했다 — `screen_service.py`가 임계값을 f-string으로 SQL에 넣는 점, 측정 스크립트의 SQLite URI 이스케이프, `_get_rs_on_date()` 튜플 반환 등 · (c) 설명 문서 `docs/rs-timeline-eli5.html`은 gitignore 대상이라 커밋되지 않았다
+  - **근거**: `.moai/specs/SPEC-RS-REBALANCE-001/progress.md` §E.2~§E.4 · `.moai/state/verify/c1bf371e/`
+
 ### Changed (SPEC-AI-REPORT-004 v0.4.4 — AI 모달 심층 분석을 Goose 스킬 하네스로 교체, 2026-10-20)
 
 - **차트 셀 AI 모달의 Deep 모드를 goose 스킬 하네스(헤드리스 `claude -p`)로 교체** — 옛 5-소스 병렬 수집 + Claude CLI 합성 파이프라인(SPEC-AI-REPORT-002)을 지우고, 전용 하네스 폴더에서 띄운 `claude -p`가 goose `company_report` 리포트를 단일 HTML로 만들도록 바꿨다. 작업은 HTTP 요청과 분리된 서버 작업 큐에서 돌아 모달을 닫거나 새로고침해도 이어진다. 모드 버튼 이름은 "심층 분석" → "Goose". 빠른 분석(Codex, SPEC-AI-REPORT-003)은 그대로다

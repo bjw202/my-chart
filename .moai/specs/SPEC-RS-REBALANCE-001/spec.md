@@ -1,8 +1,8 @@
 ---
 id: SPEC-RS-REBALANCE-001
 title: "RS 타임라인 재조정 — 종목 RS 12개월 중심 재가중·열기 배지 분리·섹터 RS 중앙값 병기"
-version: "0.3.1"
-status: in-progress
+version: "0.4.0"
+status: completed
 created: 2026-10-20
 updated: 2026-10-20
 author: manager-spec
@@ -24,6 +24,7 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 
 | 버전 | 날짜 | 변경 |
 |---|---|---|
+| 0.4.0 | 2026-10-20 | sync 단계 as-implemented 반영(manager-spec, 요구사항 원문은 고치지 않고 주석으로 덧붙임). REQ-RSR-001에 기준 종목 날짜 0개 가드, REQ-RSR-003·§2.4 B-1에 스팩 판별 대상(가격 행 종목명, 등록부 기준의 상위 집합)을 주석으로 기록. §7 알려진 부채 신설 — sync 4차원 감사 minor 12건, 이 SPEC 원인이 아닌 기존 실패 3종, 남은 Gap. plan.md §B·§D(파일 24 → 26개, `docs/` gitignore 주석)·§G(계획 밖 테스트 변경 §G.1), acceptance.md AC-RSR-001 비고·AC-RSR-006 건수(10 → 12) 정정. 근거는 progress.md §E.2·§E.3 |
 | 0.3.1 | 2026-10-20 | run 진입 전 문서 정정(plan-audit review-4 D1–D8, 재기획·요구사항 추가 없음). D1: `rs_med`에 필요한 `SectorAggregate` dataclass(`my_chart/analysis/aggregate_types.py`)를 plan.md 파일 목록에 추가(23 → 24개, Tier L 유지)하고 봉투 `SectorAggregateModel`과 이름 구분. D2: REQ-RSR-019·AC-RSR-013에 `StockTable.tsx:32` 주석과 `:263` 라벨 리터럴을 포함하고 스캔 기준선을 4줄로 정정. D3: iter-3 부채 T1(두 사본 사전 조건, 기록만 모드의 c70 상대 ±10% 단언·에스컬레이션)을 REQ-RSR-018 (a)·AC-RSR-015로, T2(날짜별 분모 크기 기록)를 AC-RSR-015로 옮김. D4: 행 번호 인용 정정(`weekly.py:431`·`:433`·`:450-456`, `stock_rs_eval.py:9`). D5: plan.md §G 테스트 목록 50개. D6: 낡은 작업 트리 메모 갱신. D7: REQ-RSR-015의 `Where`를 보편 문형으로. D8: (i)·(ii) 단계 서술의 "쌍 기준 삭제" 잔재 정정 |
 | 0.3.0 | 2026-10-20 | plan-audit iter-2 defects N1–N5 반영. N1: 70 재보정 기준을 진입 비율에서 "RS 외 진입 조건 통과 종목 중 RS 조건 통과 비중"(조건부 RS 통과율)으로 교체하고 상대 허용오차 ±10%와 판별력 사전 조건(60/70/80 단조·폭 > 허용오차, 미충족 시 70은 기록만)을 추가 — plan 단계 실측은 사전 조건 미충족을 예고. N2: REQ-RSR-001의 짝 없는 행 조항을 (i)·(ii)에 포함되는 중복으로 판정해 삭제. N3: 측정 분모를 가격 테이블 기준으로 고정. N4: REQ-RSR-023 shall 절에 전 컬럼 NULL 규칙 명시 |
 | 0.2.0 | 2026-10-20 | plan-audit iter-1 defects D1–D14 반영. D1: REQ-RSR-001을 "이번 실행이 쓰지 않은 행은 모두 삭제"(선행 단계 + 날짜별 집합 차 삭제)로 재작성, AC-RSR-017 신설. D2: Stage 2 측정을 진입 비율(70)과 Strong 비중(60) 두 기준으로 분리하고 주차 집합·측정 명령·DB 사본 경로 고정. D4: 결측 수익률 행 규칙 REQ-RSR-023·AC-RSR-018 신설. D13: 70/60 소유권 유지와 T8 공유 상수 결정. 나머지 SHOULD-FIX·MINOR 정정 |
@@ -122,6 +123,8 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 | B-3 | 재보정 범위를 Stage 2 상수로 한정 | M3 재보정 대상은 `_STAGE2_ENTRY_RS_MIN`(70)·`_STAGE2_RS_STRONG`(60)과 그 프론트 거울 `RS_STRONG_THRESHOLD`·`RS_S2_STRONG_THRESHOLD`, 그리고 같은 값을 반복한 리터럴뿐이다. `_RS_TOP_THRESHOLD`/`RS_TOP_THRESHOLD`는 80으로 유지하고 열기 배지 술어는 `RS_1M_Rating >= 80`으로 유지한다. 근거: 두 등급은 같은 날짜 분모 안의 백분위 순위라 산식과 무관하게 80 이상인 몫이 약 20%다. 라이브 DB 실측 — plan-audit iter-1 프로브: `AVG(RS_12M_Rating>=80)` 20.08%, `AVG(RS_1M_Rating>=80)` 20.04%; 이 세션 재측정(전 행): 20.02% / 20.01% (research.md R13). D6의 "60/70/80 재보정" 중 80은 이 근거로 재보정 대상에서 뺀다 |
 | D13 | 70/60 소유권 유지, T8은 공유 상수 | `RS_STRONG_THRESHOLD`·`RS_S2_STRONG_THRESHOLD`는 `SPEC-SECTOR-DISPLAY-UNIFY-001` REQ-SDU-003에서 프론트 소유 상수로 기록되어 있다(`rsMetrics.test.ts:50-54`). 이 SPEC은 소유권을 옮기지 않고 **값만** 양쪽에서 함께 바꾸며, 백엔드 값과의 동일성은 교차 언어 등식 테스트가 지킨다. Minervini T8(`backend/services/screen_service.py:61`, `stock_meta.rs_12m >= 70`)은 재보정된 Stage 2 진입 값을 **공유 상수 `_STAGE2_ENTRY_RS_MIN`으로 채택**한다(정의 지점 단일화). 기각한 대안: T8 리터럴 70을 독립 유지 — 같은 의미의 임계값이 두 값으로 갈라질 수 있음 |
 
+> **as-implemented (sync 2026-10-20)**: B-1의 스팩 판별은 그 날짜 가격 행의 종목명에 적용된다(등록부 종목명 기준의 상위 집합). 상세는 REQ-RSR-003 주석.
+
 ---
 
 ## §3 요구사항 (GEARS)
@@ -129,8 +132,10 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 ### §3.1 주간 RS 재생성 — `generate_rs_db()`
 
 - **REQ-RSR-001** (이번 실행이 쓰지 않은 행 삭제, D7) — **When** `generate_rs_db()`가 실행되면, the RS 생성기 shall 실행이 끝났을 때 `relative_strength`에 이번 실행이 기록한 `(Name, Date)` 행만 남도록, (i) 처리 날짜 집합(루프가 도는 기준 종목 날짜)에 속하지 않는 `Date`의 행을 루프 전에 삭제하고, (ii) 날짜 `d`마다 필터 후 이름 집합을 정한 뒤 같은 트랜잭션 안에서 `Date = d`이면서 그 집합에 없는 이름의 행을 삭제하고 새 행을 기록한다. 필터 후 행이 0개인 날짜는 그 날짜의 행을 모두 삭제한다. **`stock_prices` 짝이 없는 행은 이 두 단계에 이미 포함된다**: 그런 행은 날짜가 처리 날짜 집합 밖이면 (i)로, 안이면 그 날짜의 `stock_prices`에 이름이 없어 필터 후 집합에도 없으므로 (ii)로 지워진다. 따라서 별도의 "짝 없는 행 삭제" 조항은 두지 않는다. 기각한 대안: 실행 앞단의 테이블 전체 삭제 — `weekly.py` 머리말(`:7`)이 "INSERT OR REPLACE (UPSERT) instead of DROP TABLE"을 의도된 설계로 기록하고 있고, 전체 삭제는 실행이 중간에 멈추면 테이블을 빈 상태로 남긴다.
+  - **as-implemented (sync 2026-10-20) — 기준 종목 날짜 0개 가드.** 기준 종목(`REFERENCE_STOCK`)의 날짜가 하나도 없으면 `generate_rs_db()`는 (i)·(ii)를 포함해 아무 행도 지우거나 쓰지 않고, 경고(`logger.warning("[RS] reference stock %r has no dates; skipping", …)`)만 남긴 뒤 끝낸다(`my_chart/db/weekly.py:513-517`). 처리 날짜 집합이 비면 (i)이 테이블 전체를 지우게 되어, 위에서 기각한 "테이블 전체 삭제"와 같은 결과가 나기 때문이다. 이 분기는 원문에 없던 안전장치로 run 단계 M1에서 추가됐다(progress.md §E.2 `### M1` RED 문단·잔여 위험, §E.3 이탈 사항 1). 검증은 acceptance.md AC-RSR-001 비고에 있다.
 - **REQ-RSR-002** (지수·거래량 0 분모 제외, D5) — The RS 생성기 shall 각 날짜의 순위 분모에서 `Name`이 `KOSPI` 또는 `KOSDAQ`인 행과 그 날짜의 `Volume`이 0인 행을 제외한 뒤 백분위 순위를 계산한다. 제외는 순위 계산 **이전**에 적용되어 남은 종목의 등급 값에 반영되어야 한다.
 - **REQ-RSR-003** (우선주·스팩 분모 제외, D5·B-1) — The RS 생성기 shall 등록부 종목 코드의 끝자리가 `0`이 아닌 종목(우선주)과 종목명에 `스팩`이 들어 있는 종목(스팩)을 순위 분모에서 제외한다. 이 규칙은 실측된 보통주 `성우`, `에코글로우`, `이오플로우`를 제외해서는 안 된다(research.md R3). 등록부에 코드가 없는 이름은 우선주로 판정하지 않는다.
+  - **as-implemented (sync 2026-10-20) — 스팩 판별 대상.** 스팩 판별은 등록부 종목명이 아니라 **그 날짜 가격 행(`stock_prices`)의 종목명**에 `스팩`이 들어 있는지로 한다(`my_chart/db/weekly.py:393` `_RS_SPAC_MARKER = "스팩"`, `:422` `~names.str.contains(_RS_SPAC_MARKER, regex=False)` — `names`는 그 날짜 가격 행의 `Name`, `:417`). 가격 행에 있는 종목에 대해서는 등록부 종목명 기준 판별의 상위 집합이고, 등록부에 없는 이름이라도 `스팩`이 들어 있으면 제외된다. 우선주 판별(코드 끝자리)은 원문대로 등록부에 의존한다(`_registry_preferred_names()`, `:398-406`). 근거: progress.md §E.2 `### M1` 잔여 위험, §E.3 이탈 사항 2.
 - **REQ-RSR-004** (제외 행 미기록) — The RS 생성기 shall REQ-RSR-002·003·007·023으로 분모에서 제외된 `(Name, Date)`에 대해 `relative_strength` 행을 기록하지 않으며, 이전 실행이 남긴 같은 쌍의 행은 REQ-RSR-001 (ii)로 지운다.
 - **REQ-RSR-005** (IBD식 산식, D2·Q1) — The RS 생성기 shall `RS_12M_Rating`을 §2.3의 비율 기반 IBD식 종합 점수의 백분위 순위 × 100으로 계산한다.
 - **REQ-RSR-006** (나머지 등급 산식 불변) — The RS 생성기 shall `RS_6M_Rating`, `RS_3M_Rating`, `RS_1M_Rating`을 현행 산식(`weekly.py:450-456`) 그대로, REQ-RSR-002·003의 필터를 거친 같은 분모 위에서 계산한다.
@@ -212,3 +217,35 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 ### Out of Scope — 고정 픽스처
 
 - `tests/fixtures/frozen/aggregation-2026-08-11/weekly.db`는 재생성하지 않는다. 이 픽스처의 `relative_strength`는 옛 산식 값과 지수 행(186행)을 그대로 담은 채 남는다(research.md R8)
+
+---
+
+## §7 알려진 부채 (Known debt, sync 2026-10-20)
+
+> 이 절은 기록이며, 여기 적은 항목은 이 SPEC에서 고치지 않는다. 출처는 sync 4차원 감사 결과 `.moai/state/verify/c1bf371e/sync_4dim_result.json`의 `.result.findings`(`jq '.result.findings|length'` → `12`, 심각도 `jq -r '.result.findings[].severity' | sort | uniq -c` → `12 minor`)와 progress.md §E.3이다. 형제 완료 SPEC에 sync 시점 부채 절의 선례가 없어(`grep -rnE '^#{2,3} .*(부채|debt|as-implemented)' .moai/specs/*/spec.md .moai/specs/*/plan.md` → plan-audit 부채 1건만) spec.md에 둔다.
+
+### §7.1 sync 감사 지적 12건 (모두 minor)
+
+1. [Functionality] `backend/tests/test_minervini_template.py` — GroupC 3건 실패. 픽스처 `stock_meta`에 `sma5`가 없어 열 가드에서 일찍 반환하므로, T8 상수 참조 변경이 맞는지를 이 테스트로는 판별할 수 없다. `sma5` 가드는 이 SPEC 이전 커밋(`060640f`)이다.
+2. [Functionality] `tests/test_weekly_insert.py` — AC-RSR-006 본문의 "10건"이 실제로는 12건이다(테스트 함수 10개 중 2개가 `parametrize` 2값). **이번 sync에서 acceptance.md 정정으로 해소했다.**
+3. [Security] `backend/services/screen_service.py` — T8 임계값을 바인드 파라미터가 아닌 f-string으로 SQL에 넣는다. 요청 입력이 아니라 지금은 악용할 수 없지만, 상수가 유한하지 않은 float이 되면(측정 스크립트가 자기 프로세스에서 `-inf`로 바꾼다) SQL이 깨진다.
+4. [Security] `scripts/rs_eval/stock_rs_eval.py:21` — `--db` 원문을 이스케이프 없이 SQLite URI에 넣어, 경로에 `?`·`#`이 있으면 `mode=ro`·`immutable`이 덮일 수 있다. 개발자가 로컬에서 돌리는 도구라 영향은 매우 작다.
+5. [Craft] `scripts/rs_eval/stage2_ratio_eval.py:53-76` — `stage_classifier`의 모듈 전역(`sqlite3`, `_STAGE2_ENTRY_RS_MIN`, `_STAGE2_RS_STRONG`)을 덮어쓰고 되돌리지 않는다. 스크립트가 별도 프로세스로 돌기 때문에만 허용된다.
+6. [Craft] `scripts/rs_eval/stock_rs_eval.py` — 두 측정 스크립트가 읽기 전용 URI를 서로 다르게 만든다(`stage2_ratio_eval.py`는 `Path.resolve().as_uri()`, `stock_rs_eval.py`는 원문 삽입).
+7. [Craft] `my_chart/analysis/sector_advanced.py:586,815` — `_get_rs_on_date()`가 `(rs_12m, rs_1m)` 튜플을 돌려주지만 호출부 3곳 중 2곳이 두 번째 dict를 버린다.
+8. [Craft] `backend/services/meta_service.py:118` — `_ensure_meta_minervini_columns`가 RS 컬럼 `rs_1m`도 추가하게 되어 이름이 동작을 설명하지 못한다(docstring만 갱신).
+9. [Craft, 긍정 확인] `my_chart/db/weekly.py` 외 변경 파일 전체 — 새 린트 위반 0건. 남은 ruff 지적(I001 import 정렬, `my_chart/db/weekly.py` F402, `scripts/rs_eval/stock_rs_eval.py` E70x)은 변경 전부터 있던 기준선이다.
+10. [Consistency] `my_chart/db/weekly.py:515` — 새 조기 반환 분기는 `logger.warning`을 쓰고, 같은 함수의 다른 상태 메시지는 `print('[RS] …')`를 쓴다.
+11. [Consistency] `my_chart/analysis/sector_advanced.py` — 공유 헬퍼 `_get_rs_on_date()`의 반환 계약을 호출부 하나를 위해 튜플로 넓혔다. 이웃 헬퍼(`_get_price_on_date`, `_load_raw_chg_max52`)는 매핑 하나를 돌려준다(7번과 같은 지점, 다른 관점).
+12. [Consistency] `my_chart/analysis/sector_metrics.py` — `sector_rs_med`는 결측이면 `None`, 형제 `sector_rs_avg`·`sector_rs_top_pct`는 `value or 0.0`이다. REQ-RSR-013(결측을 0으로 채우지 않음)에 따른 의도된 차이이고 주석이 있다.
+
+### §7.2 이 SPEC이 원인이 아닌 기존 실패
+
+- `backend/tests/test_minervini_template.py` 3건 — `sma5` 픽스처 부재(§7.1의 1번과 같은 건). 근거: progress.md §E.3 이탈 사항 4, `### M3` 재실행 기록.
+- `backend/tests` 전체 `4 failed / 58 errors` — 기준선 `97831f4`와 최종 `15ba7b6`의 실패·오류 노드 ID 62개가 같다(`IDENTICAL`). 근거: progress.md §E.2 `### M4 (pre-rebuild)` 스위트 개수 표.
+- vitest `frontend/e2e/preset-flow.spec.ts` — Playwright 스펙이 vitest에 수집되는 문제(`Playwright Test did not expect test.describe() to be called here.`). 근거: progress.md §E.2 `### M5` 전체 스위트.
+
+### §7.3 남은 Gap
+
+- AC-RSR-011의 버블 툴팁 열기 배지는 라이브 화면에서 호버로 보지 않았다. 단위 테스트(`StockBubbleChart.rsHeat.test.tsx`, `rsHeat.injected.test.tsx`)로만 검증했다. 또 ECharts 툴팁이 기본값으로 마우스 진입을 받지 않아(`enterable: false`) 배지 title은 화면에서 읽히지 않을 수 있다. 근거: progress.md §E.2 `### M5` Gaps, `### M5 (live dev-server check)`, §E.3 Gaps.
+- `docs/rs-timeline-eli5.html`은 라이트 테마 데스크톱 폭(900px)에서만 렌더를 확인했다(다크 테마·모바일 폭 미확인). 근거: progress.md §E.2 `### M6` Gaps.

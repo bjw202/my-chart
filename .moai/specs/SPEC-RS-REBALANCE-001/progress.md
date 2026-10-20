@@ -722,7 +722,7 @@ exit=0
 | M3 | `6b09f06` `97831f4` | `feat(…): M3 Stage 2 임계값 재보정 측정 도구와 단일 정의 지점` / `docs(…): M3 재보정 측정·판정 기록` |
 | M4 | `15ba7b6` `73b02e8` `1516c25` | `feat(…): M4 백엔드 필드 — stock_meta.rs_1m·종목 rs_1m·섹터 rs_med` / `docs(…): M4 백엔드 필드 증거 기록 (라이브 재구축 전)` / `docs(…): M4 라이브 stock_meta 재구축 결과 기록` |
 | M5 | `b7ff135` `6a68ba8` `c2fe4ac` | `feat(frontend): 열기 배지와 섹터 RS 중앙값 열 표시 (SPEC-RS-REBALANCE-001 M5)` / `docs(…): M5 프론트 표시 실행 증거 기록` / `docs(…): M5 라이브 화면 확인 기록` |
-| M6 | 이 기록을 담은 커밋 | 커밋은 자기 SHA를 담을 수 없으므로 아래 `run_commit_sha`는 placeholder다 |
+| M6 | `7a77769` | `docs(…): M6 회귀 실측 기록과 run-phase 완료 신호(§E.3)` — SHA는 sync 단계에서 채움 |
 
 **AC 최종 상태.** PASS = 픽스처·단위 테스트 단계 통과. PASS-live = 그에 더해 라이브 DB·API·화면 단계도 관측함. Gap = 관측하지 못한 부분.
 
@@ -766,7 +766,7 @@ exit=0
 
 ```yaml
 run_complete_at: 2026-10-20
-run_commit_sha: pending-backfill-m6   # M6 커밋은 자기 SHA를 담을 수 없음 — 후속 커밋에서 채움
+run_commit_sha: 7a77769   # M6 기록 커밋 — sync 단계에서 채움(git log 확인)
 run_status: audit-ready
 ac_pass_count: 19          # FAIL 0; PASS-live 8 (011은 테이블만 live, 버블 툴팁 Gap 병기) + PASS 11
 ac_fail_count: 0
@@ -778,7 +778,7 @@ milestone_commits:
   M3: [6b09f06, 97831f4]
   M4: [15ba7b6, 73b02e8, 1516c25]
   M5: [b7ff135, 6a68ba8, c2fe4ac]
-  M6: [pending-backfill-m6]
+  M6: [7a77769]
 req_rsr_020_persistence: {before: 29.24, after: 65.17, target: ">= 60", source: "### M6 재측정 원문"}
 pre_existing_failures:
   - "backend/tests/test_minervini_template.py 3 failed (sma5 픽스처 부재)"
@@ -791,4 +791,54 @@ spec_status_unchanged: in-progress    # sync가 이후 전이를 소유
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+**범위.** 사용자 승인 gate-sync-2 — 문서만 다루고 코드는 바꾸지 않는다. 공용 체크아웃 `main`(시작 HEAD `7a77769`)에서 진행했다. SPEC 본문의 as-implemented 반영(spec v0.4.0, §7 알려진 부채, plan.md §B·§D·§G.1, acceptance.md AC-RSR-001 비고·AC-RSR-006 건수)은 manager-spec이 했고, 이 절은 manager-docs가 썼다. 두 쪽 변경은 sync 커밋 하나에 함께 들어간다.
+
+**sync 품질 게이트 (오케스트레이터 실행, 증거 `.moai/state/verify/c1bf371e/`).**
+
+| 항목 | 명령 결과 (로그 끝줄 원문) | 판정 | 증거 |
+|---|---|---|---|
+| 루트 `tests/` | `1070 passed, 1 skipped, 95 deselected, 1 xpassed in 66.51s` | PASS | `sync_tests.log` |
+| `backend/tests` | `4 failed, 353 passed, 58 errors in 30.96s` | 기존 실패 — 실패·오류 노드 ID가 SPEC 이전 기준선과 같음(spec.md §7.2) | `sync_backend.log` |
+| vitest 전체 | `Test Files 1 failed \| 95 passed (96)` / `Tests 832 passed (832)` | PASS — 실패 파일 1개는 기존 `e2e/preset-flow.spec.ts` Playwright 수집 문제(§7.2) | `sync_vitest.log` |
+| `tsc -b` | 로그에 오류 출력 없음(`> tsc -b` 뒤 빈 줄), 오케스트레이터 기록 exit 0 | PASS | `sync_tsc.log` |
+| ruff 새 지적 | `diff sync_ruff_head_norm.txt sync_ruff_base_norm.txt` → 차이 없음, 두 파일 41줄 = 41줄(기준 `f747ce5`), 새 파일 11개 지적 0 | PASS | `sync_ruff_head_norm.txt`, `sync_ruff_base_norm.txt` |
+
+**4차원 감사 판정.** `sync_4dim_result.json`: `verdict` PASS, `harmonic_mean` 0.8912721049629209(임계 0.85, Tier L) — Functionality 0.93 / Security 0.90 / Craft 0.84 / Consistency 0.90. 지적 12건 모두 minor, `evidence_gaps` 17건. **판정이 구속력을 갖는 근거**: 4차원 모두 임계 이상이고 must-pass 실패가 없는 정상 경로이므로 sync-auditor를 따로 띄우지 않고 이 판정을 그대로 쓴다(오케스트레이터 결정). minor 12건은 고치지 않고 spec.md §7.1에 기록했다.
+
+**run에서 넘어온 이탈 5건의 처리 (spec v0.4.0).**
+
+| # | 이탈 (§E.3) | 처리 |
+|---|---|---|
+| 1 | 기준 종목 부재 가드 | spec.md REQ-RSR-001에 as-implemented 주석 |
+| 2 | 스팩 판별 범위(가격 행 종목명) | spec.md REQ-RSR-003·§2.4 B-1에 주석 |
+| 3 | M5 계획 밖 변경 | plan.md §D 파일 24 → 26개(`SectorAnalysis.tsx`, `global.css`), §G.1 계획 밖 테스트 변경 |
+| 4 | 기존 실패 3종 | spec.md §7.2 |
+| 5 | `docs/rs-timeline-eli5.html` 미커밋 | plan.md §D 22번 주석(`.gitignore:251:docs/`). 이 파일의 추적 여부는 이번 sync에서도 바꾸지 않는다 |
+
+**갱신한 문서.**
+- `CHANGELOG.md` — `[Unreleased]` 첫 항목 `### Changed (SPEC-RS-REBALANCE-001 v0.4.0 — RS 타임라인 재조정, 2026-10-20)`
+- `README.md` — 기능 표 2행 추가(종목 스크리닝: IBD식 재가중·열기 배지, 섹터·테마 분석: RS Med 열). 구조 변경 없음
+- `.moai/project/product.md` — 기능 목록 12번 "RS Rating Rebalance & Heat Badge" 추가
+- 바꾸지 않음: `.moai/project/structure.md`, `.moai/project/tech.md`, codemaps — 새 디렉터리·의존성이 없다(신규 운영 파일은 기존 `scripts/rs_eval/` 안의 `stage2_ratio_eval.py` 하나)
+
+**상태 전이.** spec.md 머리말 `status: in-progress → completed`(3단계 마감 관례상 implemented를 거쳐 sync 커밋 하나에서 completed로), `updated: 2026-10-20`(이미 같은 날짜). plan.md·acceptance.md·research.md·progress.md에는 머리말 status 필드가 없어 전이 대상이 아니다. spec.md HISTORY 표는 본문이라 manager-docs가 행을 더하지 않았다 — 전이 기록은 이 절이 담는다.
+
+**Gaps.** (1) `tsc -b` exit 0은 로그에 종료 코드 줄이 없어 오케스트레이터 기록에 의존한다. (2) AC-RSR-011 버블 툴팁 배지 라이브 호버, `docs/rs-timeline-eli5.html` 다크 테마·모바일 렌더는 여전히 미관측(spec.md §7.3). (3) sync 커밋 SHA는 커밋이 자기 SHA를 담을 수 없어 아래에 적지 못한다 — `git log --oneline -1 -- .moai/specs/SPEC-RS-REBALANCE-001/progress.md`로 확인한다.
+
+```yaml
+sync_complete_at: 2026-10-20
+sync_commit_sha: self   # 이 절을 담은 sync 커밋 — 커밋은 자기 SHA를 담을 수 없음, git log로 확인
+sync_status: completed
+sync_route: A (main 직접 커밋, PR 없음, push 없음)
+sync_scope: docs-only (gate-sync-2, 코드 변경 없음)
+sync_4dim: {verdict: PASS, harmonic_mean: 0.891, threshold: 0.85, functionality: 0.93, security: 0.90, craft: 0.84, consistency: 0.90, findings: "12 minor (spec.md §7.1)", binding: "happy path — sync-auditor 미기동"}
+frontmatter_status_transitions:
+  spec.md: in-progress → implemented → completed (sync 커밋 하나에서, updated 2026-10-20)
+  plan.md / acceptance.md / research.md / progress.md: 머리말 status 없음 — 전이 대상 아님
+b12_self_test_a: "grep -c 'SPEC-RS-REBALANCE-001' CHANGELOG.md → 0 (추가 전)"
+b12_self_test_b: "acceptance.md 고유 AC-RSR-* 19개(001~018 + 008b) = CHANGELOG 'AC-RSR-001~018 + 008b 19개'. 원시 정규식 sort -u 24는 본문의 축약 별칭 AC-1b·AC-2~6 포함, 008b는 정규식이 008로 자름"
+b12_self_test_c: "CHANGELOG에 적은 경로 30개 [ -e ] 존재 확인(30/30)"
+changelog_entry_position: "[Unreleased] 첫 항목 — ### Changed (SPEC-RS-REBALANCE-001 v0.4.0 …)"
+run_commit_sha_backfill: "§E.3 run_commit_sha·M6 → 7a77769"
+docs_unchanged: [structure.md, tech.md, codemaps]
+```

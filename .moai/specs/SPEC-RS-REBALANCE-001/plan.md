@@ -27,6 +27,8 @@
 | D13 70/60 소유권과 T8 | 소유권은 `SPEC-SECTOR-DISPLAY-UNIFY-001`에 그대로 두고 값만 양쪽에서 변경. T8(`screen_service.py:61`)은 `_STAGE2_ENTRY_RS_MIN` 참조 | T8 리터럴 70 독립 유지 | `rsMetrics.test.ts:50-54` 리터럴 단언을 백엔드 추출 비교로 교체 |
 | B-3 재보정 범위 | (a) Stage 2 상수 70/60과 거울 `RS_STRONG_THRESHOLD`·`RS_S2_STRONG_THRESHOLD`만 | 80도 재보정하고 배지용 상수 분리 / 80을 재보정하고 배지가 따라감 | `_RS_TOP_THRESHOLD`/`RS_TOP_THRESHOLD`는 80 유지. 근거는 백분위 순위의 성질(80 이상 몫 ≈ 20%) — 라이브 DB 실측 20.08% / 20.04%(plan-audit iter-1), 재측정 20.02% / 20.01%(research.md R13). `momentum.py`·`queries.py`는 변경 대상에서 빠짐 |
 
+> **as-implemented (sync 2026-10-20) — B-1 실행 영향 보충.** 스팩 판별은 등록부 조인이 아니라 그 날짜 가격 행의 종목명에 `스팩`이 들어 있는지로 한다(`my_chart/db/weekly.py:393`, `:422`). 가격 행에 있는 종목에 대해서는 등록부 기준 판별의 상위 집합이다. 등록부 `Code` 조인은 우선주(코드 끝자리) 판별에만 쓴다(`_registry_preferred_names()`, `:398-406`). 근거: progress.md §E.2 `### M1` 잔여 위험, spec.md REQ-RSR-003 주석.
+
 ## §C 데이터 모델 변경 (변경 가능성이 큰 순)
 
 | 대상 | 변경 | 비고 |
@@ -46,6 +48,8 @@ for f in my_chart/db/weekly.py my_chart/analysis/stage_classifier.py my_chart/an
 ```
 
 관측 출력(spec 0.3.1 정정 세션 재실행): `new: scripts/rs_eval/stage2_ratio_eval.py`, `existing=23` — 합계 24개(기존 23 + M3 신설 1). 구성: Python(`my_chart/`·`backend/`) 14, 프론트 7, 스크립트 2, 문서 1. 표의 24번(`aggregate_types.py`)은 plan-audit review-4 D1로 추가했다 — 봉투 `rs_med`는 `aggregate_model()`이 읽는 `SectorAggregate` dataclass에 필드가 있어야 채워진다. B-3 결정으로 `my_chart/screening/momentum.py`, `my_chart/db/queries.py`(80/90 기준)는 목록에서 빠졌다.
+
+**as-implemented (sync 2026-10-20) — 파일 수 24 → 26.** 위 관측 출력은 plan 시점 기록으로 그대로 둔다. 같은 명령의 경로 목록 끝에 `frontend/src/components/SectorAnalysis/SectorAnalysis.tsx frontend/src/styles/global.css`를 더해 sync 세션에서 다시 실행하면 `existing=26`이고 `new:` 줄은 없다(M3 신설 파일도 이제 존재). 두 파일은 M5가 REQ-RSR-015·017의 직접 결과로 수정한 계획 밖 파일이다(`git show --stat b7ff135 -- <두 파일>` → 각 `2 ++`, `2 files changed, 4 insertions(+)`; progress.md §E.2 `### M5` "범위 밖 파일 2개"). 아래 표 25·26번으로 추가했다.
 
 | # | 경로 | 변경 종류 | 마일스톤 |
 |---|---|---|---|
@@ -70,13 +74,15 @@ for f in my_chart/db/weekly.py my_chart/analysis/stage_classifier.py my_chart/an
 | 19 | `frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` | 수정 — 툴팁 열기 배지 | M5 |
 | 20 | `frontend/src/components/SectorAnalysis/SectorRankingTable.tsx` | 수정 — `rs_med` 열 | M5 |
 | 21 | `scripts/rs_eval/stock_rs_eval.py` | 수정 — `--production`·`--db <경로>` 모드 추가(파일은 f747ce5부터 추적 중) | M2, M6 |
-| 22 | `docs/rs-timeline-eli5.html` | 수정 — 새 산식 설명 | M6 |
+| 22 | `docs/rs-timeline-eli5.html` | 수정 — 새 산식 설명. **as-implemented (sync 2026-10-20)**: `docs/`는 gitignore 대상이라(`git check-ignore -v docs/rs-timeline-eli5.html` → `.gitignore:251:docs/`, `git ls-files docs/rs-timeline-eli5.html` → 0줄) 공용 체크아웃 디스크에서만 갱신됐고 git에는 없다(progress.md §E.2 `### M6` 문서 갱신) | M6 |
 | 23 | `scripts/rs_eval/stage2_ratio_eval.py` | 신규 — `--mode conditional`(조건부 RS 통과율, 70)·`--mode strong`(Stage 2 강세 비중, 60) 측정(REQ-RSR-018) | M3 |
 | 24 | `my_chart/analysis/aggregate_types.py` | 수정 — `SectorAggregate` dataclass에 `rs_med: MetricValue` 필드(형제 `rs_avg`·`rs_top_pct`와 같은 결측 기본값) | M4 |
+| 25 | `frontend/src/components/SectorAnalysis/SectorAnalysis.tsx` | **as-implemented (sync 2026-10-20)** 수정 — `getSortValue`에 `case 'rs_med'` 2줄. 없으면 RS Med 헤더 클릭이 `default`(composite)로 조용히 정렬됨 | M5 |
+| 26 | `frontend/src/styles/global.css` | **as-implemented (sync 2026-10-20)** 수정 — `.rs-heat-badge` 규칙 1개(`stage-badge`와 같은 기하, 주황 채널) | M5 |
 
 테스트 파일은 별도(§G).
 
-**Tier 판정: L.** 마일스톤 6개(≥3)이고 운영 코드 대상 파일이 24개(≥10)다. 경계값이 아니므로 "더 단순한 쪽" 규칙은 적용되지 않는다. Tier L 표준 산출물 중 `design.md`는 별도로 만들지 않는다 — 설계 결정은 spec.md §2와 이 문서 §A~§C에 이미 고정되어 있어 같은 내용을 한 번 더 쓰게 된다. `research.md`는 작성했다.
+**Tier 판정: L.** 마일스톤 6개(≥3)이고 운영 코드 대상 파일이 24개(≥10)다(as-implemented (sync 2026-10-20): 26개, Tier L 판정 불변). 경계값이 아니므로 "더 단순한 쪽" 규칙은 적용되지 않는다. Tier L 표준 산출물 중 `design.md`는 별도로 만들지 않는다 — 설계 결정은 spec.md §2와 이 문서 §A~§C에 이미 고정되어 있어 같은 내용을 한 번 더 쓰게 된다. `research.md`는 작성했다.
 
 ## §E 위험
 
@@ -205,7 +211,39 @@ grep -rlE "RS_12M_Rating|rs_12m|RS_1M_Rating|generate_rs_db" tests backend/tests
 | 49 | `tests/test_universe.py` | Y | 7 | - | M4 조건부 — 축약 `relative_strength` DDL에 `RS_1M_Rating` 없음. 테스트가 주간 RS 질의(`stage_classifier.py:183-193`, `sector_advanced.py:240-249`)를 타면 `no such column` RED → DDL에 컬럼 추가 |
 | 50 | `frontend/src/components/ChartGrid/__tests__/ChartCellGoose.test.tsx` | - | - | - | 변경 없음 — 목 `StockItem`의 `rs_12m: 75.5` 리터럴(`:92`)뿐, 이 SPEC이 바꾸는 타입·임계값을 단언하지 않음 |
 
-변경 없이 통과해야 하는 테스트(위 목록 밖 포함): `tests/test_weekly_insert.py`(10건, 스키마 불변), `tests/test_db_service.py`(18건, 파이프라인 순서 불변), `tests/test_ac_sag_030_rs_avg.py`(4건, `rs_avg` 의미 불변), `composite_score`를 다루는 7개 파일(D1, research.md R8).
+변경 없이 통과해야 하는 테스트(위 목록 밖 포함): `tests/test_weekly_insert.py`(10건 — as-implemented (sync 2026-10-20): 수집 12건, 함수 10개 중 2개가 `parametrize` 2값. acceptance.md AC-RSR-006 참조. 스키마 불변), `tests/test_db_service.py`(18건, 파이프라인 순서 불변), `tests/test_ac_sag_030_rs_avg.py`(4건, `rs_avg` 의미 불변), `composite_score`를 다루는 7개 파일(D1, research.md R8).
+
+### §G.1 as-implemented (sync 2026-10-20) — 계획 밖 테스트 변경
+
+위 표는 plan 시점의 기계적 판정이며 그대로 둔다. 실제 run 결과는 다음과 같다.
+
+**M4 — 축약 DDL "M4 조건부" 13개 중 실제 RED 8개, RED 없음 5개.** 판정은 M4 2단계(주간 질의 변경) 직후 DDL을 고치기 전에 전체 스위트를 돌려 확정했다(progress.md §E.2 `### M4 (pre-rebuild)` "축약 DDL RED 판정": `no such column: RS_1M_Rating` 64줄, `no such column: rs.RS_1M_Rating` 36줄). 8개 파일의 DDL·INSERT 수정은 커밋 `15ba7b6`에 있다(`git show --stat 15ba7b6 -- tests backend/tests`에 아래 8개 파일이 모두 나옴).
+
+| 표 # | 파일 | 실제 | RED 건수 | 조치 |
+|---|---|---|---|---|
+| 36 | `tests/test_consumer_dates.py` | RED | 1 (+ 이 파일의 빌더를 import하는 `tests/test_ac_sag_037_endpoint_date_consistency.py` 5건 — 표 33번 "변경 없음", 파일 수정 없이 해소) | DDL 1줄 + INSERT 열 목록 |
+| 38 | `tests/test_market_api.py` | RED | 6 | DDL + INSERT 1곳 |
+| 48 | `tests/test_stage_classifier.py` | RED | 7 | DDL + INSERT 6곳 |
+| 49 | `tests/test_universe.py` | RED | 3 | DDL + INSERT |
+| 2 | `backend/tests/test_minervini_template.py` | RED | 3 (GroupB) | 주간 `_create_weekly_db` DDL만 |
+| 3 | `backend/tests/test_sector_advanced.py` | RED | 25 | RED 경로 DDL 6곳 + INSERT 7곳 |
+| 4 | `backend/tests/test_sector_detail_service.py` | RED | 3 | DDL + INSERT |
+| 5 | `backend/tests/test_stage_service.py` | RED | 3 | DDL + INSERT |
+| 30 | `tests/conftest.py` | RED 없음 | — | 변경 없음 |
+| 39 | `tests/test_market_breadth.py` | RED 없음 | — | 변경 없음 |
+| 46 | `tests/test_sector_history_consistency.py` | RED 없음 | — | 변경 없음 |
+| 47 | `tests/test_sector_metrics.py` | RED 없음(섹터 집계 질의 `_load_weekly_snapshot`은 `RS_1M_Rating`을 읽지 않음) | — | `rs_med` 기대는 신규 `tests/test_rsr_m4_rs_med.py`에 둠 |
+| 1 | `backend/tests/test_bubble_rs_missing_exclusion.py` | RED 없음 | — | 변경 없음 |
+
+**M5 — 프론트 기존 테스트 3개 갱신(열 추가의 기계적 결과).** RS Med 열이 `RS Avg`와 `RS 80+ 비중` 사이에 들어가 위치·개수 단언이 깨졌다. 커밋 `b7ff135`(`git show --stat b7ff135`에 세 파일이 나옴). 근거: progress.md §E.2 `### M5` "기존 테스트 단언 3곳 갱신".
+
+| 파일 | plan 판정 | 실제 변경 | 갱신 전 관측 |
+|---|---|---|---|
+| `frontend/src/components/common/__tests__/er2-screens.test.tsx` | 표 10번 "변경 없음" | 결측 픽스처에 `rs_med: null` 명시, 결측 셀 수 7 → 8 | `AssertionError: expected 8 to be 7` |
+| `frontend/src/components/SectorAnalysis/__tests__/SectorRankingTable.m4.test.tsx` | 표 밖 | `makeSector` 기본값 `rs_med: 50`, ⓔ 배지 4 → 5 | `Found multiple elements with the text: –`, `expected 5 to be 4` |
+| `frontend/src/components/SectorAnalysis/__tests__/SectorRankingTable.test.tsx` | 표 밖 | 색 채널 분리 단언의 비중 셀 인덱스 6 → 7 | 갱신 전에도 통과했으나 인덱스 6이 RS Med 결측 셀을 가리켜 단언이 공허해진 상태 |
+
+판정 신호의 한계: 표 10번은 `rs_12m` 등 문자열 신호로 판정했고, 이 파일이 `SectorRankingTable`의 결측 셀 전수를 센다는 점은 신호에 잡히지 않았다.
 
 **AC별 신규 테스트**: acceptance.md 각 AC에 명시. 테스트 DB는 `tmp_path`에 새로 만들고, 라이브 `Output/` DB는 테스트에서 쓰지 않는다.
 

@@ -38,6 +38,7 @@
 - **대조**: (i)과 (ii)를 모두 제거하면 짝 없는 행 `6`개가 그대로 남는다(RED). (i)만 제거하면 (b)는 (ii)가 지우지만 (a)·(c)의 `5`개가 남는다(RED). 짝 없는 행은 (i)·(ii)에 포함되므로 별도 조항이 없다(spec.md REQ-RSR-001) — 그 포함 관계가 이 두 수치로 드러난다.
 - **AC-RSR-017과의 구분**: 이 AC는 `stock_prices` 짝이 **없는** 행을, AC-RSR-017은 짝이 **있는데도** 남는 낡은 행을 다룬다. 픽스처와 잡는 오구현이 다르다(이 AC는 "재생성이 덮어쓰니 정리는 필요 없다", AC-RSR-017은 "짝 없는 행만 지우면 충분하다").
 - **양변 출처**: 좌변은 프로덕션 실행 후 실제 테이블 질의, 우변은 픽스처에 심은 행 수(6, 5)라는 독립 상수.
+- **as-implemented (sync 2026-10-20) 비고 — 기준 종목 날짜 0개 가드(spec.md REQ-RSR-001 주석)**: 테스트 `test_missing_reference_stock_leaves_table_untouched`(`tests/test_rsr_m1_denominator.py:102`)가 고정한다. 기준 종목을 픽스처에 없는 `ABSENT`로 지정하고 `relative_strength`에 2행(처리 날짜 `d1` 1행, 가격 행 없는 날짜 1행)을 심은 뒤 실행하면 `SELECT COUNT(*) FROM relative_strength`가 `2`로 그대로다. 대조: 가드를 `if False:`로 바꾸면 `AssertionError: assert 0 == 2`(테이블 전체 삭제) RED(progress.md §E.2 `### M1`). sync 재실행: `pytest "tests/test_rsr_m1_denominator.py::test_missing_reference_stock_leaves_table_untouched" -q` → `1 passed in 0.26s`.
 
 ## AC-RSR-002 — 지수·거래량 0 분모 제외, 유동성 비적용 (REQ-RSR-002, 004, 008)
 
@@ -79,9 +80,10 @@
 
 - **Given** M1 착수 직전 **변경 전 코드**로 R10 픽스처(필터에 걸리는 행 없음)를 처리해 캡처·단독 커밋한 골든값 — A `100.0/50.0/25.0`, B `25.0/25.0/50.0`, C `50.0/87.5/100.0`, D `75.0/87.5/75.0`(`RS_6M/3M/1M_Rating`, research.md R10)
 - **When** 변경 후 `generate_rs_db()`를 같은 픽스처로 실행한다
-- **Then** 네 종목의 `RS_6M_Rating`, `RS_3M_Rating`, `RS_1M_Rating`이 골든값과 정확히 같다(부동소수 동일). 그리고 `PRAGMA table_info(relative_strength)`의 컬럼 이름·순서가 `Name, Date, RS_12M_Rating, RS_6M_Rating, RS_3M_Rating, RS_1M_Rating`이며 `tests/test_weekly_insert.py` 10건이 수정 없이 통과한다
+- **Then** 네 종목의 `RS_6M_Rating`, `RS_3M_Rating`, `RS_1M_Rating`이 골든값과 정확히 같다(부동소수 동일). 그리고 `PRAGMA table_info(relative_strength)`의 컬럼 이름·순서가 `Name, Date, RS_12M_Rating, RS_6M_Rating, RS_3M_Rating, RS_1M_Rating`이며 `tests/test_weekly_insert.py` 12건이 수정 없이 통과한다(as-implemented (sync 2026-10-20): 원문 "10건" 정정 — 아래 비고)
 - **대조**: `RS_6`에서 `rank_1m`을 빼는 등 세 산식 중 하나를 바꾸면 해당 열이 RED. 골든값은 변경 전 프로덕션 출력이므로 변경 후 프로덕션 출력과 출처가 다르다.
 - **비고**: 필터에 걸리는 행이 섞인 입력에서는 분모가 달라지므로 값이 같을 수 없다. 그 경우의 정합성은 AC-RSR-002 (c)가 맡는다.
+- **as-implemented (sync 2026-10-20) 비고 — `test_weekly_insert.py` 건수**: `grep -cE '^\s*(async )?def test_' tests/test_weekly_insert.py` → `10`(테스트 함수 수), `pytest tests/test_weekly_insert.py --collect-only -q` → `12 tests collected` — `:166`·`:199`의 `@pytest.mark.parametrize("drop_col", ["SMA10", "RS_1M"])`가 각각 2건으로 펼쳐진다. `pytest tests/test_weekly_insert.py -q` → `12 passed in 0.20s`. SPEC 범위 전체에서 파일 변경 없음: `git diff --stat f747ce5~1 HEAD -- tests/test_weekly_insert.py` → 출력 없음. 원문 "10건"은 함수 수를 센 값이며 "수정 없이 통과" 요구는 그대로 충족된다(sync 4차원 감사 Functionality 지적, spec.md §7.1 2번).
 
 ## AC-RSR-007 — `stock_meta.rs_1m` 복사 (REQ-RSR-010) — 계획서 AC-1b
 
