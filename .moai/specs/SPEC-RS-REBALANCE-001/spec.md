@@ -1,7 +1,7 @@
 ---
 id: SPEC-RS-REBALANCE-001
 title: "RS 타임라인 재조정 — 종목 RS 12개월 중심 재가중·열기 배지 분리·섹터 RS 중앙값 병기"
-version: "0.3.0"
+version: "0.3.1"
 status: draft
 created: 2026-10-20
 updated: 2026-10-20
@@ -24,6 +24,7 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 
 | 버전 | 날짜 | 변경 |
 |---|---|---|
+| 0.3.1 | 2026-10-20 | run 진입 전 문서 정정(plan-audit review-4 D1–D8, 재기획·요구사항 추가 없음). D1: `rs_med`에 필요한 `SectorAggregate` dataclass(`my_chart/analysis/aggregate_types.py`)를 plan.md 파일 목록에 추가(23 → 24개, Tier L 유지)하고 봉투 `SectorAggregateModel`과 이름 구분. D2: REQ-RSR-019·AC-RSR-013에 `StockTable.tsx:32` 주석과 `:263` 라벨 리터럴을 포함하고 스캔 기준선을 4줄로 정정. D3: iter-3 부채 T1(두 사본 사전 조건, 기록만 모드의 c70 상대 ±10% 단언·에스컬레이션)을 REQ-RSR-018 (a)·AC-RSR-015로, T2(날짜별 분모 크기 기록)를 AC-RSR-015로 옮김. D4: 행 번호 인용 정정(`weekly.py:431`·`:433`·`:450-456`, `stock_rs_eval.py:9`). D5: plan.md §G 테스트 목록 50개. D6: 낡은 작업 트리 메모 갱신. D7: REQ-RSR-015의 `Where`를 보편 문형으로. D8: (i)·(ii) 단계 서술의 "쌍 기준 삭제" 잔재 정정 |
 | 0.3.0 | 2026-10-20 | plan-audit iter-2 defects N1–N5 반영. N1: 70 재보정 기준을 진입 비율에서 "RS 외 진입 조건 통과 종목 중 RS 조건 통과 비중"(조건부 RS 통과율)으로 교체하고 상대 허용오차 ±10%와 판별력 사전 조건(60/70/80 단조·폭 > 허용오차, 미충족 시 70은 기록만)을 추가 — plan 단계 실측은 사전 조건 미충족을 예고. N2: REQ-RSR-001의 짝 없는 행 조항을 (i)·(ii)에 포함되는 중복으로 판정해 삭제. N3: 측정 분모를 가격 테이블 기준으로 고정. N4: REQ-RSR-023 shall 절에 전 컬럼 NULL 규칙 명시 |
 | 0.2.0 | 2026-10-20 | plan-audit iter-1 defects D1–D14 반영. D1: REQ-RSR-001을 "이번 실행이 쓰지 않은 행은 모두 삭제"(선행 단계 + 날짜별 집합 차 삭제)로 재작성, AC-RSR-017 신설. D2: Stage 2 측정을 진입 비율(70)과 Strong 비중(60) 두 기준으로 분리하고 주차 집합·측정 명령·DB 사본 경로 고정. D4: 결측 수익률 행 규칙 REQ-RSR-023·AC-RSR-018 신설. D13: 70/60 소유권 유지와 T8 공유 상수 결정. 나머지 SHOULD-FIX·MINOR 정정 |
 | 0.1.0 | 2026-10-20 | 계획서 2판 전사. Q1~Q4 결정 반영. 계획서 §4 "제외"의 "고아 행 정리(별도 카드)"는 D7 2판과 모순되는 초안 잔재로 판단해 삭제하고 범위에 포함. 조사에서 발견한 계획서 정정 3건(R2 고아 행 합계, R3 우선주 패턴 오탐, R6 `stock_meta` 비재생성)을 반영. 조사에서 새로 드러난 결정 3건(B-1 판별 규칙, B-2 `rs_1m` 소비처, B-3 재보정 범위)을 같은 날 사용자 결정으로 §2.4에 고정 |
@@ -132,11 +133,11 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 - **REQ-RSR-003** (우선주·스팩 분모 제외, D5·B-1) — The RS 생성기 shall 등록부 종목 코드의 끝자리가 `0`이 아닌 종목(우선주)과 종목명에 `스팩`이 들어 있는 종목(스팩)을 순위 분모에서 제외한다. 이 규칙은 실측된 보통주 `성우`, `에코글로우`, `이오플로우`를 제외해서는 안 된다(research.md R3). 등록부에 코드가 없는 이름은 우선주로 판정하지 않는다.
 - **REQ-RSR-004** (제외 행 미기록) — The RS 생성기 shall REQ-RSR-002·003·007·023으로 분모에서 제외된 `(Name, Date)`에 대해 `relative_strength` 행을 기록하지 않으며, 이전 실행이 남긴 같은 쌍의 행은 REQ-RSR-001 (ii)로 지운다.
 - **REQ-RSR-005** (IBD식 산식, D2·Q1) — The RS 생성기 shall `RS_12M_Rating`을 §2.3의 비율 기반 IBD식 종합 점수의 백분위 순위 × 100으로 계산한다.
-- **REQ-RSR-006** (나머지 등급 산식 불변) — The RS 생성기 shall `RS_6M_Rating`, `RS_3M_Rating`, `RS_1M_Rating`을 현행 산식(`weekly.py:450-455`) 그대로, REQ-RSR-002·003의 필터를 거친 같은 분모 위에서 계산한다.
+- **REQ-RSR-006** (나머지 등급 산식 불변) — The RS 생성기 shall `RS_6M_Rating`, `RS_3M_Rating`, `RS_1M_Rating`을 현행 산식(`weekly.py:450-456`) 그대로, REQ-RSR-002·003의 필터를 거친 같은 분모 위에서 계산한다.
 - **REQ-RSR-007** (분모 무효 행) — **When** 어떤 행의 `1 + RS_3M`, `1 + RS_6M`, `1 + RS_9M` 중 하나가 0 이하로 검출되면, the RS 생성기 shall 그 행을 해당 날짜의 분모에서 제외하고 무한대·NaN 등급을 기록하지 않는다. (관측 데이터에서 해당 행은 0개다, research.md R3.)
 - **REQ-RSR-008** (유동성 필터 비적용, Q3) — The RS 생성기 shall not 거래대금(50억 원 기준 포함)을 근거로 순위 분모에서 행을 제외한다.
 - **REQ-RSR-009** (스키마 불변) — The `relative_strength` 테이블 shall 컬럼 이름·순서·기본 키(`Name`, `Date`, `RS_12M_Rating`, `RS_6M_Rating`, `RS_3M_Rating`, `RS_1M_Rating`, PK `(Name, Date)`)를 유지한다.
-- **REQ-RSR-023** (결측 행, 현행 유지) — The RS 생성기 shall 날짜 `d`의 `stock_prices` 행(`SELECT *`로 읽은 전 컬럼) 중 **어느 컬럼이든 NULL이 하나라도 있는 행**에 등급을 매기지 않는다(현행 `df.dropna()`, `weekly.py:430`). 이 SPEC은 이 범위를 `RS_1M`~`RS_12M` 다섯 컬럼으로 좁히지도, 넓히지도 않는다. 최신 주차(2026-10-16) 실측: 가격 행 2,535개 중 RS 행은 2,490개이며, 빠진 45행은 `RS_*` 결측 44행과 `RS_*`는 있으나 `SMA40_Trend_4M`이 NULL인 1행(`명인제약`)이다(research.md R3.1). 따라서 상장 12개월 미만 종목은 `rs_1m`도 없고 열기 배지를 표시할 수 없다.
+- **REQ-RSR-023** (결측 행, 현행 유지) — The RS 생성기 shall 날짜 `d`의 `stock_prices` 행(`SELECT *`로 읽은 전 컬럼) 중 **어느 컬럼이든 NULL이 하나라도 있는 행**에 등급을 매기지 않는다(현행 `df.dropna()`, `weekly.py:431`). 이 SPEC은 이 범위를 `RS_1M`~`RS_12M` 다섯 컬럼으로 좁히지도, 넓히지도 않는다. 최신 주차(2026-10-16) 실측: 가격 행 2,535개 중 RS 행은 2,490개이며, 빠진 45행은 `RS_*` 결측 44행과 `RS_*`는 있으나 `SMA40_Trend_4M`이 NULL인 1행(`명인제약`)이다(research.md R3.1). 따라서 상장 12개월 미만 종목은 `rs_1m`도 없고 열기 배지를 표시할 수 없다.
 
 ### §3.2 메타 재구축 — `rebuild_stock_meta()`
 
@@ -151,17 +152,17 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-DISPLAY-UNIFY-001]
 
 ### §3.4 프론트 표시
 
-- **REQ-RSR-015** (열기 배지, D3·Q4) — **Where** 종목의 `rs_1m`이 `RS_TOP_THRESHOLD` 이상이면, the 종목 테이블 행(`StockExplorer/StockTable.tsx`)과 종목 버블 툴팁(`SectorAnalysis/StockBubbleChart.tsx`) shall 열기 배지를 표시한다. `rs_1m`이 null이거나 임계값 미만이면 표시하지 않는다.
+- **REQ-RSR-015** (열기 배지, D3·Q4) — The 종목 테이블 행(`StockExplorer/StockTable.tsx`)과 종목 버블 툴팁(`SectorAnalysis/StockBubbleChart.tsx`) shall `rs_1m`이 `RS_TOP_THRESHOLD` 이상인 종목마다 열기 배지를 표시하고, `rs_1m`이 null이거나 임계값 미만인 종목에는 표시하지 않는다.
 - **REQ-RSR-016** (상수 유래 title, REQ-SDU-003 관행) — The 열기 배지 shall 임계값을 `RS_TOP_THRESHOLD` 상수에서 끌어온 title 텍스트를 함께 단다.
 - **REQ-RSR-017** (중앙값·breadth 병기, D4·Q2) — The 섹터 순위 테이블(`SectorRankingTable.tsx`) shall `RS Avg` 열 옆에 `rs_med` 열을 표시하고, 기존 `RS 80+ 비중` 열(breadth)을 그 둘과 인접하게 유지한다.
 
 ### §3.5 임계값 재보정 절차 (D6)
 
 - **REQ-RSR-018** (재보정 절차와 기록, D6·B-3) — **When** M2 재생성이 끝나면, the 재보정 절차 shall 측정 주차 집합 W = "변경 전·후 두 DB 사본에 모두 존재하는 기준 종목(`삼성전자`) 날짜 중 최근 12개"에서 두 기준을 각각 측정해 `progress.md`에 기록한다. 측정 명령은 `scripts/rs_eval/stage2_ratio_eval.py`(M3 신설)이고 DB 사본은 `Output/snapshots/weekly_before_rsr.db`, `Output/snapshots/weekly_after_rsr.db`다. 두 기준의 분모는 모두 가격 테이블(`stock_prices`)에서 정해지므로 두 사본에서 같은 종목 집합이다. 숫자는 측정 전에 정하지 않는다.
-  - **(a) 진입 기준 `_STAGE2_ENTRY_RS_MIN`(현행 70) — 조건부 RS 통과율.** 날짜 `d`에서 `screen_stage2_entry()`(`stage_classifier.py:237-310`)의 RS 외 조건 다섯 개 — 조건 1 Stage 2 분류(`classify_stage(stock).stage == 2`, `:265-267`), 조건 2 `Close > SMA10`(`:278-280`), 조건 3 `SMA10 > SMA40`(`:282-284`), 조건 4 `Volume / max(VolumeSMA10, 1) >= _STAGE2_ENTRY_VOLUME_RATIO`(`:286-288`), 조건 6 `CHG_1M > 0`(`:294-296`) — 을 모두 통과한 종목 집합(지수 행은 `_load_stocks_for_classification()`이 이미 제외, `:199-200`; 거래량 0 행은 조건 4에서 탈락)을 분모로, 그중 `RS_12M_Rating >= _STAGE2_ENTRY_RS_MIN`(조건 5, `:290-292`)도 통과하는 비중을 구하고 W 평균을 낸다. 허용오차는 **상대 ±10%**다: `|변경 후 사본·채택 상수 값 − 변경 전 사본·현행 상수 값| <= 0.10 × 변경 전 사본·현행 상수 값`. 상대 허용오차를 쓰는 이유는 이 비중이 100% 근처에 몰릴 수 있어 절대 %p 폭이 값의 크기에 따라 다른 엄격도를 갖기 때문이며, 10%는 기준 (b)의 ±5%p가 기준선 33.53%에서 갖는 상대 폭(약 15%)보다 엄격하게 잡은 값이다. **판별력 사전 조건**: M3는 먼저 변경 전 사본에서 임계값 60·70·80의 조건부 RS 통과율을 측정해 기록하고, 세 값이 엄격한 단조 감소이면서 `(60 값 − 80 값) > 0.10 × 70 값`일 때만 (a)를 재보정 기준으로 쓴다. 사전 조건이 성립하지 않으면 (a)는 판별력이 없는 것으로 보고 **70의 재보정은 "기록만"으로 격하**한다 — 70을 유지하고 세 값과 변경 후 사본의 70 값을 기록한다. plan 단계 실측(현재 라이브 DB 사본, research.md R15)은 60 → 100.00%, 70 → 99.48%, 80 → 97.85%로 폭 2.15%p가 0.10 × 99.48 = 9.95%p보다 작아 사전 조건 미충족을 예고한다.
+  - **(a) 진입 기준 `_STAGE2_ENTRY_RS_MIN`(현행 70) — 조건부 RS 통과율.** 날짜 `d`에서 `screen_stage2_entry()`(`stage_classifier.py:237-310`)의 RS 외 조건 다섯 개 — 조건 1 Stage 2 분류(`classify_stage(stock).stage == 2`, `:265-267`), 조건 2 `Close > SMA10`(`:278-280`), 조건 3 `SMA10 > SMA40`(`:282-284`), 조건 4 `Volume / max(VolumeSMA10, 1) >= _STAGE2_ENTRY_VOLUME_RATIO`(`:286-288`), 조건 6 `CHG_1M > 0`(`:294-296`) — 을 모두 통과한 종목 집합(지수 행은 `_load_stocks_for_classification()`이 이미 제외, `:199-200`; 거래량 0 행은 조건 4에서 탈락)을 분모로, 그중 `RS_12M_Rating >= _STAGE2_ENTRY_RS_MIN`(조건 5, `:290-292`)도 통과하는 비중을 구하고 W 평균을 낸다. 허용오차는 **상대 ±10%**다: `|변경 후 사본·채택 상수 값 − 변경 전 사본·현행 상수 값| <= 0.10 × 변경 전 사본·현행 상수 값`. 상대 허용오차를 쓰는 이유는 이 비중이 100% 근처에 몰릴 수 있어 절대 %p 폭이 값의 크기에 따라 다른 엄격도를 갖기 때문이며, 10%는 기준 (b)의 ±5%p가 기준선 33.53%에서 갖는 상대 폭(약 15%)보다 엄격하게 잡은 값이다. **판별력 사전 조건(두 사본)**: M3는 먼저 변경 전 사본과 변경 후 사본 **각각**에서 임계값 60·70·80의 조건부 RS 통과율을 측정해 기록하고, 사본마다 세 값이 엄격한 단조 감소이면서 `(60 값 − 80 값) > 0.10 × 70 값`인지 판정한다. **두 사본 중 하나라도** 이 조건을 충족하면 (a)를 재보정 기준으로 쓴다. 두 사본 모두 충족하지 않으면 (a)는 판별력이 없는 것으로 보고 **70의 재보정은 "기록만"으로 격하**한다 — 70을 유지하고 두 사본의 세 값을 기록한다. "기록만" 모드에서도 변경 후 사본의 70 값이 변경 전 사본의 70 값 대비 상대 ±10% 안에 드는지 확인하며(`|변경 후·70 값 − 변경 전·70 값| <= 0.10 × 변경 전·70 값`), 벗어나면 70을 그대로 확정하지 않고 측정값과 함께 사용자에게 에스컬레이션한다(plan-audit iter-3 부채 T1). plan 단계 실측(현재 라이브 DB 사본 = 변경 전 사본에 해당, research.md R15)은 60 → 100.00%, 70 → 99.48%, 80 → 97.85%로 폭 2.15%p가 0.10 × 99.48 = 9.95%p보다 작아 변경 전 사본에서는 사전 조건 미충족을 예고한다. 반면 plan-audit iter-3의 변경 후 사본 모의(감사 측정, 이 SPEC 작성 세션에서 재실행하지 않음)는 99.58 / 94.42 / 84.87로 폭 14.71 > 9.44여서 변경 후 사본에서는 충족을 예고한다 — 그 경우 (a)가 적용된다.
   - **(b) 강세 기준 `_STAGE2_RS_STRONG`(현행 60) — Stage 2 강세 비중.** 날짜 `d`에서 `classify_all(db, d)`(`:218`) 결과 중 `stage == 2`인 종목(분모 — Stage 판정은 RS를 쓰지 않으므로 가격 테이블로 결정됨, RS는 `:105`의 세부 라벨에만 쓰임)에서 `detail == "Stage 2 Strong"`인 비중의 W 평균. 허용오차는 기준선 대비 ±5%p다(plan-audit iter-2 실측 기준선 33.53%).
   - 각 기준에 대해 (1) 변경 전 사본·현행 상수, (2) 변경 후 사본·현행 상수, (3) 변경 후 사본·채택 상수를 측정하고, (3)이 (1)의 허용오차 안에 드는 상수를 채택한다.
-- **REQ-RSR-019** (단일 정의 지점) — The 재보정으로 바뀌는 각 임계값 shall 정의 지점 한 곳에서만 값이 바뀌어야 하며, 같은 임계값을 상수 없이 숫자로 반복한 리터럴(`backend/services/screen_service.py:61`의 `rs_12m >= 70`, `frontend/src/components/StockExplorer/StockTable.tsx:39`의 `c.rs_12m >= 70`)은 상수 참조로 바뀌어야 하고, 프론트 거울 상수는 교차 언어 등식 테스트로 백엔드 값과 같음이 보장되어야 한다. T8(`screen_service.py:61`)은 `_STAGE2_ENTRY_RS_MIN`을 참조한다(§2.4 D13).
+- **REQ-RSR-019** (단일 정의 지점) — The 재보정으로 바뀌는 각 임계값 shall 정의 지점 한 곳에서만 값이 바뀌어야 하며, 같은 임계값을 상수 없이 숫자로 반복한 리터럴(`backend/services/screen_service.py:61`의 `rs_12m >= 70`, `frontend/src/components/StockExplorer/StockTable.tsx:39`의 `c.rs_12m >= 70`)은 상수 참조로 바뀌어야 하고, 같은 파일의 `:32` 주석 `// rs_12m >= 70`은 숫자 대신 거울 상수 이름(`RS_STRONG_THRESHOLD`)을 가리키도록, `:263` 체크리스트 라벨 `"RS Strong (≥ 70)"`은 REQ-SDU-003 관례(상수 유래 title)대로 그 상수에서 끌어온 문자열로 바뀌어야 하며, 프론트 거울 상수는 교차 언어 등식 테스트로 백엔드 값과 같음이 보장되어야 한다. T8(`screen_service.py:61`)은 `_STAGE2_ENTRY_RS_MIN`을 참조한다(§2.4 D13).
 
 ### §3.6 불변과 회귀 실측
 

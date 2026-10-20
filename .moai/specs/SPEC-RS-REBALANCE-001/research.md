@@ -10,7 +10,7 @@
 
 - `generate_rs_db()`는 `weekly.py:390`에 정의된다.
 - 처리 날짜는 기준 종목(`REFERENCE_STOCK = "삼성전자"`, `my_chart/config.py:32`)의 `stock_prices` 날짜 목록이다(`weekly.py:416-421`).
-- 날짜마다 `SELECT * FROM stock_prices WHERE Date = ?` 후 `df.dropna()`를 적용하고(`weekly.py:425-430`), 그 행 집합 전체가 순위 분모가 된다. 지수 행(`KOSPI`, `KOSDAQ`)도 결측이 없으면 분모에 들어간다.
+- 날짜마다 `SELECT * FROM stock_prices WHERE Date = ?` 후 `df.dropna()`를 적용하고(`weekly.py:425-431`), 그 행 집합 전체가 순위 분모가 된다. 지수 행(`KOSPI`, `KOSDAQ`)도 결측이 없으면 분모에 들어간다.
 - 산식(`weekly.py:436-456`, orchestrator pre-probe 재확인):
   - `RS_12 = rank_1m + 0.8*rank_3m + 0.6*rank_6m + 0.4*rank_9m + 0.2*rank_12m`, `RS_12M_Rating = RS_12.rank(pct=True)*100`
   - `RS_6 = rank_1m + rank_3m + rank_6m`, `RS_3 = rank_1m + rank_3m`, `RS_1M_Rating = rank_1m`
@@ -38,7 +38,7 @@
 2026-09-02 sp=1 rs=2492
 ```
 
-`stock_prices`에는 한두 종목만 남은 주중 날짜인데 `relative_strength`에는 전 종목 행이 남아 있다. 계획서가 말한 "주중 날짜 42개 10만 4천 행, 옛 종목명 21개"는 실측(104,411행/42일, 21개 이름)과 일치하며, **그 밖에 쌍 불일치 9,963행이 더 있어 합계는 119,881행이다.** `(Name, Date)` 쌍 기준 삭제는 세 원인을 모두 덮는다.
+`stock_prices`에는 한두 종목만 남은 주중 날짜인데 `relative_strength`에는 전 종목 행이 남아 있다. 계획서가 말한 "주중 날짜 42개 10만 4천 행, 옛 종목명 21개"는 실측(104,411행/42일, 21개 이름)과 일치하며, **그 밖에 쌍 불일치 9,963행이 더 있어 합계는 119,881행이다.** REQ-RSR-001의 두 단계가 세 원인을 모두 덮는다: 42개 날짜와 이 4개 날짜(기준 종목 날짜가 아님)의 행은 (i) 비처리 날짜 행 선행 삭제로, 유효 날짜의 옛 이름 21개 행은 (ii) 날짜별 집합 차 삭제로 지워진다.
 
 지수 행: `SELECT Name, COUNT(*) FROM relative_strength WHERE Name IN ('KOSPI','KOSDAQ') GROUP BY Name;` → `KOSDAQ|346`, `KOSPI|346`.
 
@@ -82,7 +82,7 @@
 
 ### R3.1 결측 수익률 행 (plan-audit iter-1 D4, 이 세션 재측정)
 
-`weekly.py:425-430`은 `SELECT * FROM stock_prices WHERE Date = ?` 뒤 `df.dropna()`를 적용하므로, 약 35개 컬럼 중 하나라도 NULL이면 그 행은 등급을 받지 못한다.
+`weekly.py:425-431`은 `SELECT * FROM stock_prices WHERE Date = ?` 뒤 `df.dropna()`를 적용하므로, 약 35개 컬럼 중 하나라도 NULL이면 그 행은 등급을 받지 못한다.
 
 질의(최신 주차 `2026-10-16`): `SELECT COUNT(*), SUM(RS_12M IS NULL), SUM(RS_1M IS NULL OR RS_3M IS NULL OR RS_6M IS NULL OR RS_9M IS NULL OR RS_12M IS NULL) FROM stock_prices WHERE Date='2026-10-16'` → `2535|44|44`. 같은 날짜 `relative_strength` 행 수 → `2490`. 차이 45행의 내역: `RS_*` 결측 44행, 그리고 `RS_*`는 모두 있으나 `SMA40_Trend_4M`이 NULL인 `명인제약` 1행(질의: 가격 행 중 RS 행이 없고 `RS_1M`~`RS_12M`이 모두 NOT NULL인 이름 → `명인제약`; 그 행의 NULL 컬럼 → `['SMA40_Trend_4M']`). 즉 현행 `dropna`는 `RS_*` 결측보다 넓게 행을 뺀다. REQ-RSR-023은 이 현행 동작(전 컬럼 `dropna`)을 넓히지도 좁히지도 않고 그대로 고정한다.
 
@@ -108,7 +108,7 @@
 
 프론트 임계값 리터럴(명령: `grep -rn -E "rs[_a-zA-Z0-9]*\s*(>=|>|<=|<)\s*[0-9]+|…" …`):
 
-- `frontend/src/components/StockExplorer/StockTable.tsx:39` — `rs: c.rs_12m >= 70` **상수 미사용 리터럴**
+- `frontend/src/components/StockExplorer/StockTable.tsx:39` — `rs: c.rs_12m >= 70` **상수 미사용 리터럴**. 같은 임계값이 `:32` 주석 `// rs_12m >= 70`과 `:263` 라벨 `"RS Strong (≥ 70)"`에도 숫자로 반복된다(plan-audit review-4 D2, `grep -n -E 'rs_12m\s*>=\s*[0-9]|RS Strong[^"]*[0-9]' …` → 4줄, acceptance.md AC-RSR-013)
 - `frontend/src/components/StockExplorer/StockTable.tsx:62` — `RS_S2_STRONG_THRESHOLD` 사용
 - `frontend/src/components/ChartGrid/ChartCell.tsx:307,338` — `RS_TOP_THRESHOLD` 사용 + 상수 유래 title
 - `frontend/src/components/SectorAnalysis/SectorRankingTable.tsx:158` — `RS_TOP_THRESHOLD` 유래 title
@@ -148,7 +148,7 @@
 명령: `ls frontend/src/components/SectorAnalysis/`, `grep -rn "rs_avg\|rs_top_pct" frontend/src/components/SectorAnalysis/*.tsx …`, `grep -n "rs_12m" …StockBubbleChart.tsx …StockTable.tsx`
 
 - 섹터 테이블: `SectorRankingTable.tsx:50`(`RS Avg` 열), `:52`(`RS 80+ 비중` 열 — breadth는 이미 표시 중), `:158`(상수 유래 title), `:232-244`(셀 렌더). 데이터: `/sectors/ranking` → `backend/schemas/sector.py:26` `SectorRankItem`(`rs_avg :33`, `rs_top_pct :34`), 타입 `frontend/src/types/market.ts:95`.
-- 봉투 `data[]`: `backend/schemas/envelope.py:95-96,209-210` (`rs_avg`, `rs_top_pct`).
+- 봉투 `data[]`: `backend/schemas/envelope.py:95-96`(`SectorAggregateModel`의 `rs_avg`, `rs_top_pct`), `:209-210`(`aggregate_model()`이 `SectorAggregate` dataclass의 `a.rs_avg`·`a.rs_top_pct`를 옮김). dataclass는 `my_chart/analysis/aggregate_types.py:176` `SectorAggregate`(`rs_avg :211`, `rs_top_pct :212`) — 봉투에 `rs_med`를 싣으려면 이 dataclass에도 필드가 필요하다(plan-audit review-4 D1).
 - 섹터 상세 패널: `SectorDetailPanel.tsx:105-106`(카드), `:145`(소그룹 평균).
 - 종목 버블: `StockBubbleChart.tsx:175`(`s.rs_12m`), 타입 `frontend/src/types/bubble.ts:27`, 스키마 `backend/schemas/sector_advanced.py:48` `StockBubbleItem`(`rs_12m :53`), 데이터 `my_chart/analysis/sector_advanced.py:240` `_get_rs_on_date()`(주간 `relative_strength`).
 - 종목 테이블: `StockExplorer/StockTable.tsx:236`(`rs_12m` 셀), 데이터 `/stage/overview` → `backend/schemas/stage.py:36` `StageStock`(`rs_12m :46`), 원천 `stage_classifier.py:183-193` 주간 조인 질의(`rs.RS_12M_Rating`만 선택).
@@ -172,7 +172,7 @@
 | `tests/test_screen_service.py` | 32 | M3에서 T8(`rs_12m >= 70`)이 바뀌면 영향 |
 | `frontend/src/utils/__tests__/rsMetrics.test.ts` | 2 | 교차 언어 등식 테스트 — AC 확장 대상 |
 
-변경 기호(`RS_12M_Rating`, `rs_12m`, `RS_1M_Rating`, `generate_rs_db`)를 참조하는 테스트 파일 전체 목록과 파일별 판정은 plan.md §G에 있다(49개: Python 25, 프론트 24 — 세는 명령도 그곳에 있음). 이 중 13개 Python 파일은 `RS_1M_Rating` 없는 축약 `relative_strength` DDL을 만들므로 M4의 질의 변경에 반응할 수 있다. (0.1.0의 "Python 22개·프론트 28개"와 "대부분 반응하지 않는다"는 문장은 세는 명령이 달랐고 판정 근거가 없어 삭제했다.)
+변경 기호(`RS_12M_Rating`, `rs_12m`, `RS_1M_Rating`, `generate_rs_db`)를 참조하는 테스트 파일 전체 목록과 파일별 판정은 plan.md §G에 있다(50개: Python 25, 프론트 25 — 세는 명령도 그곳에 있음). 이 중 13개 Python 파일은 `RS_1M_Rating` 없는 축약 `relative_strength` DDL을 만들므로 M4의 질의 변경에 반응할 수 있다. (0.1.0의 "Python 22개·프론트 28개"와 "대부분 반응하지 않는다"는 문장은 세는 명령이 달랐고 판정 근거가 없어 삭제했다.)
 
 교차 언어 등식 테스트: `frontend/src/utils/__tests__/rsMetrics.test.ts:10,37,44-47`이 `node:fs`로 `sector_metrics.py`를 읽어 `_RS_TOP_THRESHOLD`를 수치로 추출해 `RS_TOP_THRESHOLD`와 비교한다. `:50-54`는 `RS_STRONG_THRESHOLD === 70`, `RS_S2_STRONG_THRESHOLD === 60`을 **리터럴로** 단언한다(백엔드 `_STAGE2_ENTRY_RS_MIN`/`_STAGE2_RS_STRONG`와는 비교하지 않음).
 
@@ -182,9 +182,9 @@ D1 가중치 고정 테스트: `grep -rn "_COMPOSITE_WEIGHTS" tests backend/test
 
 ## R9. 회귀 계측 도구 `scripts/rs_eval/stock_rs_eval.py`
 
-명령: `sed -n 1,101p scripts/rs_eval/stock_rs_eval.py`, `git status --short scripts/rs_eval` → `?? scripts/rs_eval/`(미추적)
+명령: `sed -n 1,101p scripts/rs_eval/stock_rs_eval.py`, `git ls-files scripts/rs_eval` → `stock_rs_eval.py` 포함 10개 파일(f747ce5부터 추적 중; plan 작성 당시에는 `?? scripts/rs_eval/` 미추적이었다)
 
-- CLI: `python -I scripts/rs_eval/stock_rs_eval.py <H>`, `H`=향후 주 수(기본 4). DB 경로와 `sys.path`가 절대 경로로 하드코딩돼 있다(`:6`, `:8`).
+- CLI: `python -I scripts/rs_eval/stock_rs_eval.py <H>`, `H`=향후 주 수(기본 4). `sys.path`(`:6`)와 DB 경로(`DB = …`, `:9`)가 절대 경로로 하드코딩돼 있다.
 - 유니버스: `stock_prices`에서 `KOSPI`/`KOSDAQ` 제외(`:14`), ISO 주차별 마지막 날짜만 남김(`:19-21` — 주중 고아 날짜를 자연히 배제), 20주 평균 주간거래대금 `tv20 >= 5e9`(`:99`), 날짜당 200종목 미만이면 건너뜀(`:74`), 처음 52주와 마지막 H주는 제외(`dates[52:-H]`, `:71`), 점수 ≥ 90을 상위 10%로(`:76`).
 - **중요**: 이 스크립트는 `relative_strength` 테이블을 읽지 않는다. 각 후보 산식을 `stock_prices`의 원시 컬럼에서 **스크립트 안에서 다시 계산**하고, 순위도 50억 유니버스 안에서 매긴다. 따라서 "새 산식 재생성 후 이 스크립트를 다시 돌리는 것"은 프로덕션 코드를 검증하지 못한다. AC의 프로덕션 측 계측을 위해 `relative_strength.RS_12M_Rating`을 읽는 경로가 필요하다(plan.md M2).
 - IBD식 정의(`:36-38`): `q1=RS_3M; q2=(1+RS_6M)/(1+RS_3M)-1; q3=(1+RS_9M)/(1+RS_6M)-1; q4=(1+RS_12M)/(1+RS_9M)-1; pr(2*q1+q2+q3+q4)` — 비율 기반, 원시 수익률에 가중합 후 순위. `2:1:1:1`은 `0.4:0.2:0.2:0.2`와 순위가 같다(양의 상수배).

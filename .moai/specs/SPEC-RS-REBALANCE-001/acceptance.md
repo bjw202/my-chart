@@ -1,7 +1,7 @@
 # SPEC-RS-REBALANCE-001 — 수용 기준 (acceptance)
 
 > 요구사항은 `spec.md` §3(REQ-RSR-001~023)에 있다. 이 문서는 검증 층이며 각 기준을 Given-When-Then으로 쓴다.
-> **가격 행 픽스처 규칙**: `generate_rs_db()`는 `SELECT * FROM stock_prices` 뒤 `df.dropna()`를 적용하므로(`weekly.py:425-430`, REQ-RSR-023), 픽스처의 모든 `stock_prices` 행은 약 35개 전 컬럼(`my_chart.db.weekly._STOCK_PRICES_COLS`, `weekly.py:33`)을 NULL 없이 채워야 한다 — 그렇지 않으면 행이 결측 규칙으로 빠져 다른 AC의 기대값이 엉뚱한 이유로 맞거나 틀린다. 테스트는 공용 빌더 `tests/rsr_fixtures.py`의 `price_row(name, date, **overrides)`(M1 신설: `_STOCK_PRICES_COLS` 전 컬럼에 NULL 아닌 기본값을 채우고 지정 컬럼만 덮어씀)와 `make_weekly_db(tmp_path, rows)`(테이블은 `_ensure_stock_prices_table()`로 생성)를 함께 쓴다. AC-RSR-018처럼 NULL을 의도한 경우에만 `overrides`로 `None`을 넣는다.
+> **가격 행 픽스처 규칙**: `generate_rs_db()`는 `SELECT * FROM stock_prices` 뒤 `df.dropna()`를 적용하므로(`weekly.py:425-431`, REQ-RSR-023), 픽스처의 모든 `stock_prices` 행은 약 35개 전 컬럼(`my_chart.db.weekly._STOCK_PRICES_COLS`, `weekly.py:33`)을 NULL 없이 채워야 한다 — 그렇지 않으면 행이 결측 규칙으로 빠져 다른 AC의 기대값이 엉뚱한 이유로 맞거나 틀린다. 테스트는 공용 빌더 `tests/rsr_fixtures.py`의 `price_row(name, date, **overrides)`(M1 신설: `_STOCK_PRICES_COLS` 전 컬럼에 NULL 아닌 기본값을 채우고 지정 컬럼만 덮어씀)와 `make_weekly_db(tmp_path, rows)`(테이블은 `_ensure_stock_prices_table()`로 생성)를 함께 쓴다. AC-RSR-018처럼 NULL을 의도한 경우에만 `overrides`로 `None`을 넣는다.
 > **대조 단언(lessons #9)**: 모든 AC는 "어떤 잘못된 구현을 잡는가"를 명시하고, 그 되돌림을 실제로 적용했을 때 RED가 관측되어야 한다. 단언의 두 변은 같은 식에서 나오면 안 되며, 적어도 한 변은 프로덕션 경로(실제 함수·실제 SQL·실제 응답)에서 나와야 한다. 기계적으로 되돌릴 수 없는 경우 monkeypatch 주입 대상 심볼을 적는다.
 > **픽스처 공통 주의**: `generate_rs_db()`는 기준 종목(`REFERENCE_STOCK = "삼성전자"`)의 날짜 목록만 처리한다(`weekly.py:416-421`). 기준 종목을 픽스처에 넣으면 그 행이 분모에 들어가 기대 순위가 바뀌므로, 테스트는 `monkeypatch.setattr("my_chart.db.weekly.REFERENCE_STOCK", <픽스처 종목명>)`으로 기준 종목을 픽스처 종목 하나로 지정한다. 기준 종목은 픽스처의 모든 처리 대상 날짜에 행을 가져야 한다.
 > 테스트 DB는 `tmp_path`에 새로 만든다. 라이브 `Output/` DB는 AC-RSR-001·002·007·014·015·017의 "라이브 단계"에서만 읽고, 쓰기는 M2·M4의 정식 갱신 경로로만 한다.
@@ -22,9 +22,9 @@
 | AC-RSR-010 | REQ-RSR-013, 014 | M4 | `rs_med`를 평균으로 / 결측을 0으로 |
 | AC-RSR-011 | REQ-RSR-015, 016, 022 | M5 | `>` 경계 / 리터럴 80 / 결측을 높은 값으로 |
 | AC-RSR-012 | REQ-RSR-017 | M5 | `rs_med` 열 누락·`rs_avg` 재사용 |
-| AC-RSR-013 | REQ-RSR-019, 022 | M3 | 리터럴 70 잔존 / 거울 상수 불일치 / 80 변경 |
+| AC-RSR-013 | REQ-RSR-019, 022 | M3 | 리터럴 70 잔존(코드·주석·라벨) / 거울 상수 불일치 / 80 변경 |
 | AC-RSR-014 | REQ-RSR-020 | M2 (기준선·목표), M6 (기록) | 현행 산식으로 재생성 / 원시 컬럼 재계산 |
-| AC-RSR-015 | REQ-RSR-018 | M3 | (a) 60/70/80 판별력 사전 조건 + 상대 ±10% / (b) ±5%p와 기록된 차이 |
+| AC-RSR-015 | REQ-RSR-018 | M3 | (a) 두 사본 60/70/80 판별력 사전 조건 + 상대 ±10%(기록만 모드 포함) / (b) ±5%p와 기록된 차이 |
 | AC-RSR-016 | REQ-RSR-021 | M2 | 가중치 변경 |
 | AC-RSR-017 | REQ-RSR-001, 004 | M1 (+M2 라이브) | (i)·(ii)를 짝 기준 삭제로 바꿔치기 |
 | AC-RSR-018 | REQ-RSR-023 | M1 | 결측 행에 부분 산식으로 등급 부여 |
@@ -141,10 +141,19 @@
 
 - **Given** M3에서 재보정한 Stage 2 상수(B-3: 70/60만 대상, `_RS_TOP_THRESHOLD` 80 유지)
 - **When** 다음 정적 스캔과 테스트를 실행한다
-  - `grep -n -E "rs_12m\s*>=\s*[0-9]" backend/services/screen_service.py frontend/src/components/StockExplorer/StockTable.tsx`
+  - `grep -n -E 'rs_12m\s*>=\s*[0-9]|RS Strong[^"]*[0-9]' backend/services/screen_service.py frontend/src/components/StockExplorer/StockTable.tsx`
   - `rsMetrics.test.ts`
-- **Then** 스캔 결과 0줄(변경 전 관측: `screen_service.py:61`, `StockTable.tsx:39` 두 줄 — research.md R4). `rsMetrics.test.ts`가 `RS_STRONG_THRESHOLD`·`RS_S2_STRONG_THRESHOLD`를 `stage_classifier.py`에서 추출한 `_STAGE2_ENTRY_RS_MIN`·`_STAGE2_RS_STRONG`과 수치로 비교한다(현재 `:50-54`의 리터럴 단언을 대체). 또한 `_RS_TOP_THRESHOLD == 80.0`과 `RS_TOP_THRESHOLD === 80`이 변경 후에도 유지된다(REQ-RSR-022)
-- **대조**: 거울 상수 하나만 바꾸고 백엔드를 그대로 두면 교차 언어 테스트가 RED. 리터럴을 남기면 스캔이 1줄 이상(RED). `_RS_TOP_THRESHOLD`를 80 외의 값으로 바꾸면 유지 단언이 RED.
+- **Then** 스캔 결과 0줄. 변경 전 관측(2026-10-20, spec 0.3.1 정정 세션에서 위 명령을 그대로 실행, 종료코드 0) — 4줄:
+
+  ```
+  backend/services/screen_service.py:61:        " AND rs_12m >= 70"                              # T8
+  frontend/src/components/StockExplorer/StockTable.tsx:32:  rs: boolean    // rs_12m >= 70
+  frontend/src/components/StockExplorer/StockTable.tsx:39:    rs: c.rs_12m >= 70,
+  frontend/src/components/StockExplorer/StockTable.tsx:263:                  <CheckDot pass={checklist.rs} label="RS Strong (≥ 70)" checkKey="rs" />
+  ```
+
+  네 줄 모두 REQ-RSR-019의 대상이다: `:61`(T8)과 `:39`는 상수 참조로, `:32` 주석은 상수 이름(`RS_STRONG_THRESHOLD`)을 가리키도록, `:263` 라벨은 상수에서 끌어온 문자열(예: 템플릿 리터럴 안의 `${RS_STRONG_THRESHOLD}`)로 바뀐다. 이 형태들은 패턴에 걸리지 않는다 — 비교식 오른쪽이 숫자가 아니고(`rs_12m >= {상수}`·`rs_12m >= RS_STRONG_THRESHOLD`), 라벨의 `RS Strong` 뒤부터 닫는 큰따옴표 전까지 숫자가 없기 때문이다(템플릿 리터럴의 상수 이름에는 숫자가 없다). 같은 줄의 `"Vol Surge (ratio ≥ 1.5)"`(`:262`)는 `RS Strong` 접두가 없어 걸리지 않는다. 패턴 자체 검증(정정 세션 scratchpad): 위 준수 형태 4줄 + `Vol Surge` 줄로 만든 가짜 파일은 0줄(종료코드 1), `RS Strong ≥ 70`·`RS Strong (>= 70)`·`RS Strong (≥ 65)`·`// rs_12m >=70`으로 만든 위반 가짜 파일은 4줄 모두 검출(plan-audit review-5 N2 반영 후 패턴, 오케스트레이터 재측정). 라벨 쪽 패턴은 괄호·기호 형태와 무관하게 `RS Strong` 뒤의 숫자를 잡는다. `rsMetrics.test.ts`가 `RS_STRONG_THRESHOLD`·`RS_S2_STRONG_THRESHOLD`를 `stage_classifier.py`에서 추출한 `_STAGE2_ENTRY_RS_MIN`·`_STAGE2_RS_STRONG`과 수치로 비교한다(현재 `:50-54`의 리터럴 단언을 대체). 또한 `_RS_TOP_THRESHOLD == 80.0`과 `RS_TOP_THRESHOLD === 80`이 변경 후에도 유지된다(REQ-RSR-022)
+- **대조**: 거울 상수 하나만 바꾸고 백엔드를 그대로 두면 교차 언어 테스트가 RED. 코드 리터럴·주석·라벨 중 하나라도 숫자로 남기면 스캔이 1줄 이상(RED) — 패턴이 숫자를 특정하지 않으므로 재보정 값(예: `65`)을 숫자로 다시 적어 넣는 구현도 잡는다. `_RS_TOP_THRESHOLD`를 80 외의 값으로 바꾸면 유지 단언이 RED.
 - **grep 종료코드 규약**: 0줄이면 `grep` 종료코드는 1이다. 판정은 출력 줄 수로 한다.
 - **소유권 정리(D13)**: `rsMetrics.test.ts:50-54`는 70/60을 `SPEC-SECTOR-DISPLAY-UNIFY-001` REQ-SDU-003의 프론트 소유 상수로 단언한다. 이 SPEC은 소유권을 옮기지 않고 값만 양쪽에서 함께 바꾸며, 리터럴 단언을 백엔드 추출 비교로 바꾸는 것은 값 동일성을 기계로 지키기 위한 것이다. `screen_service.py:61`(T8)은 `_STAGE2_ENTRY_RS_MIN`을 참조하도록 바뀐다(spec.md §2.4 D13).
 
@@ -164,15 +173,16 @@
 - **Given** DB 사본 `Output/snapshots/weekly_before_rsr.db`, `Output/snapshots/weekly_after_rsr.db`와 주차 집합 W = 두 사본에 모두 있는 기준 종목(`삼성전자`) 날짜 중 최근 12개. 측정 명령은 `scripts/rs_eval/stage2_ratio_eval.py --db <경로> --weeks 12 --mode {conditional|strong} --threshold <값>`이며, `my_chart.analysis.stage_classifier`의 상수를 인자값으로 바꾼 뒤 프로덕션 함수(`_load_stocks_for_classification`, `classify_stage`, `classify_all`)를 호출한다. 두 기준의 분모는 가격 테이블로 정해지는 종목 집합이라 두 사본에서 같다
 - **When / Then — (a) 조건부 RS 통과율(`--mode conditional`)**
   - 정의: 날짜 `d`에서 RS 외 진입 조건 다섯 개(Stage 2 분류 `:265-267`, `Close > SMA10` `:278-280`, `SMA10 > SMA40` `:282-284`, 거래량 배수 `:286-288`, `CHG_1M > 0` `:294-296`)를 모두 통과한 종목 중 `RS_12M_Rating >= 임계값`인 비중의 W 평균
-  - 1단계(판별력 사전 조건): 변경 전 사본에서 임계값 60·70·80의 값 `c60`, `c70`, `c80`을 측정·기록한다. `c60 > c70 > c80`이고 `c60 − c80 > 0.10 × c70`이면 2단계로 간다. 아니면 (a)는 판별력이 없으므로 **70은 "기록만"**: 상수를 70으로 유지하고 `c60`·`c70`·`c80`과 변경 후 사본의 `c70`을 기록하면 이 AC의 (a)는 충족된다
+  - 1단계(판별력 사전 조건, 두 사본): 변경 전 사본과 변경 후 사본 **각각**에서 임계값 60·70·80의 값 `c60`, `c70`, `c80`을 측정·기록하고, 사본마다 `c60 > c70 > c80`이면서 `c60 − c80 > 0.10 × c70`인지 판정한다. **두 사본 중 하나라도** 충족하면 2단계로 간다. 둘 다 충족하지 않으면 (a)는 판별력이 없으므로 **70은 "기록만"**: 상수를 70으로 유지하고 두 사본의 `c60`·`c70`·`c80`을 기록한 뒤, `|c70(변경 후) − c70(변경 전)| <= 0.10 × c70(변경 전)`을 단언한다. 이 단언이 성립하면 이 AC의 (a)는 충족된다. 성립하지 않으면 (a)는 PASS도 FAIL도 선언하지 않고 측정값과 함께 사용자에게 에스컬레이션한다(blocker 보고, plan-audit iter-3 부채 T1)
+  - **대조(1단계)**: 사전 조건을 변경 전 사본에서만 판정하는 구현은, 변경 후 사본만 충족하는 경우(아래 plan 단계 예측이 바로 그 경우다) 2단계를 건너뛰어 RED — 기록에 변경 후 사본의 판정이 없으면 이 AC는 미충족이다. "기록만" 모드에서 변경 후 c70이 상대 ±10%를 벗어났는데 70을 유지하고 PASS를 선언하면 RED(에스컬레이션 누락)
   - 2단계(사전 조건 충족 시): `|변경 후·채택 값 − 변경 전·70 값| <= 0.10 × 변경 전·70 값`
   - **대조(2단계)**: 사전 조건이 `c60 − c80 > 0.10 × c70`을 요구하므로, 채택값 대신 80(또는 60)을 넣으면 측정값이 허용오차 밖으로 나갈 수 있는 판별 폭이 확보된다. 이 경우 변경 후 사본에서 80으로 측정한 값이 허용오차 밖임을 함께 기록한다(RED 관측)
-  - **plan 단계 예측**: 현재 라이브 DB 사본에서 `c60 = 100.00`, `c70 = 99.48`, `c80 = 97.85`(research.md R15) — 단조는 성립하나 폭 2.15%p < 9.95%p로 사전 조건 미충족. 따라서 M3에서도 같은 결과면 70은 "기록만"이 된다. 이 예측은 측정이며, M3의 변경 전 사본 측정이 판정을 대신한다
+  - **plan 단계 예측**: 현재 라이브 DB 사본(변경 전 사본에 해당)에서 `c60 = 100.00`, `c70 = 99.48`, `c80 = 97.85`(research.md R15) — 단조는 성립하나 폭 2.15%p < 9.95%p로 사전 조건 미충족. plan-audit iter-3의 변경 후 사본 모의(감사 측정, 재실행하지 않음)는 `99.58 / 94.42 / 84.87`로 폭 14.71 > 9.44여서 충족 — 따라서 M3에서도 같은 결과면 (a)가 적용되어 2단계로 가며, 70 유지 시 `|94.42 − 99.48| = 5.06 <= 9.948`로 허용오차 안이다. 이 예측들은 판정이 아니며, M3의 두 사본 측정이 판정을 대신한다
 - **When / Then — (b) Stage 2 강세 비중(`--mode strong`)**
   - 정의: `classify_all(db, d)` 결과 중 `stage == 2`인 종목에서 `detail == "Stage 2 Strong"`인 비중의 W 평균(분모는 Stage 판정이 RS를 쓰지 않으므로 두 사본에서 같은 집합)
   - (1) 변경 전·현행 60, (2) 변경 후·현행 60, (3) 변경 후·채택 값을 측정하고, (3)이 (1)과 ±5%p 이내다(plan-audit iter-2 실측 기준선 33.53%)
   - **대조**: 채택 값이 60과 다르면 (2)와 (3)의 차이는 0이 아니어야 한다(0이면 바꿀 근거가 없어 RED). 60을 유지하면 (2)가 (1)과 ±5%p 이내여야 한다 — (2)가 범위 밖인데 60을 유지했다면 RED
-- 두 기준의 모든 측정값·명령·채택 상수는 progress.md에 기록한다
+- 두 기준의 모든 측정값·명령·채택 상수는 progress.md에 기록한다. (a)는 사본마다 W의 날짜별 RS 외 조건 통과 종목 수(분모 크기)를 W 평균 옆에 함께 기록한다 — 분모가 날짜별 수십 개 수준(research.md R15: 12~54개)이라 상대 ±10%가 종목 몇 개의 차이에 해당함을 판정 독자가 볼 수 있게 하기 위해서다(plan-audit iter-3 부채 T2)
 
 ## AC-RSR-016 — 섹터 종합 점수 가중치 불변 (REQ-RSR-021) — 계획서 AC-6
 
@@ -201,7 +211,7 @@
 
 ## §D.1 엣지 케이스
 
-- 분모 필터 후 한 날짜의 종목이 0개 — 현행처럼 그 날짜를 건너뛴다(`weekly.py:432`). 행을 기록하지 않는다.
+- 분모 필터 후 한 날짜의 종목이 0개 — 현행처럼 그 날짜를 건너뛴다(`weekly.py:433`). 행을 기록하지 않는다.
 - 최신 주차에 `RS_1M_Rating`이 있으나 `RS_12M_Rating` 계산이 REQ-RSR-007로 제외된 종목 — 같은 행 전체가 분모에서 빠지므로 두 값 모두 없다. `rs_1m`, `rs_12m` 모두 null/미기록.
 - 섹터 구성 종목 중 유효 RS 0개 — `rs_med` 결측(봉투 `MetricValueModel`의 결측 표현).
 

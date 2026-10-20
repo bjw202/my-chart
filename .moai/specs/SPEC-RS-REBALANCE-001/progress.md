@@ -62,6 +62,21 @@ iter-2 결함 N1~N5는 감사가 모두 해소로 확인했다(파일 대조 + �
 | T3 | MINOR | (b) 거래량 0 종목의 낡은 등급이 before 사본에만 있어 Strong 비율이 33.53→33.72로 미세 이동 | 알려진 소폭 효과로 기록 |
 | — | 참고 | `design.md` 미작성(Tier L), 사유 plan.md §D | 유지 |
 
+## §E.1.4 Run-phase Plan Audit Gate (2026-10-20, review-4)
+
+- audit_verdict: PASS-WITH-DEBT 0.88 (Tier L 기준 0.85) — 명확성 0.90 / 완전성 0.85 / 검증가능성 0.85 / 추적성 0.95
+- audit_report: .moai/reports/plan-audit/SPEC-RS-REBALANCE-001-review-4.md
+- audit_at: 2026-10-20T07:20:10Z
+- auditor_version: plan-auditor (Claude-only, 교차 모델 미사용)
+- audit_cache_hit: false (이 SPEC의 이전 보고서 파일 부재)
+- f747ce5 이후 표류: 없음 — 인용 경로 전체 `git diff --quiet f747ce5 HEAD` 종료 0, DB 수치 재측정 일치
+- 신규 결함: SHOULD-FIX 3(D1 `aggregate_types.py` 누락, D2 AC-RSR-013 grep 기준 3줄, D3 T1 부채가 REQ/AC에 미반영) / MINOR 5(D4~D8)
+- 오케스트레이터 확인: D1(`envelope.py:209-210`이 `SectorAggregate`에서 읽음), D2(`StockTable.tsx:32` 주석이 grep에 걸림) 직접 관측. 추가 관측: `StockTable.tsx:263` 라벨 `"RS Strong (≥ 70)"` 리터럴
+
+- 결함 처리(사용자 결정: 착수 전 수정): manager-spec이 D1~D8 수정(spec.md 0.3.1, 추가로 REQ-RSR-006 `weekly.py:450-456` 정정) → 차등 재감사 review-5 **PASS 0.92** (명확성 0.92 / 완전성 0.92 / 검증가능성 0.90 / 추적성 0.95, D1~D8 전부 해소, 2026-10-20T07:47:20Z)
+- review-5 신규 MINOR 2건은 오케스트레이터가 직접 수정: N1 plan.md M3·§D 18행에 `:32` 주석·`:263` 라벨 추가, N2 AC-RSR-013 라벨 패턴을 `RS Strong[^"]*[0-9]`로 넓힘 — 현재 코드 4줄, 준수 형태 0줄, 위반 형태 4/4 검출(scratchpad 재측정)
+- 이 SPEC의 run 진입 기준 판정: PASS 0.92 (report .moai/reports/plan-audit/SPEC-RS-REBALANCE-001-review-5.md)
+
 ## Phase 1 SKIP Rationale
 
 건너뛰지 않음(not skipped). 이 SPEC은 기존 코드(`weekly.py`, `meta_service.py`, 섹터 집계, 프론트 세 화면)를 고치므로 코드베이스 조사가 필수였다. 실제로 조사에서 계획서 주장 세 건이 관측과 달랐다(고아 행 합계, 우선주 패턴 오탐, `stock_meta` 비재생성 — 아래 표). 조사를 건너뛰었다면 세 건 모두 run 단계에서 결함으로 드러났을 것이다.
@@ -119,9 +134,23 @@ Input parameters:
 | concurrency benefit | LOW — 코딩 중심이며 M1→M2→M3 순서가 데이터 의존(재생성 전 기준선 측정, 재생성 후 재보정) |
 | 라이브 DB 쓰기 | M2(재생성), M4(메타 재구축) — 동시 쓰기 금지 |
 
-Decision: (run-phase에서 결정)
+| 모드 | 평가 |
+| --- | --- |
+| serial | 채택 — 마일스톤 단위로 `manager-develop`(tdd) 단독 스폰, 순차 |
+| fanout | 기각 — 연구는 plan 단계에서 끝남, 남은 일은 코딩 중심 |
+| agent-team | 기각 — 명시 요청 없음(실험 기능), 라이브 DB 쓰기 경합 위험 |
+| sweep | 기각 — 균일 기계 변환 아님, 파일 간 의존·데이터 순서 의존 |
 
-Justification: (run-phase에서 결정)
+Decision: serial (files: 24, domains: 3, milestones: 6)
+
+Justification: M1→M2→M3이 데이터 순서로 묶이고(재생성 전 기준선, 재생성 후 재보정), M2·M4가 라이브 `Output/` DB에 쓰므로 쓰기 가능한 에이전트를 동시에 둘 수 없다. 코딩 중심 작업이라 병렬 이득도 낮다.
+
+## §F.1 Implementation Kickoff Approval (2026-10-20, 사용자 결정)
+
+- 착수: 승인 — 단, 감사 review-4의 SHOULD-FIX 3건(D1~D3)과 MINOR 5건(D4~D8)을 manager-spec이 먼저 고친 뒤 M1 시작
+- 진행 방식: 반자율 — 마일스톤마다 오케스트레이터가 증거를 읽고 사용자 확인 후 다음 마일스톤
+- 라이브 DB(M2 재생성, M4 메타 재구축): `.bak_<날짜>` 백업 + 변경 전 기준선 측정 후, 덮어쓰기 직전에 사용자 확인
+- `/moai goal` 미설정(반자율 선택)
 
 ## §E.2 Run-phase Evidence
 

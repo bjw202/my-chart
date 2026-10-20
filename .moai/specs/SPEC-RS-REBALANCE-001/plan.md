@@ -34,7 +34,7 @@
 | `relative_strength` | 스키마 불변, 값 의미 변경(`RS_12M_Rating`), 지수·거래량 0·고아 행 소거 | REQ-RSR-001~009 |
 | `stock_meta` | `rs_1m REAL` 컬럼 1개, **테이블 끝** 추가 + 멱등 ALTER | REQ-RSR-010·011, research.md R6 |
 | `StageStock`(`backend/schemas/stage.py:36`) · `StockBubbleItem`(`backend/schemas/sector_advanced.py:48`) | `rs_1m: float \| None` 추가 | REQ-RSR-012 |
-| `SectorAggregate` 봉투(`backend/schemas/envelope.py:95-96`) · `SectorRankItem`(`backend/schemas/sector.py:26`) · 레거시 dataclass(`sector_metrics.py:107-108`) | `rs_med` 추가 (봉투는 `MetricValueModel`, 랭킹 항목은 `float \| None`) | REQ-RSR-013 |
+| `SectorAggregate` dataclass(`my_chart/analysis/aggregate_types.py:176`, 형제 필드 `rs_avg`·`rs_top_pct` `:211-212`) · 봉투 `SectorAggregateModel`(`backend/schemas/envelope.py:95-96`; `aggregate_model()` `:209-210`이 dataclass의 `a.rs_avg`·`a.rs_top_pct`를 옮김) · `SectorRankItem`(`backend/schemas/sector.py:26`) · 레거시 dataclass `SectorRank`(`sector_metrics.py:107-108`) | `rs_med` 추가 (dataclass는 `MetricValue`, 봉투는 `MetricValueModel`, 랭킹 항목은 `float \| None`) | REQ-RSR-013 |
 | 프론트 타입 `types/stage.ts`, `types/bubble.ts`, `types/market.ts` | `rs_1m?`, `rs_med` 추가 | REQ-RSR-015·017 |
 
 ## §D 파일 목록과 Tier 판정
@@ -42,10 +42,10 @@
 명령(재현용, 코드 cwd에서 실행):
 
 ```bash
-for f in my_chart/db/weekly.py my_chart/analysis/stage_classifier.py my_chart/analysis/sector_metrics.py my_chart/analysis/sector_advanced.py backend/services/meta_service.py backend/services/stage_service.py backend/services/sector_advanced_service.py backend/services/sector_ranking_service.py backend/services/screen_service.py backend/schemas/stage.py backend/schemas/sector.py backend/schemas/sector_advanced.py backend/schemas/envelope.py frontend/src/utils/rsMetrics.ts frontend/src/types/stage.ts frontend/src/types/bubble.ts frontend/src/types/market.ts frontend/src/components/StockExplorer/StockTable.tsx frontend/src/components/SectorAnalysis/StockBubbleChart.tsx frontend/src/components/SectorAnalysis/SectorRankingTable.tsx scripts/rs_eval/stock_rs_eval.py docs/rs-timeline-eli5.html scripts/rs_eval/stage2_ratio_eval.py; do [ -f "$f" ] && e=$((e+1)) || echo "new: $f"; done; echo "existing=$e"
+for f in my_chart/db/weekly.py my_chart/analysis/stage_classifier.py my_chart/analysis/sector_metrics.py my_chart/analysis/sector_advanced.py my_chart/analysis/aggregate_types.py backend/services/meta_service.py backend/services/stage_service.py backend/services/sector_advanced_service.py backend/services/sector_ranking_service.py backend/services/screen_service.py backend/schemas/stage.py backend/schemas/sector.py backend/schemas/sector_advanced.py backend/schemas/envelope.py frontend/src/utils/rsMetrics.ts frontend/src/types/stage.ts frontend/src/types/bubble.ts frontend/src/types/market.ts frontend/src/components/StockExplorer/StockTable.tsx frontend/src/components/SectorAnalysis/StockBubbleChart.tsx frontend/src/components/SectorAnalysis/SectorRankingTable.tsx scripts/rs_eval/stock_rs_eval.py docs/rs-timeline-eli5.html scripts/rs_eval/stage2_ratio_eval.py; do [ -f "$f" ] && e=$((e+1)) || echo "new: $f"; done; echo "existing=$e"
 ```
 
-관측 출력: `new: scripts/rs_eval/stage2_ratio_eval.py`, `existing=22` — 합계 23개(기존 22 + M3 신설 1). 구성: Python(`my_chart/`·`backend/`) 13, 프론트 7, 스크립트 2, 문서 1. B-3 결정으로 `my_chart/screening/momentum.py`, `my_chart/db/queries.py`(80/90 기준)는 목록에서 빠졌다.
+관측 출력(spec 0.3.1 정정 세션 재실행): `new: scripts/rs_eval/stage2_ratio_eval.py`, `existing=23` — 합계 24개(기존 23 + M3 신설 1). 구성: Python(`my_chart/`·`backend/`) 14, 프론트 7, 스크립트 2, 문서 1. 표의 24번(`aggregate_types.py`)은 plan-audit review-4 D1로 추가했다 — 봉투 `rs_med`는 `aggregate_model()`이 읽는 `SectorAggregate` dataclass에 필드가 있어야 채워진다. B-3 결정으로 `my_chart/screening/momentum.py`, `my_chart/db/queries.py`(80/90 기준)는 목록에서 빠졌다.
 
 | # | 경로 | 변경 종류 | 마일스톤 |
 |---|---|---|---|
@@ -66,16 +66,17 @@ for f in my_chart/db/weekly.py my_chart/analysis/stage_classifier.py my_chart/an
 | 15 | `frontend/src/types/stage.ts` | 수정 — `rs_1m` | M5 |
 | 16 | `frontend/src/types/bubble.ts` | 수정 — `rs_1m` | M5 |
 | 17 | `frontend/src/types/market.ts` | 수정 — `rs_med` | M5 |
-| 18 | `frontend/src/components/StockExplorer/StockTable.tsx` | 수정 — `:39` 리터럴 → 상수(M3), 열기 배지(M5) | M3, M5 |
+| 18 | `frontend/src/components/StockExplorer/StockTable.tsx` | 수정 — `:39` 리터럴 → 상수, `:32` 주석·`:263` 라벨 → 상수 유래(M3), 열기 배지(M5) | M3, M5 |
 | 19 | `frontend/src/components/SectorAnalysis/StockBubbleChart.tsx` | 수정 — 툴팁 열기 배지 | M5 |
 | 20 | `frontend/src/components/SectorAnalysis/SectorRankingTable.tsx` | 수정 — `rs_med` 열 | M5 |
-| 21 | `scripts/rs_eval/stock_rs_eval.py` | 신규 추적 + `--production`·`--db <경로>` 모드 추가 | M2, M6 |
+| 21 | `scripts/rs_eval/stock_rs_eval.py` | 수정 — `--production`·`--db <경로>` 모드 추가(파일은 f747ce5부터 추적 중) | M2, M6 |
 | 22 | `docs/rs-timeline-eli5.html` | 수정 — 새 산식 설명 | M6 |
 | 23 | `scripts/rs_eval/stage2_ratio_eval.py` | 신규 — `--mode conditional`(조건부 RS 통과율, 70)·`--mode strong`(Stage 2 강세 비중, 60) 측정(REQ-RSR-018) | M3 |
+| 24 | `my_chart/analysis/aggregate_types.py` | 수정 — `SectorAggregate` dataclass에 `rs_med: MetricValue` 필드(형제 `rs_avg`·`rs_top_pct`와 같은 결측 기본값) | M4 |
 
 테스트 파일은 별도(§G).
 
-**Tier 판정: L.** 마일스톤 6개(≥3)이고 운영 코드 대상 파일이 23개(≥10)다. 경계값이 아니므로 "더 단순한 쪽" 규칙은 적용되지 않는다. Tier L 표준 산출물 중 `design.md`는 별도로 만들지 않는다 — 설계 결정은 spec.md §2와 이 문서 §A~§C에 이미 고정되어 있어 같은 내용을 한 번 더 쓰게 된다. `research.md`는 작성했다.
+**Tier 판정: L.** 마일스톤 6개(≥3)이고 운영 코드 대상 파일이 24개(≥10)다. 경계값이 아니므로 "더 단순한 쪽" 규칙은 적용되지 않는다. Tier L 표준 산출물 중 `design.md`는 별도로 만들지 않는다 — 설계 결정은 spec.md §2와 이 문서 §A~§C에 이미 고정되어 있어 같은 내용을 한 번 더 쓰게 된다. `research.md`는 작성했다.
 
 ## §E 위험
 
@@ -89,9 +90,9 @@ for f in my_chart/db/weekly.py my_chart/analysis/stage_classifier.py my_chart/an
 | 짝이 있는 낡은 행 | 지수 600행·거래량 0 행 16,369행·비기준 날짜 5행은 `stock_prices` 짝이 있어 쌍 기준 삭제로 지워지지 않고 UPSERT로도 덮이지 않음(R2.1) — 최신 주차의 거래량 0 행 101개가 `stock_meta.rs_12m`·섹터 `rs_avg`·Stage 분류로 흘러감 | REQ-RSR-001 (ii) 날짜별 집합 차 삭제 + AC-RSR-017 |
 | 테스트의 축약 `relative_strength` DDL | 13개 테스트 파일이 `RS_12M_Rating`만 있는 축약 DDL을 만든다(§G). M4가 주간 질의에 `RS_1M_Rating`을 추가하면 이 경로를 타는 테스트가 `no such column`으로 실패 | M4에서 전체 테스트를 먼저 돌려 RED 파일을 확정하고 해당 DDL에 컬럼 추가. 운영 코드에 컬럼 부재 허용 분기는 넣지 않음(운영 스키마는 REQ-RSR-009로 고정) |
 | 재보정이 Stage 2 모집단을 바꿈 | 스크리닝·섹터 `stage2_pct`가 달라짐 | REQ-RSR-018의 (a) 상대 ±10%·(b) ±5%p 목표와 기록 의무 |
-| 70 기준의 판별력 부족 | 진입 비율은 RS 조건이 거의 묶지 않아(plan-audit iter-2: 임계값 50~80에서 1.057~1.074%) 어떤 값도 통과. 조건부 RS 통과율도 plan 단계 실측에서 60/70/80 폭 2.15%p로 상대 ±10%보다 작음(R15) | 판별력 사전 조건을 AC-RSR-015에 두고, 미충족이면 70은 "기록만"으로 격하 — 70 유지 |
+| 70 기준의 판별력 부족 | 진입 비율은 RS 조건이 거의 묶지 않아(plan-audit iter-2: 임계값 50~80에서 1.057~1.074%) 어떤 값도 통과. 조건부 RS 통과율도 plan 단계 실측에서 60/70/80 폭 2.15%p로 상대 ±10%보다 작음(R15) | 판별력 사전 조건을 두 사본에서 판정해 AC-RSR-015에 두고, 둘 다 미충족이면 70은 "기록만"으로 격하 — 70 유지하되 c70 상대 ±10% 단언, 벗어나면 사용자 에스컬레이션 |
 | 회귀 계측이 프로덕션을 읽지 않음 | 스크립트 재실행이 산식 구현 오류를 잡지 못함(R9) | M2에서 `relative_strength`를 읽는 프로덕션 경로 모드 추가, AC-RSR-014 |
-| `stock_prices`의 1~2행 주중 날짜 13개 | RS 처리 대상 아님 — 영향 없음. 다만 M1의 쌍 기준 삭제가 이 날짜의 RS 행(9,963행)을 지움 | 의도된 결과. 범위 밖 정리는 하지 않음 |
+| `stock_prices`의 1~2행 주중 날짜 13개 | RS 처리 대상 아님 — 영향 없음. 다만 M1의 (i) 비처리 날짜 행 선행 삭제가 이 날짜의 RS 행(9,963행)을 지움(이 날짜들은 기준 종목 날짜가 아니므로 처리 날짜 집합 밖) | 의도된 결과. 범위 밖 정리는 하지 않음 |
 
 ## §F 마일스톤
 
@@ -107,7 +108,7 @@ M1은 M2보다 반드시 먼저다(고아 행 정리가 재생성에 앞서야 �
 
 ### M2 — IBD식 재가중과 재생성 (Priority High)
 
-- `scripts/rs_eval/stock_rs_eval.py`에 `--production`과 `--db <경로>`를 추가하고 추적 대상으로 넣는다. 프로덕션 모드는 점수만 `relative_strength.RS_12M_Rating`으로 바꾸고 유니버스 규칙(`:19-21`, `:71`, `:74`, `:76`, `:99`)은 그대로 쓴다.
+- `scripts/rs_eval/stock_rs_eval.py`(f747ce5부터 추적 중)에 `--production`과 `--db <경로>`를 추가한다. 프로덕션 모드는 점수만 `relative_strength.RS_12M_Rating`으로 바꾸고 유니버스 규칙(`:19-21`, `:71`, `:74`, `:76`, `:99`)은 그대로 쓴다.
 - 라이브 DB를 `Output/snapshots/weekly_before_rsr.db`로 복사하고, **재생성 전에** 그 사본에서 기준선을 잰다(AC-RSR-014 첫 명령).
 - `RS_12M_Rating`을 IBD식으로 바꾸고(REQ-RSR-005·006) 라이브 DB를 재생성한 뒤 `Output/snapshots/weekly_after_rsr.db`로 복사한다.
 - 종료 조건: AC-RSR-005·006·014(목표 ≥ 60)·016 PASS. 재생성 후 라이브 DB에서 AC-RSR-001·002·017의 라이브 단계 질의가 모두 `0`.
@@ -115,9 +116,9 @@ M1은 M2보다 반드시 먼저다(고아 행 정리가 재생성에 앞서야 �
 ### M3 — Stage 2 상수 재보정 (Priority High)
 
 - `scripts/rs_eval/stage2_ratio_eval.py --db <경로> --weeks 12 --mode {conditional|strong} --threshold <값>` 신설. 주차 집합 W = 두 사본에 모두 있는 `삼성전자` 날짜 중 최근 12개. `conditional`은 RS 외 진입 조건 다섯 개를 통과한 종목 중 RS 조건 통과 비중(70 기준), `strong`은 Stage 2 종목 중 "Stage 2 Strong" 비중(60 기준). 분모는 모두 가격 테이블로 정해진다(REQ-RSR-018).
-- 먼저 변경 전 사본에서 `conditional`을 임계값 60·70·80으로 측정해 판별력 사전 조건(엄격 단조 + `c60 − c80 > 0.10 × c70`)을 판정·기록한다. 미충족이면 70은 "기록만"(유지). plan 단계 실측은 미충족을 예고한다(research.md R15).
+- 먼저 변경 전·후 두 사본 각각에서 `conditional`을 임계값 60·70·80으로 측정해 판별력 사전 조건(엄격 단조 + `c60 − c80 > 0.10 × c70`)을 사본별로 판정·기록하고, 날짜별 분모 크기도 함께 기록한다. 하나라도 충족하면 (a) 적용, 둘 다 미충족이면 70은 "기록만"(유지, 단 변경 후 c70이 변경 전 대비 상대 ±10% 안인지 단언 — 벗어나면 사용자 에스컬레이션). plan 단계 실측은 변경 전 사본 미충족(research.md R15), 감사 모의는 변경 후 사본 충족을 예고한다(AC-RSR-015).
 - 60은 (1) 변경 전·현행, (2) 변경 후·현행, (3) 변경 후·채택 값을 측정하고 ±5%p 안의 값을 채택한다. 채택 상수는 `stage_classifier.py` 한 곳에서만 바꾼다.
-- `screen_service.py:61`(T8)을 `_STAGE2_ENTRY_RS_MIN` 참조로, `StockTable.tsx:39`를 상수 참조로 교체(REQ-RSR-019, D13). `_RS_TOP_THRESHOLD`(80)는 바꾸지 않는다(B-3).
+- `screen_service.py:61`(T8)을 `_STAGE2_ENTRY_RS_MIN` 참조로, `StockTable.tsx:39`를 상수 참조로, 같은 파일 `:32` 주석과 `:263` 라벨을 상수 유래로 교체(REQ-RSR-019, D13). `_RS_TOP_THRESHOLD`(80)는 바꾸지 않는다(B-3).
 - `rsMetrics.test.ts`의 리터럴 단언(`:50-54`)을 `stage_classifier.py` 상수 추출 비교로 교체. 소유권은 그대로 둔다(D13).
 - 종료 조건: AC-RSR-013·015 PASS.
 
@@ -125,7 +126,7 @@ M1은 M2보다 반드시 먼저다(고아 행 정리가 재생성에 앞서야 �
 
 - `stock_meta.rs_1m`: DDL 마지막 컬럼 + 멱등 ALTER + 튜플 28번째 값(REQ-RSR-010·011).
 - `stage_classifier.py` 주간 질의와 `sector_advanced.py` `_get_rs_on_date()`에서 `RS_1M_Rating`을 함께 읽어 `StageStock`·`StockBubbleItem`에 `rs_1m` 전달(REQ-RSR-012). 축약 DDL 테스트의 RED를 §G 규칙으로 정리.
-- `sector_metrics.py` 집계에 `rs_med`, 봉투·랭킹 응답 연결(REQ-RSR-013·014).
+- `sector_metrics.py` 집계에 `rs_med`, `aggregate_types.py` `SectorAggregate` dataclass에 `rs_med` 필드, 봉투(`aggregate_model()`)·랭킹 응답 연결(REQ-RSR-013·014).
 - 종료 조건: AC-RSR-007·008·008b·009·010 PASS. 갱신 1회 후 라이브 `stock_meta.rs_1m`이 채워짐(AC-RSR-007 라이브 단계).
 
 ### M5 — 프론트 표시 (Priority Medium)
@@ -149,7 +150,7 @@ grep -rlE "RS_12M_Rating|rs_12m|RS_1M_Rating|generate_rs_db" tests backend/tests
   | grep -E '(^|/)(test_[^/]*\.py|conftest\.py|[^/]*\.test\.tsx?)$' | sort
 ```
 
-관측: 49개(Python 25, 프론트 24). `--include`로 `.py`/`.ts`/`.tsx`만 보므로 `__pycache__`·`.pyc`·JSON은 들어오지 않는다. 열의 뜻: "축약 DDL" = 파일이 `RS_1M_Rating` 없는 `relative_strength`를 만든다(`CREATE TABLE … relative_strength` 뒤 8줄 안에 `RS_1M_Rating` 없음); "고정 픽스처" = `frozen` 언급 수; "임계값 리터럴" = `>= 70`·`> 60`·`RS_STRONG`·`S2_STRONG`·`_STAGE2_`·`T8` 언급 수. 판정은 이 신호에서 기계적으로 정했으며, "M4 조건부" 행은 M4 착수 직후 전체 테스트 실행으로 실제 RED 여부를 확정한다.
+관측(spec 0.3.1 정정 세션 재실행): 50개(Python 25, 프론트 25). 50번 `ChartCellGoose.test.tsx`는 plan 프로브 이후 6941e90에서 추가된 파일로, 정렬 순서상 7번째지만 번호를 밀지 않으려고 표 끝에 붙였다. `--include`로 `.py`/`.ts`/`.tsx`만 보므로 `__pycache__`·`.pyc`·JSON은 들어오지 않는다. 열의 뜻: "축약 DDL" = 파일이 `RS_1M_Rating` 없는 `relative_strength`를 만든다(`CREATE TABLE … relative_strength` 뒤 8줄 안에 `RS_1M_Rating` 없음); "고정 픽스처" = `frozen` 언급 수; "임계값 리터럴" = `>= 70`·`> 60`·`RS_STRONG`·`S2_STRONG`·`_STAGE2_`·`T8` 언급 수. 판정은 이 신호에서 기계적으로 정했으며, "M4 조건부" 행은 M4 착수 직후 전체 테스트 실행으로 실제 RED 여부를 확정한다.
 
 | # | 파일 | 축약 DDL | 고정 픽스처 | 임계값 리터럴 | 판정 |
 |---|---|---|---|---|---|
@@ -202,6 +203,7 @@ grep -rlE "RS_12M_Rating|rs_12m|RS_1M_Rating|generate_rs_db" tests backend/tests
 | 47 | `tests/test_sector_metrics.py` | Y | - | - | M4 — `rs_med` 기대 추가; M4 조건부 — 축약 `relative_strength` DDL에 `RS_1M_Rating` 없음. 테스트가 주간 RS 질의(`stage_classifier.py:183-193`, `sector_advanced.py:240-249`)를 타면 `no such column` RED → DDL에 컬럼 추가 |
 | 48 | `tests/test_stage_classifier.py` | Y | - | 4 | M4 조건부 — 축약 `relative_strength` DDL에 `RS_1M_Rating` 없음. 테스트가 주간 RS 질의(`stage_classifier.py:183-193`, `sector_advanced.py:240-249`)를 타면 `no such column` RED → DDL에 컬럼 추가; M3 — 70/60 값이 바뀌면 경계 기대 재검토 |
 | 49 | `tests/test_universe.py` | Y | 7 | - | M4 조건부 — 축약 `relative_strength` DDL에 `RS_1M_Rating` 없음. 테스트가 주간 RS 질의(`stage_classifier.py:183-193`, `sector_advanced.py:240-249`)를 타면 `no such column` RED → DDL에 컬럼 추가 |
+| 50 | `frontend/src/components/ChartGrid/__tests__/ChartCellGoose.test.tsx` | - | - | - | 변경 없음 — 목 `StockItem`의 `rs_12m: 75.5` 리터럴(`:92`)뿐, 이 SPEC이 바꾸는 타입·임계값을 단언하지 않음 |
 
 변경 없이 통과해야 하는 테스트(위 목록 밖 포함): `tests/test_weekly_insert.py`(10건, 스키마 불변), `tests/test_db_service.py`(18건, 파이프라인 순서 불변), `tests/test_ac_sag_030_rs_avg.py`(4건, `rs_avg` 의미 불변), `composite_score`를 다루는 7개 파일(D1, research.md R8).
 
@@ -212,7 +214,7 @@ grep -rlE "RS_12M_Rating|rs_12m|RS_1M_Rating|generate_rs_db" tests backend/tests
 ```bash
 /Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db Output/snapshots/weekly_before_rsr.db   # M2 기준선(재생성 전)
 /Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db Output/snapshots/weekly_after_rsr.db    # M2 목표 ≥ 60
-/Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stage2_ratio_eval.py --db Output/snapshots/weekly_before_rsr.db --weeks 12 --mode conditional --threshold 70   # M3 (a) 기준선 (60, 80도 각각 실행해 판별력 사전 조건 판정)
+/Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stage2_ratio_eval.py --db Output/snapshots/weekly_before_rsr.db --weeks 12 --mode conditional --threshold 70   # M3 (a) 기준선 (60, 80도 실행하고 weekly_after_rsr.db에서도 60·70·80을 실행해 두 사본의 판별력 사전 조건 판정)
 /Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stage2_ratio_eval.py --db Output/snapshots/weekly_before_rsr.db --weeks 12 --mode strong --threshold 60        # M3 (b) 기준선
 ```
 
@@ -223,4 +225,4 @@ venv 위치는 `/Users/byunjungwon/Dev/my_chart/.venv`이고 코드 cwd는 `/Use
 - 계획서: `docs/rs-rebalance-plan-brief.md`, 쉬운 설명판 `docs/rs-timeline-eli5.html`
 - 계측 원문: `scripts/rs_eval/rs_final_h4.out`, `codex_round1.md`, `codex_round2.md`
 - 관례: `SPEC-SECTOR-DISPLAY-UNIFY-001` REQ-SDU-003(상수 유래 title)·REQ-SDU-005(`rating` 셀 유형), `SPEC-SECTOR-METRIC-UNIFY-001`(봉투 `data[]`)
-- 작업 트리 주의: `SPEC-AI-REPORT-004`의 미커밋 변경(`backend/main.py`, `backend/routers/ai_report.py`, 테스트 3개, 미추적 `backend/services/goose_job_service.py`)은 이 SPEC과 무관하다. 스테이징은 명시 경로로만 한다.
+- 작업 트리 주의: `SPEC-AI-REPORT-004`의 변경은 모두 커밋되었다(`git ls-files backend/services/goose_job_service.py` → 추적 중). 그래도 스테이징은 명시 경로로만 한다.
