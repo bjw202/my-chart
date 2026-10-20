@@ -557,6 +557,13 @@ RED가 나지 않아 손대지 않은 §G "M4 조건부" 파일: `tests/conftest
 - 라이브 재구축은 `stock_meta` 전체를 `DELETE` 후 다시 넣는다. 서버가 같은 파일을 읽는 중이면 짧은 쓰기 잠금 경합이 생길 수 있다.
 - 재구축은 `rs_1m`만이 아니라 `rs_12m`(M2 새 산식 값), `market_cap`, 등록부 기반 `market`·섹터, `last_updated`도 함께 갱신한다 — 일봉 화면의 `rs_12m` 기반 값(스크리닝 T8 등)이 이 시점에 새 산식으로 바뀐다.
 
+### M4 (live stock_meta rebuild, orchestrator-run, 2026-10-20)
+
+- 사용자 확인 후 실행(§F.1). 백업 `Output/stock_data_daily.db.bak_20261020_m4` — 원본과 크기 509251584, sha256 앞 16자리 `7182aa1a394ff69c`, `quick_check` ok, `stock_meta` 2533행 동일 확인 (`.moai/state/verify/c1bf371e/m4_backup.log`)
+- 명령: 코드 cwd에서 `…/.venv/bin/python -W ignore -c "…assert my_chart.__file__/meta_service.__file__/_RS_META_COLS==('rs_1m',)/DAILY_DB_PATH/WEEKLY_DB_PATH…; m.rebuild_stock_meta(d.DAILY_DB_PATH, d.WEEKLY_DB_PATH)"` → `done`, `exit=0`, 종료 19:18:32 (`m4_rebuild.log`)
+- **AC-RSR-007 라이브 단계 PASS** (두 DB immutable 읽기, ATTACH 없음, `m4_live_ac007.log`): 최신 주차 2026-10-16, 주간 등급 종목 2387 / `stock_meta` 2533행·28컬럼·마지막 컬럼 `rs_1m`, 이름 일치 2387, `rs_1m` 불일치 **0**, `rs_12m` 불일치 **0**(M2 새 산식 반영), 이번 주 미등급 146종목은 `rs_1m` NULL(비NULL 0)
+- 이 시점부터 일봉 `stock_meta.rs_12m`도 IBD식 값
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
