@@ -554,3 +554,116 @@ def test_module_singleton_get_and_set(mods):
     gjs.set_service(other)
     assert gjs.get_service() is other
     gjs.set_service(original)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 작업 폴더 보존 개수 (사용자 결정 2026-10-20: 최근 10개 유지, 새 작업 시작 때 정리)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _make_old_runs(root: Path, n: int, *, base: float = 1_700_000_000.0) -> list[str]:
+    """수정 시각이 오래된 순서대로 n개 작업 폴더를 만든다(이름 r00이 가장 오래됨)."""
+    root.mkdir(parents=True, exist_ok=True)
+    names = []
+    for i in range(n):
+        d = root / f"r{i:02d}"
+        d.mkdir()
+        (d / "input.json").write_text("{}")
+        os.utime(d, (base + i * 60, base + i * 60))
+        names.append(d.name)
+    return names
+
+
+def test_runs_keep_default_is_10_and_env_override(mods, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_RUNS_KEEP", raising=False)
+    assert mods.gjs.RUNS_KEEP == 10
+    assert mods.gjs.runs_keep() == 10
+    monkeypatch.setenv("AI_REPORT_GOOSE_RUNS_KEEP", "3")
+    assert mods.gjs.runs_keep() == 3
+    for bad in ("abc", "0", "-2"):
+        monkeypatch.setenv("AI_REPORT_GOOSE_RUNS_KEEP", bad)
+        assert mods.gjs.runs_keep() == 10
+
+
+def test_prune_runs_keeps_most_recent_and_removes_older(mods, tmp_path):
+    root = tmp_path / "runs"
+    names = _make_old_runs(root, 13)
+    removed = mods.gjs.prune_runs(root, keep=10, protect=())
+    assert sorted(removed) == names[:3]
+    assert sorted(p.name for p in root.iterdir()) == names[3:]
+
+
+def test_prune_runs_never_removes_protected_dirs(mods, tmp_path):
+    root = tmp_path / "runs"
+    names = _make_old_runs(root, 13)
+    # 가장 오래된 폴더가 실행 중 작업의 폴더라고 가정한다.
+    removed = mods.gjs.prune_runs(root, keep=10, protect=(names[0],))
+    assert names[0] not in removed
+    assert (root / names[0]).is_dir()
+    assert sorted(removed) == names[1:3]
+
+
+def test_prune_runs_skips_symlinks_files_and_targets_outside(mods, tmp_path):
+    root = tmp_path / "runs"
+    names = _make_old_runs(root, 3, base=1_800_000_000.0)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("OUTSIDE")
+    link = root / "aa_link"
+    link.symlink_to(outside, target_is_directory=True)
+    os.utime(link, (1.0, 1.0), follow_symlinks=False)
+    (root / "note.txt").write_text("x")
+    removed = mods.gjs.prune_runs(root, keep=1, protect=())
+    assert sorted(removed) == names[:2]
+    assert link.is_symlink() and (outside / "keep.txt").read_text() == "OUTSIDE"
+    assert (root / "note.txt").is_file()
+    assert (root / names[2]).is_dir()
+
+
+def test_prune_runs_missing_root_is_noop(mods, tmp_path):
+    assert mods.gjs.prune_runs(tmp_path / "nope", keep=10, protect=()) == []
+
+
+async def test_start_prunes_old_run_dirs_but_keeps_new_job_dir(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_RUNS_KEEP", raising=False)
+    root = tmp_path / "runs"
+    names = _make_old_runs(root, 12)
+    runner = FakeRunner(mods.gr)
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    out = await svc.start("299030", "하나기술")
+    left = sorted(p.name for p in root.iterdir())
+    assert out.job.job_id in left
+    assert len(left) == 10
+    assert sorted(set(left) - {out.job.job_id}) == names[3:]
+    runner.release.set()
+    await _finish(out.job)
+
+
+async def test_start_without_new_job_does_not_prune(mods, tmp_path, monkeypatch):
+    # 같은 종목(기존 작업 반환)·다른 종목(busy)·쿼터 소진은 새 작업이 아니므로 정리하지 않는다.
+    runner = FakeRunner(mods.gr)
+    svc = _service(mods, tmp_path, runner, quota=1, monkeypatch=monkeypatch)
+    first = await svc.start("299030", "하나기술")
+    root = tmp_path / "runs"
+    names = _make_old_runs(root, 11)
+    assert (await svc.start("299030", "하나기술")).kind == "existing"
+    assert (await svc.start("005930", "삼성전자")).kind == "busy"
+    assert len(list(root.iterdir())) == 12
+    runner.release.set()
+    await _finish(first.job)
+    assert (await svc.start("005930", "삼성전자")).kind == "rate_limit"
+    assert sorted(p.name for p in root.iterdir()) == sorted(names + [first.job.job_id])
+
+
+async def test_prune_failure_does_not_block_start(mods, tmp_path, monkeypatch):
+    runner = FakeRunner(mods.gr)
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+
+    def boom(*a, **k):
+        raise OSError("disk")
+
+    monkeypatch.setattr(mods.gjs, "prune_runs", boom)
+    out = await svc.start("299030", "하나기술")
+    assert out.kind == "started"
+    runner.release.set()
+    await _finish(out.job)

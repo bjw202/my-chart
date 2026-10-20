@@ -891,6 +891,76 @@ B1 RED는 위 B1 절, M-k 보완 시험의 RED는 E1 되돌림 절에 있다(이
 
 M5 소유 AC(013·014 (a)~(g)·015·016·017)와 AC-010 보관 절반 자동 시험 PASS, 전체 백엔드 새 실패 0, 신규 `goose_storage.py` 98%·`goose_job_service.py` 99%. M6 프론트가 쓸 계약: 종료 이벤트 `{run, delivery_status, report_url[, interrupted]}`, 기록 항목 `{kind, run, delivery_status, interrupted}`, HTML URL `/api/ai-report/{code}/goose/{run}/report.html`.
 
+### 0부 — 작업 폴더 보존 개수 (M6 앞, 백엔드)
+
+기준: HEAD `c4779cd`(시작). 증거 파일: `.moai/state/verify/m6/part0_*.txt`(git 미추적).
+
+**결정 기록**: design §5.2가 "보존 기간은 구현 단계에서 정함"으로 남겨 둔 `runs/{job_id}/` 정리를 사용자가 2026-10-20에 정했다 — 하네스 `runs/` 아래 작업 폴더는 **최근 10개만 남긴다**. 정리 시점은 새 작업이 시작될 때(시작 판정 8단계에서 새 작업 폴더를 만든 직후)다. M5 Gaps의 "보존 기간 결정 필요" 항목이 이것으로 닫힌다.
+
+구현(`goose_job_service.py`):
+- 모듈 상수 `RUNS_KEEP = 10`, 환경 변수 `AI_REPORT_GOOSE_RUNS_KEEP`(양의 정수가 아니면 10).
+- `prune_runs(runs_root, keep, protect)`: `runs/` 바로 아래의 실제 폴더만 대상(심볼릭 링크·파일 제외, `resolve()` 결과의 부모가 `runs/`인지 확인). 수정 시각 최근 순으로 `keep`개를 남기고 나머지를 지운다. `protect`(새 작업 + 아직 끝나지 않은 작업의 job_id)는 개수와 상관없이 남긴다.
+- 정리 실패는 로그만 남기고 시작은 계속한다. 같은 종목(기존 작업)·다른 종목(busy)·쿼터 소진·무결성 실패는 새 폴더를 만들지 않으므로 정리하지 않는다.
+
+E1 — 시험(`test_goose_job_service.py`에 8건 추가):
+
+```
+$ python -m pytest backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py backend/tests/test_goose_storage.py -q -p no:cacheprovider
+107 passed, 1 warning in 5.77s
+```
+
+| 시험 | 확인 내용 |
+|---|---|
+| `test_runs_keep_default_is_10_and_env_override` | 기본 10, 환경 변수 3, `abc`·`0`·`-2` → 10 |
+| `test_prune_runs_keeps_most_recent_and_removes_older` | 13개 중 가장 오래된 3개만 삭제 |
+| `test_prune_runs_never_removes_protected_dirs` | 가장 오래된 폴더가 보호 대상이면 남고 그다음 2개가 삭제 |
+| `test_prune_runs_skips_symlinks_files_and_targets_outside` | `runs/` 밖을 가리키는 심볼릭 링크·일반 파일은 그대로, 링크 대상 내용 불변 |
+| `test_prune_runs_missing_root_is_noop` | `runs/` 없음 → `[]` |
+| `test_start_prunes_old_run_dirs_but_keeps_new_job_dir` | 기존 12개 + 새 작업 → 10개(새 작업 폴더 포함, 기존 최근 9개) |
+| `test_start_without_new_job_does_not_prune` | existing·busy·rate_limit 경로에서 폴더 수 불변 |
+| `test_prune_failure_does_not_block_start` | 정리 함수가 `OSError`를 던져도 `started` |
+
+E8 — RED(구현 전, `part0_red.txt`):
+
+```
+E       AttributeError: <module 'backend.services.goose_job_service' …> has no attribute 'prune_runs'
+FAILED …::test_runs_keep_default_is_10_and_env_override
+FAILED …::test_prune_runs_keeps_most_recent_and_removes_older
+FAILED …::test_prune_runs_never_removes_protected_dirs
+FAILED …::test_prune_runs_skips_symlinks_files_and_targets_outside
+FAILED …::test_prune_runs_missing_root_is_noop
+FAILED …::test_start_prunes_old_run_dirs_but_keeps_new_job_dir
+FAILED …::test_prune_failure_does_not_block_start
+7 failed, 2 passed, 28 deselected in 0.11s
+```
+
+(`-k` 묶음에서 통과한 2건은 정리가 일어나면 안 되는 경로의 대조 시험과 기존 `test_finished_jobs_are_pruned_beyond_limit`이다.)
+
+대조 단언 되돌림(`part0_mutate.txt`, 원복 `cmp` → `RESTORED`):
+
+```
+== P-a protect 무시                 FAILED …test_prune_runs_never_removes_protected_dirs            1 failed, 36 passed
+== P-b 심볼릭 링크 검사 제거        FAILED …test_prune_runs_skips_symlinks_files_and_targets_outside 1 failed, 36 passed
+== P-c start에서 정리 호출 안 함     FAILED …test_start_prunes_old_run_dirs_but_keeps_new_job_dir    1 failed, 36 passed
+== P-d 정렬 반대(오래된 것을 남김)   FAILED 4건                                                     4 failed, 33 passed
+```
+
+E2 — 전체 백엔드(기준 HEAD `c4779cd` → 변경 후):
+
+```
+$ python -m pytest backend/tests -q -p no:cacheprovider --continue-on-collection-errors -rfE
+기준:   38 failed, 362 passed, 3 xfailed, 1 warning, 63 errors in 53.01s
+변경 후: 38 failed, 370 passed, 3 xfailed, 1 warning, 63 errors in 51.03s
+$ comm -13 base_bad.txt part0_bad.txt   # 새 실패·오류 (각 101줄)
+(출력 없음)
+$ comm -23 base_bad.txt part0_bad.txt
+(출력 없음)
+```
+
+E3 — `coverage run --include=backend/services/goose_job_service.py -m pytest backend/tests/test_goose_job_service.py` → `goose_job_service.py 249 stmts, 4 miss, 98%`.
+
+Gaps: 실제 `~/.goose-harness/runs`에서의 정리는 관측하지 않았다(tmp 경로만). 삭제는 이벤트 루프 안에서 동기로 돈다(폴더 수가 적어 짧다고 보았으며 측정하지 않음). 정렬 기준은 폴더 수정 시각이므로, 끝난 작업 폴더 바로 아래에 파일이 나중에 생기거나 지워지면 순서가 바뀔 수 있다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

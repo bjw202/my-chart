@@ -18,8 +18,9 @@ import asyncio
 import inspect
 import logging
 import os
+import shutil
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -142,6 +143,51 @@ def _default_integrity() -> goose_harness.IntegrityResult:
     return goose_harness.check_job_integrity()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 작업 폴더 보존 (design §5.2 "보존 기간은 구현 단계에서 정함" — 사용자 결정 2026-10-20: 최근 10개)
+# ─────────────────────────────────────────────────────────────────────────────
+
+ENV_RUNS_KEEP = "AI_REPORT_GOOSE_RUNS_KEEP"
+RUNS_KEEP = 10
+
+
+def runs_keep() -> int:
+    """보존할 작업 폴더 수. 환경 변수가 양의 정수가 아니면 기본 10."""
+    raw = os.environ.get(ENV_RUNS_KEEP)
+    if not raw:
+        return RUNS_KEEP
+    try:
+        value = int(raw)
+    except ValueError:
+        return RUNS_KEEP
+    return value if value > 0 else RUNS_KEEP
+
+
+# @MX:WARN: [AUTO] 하네스 runs/ 아래 폴더를 지운다(shutil.rmtree).
+# @MX:REASON: 지우는 대상은 runs/ 바로 아래의 실제 폴더(심볼릭 링크 아님)이며 resolve() 결과가
+#             runs/ 안인지 다시 확인한다. 실행 중 작업 폴더(protect)는 개수와 상관없이 남긴다.
+def prune_runs(runs_root: Path, keep: int, protect: Collection[str]) -> list[str]:
+    """수정 시각이 최근인 ``keep``개만 남기고 나머지 작업 폴더를 지운다. 지운 이름 목록을 돌려준다."""
+    if not runs_root.is_dir():
+        return []
+    root = runs_root.resolve()
+    dirs = []
+    for entry in runs_root.iterdir():
+        if entry.is_symlink() or not entry.is_dir():
+            continue
+        if entry.resolve().parent != root:
+            continue
+        dirs.append(entry)
+    dirs.sort(key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+    removed: list[str] = []
+    for entry in dirs[keep:]:
+        if entry.name in protect:
+            continue
+        shutil.rmtree(entry)
+        removed.append(entry.name)
+    return removed
+
+
 class GooseJobService:
     """서버 전체 goose 작업 관리(동시 실행 1개, D10). 단일 uvicorn 워커 전제."""
 
@@ -203,13 +249,26 @@ class GooseJobService:
                 await self._finish(job, "error", "integrity", {})
                 return StartOutcome("integrity", job)
             # 8. 작업 디렉터리 → active 등록 → 쿼터 차감 → 백그라운드 태스크
-            (self._runs_root() / job.job_id).mkdir(parents=True, exist_ok=True)
+            runs_root = self._runs_root()
+            (runs_root / job.job_id).mkdir(parents=True, exist_ok=True)
+            self._prune_runs(runs_root, job.job_id)
             self._active_job_id = job.job_id
             self.limiter.consume()
             job.task = asyncio.create_task(self._run(job), name=f"goose-{job.job_id}")
             logger.info("goose 작업 시작 %s (%s %s), 쿼터 %d/%d",
                         job.job_id, code, stock_name, self.limiter.used(), self.limiter.quota)
             return StartOutcome("started", job)
+
+    def _prune_runs(self, runs_root: Path, new_job_id: str) -> None:
+        """새 작업 폴더를 만든 직후 오래된 작업 폴더를 정리한다. 실패는 로그만 남긴다(시작은 계속)."""
+        protect = {new_job_id} | {j.job_id for j in self._jobs.values() if not j.finished}
+        try:
+            removed = prune_runs(runs_root, runs_keep(), protect)
+        except Exception:  # noqa: BLE001 - 정리 실패가 작업 시작을 막지 않는다
+            logger.exception("goose 작업 폴더 정리 실패 (%s)", runs_root)
+            return
+        if removed:
+            logger.info("goose 작업 폴더 %d개 정리: %s", len(removed), ", ".join(removed))
 
     # ── 실행 ────────────────────────────────────────────────────────────────
 
