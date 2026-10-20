@@ -28,7 +28,7 @@
   - argv에 `-p`, `--setting-sources`, `project`, `--strict-mcp-config`, `--output-format`, `stream-json`, `--permission-mode`, `dontAsk`가 있고, `--settings` 다음 값이 `<cwd>/.claude/settings.json`, `--model` 다음 값이 미설정 시 `sonnet`, 설정 시 `opus`
   - cwd가 `HARNESS_DIR` 미설정 시 `<T>/.goose-harness`, 설정 시 `/tmp/h2`; 어느 경우도 리포 루트 아래가 아님
   - `bypassPermissions`·`--dangerously-skip-permissions`·`--restricted` 문자열 없음
-  - 설정 파일: `disableAllHooks`가 `true`, `autoMemoryEnabled`가 `false`, `env.PATH`에 `/usr/bin`과 `/bin` 포함
+  - 설정 파일: `disableAllHooks`가 `true`, `autoMemoryEnabled`가 `false`, `claudeMdExcludes`에 `**/.claude/CLAUDE.md` 포함, `env.PATH`에 `/usr/bin`과 `/bin` 포함
 - 잡아내는 구현: `stream_claude_synthesis` argv를 복사해 `bypassPermissions`가 남은 구현, cwd를 리포 루트나 `backend/goose_harness`로 둔 구현, 모델을 `claude-sonnet-4-6`처럼 하드코딩한 구현, `--settings`를 빠뜨려 리포 밖에서 allow가 무시되는 구현, `--strict-mcp-config`를 빠뜨려 계정 커넥터 MCP가 붙는 구현, `env.PATH`가 없어 `python3`를 못 찾는 설정
 
 **AC-AIR4-003** [라이브] — REQ-003

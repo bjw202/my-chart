@@ -675,3 +675,5 @@ ls: .moai/specs/SPEC-AI-REPORT-004: No such file or directory   (작성 전, 중
 - 문구 정정: design §6.1·§9 행과 이 문서 §E.2 표 아래 정정 줄(R5-4, 관측 기록은 그대로), design §2.2 표 제목과 [미관측] 표시(R5-5), research.md 두 곳의 T11 대체 표시(R5-7), acceptance 머리말 AC-025(R5-9).
 - 보류: R5-6·R5-8·R5-10(plan §2.4에 권장 처리 기록).
 - M2 진입 조건 갱신: AC-003 (6a)~(6f) 재탐침. 하나라도 막지 못하면 차단 보고(M3 진입 금지).
+
+**개정 v0.4.2 (2026-10-20, manager-spec, M3 차단 보고 B2 재위임)**: 사용자 결정에 따라 하네스 설정 키 `claudeMdExcludes: ["**/.claude/CLAUDE.md"]` 반영 — spec REQ-002, acceptance AC-002 설정 파일 줄, spec-compact REQ-002·AC-002 행, design §2.2 설정 키·§9.1 행(해소, 근거 §E.2 `### M3 실행기 goose_runner` E4). `status`는 `in-progress` 그대로. M4 진입 확인: 설치본 설정 파일로 재탐침.

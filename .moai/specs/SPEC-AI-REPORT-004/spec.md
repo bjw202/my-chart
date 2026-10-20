@@ -1,10 +1,10 @@
 ---
 id: SPEC-AI-REPORT-004
 title: "AI 모달 Deep 모드를 goose 스킬 하네스(헤드리스 claude -p)로 교체"
-version: "0.4.1"
+version: "0.4.2"
 status: in-progress
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-20
 author: manager-spec
 priority: High
 phase: "v0.5.3 target"
@@ -26,6 +26,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 | 0.3.2 | 2026-10-19 | manager-spec | plan-audit 3회차(FAIL 0.91) 후 사용자가 부채 수용(PASS-WITH-DEBT)을 선택, 재감사 없이 수정, 재번호 없음: `HistoryItem`에 `interrupted` 추가(REQ-017, R3-M1), 중단된 작업은 선택된 전달 상태를 그대로 유지하고 중단 안내는 상태와 상관없이 표시(REQ-014·019, 사용자 결정 R3-M2), 서버 종료 시 보관을 best-effort로 명시(R3-M3), design §4.1·plan T1 문구 정정(R3-M4·M5) |
 | 0.4.0 | 2026-10-19 | manager-spec | run 단계 M1 스파이크(조건부 GO) 관측 반영, 재번호 없음(REQ 23·AC 25 유지): 하네스를 리포 밖 `~/.goose-harness`로 옮기고 리포에는 `.claude`·`CLAUDE.md` 이름이 없는 추적 원본만 두어 서버 시작 시 매니페스트 대조 후 설치(결정 T11, REQ-001·022), argv에 `--strict-mcp-config`·`--settings <하네스>/.claude/settings.json` 추가와 설정 키 `disableAllHooks`·`autoMemoryEnabled`·`env.PATH`(REQ-002), 읽기 전용 Bash 자동 허용 관측에 따라 하네스 밖 읽기 거부를 명시(REQ-003), 시간 상한 기본 900초(표본 1회), 진행 단계 대응표·산출물 위치·환경 변수 목록을 측정값으로 확정(design §9). plan-audit 4회차 결함 R4-1·R4-2·R4-3·R4-4·R4-5·R4-7·R4-8 수정 |
 | 0.4.1 | 2026-10-19 | manager-spec | plan-audit 5회차(FAIL 0.83, 점수 하락 → 단일 수정) 반영, 재번호 없음(REQ 23·AC 25 유지): 서버 시작 원본 대조가 실패하면 실패를 기록하고 이후 모든 goose 작업을 `error`/`integrity`로 끝냄 — 기존 설치본이 매니페스트와 맞아도 마찬가지(사용자 결정 2026-10-19, 닫힌 실패, R5-1, REQ-001·008, AC-001 (2b)), 원본 쪽 목록 밖 파일 규칙과 제외 목록(`goose-manifest.json`, `.DS_Store`)을 요구사항으로 올림(R5-2, AC-001 (1)(2c)), 하네스 밖 읽기 전용 Bash 탐침을 `cat`·`head`·`grep`·`~`·`$HOME`·허용 스크립트 뒤 복합 명령으로 넓힘(R5-3, REQ-003, AC-003 (6a)~(6f)), M1 해시 비교를 "오탐 없음 관측"으로 정정(R5-4). 선택 결함 R5-5·R5-7·R5-9 반영, R5-6·R5-8·R5-10 보류. 감사 보고서의 결함 번호 D1~D10을 결정 ID와 구분하려고 `R5-1`~`R5-10`으로 적는다 |
+| 0.4.2 | 2026-10-20 | manager-spec | run 단계 M3 차단 보고(B2) 반영, 재번호 없음(REQ 23·AC 25 유지): 사용자 전역 `~/.claude/CLAUDE.md`가 하네스 세션에 로드되는 관측에 따라 하네스 설정 키에 `claudeMdExcludes: ["**/.claude/CLAUDE.md"]`를 추가(사용자 결정 2026-10-20, REQ-002, AC-002, design §2.2·§9.1). 근거: M3 탐침 4회 — 설정 키는 전역 지침만 빼고 하네스 `CLAUDE.md`는 남김, 인증 유지(`progress.md §E.2 ### M3 실행기 goose_runner` E4). 설치본 경로 재탐침은 M4 진입 확인 항목 |
 
 관계: 이 SPEC은 **SPEC-AI-REPORT-002**(Deep 5소스 수집 + claude 합성)를 대체한다(supersedes). 002 문서 자체는 수정하지 않으며, 상태 정리는 sync 단계에서 한다. SPEC-AI-REPORT-003(Fast/Codex)은 유지된다.
 
@@ -82,7 +83,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 
 **REQ-AIR4-001** — When the server starts, the job service shall verify the tracked harness source against the manifest committed in the repository and, only when every listed file matches and no unlisted source file exists (the manifest file `goose-manifest.json` itself and `.DS_Store` files are excluded from this check and are never installed), shall install it into the harness directory (`AI_REPORT_GOOSE_HARNESS_DIR`, default `~/.goose-harness`) by replacing the installed `CLAUDE.md` and `.claude/` directory and leaving `runs/` untouched; when the source verification fails, it shall not install and shall record a startup integrity failure that holds until the next server start. When a goose job is about to start and either a startup integrity failure is recorded (even if a previously installed harness matches the committed manifest) or the installed harness fails the integrity check against that committed manifest (a listed file is missing or its sha256 differs, or an unlisted file exists under the harness `.claude/` directory), the job service shall record the job as `error` with error kind `integrity`, shall not launch `claude`, shall not register the job as the running job, and shall not consume daily quota, and the router shall return 202 with that job's `job_id`.
 
-**REQ-AIR4-002** — The goose runner shall launch `claude -p` with the harness directory as working directory, `--setting-sources project`, `--settings <harness directory>/.claude/settings.json`, `--strict-mcp-config`, `--output-format stream-json`, `--permission-mode dontAsk`, and `--model` set to `AI_REPORT_GOOSE_MODEL` (default `sonnet`), and shall not pass `bypassPermissions` or `--dangerously-skip-permissions`. The harness settings file shall set `disableAllHooks: true`, `autoMemoryEnabled: false`, and an `env.PATH` naming the system binary directories.
+**REQ-AIR4-002** — The goose runner shall launch `claude -p` with the harness directory as working directory, `--setting-sources project`, `--settings <harness directory>/.claude/settings.json`, `--strict-mcp-config`, `--output-format stream-json`, `--permission-mode dontAsk`, and `--model` set to `AI_REPORT_GOOSE_MODEL` (default `sonnet`), and shall not pass `bypassPermissions` or `--dangerously-skip-permissions`. The harness settings file shall set `disableAllHooks: true`, `autoMemoryEnabled: false`, `claudeMdExcludes` containing `**/.claude/CLAUDE.md`, and an `env.PATH` naming the system binary directories.
 
 **REQ-AIR4-003** — The harness permission policy shall deny, without prompting, every tool call outside the allowlist: WebSearch, WebFetch, Read/Glob/Grep inside the harness, writes inside the job workspace only, Agent, Skill, and Bash limited to the exact script paths of `render_report.py` and `audit_report.py`; the policy shall also deny read-only Bash commands that read a path outside the harness directory, whether the path is written as an absolute path or with `~` or `$HOME`, and whether the command stands alone or is chained after an allowed command, because Claude Code auto-approves some read-only Bash commands in `dontAsk` mode.
 

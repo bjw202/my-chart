@@ -84,6 +84,7 @@ backend/goose_harness_src/             추적 원본 — 작업 디렉터리로 
   "env": { "PATH": "/usr/bin:/bin:/usr/sbin:/sbin" },
   "autoMemoryEnabled": false,
   "disableAllHooks": true,
+  "claudeMdExcludes": ["**/.claude/CLAUDE.md"],
   "permissions": { "allow": [ … 위 표 … ], "deny": [ … 위 표 … ] }
 }
 ```
@@ -94,6 +95,7 @@ backend/goose_harness_src/             추적 원본 — 작업 디렉터리로 
 - **`env.PATH`**: `-p` 세션의 Bash 도구가 부모 프로세스의 `PATH`를 쓰지 않아 `python3`를 찾지 못했다(`command not found: python3`, 환경 변수 59개를 넘겨도 같음). 설정 `env.PATH`로 해결했다 [측정 — M1 P4]. 원인은 확인하지 못했다 [미관측]. 값은 macOS 시스템 경로(`/usr/bin/python3` = Python 3.9.6)이며 다른 OS는 대상이 아니다.
 - **`autoMemoryEnabled: false`**: 하네스 세션이 자동 메모리를 읽거나 쓰지 않게 한다(리포 위치에서 `memory_paths.auto`가 리포 메모리를 가리켰음) [측정 — M1 P1·P2c].
 - **`disableAllHooks: true`**: 설치본에는 hooks가 없지만, 설정 출처가 늘어날 경우를 막는 방어선이다. 리포 위치 실행에서 리포 hooks가 실행됐는지는 확인하지 못했다 [미관측].
+- **`claudeMdExcludes: ["**/.claude/CLAUDE.md"]`**: 사용자 전역 `~/.claude/CLAUDE.md`를 하네스 세션에서 뺀다. 하네스 `CLAUDE.md`(설치본 최상위)는 이 글롭에 걸리지 않아 그대로 로드된다. 환경 변수 `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`은 하네스 `CLAUDE.md`까지 없애 쓸 수 없다 [측정 — M3 E4 탐침 4회, 사본 경로의 설정 파일을 `--settings`로 넘김]. 설치본 경로에서의 재탐침은 M4 진입 확인 항목이다(§9.1).
 
 ### 2.3 설치와 무결성 검사 (REQ-001, 결정 T11)
 
@@ -431,7 +433,7 @@ v0.3.2의 잠정 목록을 M1 관측(2026-10-19, `claude` 2.1.303, HEAD `11f3e16
 |---|---|---|
 | `final/`·`delivery-audit.json`·`audit_report.py`·`render_report.py --final` 실행 경로 | §5.2 `final` 판정 규칙과 §3.5 `audit`·`render_final` 단계가 실제 산출물로 검증되지 않음. 실제 결과가 거의 늘 `draft`일 수 있음(plan §6 위험 1) | AC-025 라이브. 관측 전까지 AC-014 (a)(g)는 goose 지침 기준 픽스처로 검증 |
 | 서브에이전트가 메인 세션의 권한 규칙을 따르는지 | 서브에이전트(`web-fetch`)는 허용된 WebFetch만 써서 거부 사례가 없었다. 서브에이전트 쪽 음성 탐침은 하지 않음 | 범위 밖(acceptance.md §H). 위험으로 기록 |
-| 사용자 전역 `~/.claude/CLAUDE.md` 로드 여부 | 두 위치에 똑같이 영향을 줘 P2 비교로 구분되지 않음. 로드되면 사용자 개인 지시가 하네스 세션에 섞임 | M2 재관측(P1 `system/init`·토큰 비교). 위험으로 기록 |
+| 사용자 전역 `~/.claude/CLAUDE.md` 로드 여부 — **해소(v0.4.2)** | M2 재관측에서 설치본 세션에 로드됨을 확인(`--setting-sources project`로는 막히지 않음). M3 E4 탐침 4회: 대조군은 전역·하네스 지침 둘 다 로드, `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`은 둘 다 제거(사용 불가), `claudeMdExcludes` 절대 경로·글롭 `**/.claude/CLAUDE.md`는 각각 전역 지침만 제외하고 하네스 규칙 유지, exit 0·`is_error` False(인증 유지) [측정 — `progress.md §E.2 ### M3 실행기 goose_runner` E4]. 글롭을 설정 키로 채택(§2.2, REQ-002, AC-002). 탐침은 다른 경로의 설정 사본을 넘겼으므로 설치본 설정 파일로 재탐침해야 한다 | M4 진입 확인: 설치본 `<H>/.claude/settings.json`을 `--settings`로 넘겨 전역 지침 제외·하네스 규칙 유지 재관측 |
 | `-p` 세션 Bash가 부모 `PATH`를 무시하는 원인 | `env.PATH` 설정으로 우회했지만 원인 미상. `claude` 버전이 바뀌면 동작이 달라질 수 있음 | 위험으로 기록 |
 | 리포 위치 실행에서 리포 hooks 실행 여부 | 리포 밖 실행으로 대상이 사라짐. `disableAllHooks`로 방어 | 해당 없음 |
 | 환경 변수를 하나씩 뺐을 때의 인증 결과 | 허용 목록을 더 줄일 수 있는지 모름 | 범위 밖 |
