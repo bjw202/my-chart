@@ -41,15 +41,22 @@ def gr():
     sys.modules 스텁으로 바꿔 두므로 `my_chart*`·`backend*` 항목을 잠시 비우고 불러온 뒤
     원래대로 되돌린다(test_main_goose_lifespan과 같은 방식).
     """
-    saved = dict(sys.modules)
-    for name in list(sys.modules):
-        if name in ("my_chart", "backend") or name.startswith(("my_chart.", "backend.")):
-            del sys.modules[name]
+    saved = {name: mod for name, mod in sys.modules.items() if _ours(name)}
+    for name in saved:
+        del sys.modules[name]
     try:
         yield importlib.import_module("backend.services.goose_runner")
     finally:
-        sys.modules.clear()
+        # `my_chart*`·`backend*`만 되돌린다. sys.modules 전체를 되돌리면 이 픽스처 안에서 처음
+        # 불러온 numpy 같은 C 확장이 빠지고, 다음 파일(test_main_goose_lifespan)이 다시 불러올 때
+        # `ImportError: cannot load module more than once per process`가 난다.
+        for name in [n for n in sys.modules if _ours(n)]:
+            del sys.modules[name]
         sys.modules.update(saved)
+
+
+def _ours(name: str) -> bool:
+    return name in ("my_chart", "backend") or name.startswith(("my_chart.", "backend."))
 
 
 def _base_environ(tmp_path: Path) -> dict[str, str]:

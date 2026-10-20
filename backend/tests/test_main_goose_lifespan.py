@@ -21,17 +21,23 @@ import pytest
 # 이 파일의 테스트들이 한 번 불러온 모듈을 함께 쓴다(M4에서 두 번째 테스트 추가).
 @pytest.fixture(scope="module")
 def real_main():
-    saved = dict(sys.modules)
-    for name in list(sys.modules):
-        if name in ("my_chart", "backend") or name.startswith(("my_chart.", "backend.")):
-            del sys.modules[name]
+    saved = {name: mod for name, mod in sys.modules.items() if _ours(name)}
+    for name in saved:
+        del sys.modules[name]
     try:
         main_module = importlib.import_module("backend.main")
         goose_harness = importlib.import_module("backend.services.goose_harness")
         yield main_module, goose_harness
     finally:
-        sys.modules.clear()
+        # `my_chart*`·`backend*`만 되돌린다. sys.modules 전체를 되돌리면 여기서 처음 불러온 numpy 같은
+        # C 확장이 빠지고, 다음 파일(test_goose_runner)이 다시 불러올 때 ImportError가 난다.
+        for name in [n for n in sys.modules if _ours(n)]:
+            del sys.modules[name]
         sys.modules.update(saved)
+
+
+def _ours(name: str) -> bool:
+    return name in ("my_chart", "backend") or name.startswith(("my_chart.", "backend."))
 
 
 @pytest.fixture()
