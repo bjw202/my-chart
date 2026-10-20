@@ -189,7 +189,7 @@ def test_compute_sector_history_excludes_partial_dates(history_db: str) -> None:
     result = compute_sector_history(history_db, weeks=3, daily_db_path=_daily_db(history_db))
 
     # 수정 후 시그니처: (dates, rankings) 튜플 반환
-    # 현재 시그니처: list[list[SectorRank]] 반환
+    # 구 시그니처: list[list[...]] 반환
     if isinstance(result, tuple):
         dates, rankings = result
     else:

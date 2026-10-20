@@ -1,299 +1,63 @@
-"""Specification tests for my_chart/analysis/sector_metrics.py.
+"""섹터 순위 응답 ``sectors[]`` 의 값 단언(AC-SAG-044 의미 테스트).
 
-Tests are written first (RED phase) to define expected behavior per SPEC R7, R8.
+종전에는 레거시 ``compute_sector_ranking`` → ``SectorRank`` 를 직접 검사했다(SPEC R7/R8).
+그 함수는 집계 경로(``compute_sector_aggregates`` — ALL_CAPPED 벤치마크·순위 백분위)로
+통일되며 제거됐고, 여전히 유효한 단언(순위·composite 범위·초과수익률 관계·RS 지표·
+지수 행 제외)은 같은 산출을 싣는 응답 ``sectors[]`` 대상으로 이관했다.
+검출력 실증(되돌림 3케이스)은 ``tests/test_ac_sag_044_regression.py`` 가 전담한다.
 """
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
-
 import pytest
 
-
-# ---------------------------------------------------------------------------
-# Fixtures: weekly DB with sector data
-# ---------------------------------------------------------------------------
-
-_WEEKLY_DDL = """
-CREATE TABLE IF NOT EXISTS stock_prices (
-    Name TEXT NOT NULL,
-    Date TEXT NOT NULL,
-    Open REAL, High REAL, Low REAL, Close REAL,
-    Volume REAL, VolumeSMA10 REAL,
-    CHG_1W REAL, CHG_1M REAL, CHG_2M REAL, CHG_3M REAL,
-    CHG_6M REAL, CHG_9M REAL, CHG_12M REAL,
-    SMA10 REAL, SMA20 REAL, SMA40 REAL,
-    SMA40_Trend_1M REAL, SMA40_Trend_2M REAL,
-    SMA40_Trend_3M REAL, SMA40_Trend_4M REAL,
-    MAX10 REAL, MAX52 REAL, min52 REAL, Close_52min REAL,
-    RS_1M REAL, RS_2M REAL, RS_3M REAL,
-    RS_6M REAL, RS_9M REAL, RS_12M REAL, RS_Line REAL,
-    PRIMARY KEY (Name, Date)
-)
-"""
-
-_RS_DDL = """
-CREATE TABLE IF NOT EXISTS relative_strength (
-    Name TEXT NOT NULL,
-    Date TEXT NOT NULL,
-    RS_12M_Rating REAL,
-    PRIMARY KEY (Name, Date)
-)
-"""
-
-
-def _make_sector_row(
-    name: str,
-    date: str,
-    close: float = 100.0,
-    sma10: float = 90.0,
-    sma40: float = 85.0,
-    chg_1w: float = 0.02,
-    chg_1m: float = 0.05,
-    chg_3m: float = 0.10,
-    max52: float = 110.0,
-    min52: float = 70.0,
-    volume: float = 1_000_000.0,
-    volume_sma10: float = 800_000.0,
-    sma40_trend_4m: float = 84.0,
-) -> tuple:
-    """Build a 32-element weekly row for sector testing."""
-    return (
-        name, date,
-        close * 0.99, close * 1.01, close * 0.98, close,
-        volume, volume_sma10,
-        chg_1w, chg_1m, 0.08, chg_3m, 0.20, 0.25, 0.30,
-        sma10, 92.0, sma40,
-        sma40_trend_4m, sma40 * 0.98, sma40 * 0.97, sma40 * 0.96,
-        close * 1.05, max52, min52, close - min52,
-        50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 1.1,
-    )
+from tests.test_sector_ranking_sectors_unify import unify_dbs  # noqa: F401 — 픽스처 공유
 
 
 @pytest.fixture
-def sector_db(tmp_path: Path, mock_sectormap) -> str:  # noqa: F811
-    """Weekly DB with multi-sector stocks for ranking tests.
+def ranking(unify_dbs):  # noqa: F811
+    from backend.services.sector_ranking_service import get_sector_ranking
 
-    Uses mock_sectormap fixture to avoid xlsx file dependency.
-    Stocks: 삼성전자, SK하이닉스 → 전기전자; POSCO홀딩스 → 철강금속.
-    """
-    db_path = str(tmp_path / "test_sector.db")
-    conn = sqlite3.connect(db_path)
-    conn.execute(_WEEKLY_DDL)
-    conn.execute(_RS_DDL)
-
-    test_date = "2024-01-05"
-    prev_date_4w = "2023-12-08"  # 4 weeks ago
-
-    # KOSPI index (for excess return calculation)
-    kospi_chg_1w = 0.01  # KOSPI 1W return = 1%
-    for dt in [test_date, prev_date_4w]:
-        conn.execute(
-            "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            _make_sector_row("KOSPI", dt, close=2500.0, chg_1w=kospi_chg_1w, chg_1m=0.03, chg_3m=0.08),
-        )
-
-    # 전기전자 sector stocks (above KOSPI performance)
-    for name, chg_1w, chg_1m, chg_3m, rs in [
-        ("삼성전자", 0.03, 0.08, 0.15, 85.0),  # outperforms
-        ("SK하이닉스", 0.025, 0.07, 0.12, 72.0),
-    ]:
-        conn.execute(
-            "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            _make_sector_row(name, test_date, close=100.0, chg_1w=chg_1w, chg_1m=chg_1m, chg_3m=chg_3m,
-                             max52=105.0, sma10=90.0, sma40=85.0),
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
-            (name, test_date, rs),
-        )
-        # Previous date for rank_change
-        conn.execute(
-            "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            _make_sector_row(name, prev_date_4w, close=95.0, chg_1w=0.01, chg_1m=0.03, chg_3m=0.07),
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
-            (name, prev_date_4w, rs - 5.0),
-        )
-
-    # 철강금속 sector stocks (below KOSPI performance)
-    for name, chg_1w, chg_1m, chg_3m, rs in [
-        ("POSCO홀딩스", -0.01, -0.02, 0.03, 45.0),  # underperforms
-    ]:
-        conn.execute(
-            "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            _make_sector_row(name, test_date, close=100.0, chg_1w=chg_1w, chg_1m=chg_1m, chg_3m=chg_3m,
-                             max52=120.0, sma10=105.0, sma40=110.0),
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
-            (name, test_date, rs),
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            _make_sector_row(name, prev_date_4w, close=105.0, chg_1w=0.02, chg_1m=0.04, chg_3m=0.10),
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
-            (name, prev_date_4w, 50.0),
-        )
-
-    conn.commit()
-    conn.close()
-    return db_path
+    weekly_db, daily_db, as_of = unify_dbs
+    return get_sector_ranking(weekly_db, daily_db, as_of=as_of)
 
 
-# ---------------------------------------------------------------------------
-# Tests: compute_sector_ranking (AC8, AC9)
-# ---------------------------------------------------------------------------
+def test_ranks_are_contiguous_and_follow_composite_descending(ranking) -> None:
+    """순위는 1..N 연속이며 rank 순서로 composite_score 가 내림차순이다(구 AC8)."""
+    items = sorted(ranking.sectors, key=lambda s: s.rank)
+    assert [s.rank for s in items] == list(range(1, len(items) + 1))
+    scores = [s.composite_score for s in items]
+    assert scores == sorted(scores, reverse=True)
 
 
-class TestComputeSectorRanking:
-    """Tests for compute_sector_ranking() - R7, R8."""
+def test_sector_rank_item_has_spec_values(ranking) -> None:
+    """AC-SAG-044 — 각 필드가 타입·범위·관계를 실제로 만족한다(존재가 아니라 값)."""
+    assert ranking.sectors
+    bench = {p: ranking.benchmark.returns[p].value for p in ("1w", "1m", "3m")}
+    for s in ranking.sectors:
+        assert isinstance(s.name, str) and s.name
+        assert isinstance(s.stock_count, int) and s.stock_count > 0
+        for field in ("rs_avg", "rs_top_pct", "nh_pct", "stage2_pct"):
+            assert 0.0 <= getattr(s, field) <= 100.0, f"{field} must be a 0-100 pct"
+        assert 0.0 <= s.composite_score <= 100.0
+        assert isinstance(s.rank, int) and s.rank >= 1
+        assert isinstance(s.rank_change, int)
+        # 관계 — 초과수익률 = 섹터수익률 − ALL_CAPPED 벤치마크 수익률(규칙 EX-2)
+        for key, p in (("w1", "1w"), ("m1", "1m"), ("m3", "3m")):
+            assert abs(getattr(s.excess_returns, key)
+                       - (getattr(s.returns, key) - bench[p])) < 1e-3
 
-    def test_returns_list_of_sector_rank(self, sector_db: str) -> None:
-        """compute_sector_ranking() returns a list of SectorRank objects."""
-        from my_chart.analysis.sector_metrics import SectorRank, compute_sector_ranking
 
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        assert isinstance(results, list)
-        assert len(results) > 0
-        assert all(isinstance(r, SectorRank) for r in results)
+def test_rs_avg_and_rs_top_pct(ranking) -> None:
+    """rs_avg 는 구성종목 RS 평균, rs_top_pct 는 RS>=80 비율(%)이다(구 R7)."""
+    lead = next(s for s in ranking.sectors if s.name == "LEAD")
+    assert lead.rs_avg == pytest.approx((85 + 72 + 90 + 60 + 50) / 5, abs=0.01)
+    assert lead.rs_top_pct == pytest.approx(40.0, abs=0.01)
 
-    def test_ranks_sectors_by_composite_score(self, sector_db: str) -> None:
-        """AC8: compute_sector_ranking() ranks sectors by composite score descending."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
 
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        # 전기전자 outperforms KOSPI → should rank #1
-        # 철강금속 underperforms → should rank #2
-        sector_names = [r.name for r in results]
-        assert len(sector_names) > 0
-        assert results[0].rank == 1
-        assert results[-1].rank == len(results)
-
-    def test_ranks_sorted_descending_by_composite(self, sector_db: str) -> None:
-        """Ranks are assigned in descending order of composite_score."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        scores = [r.composite_score for r in results]
-        assert scores == sorted(scores, reverse=True)
-
-    def test_strong_sector_ranks_above_weak_sector(self, sector_db: str) -> None:
-        """전기전자 (outperforms) should rank above 철강금속 (underperforms)."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        rank_by_name = {r.name: r.rank for r in results}
-
-        if "전기전자" in rank_by_name and "철강금속" in rank_by_name:
-            assert rank_by_name["전기전자"] < rank_by_name["철강금속"]
-
-    def test_sector_rank_has_required_fields(self, sector_db: str) -> None:
-        """AC-SAG-044 — SectorRank 필드가 SPEC이 요구하는 *값*을 갖는다(존재만이 아니라).
-
-        v0.5.0 이전 판은 필드 존재 확인 함수 15건으로 존재만 확인했다(항진명제에
-        가깝다 — 필드가 없으면 애초에 dataclass 생성이 실패해 이전 라인에서 이미
-        예외가 난다). 값 단언으로 대체한다 — 각 필드가 SPEC이 규정한 타입·범위·
-        관계를 실제로 만족하는지 확인한다. 검출력 실증(되돌림 3케이스)은
-        ``tests/test_ac_sag_044_regression.py`` 가 전담한다(§8.4 규약 9/10).
-        """
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        assert len(results) > 0
-        r = results[0]
-
-        # 타입 · 범위 단언(존재가 아니라 값)
-        assert isinstance(r.name, str) and r.name
-        assert isinstance(r.stock_count, int) and r.stock_count > 0
-        for field in (
-            "sector_return_1w", "sector_return_1m", "sector_return_3m",
-            "sector_excess_return_1w", "sector_excess_return_1m", "sector_excess_return_3m",
-        ):
-            assert isinstance(getattr(r, field), float)
-        for field in ("sector_rs_avg", "sector_rs_top_pct", "sector_nh_pct", "sector_stage2_pct"):
-            assert 0.0 <= getattr(r, field) <= 100.0, f"{field} must be a 0-100 pct"
-        assert isinstance(r.composite_score, float)
-        assert isinstance(r.rank, int) and r.rank >= 1
-        assert r.rank_change is None or isinstance(r.rank_change, int)
-
-        # 관계 단언 — 초과수익률 = 섹터수익률 − KOSPI수익률(규칙 EX-2와 동형)
-        # 이 파일의 전기전자 fixture 는 KOSPI(1W=1%)를 상회하므로 excess > 0 이어야 한다.
-        elec = next((x for x in results if x.name == "전기전자"), None)
-        if elec is not None:
-            assert elec.sector_excess_return_1w > 0.0
-            # KOSPI 1W = 0.01(fraction) → _load_kospi_returns 가 %로 환산(×100) = 1.0
-            assert abs(
-                elec.sector_excess_return_1w
-                - (elec.sector_return_1w - 1.0)
-            ) < 1e-9
-
-    def test_excess_return_computed_correctly(self, sector_db: str) -> None:
-        """sector_excess_return = sector_return - KOSPI_return."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        # 전기전자 avg return ≈ (3% + 2.5%) / 2 = 2.75%, KOSPI = 1%
-        # excess ≈ 1.75%
-        elec_sector = next((r for r in results if r.name == "전기전자"), None)
-        if elec_sector:
-            assert elec_sector.sector_excess_return_1w > 0  # outperforms KOSPI
-
-    def test_rs_avg_calculated(self, sector_db: str) -> None:
-        """sector_rs_avg is the average RS_12M_Rating of sector stocks."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        elec_sector = next((r for r in results if r.name == "전기전자"), None)
-        if elec_sector:
-            # 삼성전자 RS=85, SK하이닉스 RS=72 → avg ≈ 78.5
-            assert 70.0 <= elec_sector.sector_rs_avg <= 90.0
-
-    def test_rs_top_pct_calculated(self, sector_db: str) -> None:
-        """sector_rs_top_pct = % of sector stocks with RS >= 80."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        elec_sector = next((r for r in results if r.name == "전기전자"), None)
-        if elec_sector:
-            # 삼성전자 RS=85 >= 80 → 1/2 = 50%
-            assert abs(elec_sector.sector_rs_top_pct - 50.0) < 1.0
-
-    def test_rank_change_compares_current_vs_historical(self, sector_db: str) -> None:
-        """AC9: sector rank_change correctly compares current vs 4-week-ago rank."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        # rank_change should be an integer (positive = improved, negative = declined)
-        for r in results:
-            assert isinstance(r.rank_change, int)
-
-    def test_composite_score_formula(self, sector_db: str) -> None:
-        """composite = 0.3 * excess_1w_norm + 0.4 * excess_1m_norm + 0.3 * excess_3m_norm."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        # Composite scores should be within reasonable range
-        for r in results:
-            assert 0.0 <= r.composite_score <= 100.0
-
-    def test_nh_pct_reflects_52w_high_stocks(self, sector_db: str) -> None:
-        """sector_nh_pct = % of sector stocks at 52-week high."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        for r in results:
-            assert 0.0 <= r.sector_nh_pct <= 100.0
-
-    def test_excludes_index_names_from_sectors(self, sector_db: str) -> None:
-        """KOSPI/KOSDAQ are not counted as sector stocks."""
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-
-        results = compute_sector_ranking(sector_db, "2024-01-05")
-        sector_names = [r.name for r in results]
-        assert "KOSPI" not in sector_names
-        assert "KOSDAQ" not in sector_names
+def test_index_rows_are_not_sector_members(ranking) -> None:
+    """KOSPI 지수 행은 등록부에 섹터 소속으로 있어도 구성종목으로 세지 않는다."""
+    names = {s.name for s in ranking.sectors}
+    assert "KOSPI" not in names and "KOSDAQ" not in names
+    lead = next(s for s in ranking.sectors if s.name == "LEAD")
+    assert lead.stock_count == 5

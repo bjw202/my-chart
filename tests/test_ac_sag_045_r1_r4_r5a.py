@@ -177,7 +177,10 @@ def test_ac_sag_045_r5a_norm_is_evenly_spaced(new_agg, period: str) -> None:
 def test_ac_sag_045_r5a_mut_minmax_norm_control(new_agg, period: str) -> None:
     """되돌림 대조(필수) — `mut_minmax_norm`: min-max 정규화로 되돌리면 등간격이
     깨진다(값 분포가 균등하지 않은 한 min-max 결과는 등간격이 아니다)."""
-    from my_chart.analysis.sector_metrics import _normalize_list
+    def _minmax(vals: list[float]) -> list[float]:
+        # 되돌림 변형 — min-max 0~100(제거된 레거시 정규화와 동형, 테스트 전용)
+        lo, hi = min(vals), max(vals)
+        return [50.0] * len(vals) if hi == lo else [(v - lo) / (hi - lo) * 100 for v in vals]
 
     values = [
         a.excess_returns[period].value for a in new_agg.aggregates
@@ -185,7 +188,7 @@ def test_ac_sag_045_r5a_mut_minmax_norm_control(new_agg, period: str) -> None:
     ]
     assert len(values) >= MIN_SECTORS
 
-    minmax_normed = sorted(_normalize_list(values))
+    minmax_normed = sorted(_minmax(values))
     n = len(minmax_normed)
     expected = [i * 100.0 / (n - 1) for i in range(n)]
     diverging = sum(

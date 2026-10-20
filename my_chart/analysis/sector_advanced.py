@@ -938,8 +938,8 @@ def _transition_rankings(
     )
 
     # @MX:NOTE: [AUTO] 알림 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=None)`
-    #   (순위 백분위 AG-8 + 시총가중). 종전에는 레거시 `compute_sector_ranking`(min-max
-    #   `_normalize_list`, daily DB 미전달 → 등가중 폴백)을 타서 "순위 3단계 상승/하락"·RS·
+    #   (순위 백분위 AG-8 + 시총가중). 종전에는 레거시 순위 함수(min-max 정규화, daily DB
+    #   미전달 → 등가중 폴백, 제거됨)를 타서 "순위 3단계 상승/하락"·RS·
     #   Stage 2 판정이 표와 다른 기준이었다(라이브 2026-10-16 비철금속: 레거시 1위, 표 5위).
     #   `as_of=d` 로 고정해 오늘 날짜에 기대지 않는다. 격자·유효 유니버스·registry 매핑은
     #   두 기준일에 공통이므로 한 번만 계산한다 — 근거는 `_SharedInputs` docstring 과 같다

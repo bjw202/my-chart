@@ -68,7 +68,7 @@ def _build_fixture_max_ne_canonical(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     try:
         # _load_weekly_snapshot 이 읽는 컬럼을 갖춘 stock_prices (날짜 집합 검증이
-        # 목적이므로 값은 기본값). compute_sector_ranking → LEFT JOIN relative_strength.
+        # 목적이므로 값은 기본값). compute_sector_aggregates → LEFT JOIN relative_strength.
         conn.execute(
             "CREATE TABLE stock_prices (Name TEXT, Date TEXT, Close REAL, SMA10 REAL, "
             "SMA20 REAL, SMA40 REAL, SMA40_Trend_4M REAL, CHG_1W REAL, CHG_1M REAL, "
@@ -554,10 +554,10 @@ def test_ac006a_meta_service_weekly_uses_shared_helper() -> None:
 def test_ac006b_rank_change_uses_anchor_not_offset(
     fixture_max_ne_canonical: str,
 ) -> None:
-    """B-1: compute_sector_ranking 의 rank_change 기준일이 ``anchor(t, 28)`` 경로다.
+    """B-1: compute_sector_aggregates 의 rank_change 기준일이 ``anchor(t, 28)`` 경로다.
 
     ``LIMIT 1 OFFSET 3`` 자체 관용구가 제거됐는지(AC-005 스캔이 담당)에 더해,
-    ``anchor(``` 호출이 compute_sector_ranking 본문에 존재함을 구조적으로 단언한다.
+    ``anchor(``` 호출이 sector_metrics 본문에 존재함을 구조적으로 단언한다.
     anchor 값 단언(28≤days≤35)은 M6 AC-SGR-020 R2 가 고정한다.
     """
     src = (PROJECT_ROOT / "my_chart/analysis/sector_metrics.py").read_text()
@@ -565,7 +565,7 @@ def test_ac006b_rank_change_uses_anchor_not_offset(
         "B-1 위반 — sector_metrics.py 에 LIMIT 1 OFFSET 관용구 잔존"
     )
     assert "anchor(" in src, (
-        "B-1 위반 — compute_sector_ranking 이 anchor() 를 사용하지 않음"
+        "B-1 위반 — sector_metrics 가 anchor() 를 사용하지 않음"
     )
 
 
@@ -603,7 +603,7 @@ def test_ac006b_anchor_returns_earlier_history_bar(tmp_path: Path) -> None:
 
 def test_ac006b_compute_sector_history_dates_equal_shared_guard(
     fixture_max_ne_canonical: str,
-    mock_sectormap,  # noqa: F811 — compute_sector_ranking 의 get_sector_registry 용
+    mock_sectormap,  # noqa: F811 — compute_sector_history 의 get_sector_registry 용
 ) -> None:
     """B-2: compute_sector_history 반환 날짜 집합 == 공유 격자 history(자체 GROUP BY 없음).
 

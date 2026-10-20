@@ -415,22 +415,25 @@ def _collect_sentinel_keys(db: str) -> tuple[str, str]:
 
     * Stage 분포: ``backend.services.stage_service.get_stage_overview``
       (내부에서 ``sector_map[Name] = str(row.get("산업명(대)") or ETC_SECTOR)``).
-    * 섹터 집계: ``my_chart.analysis.sector_metrics.compute_sector_ranking``
-      (내부에서 ``sector = str(row.get("산업명(대)") or ETC_SECTOR)`` 로 그룹핑).
+    * 섹터 집계: ``my_chart.analysis.sector_metrics.compute_sector_aggregates``
+      (``_load_registry_mapping`` 에서 ``sector = str(row.get("산업명(대)") or ETC_SECTOR)``
+      로 그룹핑). 단독 구성원 그룹을 보려고 AG-5(최소 구성종목) 게이트는 끈다.
 
     두 경로 모두 ``get_sector_registry()`` 를 읽으므로 registry 를 패치하면 실제
     배선을 그대로 통과한다 — 테스트 안에서 식을 재작성하지 않는다.
     """
     from backend.services.stage_service import get_stage_overview
-    from my_chart.analysis.sector_metrics import compute_sector_ranking
+    from my_chart.analysis.sector_metrics import compute_sector_aggregates
 
     overview = get_stage_overview(db)
     stage_key = {s.name: s.sector_major for s in overview.all_stocks}[_UNCLASSIFIED_STOCK]
 
-    ranks = compute_sector_ranking(db, _SENTINEL_FIXTURE_DATE)
+    groups = [a.name for a in compute_sector_aggregates(
+        db, _SENTINEL_FIXTURE_DATE, as_of=_SENTINEL_FIXTURE_DATE,
+        apply_min_members=False, compute_rank_change=False).aggregates]
     # 미분류 종목은 유일하게 _CLASSIFIED_SECTOR 가 아닌 그룹의 단독 구성원이다.
-    other = [r.name for r in ranks if r.name != _CLASSIFIED_SECTOR]
-    assert len(other) == 1, f"섹터 집계 그룹이 예상과 다름: {[r.name for r in ranks]}"
+    other = [g for g in groups if g != _CLASSIFIED_SECTOR]
+    assert len(other) == 1, f"섹터 집계 그룹이 예상과 다름: {groups}"
     metrics_key = other[0]
     return stage_key, metrics_key
 
@@ -443,7 +446,7 @@ def test_ac_sgr_021_sentinel_behavioral_divergence_blocked(tmp_path, monkeypatch
     두 식이 바이트 동일하므로 프로덕션 코드를 한 줄도 실행하지 않고 **무조건 통과**했다
     — docstring 이 주장한 "두 경로가 다른 기본값을 쓰면 실패한다" 는 거짓이었다.
 
-    재작성판은 ``get_stage_overview`` 와 ``compute_sector_ranking`` 을 **실제로 호출**해
+    재작성판은 ``get_stage_overview`` 와 ``compute_sector_aggregates`` 를 **실제로 호출**해
     각 경로가 산출한 섹터 키를 비교한다. 두 모듈의 배선이 갈라지면 값이 갈라진다.
     """
     import my_chart.registry as reg

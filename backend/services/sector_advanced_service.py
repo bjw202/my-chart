@@ -191,16 +191,23 @@ def get_stock_bubble(
     ]
 
     # AC-SAG-042 — sector_aggregate 는 /sectors/ranking 의 동일 섹터·동일 기간
-    # sector_return 과 일치해야 한다. compute_sector_ranking() 을 같은 인자로
-    # 재호출해 단일 원천을 공유한다(별도 산식을 두지 않는다).
+    # sector_return 과 일치해야 한다. 랭킹 sectors[]/data[] 와 같은 집계 경로
+    # (compute_sector_aggregates, 같은 인자)를 재호출해 단일 원천을 공유한다(별도 산식 없음).
+    # 순위·rank_change 는 쓰지 않으므로 기준일 재집계는 생략한다. 랭킹에 행이 없는
+    # 섹터(AG-5 최소 구성종목 미달)와 시총가중 불가(AG-4/AG-7 null) 섹터는 기준선이 없다(None).
     sector_aggregate: float | None = None
     if date:
-        from my_chart.analysis.sector_metrics import compute_sector_ranking
-        period_attr = {"1w": "sector_return_1w", "1m": "sector_return_1m",
-                       "3m": "sector_return_3m"}.get(period, "sector_return_1w")
-        for r in compute_sector_ranking(weekly_db_path, date, daily_db_path, market):
-            if r.name == sector_name:
-                sector_aggregate = getattr(r, period_attr)
+        from my_chart.analysis.sector_metrics import compute_sector_aggregates
+        label = period if period in ("1w", "1m", "3m") else "1w"
+        agg = compute_sector_aggregates(
+            weekly_db_path, date, daily_db_path=daily_db_path, market=market,
+            compute_rank_change=False)
+        for a in agg.aggregates:
+            if a.name == sector_name:
+                m = a.returns.get(label)
+                if m is not None and m.value is not None:
+                    # sectors[].returns 와 같은 직렬화 반올림(4자리)
+                    sector_aggregate = round(m.value, 4)
                 break
 
     return StockBubbleResponse(

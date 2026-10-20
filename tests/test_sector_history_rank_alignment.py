@@ -140,7 +140,7 @@ def test_history_composite_score_matches_table(alignment_dbs) -> None:
     table = compute_sector_aggregates(
         weekly_db, dates[-1], daily_db, as_of=dates[-1], compute_rank_change=False)
     expected = {a.name: a.composite_score.value for a in table.aggregates if a.rank is not None}
-    # 반환 원소 타입은 무관하게 composite 의 수치만 비교한다(SectorRank float / MetricValue).
+    # 반환 원소 타입은 무관하게 composite 의 수치만 비교한다(float / MetricValue).
     got = {r.name: getattr(r.composite_score, "value", r.composite_score) for r in rankings[-1]}
     assert got == pytest.approx(expected)
 

@@ -38,7 +38,6 @@ ENTRY_POINTS = {
     "compute_weekly_grid",
     "compute_universe",
     "compute_sector_aggregates",
-    "compute_sector_ranking",
     "anchor",
 }
 
@@ -74,11 +73,8 @@ def test_entry_point_calls_pass_as_of_explicitly(filename: str) -> None:
     """AST 기반 — 격자·집계·유니버스 진입점 호출에 `as_of=` 키워드(또는 그 함수의
     2번째 위치 인자에 값이 채워짐)가 누락된 호출이 0건이다.
 
-    ``compute_sector_ranking(db_path, date, ...)`` 은 ``as_of`` 키워드가 없고
-    ``date`` 를 위치 인자로 받는 별도 계약이므로(§8.4 규약 8은 as_of=None 기본값
-    의존을 금지하는 것이지, 이 함수의 시그니처를 바꾸지 않는다) 이 함수는 위치
-    인자 존재만 확인한다. ``anchor(grid, t, days)`` 도 동형(위치 인자 3개 필수,
-    ``as_of`` 키워드가 없는 별도 계약)이다.
+    ``anchor(grid, t, days)`` 는 ``as_of`` 키워드가 없는 별도 계약이므로(위치 인자 3개
+    필수) 위치 인자 존재만 확인한다.
     """
     path = TESTS_DIR / filename
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -91,10 +87,9 @@ def test_entry_point_calls_pass_as_of_explicitly(filename: str) -> None:
         if name not in ENTRY_POINTS:
             continue
         found_any = True
-        if name in ("compute_sector_ranking", "anchor"):
+        if name == "anchor":
             # as_of 키워드가 없는 별도 계약 — 위치 인자 개수만 확인한다.
-            min_args = 2 if name == "compute_sector_ranking" else 3
-            if len(node.args) < min_args:
+            if len(node.args) < 3:
                 violations.append(
                     f"{filename}:{node.lineno} — {name}() 필수 위치 인자 누락"
                 )

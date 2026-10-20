@@ -50,11 +50,6 @@ _NH_THRESHOLD = 0.02  # within 2% of high_52w
 #: weekly `stock_prices.High` 를 이 창으로 직접 재계산한다(REQ-SAG-022, 규약 Y).
 HIGH_52W_WINDOW_DAYS = 364
 
-# Composite score weights per SPEC R8
-_COMPOSITE_W_1W = 0.3
-_COMPOSITE_W_1M = 0.4
-_COMPOSITE_W_3M = 0.3
-
 # RS top threshold per SPEC R7
 _RS_TOP_THRESHOLD = 80.0
 
@@ -78,42 +73,6 @@ COVERAGE_LOW_CONFIDENCE_THRESHOLD = 0.80
 _PERIOD_LABEL_DAYS = {"1w": 7, "1m": 28, "3m": 91}
 #: 기간 라벨 목록(응답 키 순서 고정).
 _PERIODS = tuple(_PERIOD_LABEL_DAYS)
-
-
-@dataclass
-class SectorRank:
-    """Sector ranking result with all SPEC-required fields.
-
-    하위 호환 표면이다(plan.md §1 D4). SPEC-SECTOR-AGGREGATION-001 의 결측 3상태·커버리지
-    계약은 :class:`~my_chart.analysis.aggregate_types.SectorAggregate` (응답 ``data[]``)가
-    소유하며, 이 dataclass 의 float 필드는 **null 을 표현할 수 없다** — 따라서 시총가중
-    산출이 불가능한 경우(AG-4/AG-7) 등가중 값으로 되돌아간다(아래 각 필드 주석).
-    """
-
-    name: str                      # 산업명(대)
-    stock_count: int
-    # @MX:NOTE: [AUTO] 아래 세 필드는 M2 부터 **상한 재배분 시총가중**(AG-1) 값이다.
-    #   M2 이전 주석은 "market-cap weighted" 라고 적혀 있었으나 실제 구현은 `sum/n`
-    #   등가중이었다(구 :173-175). 주석만 시총가중이고 코드는 등가중인 상태가 오래
-    #   유지됐고, 그 괴리가 본 SPEC 의 출발점이다(plan.md §2 M2 "거짓 주석 정정").
-    #   현재 계약: 유효 시총 종목 >= 5 이고 커버리지 >= 0.50 이면 시총가중,
-    #   그렇지 않으면 **등가중으로 폴백**한다(이 표면은 null 을 실을 수 없다).
-    #   null 이 필요한 소비자는 응답 `data[]` 의 SectorAggregate.returns 를 읽어야 한다.
-    sector_return_1w: float        # 상한재배분 시총가중, anchor(t,7) 기준 (%) — 폴백 등가중
-    sector_return_1m: float        # 상한재배분 시총가중, anchor(t,28) 기준 (%) — 폴백 등가중
-    sector_return_3m: float        # 상한재배분 시총가중, anchor(t,91) 기준 (%) — 폴백 등가중
-    sector_excess_return_1w: float # sector - KOSPI 1W return
-    sector_excess_return_1m: float # sector - KOSPI 1M return
-    sector_excess_return_3m: float # sector - KOSPI 3M return
-    sector_rs_avg: float           # avg RS_12M_Rating
-    sector_rs_top_pct: float       # % stocks with RS >= 80
-    sector_nh_pct: float           # % stocks at 52-week high
-    sector_stage2_pct: float       # % stocks classified Stage 2
-    composite_score: float         # 0-100 ranking score
-    rank: int = 0
-    rank_change: int = 0           # positive = improved, negative = declined
-    # SPEC-RS-REBALANCE-001 REQ-RSR-013 — RS_12M_Rating 중앙값(결측 제외). 유효 RS 가 없으면 None.
-    sector_rs_med: float | None = None
 
 
 def _load_weekly_snapshot(
@@ -151,32 +110,6 @@ def _load_weekly_snapshot(
             "RS_12M_Rating": r[11],
         }
     return result
-
-
-def _load_kospi_returns(conn: sqlite3.Connection, date: str) -> dict[str, float]:
-    """Load KOSPI index returns for the given date."""
-    row = conn.execute(
-        "SELECT CHG_1W, CHG_1M, CHG_3M FROM stock_prices WHERE Name = 'KOSPI' AND Date = ?",
-        (date,),
-    ).fetchone()
-    if not row:
-        return {"chg_1w": 0.0, "chg_1m": 0.0, "chg_3m": 0.0}
-    return {
-        "chg_1w": float(row[0] or 0.0) * 100,  # convert to %
-        "chg_1m": float(row[1] or 0.0) * 100,
-        "chg_3m": float(row[2] or 0.0) * 100,
-    }
-
-
-def _normalize_list(values: list[float]) -> list[float]:
-    """Min-max normalize a list of values to 0-100 range."""
-    if not values:
-        return []
-    min_v = min(values)
-    max_v = max(values)
-    if max_v == min_v:
-        return [50.0] * len(values)
-    return [(v - min_v) / (max_v - min_v) * 100 for v in values]
 
 
 # --- SPEC-SECTOR-AGGREGATION-001 M3 순위·정규화 상수 (규칙 AG-8/AG-9/RK-1) --------
@@ -784,7 +717,8 @@ def _valid_universe(
 class _SharedInputs:
     """여러 기준일을 연달아 집계할 때 **날짜와 무관한** 입력을 한 번만 계산해 넘기는 묶음.
 
-    ``compute_sector_history`` 전용이다(표 엔드포인트는 넘기지 않으므로 동작이 그대로다).
+    ``compute_sector_history`` 와, 같은 기준일을 두 번(기간 순위·composite 순위) 집계하는
+    표 엔드포인트(``period`` 지정 시)가 쓴다 — :func:`build_shared_inputs` 참조.
     두 필드가 기준일 ``d`` 마다 새로 계산한 값과 같은 결과를 내는 근거:
 
     * ``universe`` — :func:`compute_universe` 는 격자의 ``latest.date``(as_of 와 무관하게
@@ -802,6 +736,21 @@ class _SharedInputs:
     grid: Any
     universe: set[str] | None
     registry_mapping: tuple[dict[str, list[str]], dict[str, str]]
+
+
+def build_shared_inputs(
+    weekly_db_path: str, daily_db_path: str | None, as_of: str,
+) -> _SharedInputs:
+    """기준일 ``as_of`` 로 :func:`_compute_sector_aggregates_core` 가 스스로 계산할 것과
+    **같은** 날짜 무관 입력을 미리 만든다(registry 는 모듈 캐시 — ``registry_path=None``).
+
+    같은 기준일을 ``period`` 만 바꿔 두 번 집계할 때(표 엔드포인트의 ``data[]`` 기간 순위 +
+    ``sectors[]`` composite 순위) 유효 유니버스(registry xlsx 재독)를 한 번만 계산하려는 용도다.
+    """
+    return _SharedInputs(
+        grid=compute_weekly_grid(weekly_db_path, as_of),
+        universe=_valid_universe(weekly_db_path, daily_db_path, None, as_of),
+        registry_mapping=_load_registry_mapping(None))
 
 
 def _compute_sector_aggregates_core(
@@ -974,190 +923,6 @@ def compute_sector_aggregates(
     return result
 
 
-def _compute_sector_metrics(
-    sector_name: str,
-    stock_names: list[str],
-    snapshot: dict[str, dict[str, Any]],
-    kospi_returns: dict[str, float],
-    caps: dict[str, float] | None = None,
-    returns_by_name: dict[str, dict[str, float | None]] | None = None,
-    high52_map: dict[str, float] | None = None,
-) -> SectorRank | None:
-    """하위 호환 표면용 단일 섹터 지표(:class:`SectorRank`).
-
-    M2 부터 수익률은 :func:`_aggregate_members` 의 **상한 재배분 시총가중** 값이며,
-    AG-4/AG-7 로 시총가중이 불가능한 경우에만 등가중으로 폴백한다(이 표면의 float
-    필드는 null 을 실을 수 없다). AG-5 제외는 여기에 적용하지 않는다 — 기존 응답의
-    섹터 구성을 보존하기 위함이며 규칙 AG-5 는 ``data[]`` 가 소유한다.
-
-    Returns None if no valid stocks found in sector.
-    """
-    rets = returns_by_name or {}
-    h52 = high52_map or {}
-    members = [
-        _build_member(name, snapshot[name], caps or {}, h52, rets.get(name))
-        for name in stock_names
-        if name in snapshot and name not in _INDEX_NAMES
-    ]
-    if not members:
-        return None
-
-    aggregate, equal_fallback = _aggregate_members(sector_name, members)
-
-    def _value(metric: MetricValue, fallback: float | None) -> float:
-        if metric.value is not None:
-            return float(metric.value)
-        return float(fallback) if fallback is not None else 0.0
-
-    avg_1w = _value(aggregate.returns["1w"], equal_fallback["1w"])
-    avg_1m = _value(aggregate.returns["1m"], equal_fallback["1m"])
-    avg_3m = _value(aggregate.returns["3m"], equal_fallback["3m"])
-
-    return SectorRank(
-        name=sector_name,
-        stock_count=aggregate.member_count,
-        sector_return_1w=round(avg_1w, 4),
-        sector_return_1m=round(avg_1m, 4),
-        sector_return_3m=round(avg_3m, 4),
-        sector_excess_return_1w=round(avg_1w - kospi_returns["chg_1w"], 4),
-        sector_excess_return_1m=round(avg_1m - kospi_returns["chg_1m"], 4),
-        sector_excess_return_3m=round(avg_3m - kospi_returns["chg_3m"], 4),
-        sector_rs_avg=round(aggregate.rs_avg.value or 0.0, 2),
-        sector_rs_top_pct=round(aggregate.rs_top_pct.value or 0.0, 2),
-        sector_rs_med=(round(aggregate.rs_med.value, 2)
-                       if aggregate.rs_med.value is not None else None),
-        sector_nh_pct=round(aggregate.nh_pct.value or 0.0, 2),
-        sector_stage2_pct=round(aggregate.stage2_pct.value or 0.0, 2),
-        composite_score=0.0,  # computed after normalization
-    )
-
-
-def compute_sector_ranking(
-    db_path: str, date: str, daily_db_path: str | None = None,
-    market: str = "all",
-) -> list[SectorRank]:
-    """Compute sector ranking for all sectors on a given date.
-
-    Per SPEC R7-R8:
-    - R7: sector_return, excess_return, rs_avg, rs_top_pct, nh_pct, stage2_pct
-    - R8: composite = 0.3 * excess_1w_norm + 0.4 * excess_1m_norm + 0.3 * excess_3m_norm
-
-    Also computes rank_change by comparing to 4-week-ago ranking.
-
-    Args:
-        db_path: Path to weekly SQLite database file.
-        date: Date string in YYYY-MM-DD format.
-        daily_db_path: 일봉 DB 경로(``stock_meta.market_cap``). ``None`` 이면 시총이
-            전부 결측으로 취급돼 등가중 폴백이 걸린다(라이브 DB 를 암묵 개방하지 않는다).
-        market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039). 종목별 소속
-            시장(registry ``Market`` 컬럼)으로 구성종목을 필터링한다.
-
-    Returns:
-        List of SectorRank ordered by composite_score descending (rank 1 = best).
-    """
-    grid = compute_weekly_grid(db_path)
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    try:
-        snapshot = _load_weekly_snapshot(conn, date)
-        kospi_returns = _load_kospi_returns(conn, date)
-        # M2 — 기간 수익률은 `anchor(t, N)` 기준이며 저장된 CHG_* 컬럼이 아니다.
-        returns_now, _anchors = _anchor_returns(conn, grid, date)
-        # M5 — AC-SAG-024 규약 Y: 신고가 판정은 weekly High 364일 창 재계산
-        high52_map = _high52_map(conn, date)
-
-        # rank_change 기준일: anchor(t, 28) — t−28일 이하 최근 정규 격자 바
-        # (SPEC-SECTOR-GRID-001 AC-SGR-006-B / AC-SGR-020 R2). 1M = 28d(REQ-SGR-006).
-        # 기존 raw 날짜 오프셋 기준 → 정규 격자 기준으로 의미 변경.
-        prev_bar = anchor(grid, date, 28)
-        prev_date = prev_bar.date if prev_bar is not None else None
-        prev_snapshot = _load_weekly_snapshot(conn, prev_date) if prev_date else {}
-        returns_prev = (
-            _anchor_returns(conn, grid, prev_date)[0] if prev_date else {})
-        prev_kospi = _load_kospi_returns(conn, prev_date) if prev_date else {
-            "chg_1w": 0.0, "chg_1m": 0.0, "chg_3m": 0.0
-        }
-    finally:
-        conn.close()
-
-    # Load sector registry to map stock names to sectors
-    sector_to_stocks, market_of = _load_registry_mapping()
-    caps = _load_market_caps(daily_db_path)
-    market_key = (market or "all").lower()
-
-    def _filter_by_market(names: list[str]) -> list[str]:
-        if market_key in ("", "all"):
-            return names
-        return [n for n in names if _market_matches(market_of.get(n), market_key)]
-
-    # Compute current metrics for each sector
-    current_results: list[SectorRank] = []
-    for sector_name, stock_names in sector_to_stocks.items():
-        metrics = _compute_sector_metrics(
-            sector_name, _filter_by_market(stock_names), snapshot, kospi_returns, caps,
-            returns_now, high52_map)
-        if metrics:
-            current_results.append(metrics)
-
-    if not current_results:
-        return []
-
-    # Compute composite scores via normalization
-    excess_1w_values = [r.sector_excess_return_1w for r in current_results]
-    excess_1m_values = [r.sector_excess_return_1m for r in current_results]
-    excess_3m_values = [r.sector_excess_return_3m for r in current_results]
-
-    norm_1w = _normalize_list(excess_1w_values)
-    norm_1m = _normalize_list(excess_1m_values)
-    norm_3m = _normalize_list(excess_3m_values)
-
-    for i, r in enumerate(current_results):
-        r.composite_score = round(
-            _COMPOSITE_W_1W * norm_1w[i]
-            + _COMPOSITE_W_1M * norm_1m[i]
-            + _COMPOSITE_W_3M * norm_3m[i],
-            2,
-        )
-
-    # Sort by composite score descending and assign ranks
-    current_results.sort(key=lambda r: r.composite_score, reverse=True)
-    current_rank_by_sector: dict[str, int] = {}
-    for rank_i, r in enumerate(current_results, start=1):
-        r.rank = rank_i
-        current_rank_by_sector[r.name] = rank_i
-
-    # Compute rank_change if previous data available
-    if prev_snapshot:
-        prev_results: list[SectorRank] = []
-        for sector_name, stock_names in sector_to_stocks.items():
-            metrics = _compute_sector_metrics(
-                sector_name, _filter_by_market(stock_names), prev_snapshot, prev_kospi, caps,
-                returns_prev)
-            if metrics:
-                prev_results.append(metrics)
-
-        if prev_results:
-            prev_excess_1w = [r.sector_excess_return_1w for r in prev_results]
-            prev_excess_1m = [r.sector_excess_return_1m for r in prev_results]
-            prev_excess_3m = [r.sector_excess_return_3m for r in prev_results]
-            pn1w = _normalize_list(prev_excess_1w)
-            pn1m = _normalize_list(prev_excess_1m)
-            pn3m = _normalize_list(prev_excess_3m)
-            for i, r in enumerate(prev_results):
-                r.composite_score = (
-                    _COMPOSITE_W_1W * pn1w[i]
-                    + _COMPOSITE_W_1M * pn1m[i]
-                    + _COMPOSITE_W_3M * pn3m[i]
-                )
-            prev_results.sort(key=lambda r: r.composite_score, reverse=True)
-            prev_rank_by_sector = {r.name: rank_i for rank_i, r in enumerate(prev_results, start=1)}
-
-            for r in current_results:
-                prev_rank = prev_rank_by_sector.get(r.name, r.rank)
-                r.rank_change = prev_rank - r.rank  # positive = improved rank
-
-    return current_results
-
-
 def compute_sector_history(
     db_path: str,
     weeks: int = 12,
@@ -1192,7 +957,7 @@ def compute_sector_history(
         return [], []
 
     # @MX:NOTE: [AUTO] Bump 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=None)`.
-    #   종전에는 레거시 `compute_sector_ranking`(min-max `_normalize_list`)을 탔고, 3M 초과수익률
+    #   종전에는 레거시 순위 함수(min-max 정규화, 제거됨)를 탔고, 3M 초과수익률
     #   극단값 섹터가 Bump 에서만 1위로 뛰는 불일치가 있었다(라이브 2026-10-16 비철금속: Bump 1위,
     #   표 5위). 이제 각 날짜 d 의 순위·composite 는 표의 순위 백분위(AG-8) 값과 같다.
     #   `as_of=d` 로 고정해 오늘 날짜에 기대지 않는다(acceptance.md §8.4 규약 8).

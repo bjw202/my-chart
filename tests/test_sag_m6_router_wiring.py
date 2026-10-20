@@ -209,9 +209,8 @@ def test_ac_sag_042_stock_bubble_sector_aggregate_matches_ranking(
 ) -> None:
     ranking = client.get("/api/sectors/ranking").json()
     # AC-SAG-042 는 "/sectors/ranking 의 동일 섹터·동일 기간 sector_return" 을
-    # 지시한다 — 이는 하위 호환 legacy 표면 sectors[i].returns(SectorReturns,
-    # compute_sector_ranking 산출)이며, 신규 canonical data[](compute_sector_
-    # aggregates 산출, 별도 계산 경로)가 아니다.
+    # 지시한다 — 하위 호환 표면 sectors[i].returns(SectorReturns)이며, 이제 data[] 와
+    # 같은 compute_sector_aggregates 산출이다(직렬화 반올림 4자리).
     ranking_return = next(
         (s["returns"]["w1"] for s in ranking["sectors"] if s["name"] == sector_name),
         None)
