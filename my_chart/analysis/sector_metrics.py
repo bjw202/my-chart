@@ -764,6 +764,7 @@ def _compute_sector_aggregates_core(
     apply_min_members: bool,
     period: str | None = None,
     shared: _SharedInputs | None = None,
+    equal_weight_fallback: bool = False,
 ) -> SectorAggregationResult:
     """`compute_sector_aggregates` 의 rank_change 를 제외한 나머지 전체(벤치마크 ~ 순위).
 
@@ -800,6 +801,7 @@ def _compute_sector_aggregates_core(
 
         market_key = (market or "all").lower()
         aggregates: list[SectorAggregate] = []
+        equal_by_name: dict[str, dict[str, float | None]] = {}   # 등가중 대체 수익률(히스토리 전용)
         excluded: list[ExcludedSector] = []
         all_members: list[_Member] = []          # 규칙 BM-1 — 섹터 그룹핑 없는 벤치마크 유니버스
         for sector_name, stock_names in sector_to_stocks.items():
@@ -824,12 +826,20 @@ def _compute_sector_aggregates_core(
                 excluded.append(
                     ExcludedSector(sector_name, "insufficient_members", len(members)))
                 continue
-            aggregate, _fallback = _aggregate_members(sector_name, members, cap=cap)
+            aggregate, equal_fallback = _aggregate_members(sector_name, members, cap=cap)
             aggregates.append(aggregate)
+            equal_by_name[sector_name] = equal_fallback
 
         # --- 규칙 BM-1 ~ BM-6 벤치마크(EX-1/EX-2 구조 보장 — 같은 `_aggregate_members`) --
         benchmark = _compute_benchmark(all_members, cap, market_key, anchor_dates)
         for a in aggregates:
+            if equal_weight_fallback and not a.cap_weighted_available:
+                # 히스토리(Bump) 전용 — AG-4/AG-7 로 시총가중이 null 이 된 섹터는 등가중
+                # 수익률로 대체한다(3기간 모두 있을 때만). 표 경로는 이 인자를 넘기지 않는다.
+                eq = equal_by_name[a.name]
+                if all(eq[label] is not None for label in _PERIODS):
+                    a.returns = {
+                        label: present(eq[label]) for label in _PERIODS}  # type: ignore[arg-type]
             a.excess_returns = _excess_returns(a.returns, benchmark.returns)
         if benchmark.status == "ok":
             uncapped = _compute_benchmark(all_members, 1.0, market_key, anchor_dates).returns
@@ -876,6 +886,7 @@ def compute_sector_aggregates(
     compute_rank_change: bool = True,
     period: str | None = None,
     shared: _SharedInputs | None = None,
+    equal_weight_fallback: bool = False,
 ) -> SectorAggregationResult:
     """섹터별 시총가중 집계(규칙 AG-1 ~ AG-9, BM-1 ~ BM-6) — 응답 ``data[]`` 의 단일 산출 경로.
 
@@ -902,10 +913,14 @@ def compute_sector_aggregates(
             ``compute_sector_history`` 전용(:class:`_SharedInputs`). ``None``(기본)이면
             종전과 동일하게 매번 계산한다.
             rank_change 기준일 집계에는 넘기지 않는다.
+        equal_weight_fallback: ``True`` 면 시총가중이 AG-4/AG-7 로 null 인 섹터의 수익률을
+            등가중 수익률로 대체해 순위에 넣는다 — ``compute_sector_history``(Bump) 전용.
+            ``False``(기본)이면 종전과 동일하다(표·알림 경로는 넘기지 않는다).
     """
     result = _compute_sector_aggregates_core(
         weekly_db_path, date, daily_db_path, registry_path, market, cap, as_of,
-        apply_min_members, period=period, shared=shared)
+        apply_min_members, period=period, shared=shared,
+        equal_weight_fallback=equal_weight_fallback)
 
     if compute_rank_change:
         grid = compute_weekly_grid(weekly_db_path, as_of or date)
@@ -913,7 +928,8 @@ def compute_sector_aggregates(
         if baseline_bar is not None:
             baseline = _compute_sector_aggregates_core(
                 weekly_db_path, baseline_bar.date, daily_db_path, registry_path, market, cap,
-                baseline_bar.date, apply_min_members, period=period)
+                baseline_bar.date, apply_min_members, period=period,
+                equal_weight_fallback=equal_weight_fallback)
             prev_rank = {a.name: a.rank for a in baseline.aggregates}
             for a in result.aggregates:
                 p = prev_rank.get(a.name)
@@ -946,7 +962,8 @@ def compute_sector_history(
     Returns:
         (dates, rankings) 튜플. dates는 정규 격자 history 의 최근 weeks 개(오름차순),
         rankings는 각 날짜에서 **순위가 매겨진** 섹터의 :class:`SectorAggregate` 리스트
-        (rank 오름차순). 순위 제외 섹터(``rank is None``)는 그 날짜에서 빠진다.
+        (rank 오름차순). AG-5 는 적용하지 않고 AG-4/AG-7 섹터는 등가중으로 대체한다
+        (AC-SUX-019, 아래 @MX:NOTE). 그래도 순위가 없는 섹터(``rank is None``)는 그 날짜에서 빠진다.
         둘은 같은 길이·같은 순서.
     """
     grid = compute_weekly_grid(db_path)
@@ -964,6 +981,13 @@ def compute_sector_history(
     #   격자·유효 유니버스·registry 매핑은 날짜와 무관하므로 한 번만 계산해 넘긴다
     #   (_SharedInputs 근거 참조) — 유니버스 산출이 registry xlsx 를 매번 다시 읽어
     #   날짜당 ~0.5초가 들었다.
+    # @MX:NOTE: [AUTO] AG-5 예외(AC-SUX-019) — Bump 는 AG-5 를 적용하지 않는다: 표 excluded[]
+    #   섹터도 선이 있어야 한다. `apply_min_members=False` + `equal_weight_fallback=True` 로,
+    #   AG-4/AG-7 로 시총가중 수익률이 null 인 섹터(구성종목 < 5 섹터뿐 아니라 유효 시총 < 5 거나
+    #   커버리지 < 0.50 인 ≥ 5 종목 섹터도)는 등가중 수익률 − 벤치마크를 초과수익률로 써서
+    #   전 섹터를 같은 순위 백분위 composite 로 순위 매긴다. 대체 섹터가 없는 날짜(라이브
+    #   market=all)의 순위는 표 composite 순위와 정확히 같고, 대체 섹터가 있으면 Bump 의 순위
+    #   분모가 표보다 크다(사용자 결정). 3기간 수익률이 하나라도 없는 섹터(3M 앵커 없음 등)는 여전히 빠진다.
     shared = _SharedInputs(
         grid=grid,
         universe=_valid_universe(db_path, daily_db_path, None, history_dates[-1]),
@@ -972,7 +996,8 @@ def compute_sector_history(
     for date in history_dates:
         result = compute_sector_aggregates(
             db_path, date, daily_db_path, market=market, as_of=date,
-            compute_rank_change=False, period=None, shared=shared)
+            compute_rank_change=False, period=None, shared=shared,
+            apply_min_members=False, equal_weight_fallback=True)
         ranked = [a for a in result.aggregates if a.rank is not None]
         ranked.sort(key=lambda a: a.rank)
         rankings.append(ranked)

@@ -6,9 +6,12 @@
       가중치(1W 0.30 / 1M 0.40 / 3M 0.30)는 같지만 정규화가 달라, 3M 초과수익률이 극단값인
       섹터가 Bump 에서만 1위로 뛰어오른다(라이브 2026-10-16 비철금속: Bump 1위, 표 5위).
 
-기대 동작(사용자 결정): Bump 의 각 날짜 d 순위 ==
+기대 동작(사용자 결정): **표에서 제외된 섹터가 없을 때** Bump 의 각 날짜 d 순위 ==
 ``compute_sector_aggregates(weekly, d, daily, as_of=d, period=None)`` 순위.
-순위에서 제외된(``rank is None``) 섹터는 그 날짜의 히스토리에서도 빠진다(표와 동일).
+
+AC-SUX-019(Bump 는 AG-5 미적용): 표에서 AG-5(구성종목 < 5)·AG-4(유효 시총 < 5)로 빠진
+섹터도 Bump 에서는 등가중 수익률 − 벤치마크로 순위를 받는다(전 섹터 같은 순위 백분위
+composite). 이때 Bump 의 순위 분모는 표보다 크다 — 하단 ``exclusion_dbs`` 테스트 참조.
 
 픽스처 설계(손으로 검산한 불일치):
     섹터별 수익률(%) — 구성종목 5개 모두 동일 경로, 시총 동일
@@ -59,16 +62,27 @@ def _close_path(r1w: float, r1m: float, r3m: float) -> list[float]:
     return closes
 
 
-@pytest.fixture
-def alignment_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
-    """(weekly_db, daily_db) — 4섹터 × 5종목, 16주, 시총 동일."""
+_CAP = 1_000_000_000_000.0
+
+
+def _build_dbs(
+    tmp_path: Path,
+    monkeypatch,
+    sector_returns: dict[str, tuple[float, float, float]],
+    members: dict[str, int] | None = None,
+    cap_by_sector: dict[str, float | None] | None = None,
+) -> tuple[str, str]:
+    """(weekly_db, daily_db) 를 만든다. 섹터별 구성종목 수·시총(None → NULL)을 덮어쓸 수 있다."""
+    members = members or {}
+    cap_by_sector = cap_by_sector or {}
     dates = _dates()
     names_by_sector = {
-        s: [f"{s}{i}" for i in range(_MEMBERS_PER_SECTOR)] for s in _SECTOR_RETURNS
+        s: [f"{s}{i}" for i in range(members.get(s, _MEMBERS_PER_SECTOR))]
+        for s in sector_returns
     }
     rows: list[tuple] = []
     rs_rows: list[tuple] = []
-    for sector, (r1w, r1m, r3m) in _SECTOR_RETURNS.items():
+    for sector, (r1w, r1m, r3m) in sector_returns.items():
         closes = _close_path(r1w, r1m, r3m)
         for name in names_by_sector[sector]:
             for d, c in zip(dates, closes):
@@ -83,7 +97,8 @@ def alignment_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
         conn.execute("CREATE TABLE stock_prices (Name TEXT, Date TEXT, VolumeWon REAL)")
         all_names = [n for ns in names_by_sector.values() for n in ns]
         conn.executemany("INSERT INTO stock_meta VALUES (?, ?)",
-                         [(n, 1_000_000_000_000.0) for n in all_names])
+                         [(n, cap_by_sector.get(s, _CAP))
+                          for s, ns in names_by_sector.items() for n in ns])
         conn.executemany("INSERT INTO stock_prices VALUES (?, ?, ?)",
                          [(n, d, 1.0e9) for n in all_names for d in dates])
         conn.commit()
@@ -103,6 +118,28 @@ def alignment_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
     monkeypatch.setattr(
         "my_chart.analysis.sector_metrics._valid_universe", lambda *a, **k: None)
     return weekly_db, daily_db
+
+
+@pytest.fixture
+def alignment_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
+    """(weekly_db, daily_db) — 4섹터 × 5종목, 16주, 시총 동일. **제외 섹터 없음.**"""
+    return _build_dbs(tmp_path, monkeypatch, _SECTOR_RETURNS)
+
+
+# 제외 섹터가 있는 픽스처(AC-SUX-019): 표에서는 빠지지만 Bump 에는 선이 있어야 하는 두 섹터.
+#   SMALL  — 구성종목 4개(AG-5 미달 → 표 excluded `insufficient_members`, AG-4 도 미달)
+#   NOCAP  — 구성종목 5개지만 시총 전부 NULL(AG-4 미달 → 시총가중 null → 표 순위 제외)
+_EXCLUSION_RETURNS: dict[str, tuple[float, float, float]] = {
+    **_SECTOR_RETURNS,
+    "SMALL": (3.0, 4.0, 6.0),
+    "NOCAP": (0.0, 0.0, 1.0),
+}
+
+
+@pytest.fixture
+def exclusion_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
+    return _build_dbs(tmp_path, monkeypatch, _EXCLUSION_RETURNS,
+                      members={"SMALL": 4}, cap_by_sector={"NOCAP": None})
 
 
 def _table_ranks(weekly_db: str, daily_db: str, d: str) -> dict[str, int]:
@@ -161,3 +198,51 @@ def test_history_computes_universe_once_per_call(alignment_dbs, monkeypatch) -> 
     dates, _rankings = compute_sector_history(weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db)
     assert len(dates) == _N_WEEKS
     assert len(calls) == 1, f"유효 유니버스가 {len(calls)}회 계산됨(기대 1회)"
+
+
+# --- AC-SUX-019: Bump 는 AG-5 를 적용하지 않는다(표 excluded[] 섹터도 선이 있다) ----------
+#
+# 손 검산(6섹터, 순위 백분위는 순위에 단조이므로 순위 위치로 계산 — 6=최고):
+#   1W: SMALL 3 > LEAD 2 > OUT 1.5 > MID 1 > NOCAP 0 > LAG -1
+#   1M: SMALL 4 > LEAD 3 > OUT 2.5 > MID 2 > NOCAP 0 > LAG -1
+#   3M: OUT 60 > SMALL 6 > LEAD 5 > MID 4 > NOCAP 1 > LAG 0
+#   composite(0.3/0.4/0.3): SMALL 5.7 > LEAD 4.7 > OUT 4.6 > MID 3 > NOCAP 2 > LAG 1
+#   (벤치마크는 모든 섹터에 같은 값을 빼므로 초과수익률 순서 = 수익률 순서)
+_EXPECTED_BUMP_RANKS_WITH_EXCLUSIONS = {
+    "SMALL": 1, "LEAD": 2, "OUT": 3, "MID": 4, "NOCAP": 5, "LAG": 6}
+
+
+def test_table_still_excludes_small_and_nocap_sectors(exclusion_dbs) -> None:
+    """대체(등가중) 경로가 표(data[])로 새지 않는다 — 표는 AG-5/AG-4 를 그대로 적용한다."""
+    weekly_db, daily_db = exclusion_dbs
+    d = _dates()[-1]
+    result = compute_sector_aggregates(
+        weekly_db, d, daily_db, as_of=d, compute_rank_change=False, period=None)
+    assert _table_ranks(weekly_db, daily_db, d) == {"LEAD": 1, "OUT": 2, "MID": 3, "LAG": 4}
+    assert "SMALL" not in {a.name for a in result.aggregates}
+    excluded = {e.sector: e.reason for e in result.excluded}
+    assert excluded.get("SMALL") == "insufficient_members"
+    assert excluded.get("NOCAP") == "excess_return_missing"
+
+
+def test_history_ranks_sectors_excluded_from_table(exclusion_dbs) -> None:
+    """AG-5(구성종목 < 5)·AG-4(유효 시총 < 5) 로 표에서 빠진 섹터도 Bump 순위를 가진다."""
+    weekly_db, daily_db = exclusion_dbs
+    dates, rankings = compute_sector_history(weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db)
+    last = {r.name: r.rank for r in rankings[-1]}
+    assert last == _EXPECTED_BUMP_RANKS_WITH_EXCLUSIONS, f"Bump 마지막 날짜 순위: {last}"
+
+
+def test_get_sector_history_includes_excluded_sectors_and_envelope_excluded_empty(
+    exclusion_dbs,
+) -> None:
+    """API 응답 sectors[] 에 SMALL·NOCAP 선이 있고, 히스토리 봉투 excluded[] 는 비어 있다."""
+    from backend.services.sector_advanced_service import get_sector_history
+
+    weekly_db, daily_db = exclusion_dbs
+    resp = get_sector_history(weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db)
+    names = {s.name for s in resp.sectors}
+    assert {"SMALL", "NOCAP"} <= names, f"sectors[]: {sorted(names)}"
+    assert resp.excluded == []
+    last = resp.dates[-1]
+    assert resp.rankings[last]["SMALL"] == 1
