@@ -78,6 +78,7 @@ def env(monkeypatch, tmp_path):
         check_rate_limit=MagicMock(),
         get_history=MagicMock(return_value=[]),
         get_report_content=MagicMock(return_value=None),
+        get_goose_report_path=MagicMock(return_value=None),  # M5 라우터가 불러오는 이름
         get_stock_name=lambda code: _NAMES.get(code),
         stream_codex_fast=MagicMock(),
     )
