@@ -2,7 +2,7 @@
 id: SPEC-RS-REBALANCE-001
 title: "RS 타임라인 재조정 — 종목 RS 12개월 중심 재가중·열기 배지 분리·섹터 RS 중앙값 병기"
 version: "0.3.1"
-status: draft
+status: in-progress
 created: 2026-10-20
 updated: 2026-10-20
 author: manager-spec

@@ -387,6 +387,77 @@ def generate_price_db(
     print(f"[weekly] Price DB done: {done_count} stocks in {elapsed:.1f}s")
 
 
+# RS 순위 분모에서 제외하는 지수 행 이름(REQ-RSR-002, D5).
+_RS_INDEX_NAMES = frozenset({"KOSPI", "KOSDAQ"})
+# 스팩 판별 표지 — 종목명에 포함되면 분모에서 제외(REQ-RSR-003, B-1).
+_RS_SPAC_MARKER = "스팩"
+# 비율 기반 분기 수익률의 분모가 되는 원시 컬럼(REQ-RSR-007). `1 + R <= 0`이면 제외.
+_RS_RATIO_DENOM_COLS = ("RS_3M", "RS_6M", "RS_9M")
+
+
+def _registry_preferred_names() -> frozenset[str]:
+    """등록부에서 우선주로 판정되는 종목명 — 6자리 코드의 끝자리가 '0'이 아닌 종목(B-1).
+
+    코드가 없거나 6자리 숫자가 아닌 행은 우선주로 판정하지 않는다(REQ-RSR-003).
+    """
+    reg = get_stock_registry()
+    codes = reg["Code"].astype(str).str.zfill(6)
+    preferred = codes.str.fullmatch(r"\d{6}") & (codes.str[-1] != "0")
+    return frozenset(reg.loc[preferred, "Name"].astype(str))
+
+
+def _filter_rs_universe(df: pd.DataFrame, preferred: frozenset[str]) -> pd.DataFrame:
+    """한 날짜의 가격 행에서 RS 순위 분모를 고른다 — 순위 계산 **이전**에 적용한다.
+
+    제외: 어느 컬럼이든 NULL인 행(현행 dropna, REQ-RSR-023), 지수 행·거래량 0
+    (REQ-RSR-002), 우선주·스팩(REQ-RSR-003), `1 + RS_3M/6M/9M <= 0` 행(REQ-RSR-007).
+    거래대금 기준 제외는 하지 않는다(REQ-RSR-008).
+    """
+    df = df.dropna()
+    names = df["Name"].astype(str)
+    keep = (
+        ~names.isin(_RS_INDEX_NAMES)
+        & (df["Volume"] != 0)
+        & ~names.isin(preferred)
+        & ~names.str.contains(_RS_SPAC_MARKER, regex=False)
+        & (1 + df[list(_RS_RATIO_DENOM_COLS)] > 0).all(axis=1)
+    )
+    return df[keep]
+
+
+def _delete_unprocessed_dates(conn: sqlite3.Connection) -> None:
+    """(i) 처리 날짜 집합(기준 종목의 날짜) 밖의 relative_strength 행을 삭제한다(REQ-RSR-001)."""
+    conn.execute(
+        "DELETE FROM relative_strength WHERE Date NOT IN "
+        "(SELECT Date FROM stock_prices WHERE Name = ?)",
+        (REFERENCE_STOCK,),
+    )
+
+
+def _delete_stale_rows_for_date(
+    conn: sqlite3.Connection, date_str: str, keep_names: set[str]
+) -> None:
+    """(ii) `Date = date_str`이면서 이번 실행의 필터 후 이름 집합에 없는 행을 삭제한다.
+
+    호출처가 같은 트랜잭션 안에서 이어서 새 행을 기록한다(REQ-RSR-001·004).
+    """
+    existing = {
+        row[0]
+        for row in conn.execute(
+            "SELECT Name FROM relative_strength WHERE Date = ?", (date_str,)
+        )
+    }
+    stale = existing - keep_names
+    if stale:
+        conn.executemany(
+            "DELETE FROM relative_strength WHERE Name = ? AND Date = ?",
+            [(name, date_str) for name in stale],
+        )
+
+
+# @MX:WARN: [AUTO] 물리 DELETE 경로 — 이번 실행이 쓰지 않은 relative_strength 행을 삭제한다.
+# @MX:REASON: (i) 기준 종목 날짜 밖의 행, (ii) 처리 날짜의 필터 후 이름 집합 밖의 행만 지운다.
+#             테이블 전체 삭제는 하지 않는다(중단 시 빈 테이블 방지, SPEC-RS-REBALANCE-001 REQ-RSR-001).
 def generate_rs_db(
     db_name: str = DEFAULT_DB_WEEKLY,
     progress_callback: Callable[[int, int, str], None] | None = None,
@@ -422,13 +493,23 @@ def generate_rs_db(
     total_dates = len(dates)
     print(f"[RS] Processing {total_dates} dates...")
 
+    if total_dates == 0:
+        # 기준 종목 행이 없으면 (i)이 테이블 전체를 지우게 되므로 아무것도 바꾸지 않는다.
+        logger.warning("[RS] reference stock %r has no dates; skipping", REFERENCE_STOCK)
+        conn.close()
+        return
+
+    preferred = _registry_preferred_names()
+    _delete_unprocessed_dates(conn)
+
     for i, date in enumerate(dates):
         df = pd.read_sql_query(
             "SELECT * FROM stock_prices WHERE Date = ?",
             conn,
             params=[str(date)],
         )
-        df.dropna(inplace=True)
+        df = _filter_rs_universe(df, preferred)
+        _delete_stale_rows_for_date(conn, str(date), set(df["Name"].astype(str)))
 
         if len(df) == 0:
             continue
