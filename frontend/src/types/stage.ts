@@ -45,6 +45,8 @@ export interface Stage2Candidate {
   weight_capped?: boolean
   // 52W고 열 — ② StageStock.near_52w_high. 52주 고가 근접 여부.
   near_52w_high?: boolean | null
+  // SPEC-RS-REBALANCE-001 REQ-RSR-012/015: 주간 RS_1M_Rating — 열기 배지의 값 출처. 결측 가능.
+  rs_1m?: number | null
 }
 
 export interface StageOverviewResponse {

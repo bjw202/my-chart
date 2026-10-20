@@ -46,6 +46,8 @@ function getSortValue(sector: SectorRankItem, field: string): number | null {
     case 'excess_m1': return sector.excess_returns.m1
     case 'excess_m3': return sector.excess_returns.m3
     case 'rs_avg': return sector.rs_avg
+    // SPEC-RS-REBALANCE-001 REQ-RSR-017: RS Med 열 정렬 — 누락 시 default(composite)로 조용히 정렬됨
+    case 'rs_med': return sector.rs_med ?? null
     case 'rs_top_pct': return sector.rs_top_pct
     case 'nh_pct': return sector.nh_pct
     case 'stage2_pct': return sector.stage2_pct

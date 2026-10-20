@@ -190,9 +190,11 @@ describe('SectorRankingTable — REQ-SDU-005 색 램프 분리', () => {
     render(<SectorRankingTable {...defaultProps} sectors={[sameValueSector]} />)
     const row = screen.getByText('SameValue').closest('tr') as HTMLTableRowElement
     const tds = row.querySelectorAll('td')
-    // 열 순서: rank(0) name(1) 1W(2) 1M(3) 3M(4) RS Avg(5) RS 80+ 비중(6) ...
+    // 열 순서: rank(0) name(1) 1W(2) 1M(3) 3M(4) RS Avg(5) RS Med(6) RS 80+ 비중(7) ...
+    // SPEC-RS-REBALANCE-001 REQ-RSR-017 로 RS Med 가 끼어들어 비중 셀이 6 → 7 로 밀렸다
+    // (6 을 그대로 두면 rs_med 결측 셀의 transparent 와 비교하게 돼 단언이 공허해진다).
     const ratingBg = (tds[5] as HTMLElement).style.background
-    const pctBg = (tds[6] as HTMLElement).style.background
+    const pctBg = (tds[7] as HTMLElement).style.background
     expect(ratingBg).not.toBe('')
     expect(pctBg).not.toBe('')
     expect(ratingBg).not.toBe(pctBg)

@@ -11,6 +11,9 @@ function makeSector(over: Partial<SectorRankItem>): SectorRankItem {
     returns: { w1: 0, m1: 0, m3: 0 },
     excess_returns: { w1: 0, m1: 0, m3: 0 },
     rs_avg: 50,
+    // SPEC-RS-REBALANCE-001 REQ-RSR-017: RS Med 열 추가 — 미지정이면 결측 '–' 가 렌더돼
+    // rank_change 유지('–') 텍스트 단언과 겹친다. 실제 응답처럼 값을 채운다.
+    rs_med: 50,
     rs_top_pct: 20,
     nh_pct: 10,
     stage2_pct: 30,
@@ -135,9 +138,10 @@ describe('AC-SUX-026 — 가중 방식 배지 (본문 상설)', () => {
     // 헤더 영역(thead) 의 배지만 집계 — 하단 범례의 배지와 구분.
     const badges = Array.from(document.querySelectorAll('thead .weight-badge'))
     const glyphs = badges.map(b => b.textContent)
-    // ⓦ 3개 (1W/1M/3M) + ⓔ 4개 (RS Avg/RS Top%/52W High%/Stage 2%)
+    // ⓦ 3개 (1W/1M/3M) + ⓔ 5개 (RS Avg/RS Med/RS 80+ 비중/52W High%/Stage 2%)
+    // SPEC-RS-REBALANCE-001 REQ-RSR-017: RS Med 는 구성 종목 중앙값 — 등가중(ⓔ) 계열이라 4 → 5.
     expect(glyphs.filter(g => g === 'ⓦ').length).toBe(3)
-    expect(glyphs.filter(g => g === 'ⓔ').length).toBe(4)
+    expect(glyphs.filter(g => g === 'ⓔ').length).toBe(5)
   })
 
   it('표 하단에 가중 방식 범례 한 줄이 렌더된다', () => {

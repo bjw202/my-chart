@@ -19,3 +19,18 @@ export const RS_S2_STRONG_THRESHOLD = 60
 
 // 유니버스 백분위 중앙 — 섹터 버블 markLine(RS 중앙선)의 Y 좌표.
 export const RS_UNIVERSE_MIDPOINT = 50
+
+// 열기(heat) 배지 — SPEC-RS-REBALANCE-001 REQ-RSR-015·016·022 (D3·Q4).
+// 술어: 주간 RS_1M_Rating(응답의 rs_1m) >= 임계값. 결측(null/undefined)은 배지 없음 — 높은 값으로 메우지 않는다.
+// 임계값은 인자로 받는다: 호출부가 RS_TOP_THRESHOLD 를 넘겨야 상수 교체가 배지 경계를 함께 움직인다
+// (모듈 내부 바인딩을 쓰면 테스트의 상수 주입이 술어에 닿지 않는다 — rsHeat.injected.test.tsx).
+export function isRsHeat(rs1m: number | null | undefined, threshold: number): boolean {
+  return rs1m != null && rs1m >= threshold
+}
+
+// 열기 배지 표시 문구와 상수 유래 title (REQ-RSR-016, REQ-SDU-003 관행).
+export const RS_HEAT_LABEL = '열기'
+
+export function rsHeatTitle(threshold: number): string {
+  return `최근 1개월 RS ${threshold} 이상 — 단기 강세(열기)`
+}

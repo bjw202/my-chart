@@ -93,6 +93,9 @@ export interface SectorRankItem {
   returns: { w1: number; m1: number; m3: number }
   excess_returns: { w1: number; m1: number; m3: number }
   rs_avg: number
+  // SPEC-RS-REBALANCE-001 REQ-RSR-013/017: 섹터 RS 중앙값 — 백엔드 float | None(기본 None).
+  // rs_avg 와 달리 결측 가능·구 응답 호환이라 선택 필드로 둔다.
+  rs_med?: number | null
   rs_top_pct: number
   nh_pct: number
   stage2_pct: number

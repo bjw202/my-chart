@@ -32,6 +32,7 @@ export interface StockBubbleItem {
   volume_ratio: number
   sector_minor: string | null  // 산업명(중) — SPEC-SECTOR-MINOR-COLOR-001
   product: string | null       // 주요제품 — SPEC-STOCK-TOOLTIP-PRODUCT-001
+  rs_1m?: number | null        // 주간 RS_1M_Rating — 툴팁 열기 배지 (SPEC-RS-REBALANCE-001 REQ-RSR-015)
 }
 
 export interface StockBubbleResponse {

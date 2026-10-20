@@ -48,6 +48,9 @@ const COLUMNS: ColumnDef[] = [
   { label: '1M', field: 'excess_m1', align: 'right', badge: 'W' },
   { label: '3M', field: 'excess_m3', align: 'right', badge: 'W' },
   { label: 'RS Avg', field: 'rs_avg', align: 'right', badge: 'E' },
+  // SPEC-RS-REBALANCE-001 REQ-RSR-017: 중앙값 열 — 평균·중앙값·breadth(RS 80+ 비중) 셋을 인접 배치.
+  // 소수 대형 강세주가 평균을 끌어올린 섹터는 평균과 중앙값이 벌어진다.
+  { label: 'RS Med', field: 'rs_med', align: 'right', badge: 'E' },
   // REQ-SDU-004: 'RS Top %' → 'RS 80+ 비중' — RS 점수가 아니라 "RS≥80 종목 비율"임을 정확히 서술.
   { label: 'RS 80+ 비중', field: 'rs_top_pct', align: 'right', badge: 'E' },
   { label: '52W High %', field: 'nh_pct', align: 'right', badge: 'E' },
@@ -155,7 +158,13 @@ export function SectorRankingTable({
                 style={{ textAlign: col.align }}
                 onClick={() => onSort(col.field)}
                 // REQ-SDU-003/004: 'RS 80+ 비중' 헤더 — 임계값이 상수에서 나온 title.
-                title={col.field === 'rs_top_pct' ? `섹터 내 RS ${RS_TOP_THRESHOLD} 이상 종목의 비율` : undefined}
+                title={
+                  col.field === 'rs_top_pct'
+                    ? `섹터 내 RS ${RS_TOP_THRESHOLD} 이상 종목의 비율`
+                    : col.field === 'rs_med'
+                      ? '섹터 내 종목 RS 중앙값 (RS 결측 종목 제외)'
+                      : undefined
+                }
               >
                 <span>{col.label}</span>
                 {/* AC-SUX-025: Rank 열 헤더에 rank_change 기준일(baseline_date) 표기 */}
@@ -233,6 +242,15 @@ export function SectorRankingTable({
                 }}
               >
                 <MetricCell value={sector.rs_avg} format={rating0} />
+              </td>
+              {/* RS Med — REQ-RSR-017. 등급 값이므로 RS Avg 와 같은 'rating' 채널·rating0 포맷, 결측은 MetricCell 표기 */}
+              <td
+                style={{
+                  textAlign: 'right',
+                  background: getCellColor(sector.rs_med, 'rating'),
+                }}
+              >
+                <MetricCell value={sector.rs_med} format={rating0} />
               </td>
               {/* RS 80+ 비중 — REQ-SDU-004 개명. 비중은 기존 파란 채널 유지 */}
               <td

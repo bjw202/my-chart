@@ -6,7 +6,15 @@ import { COLLAPSE_ORDER, hiddenColumnKeys, INVARIANT_COLUMN_KEYS } from './stock
 import { MetricCell, percent1, percent2, rating0 } from '../common/MetricCell'
 // REQ-SDU-003: s2-strong 술어 임계값 상수 — 라벨 없던 술어에 상수 유래 title 을 붙인다.
 // SPEC-RS-REBALANCE-001 REQ-RSR-019: RS 체크 술어·라벨도 RS_STRONG_THRESHOLD 단일 출처를 쓴다.
-import { RS_S2_STRONG_THRESHOLD, RS_STRONG_THRESHOLD } from '../../utils/rsMetrics'
+// SPEC-RS-REBALANCE-001 REQ-RSR-015·016: 열기 배지 술어·title 도 같은 모듈에서 온다.
+import {
+  RS_HEAT_LABEL,
+  RS_S2_STRONG_THRESHOLD,
+  RS_STRONG_THRESHOLD,
+  RS_TOP_THRESHOLD,
+  isRsHeat,
+  rsHeatTitle,
+} from '../../utils/rsMetrics'
 import { filterCandidates } from './stockFilter'
 
 interface StockTableProps {
@@ -234,7 +242,15 @@ export function StockTable({
                   </span>
                   {isEntry && <span className="entry-star">★</span>}
                 </td>
-                <td data-col-key="rs_12m"><MetricCell value={c.rs_12m} format={rating0} /></td>
+                <td data-col-key="rs_12m">
+                  <MetricCell value={c.rs_12m} format={rating0} />
+                  {/* SPEC-RS-REBALANCE-001 REQ-RSR-015·016: 열기 배지 — 1개월 RS(rs_1m) ≥ RS_TOP_THRESHOLD, 상수 유래 title */}
+                  {isRsHeat(c.rs_1m, RS_TOP_THRESHOLD) && (
+                    <span className="rs-heat-badge" data-testid="rs-heat-badge" title={rsHeatTitle(RS_TOP_THRESHOLD)}>
+                      {RS_HEAT_LABEL}
+                    </span>
+                  )}
+                </td>
                 <td data-col-key="chg_1w"><MetricCell value={c.chg_1w} format={percent1} /></td>
                 <td data-col-key="chg_1m" className={`chg-cell ${chgColor}`}>
                   <div className="chg-cell-inner">

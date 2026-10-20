@@ -17,6 +17,8 @@ import {
   STOCK_BUBBLE_R_MAX,
 } from './bubbleRadius'
 import type { SizePeriod } from './bubbleRadius'
+// SPEC-RS-REBALANCE-001 REQ-RSR-015·016: 툴팁 열기 배지 — 술어·문구·title 단일 출처.
+import { RS_HEAT_LABEL, RS_TOP_THRESHOLD, isRsHeat, rsHeatTitle } from '../../utils/rsMetrics'
 
 // tooltip formatter가 읽는 series.data 항목 shape.
 // value 는 이종 배열(숫자 + 문자열)이지만 기존 코드가 인덱스별로 캐스팅하므로 number[] 선언을 유지한다.
@@ -24,6 +26,7 @@ interface BubbleTooltipDatum {
   value: number[]
   sector_minor?: string | null
   product?: string | null
+  rs_1m?: number | null
 }
 
 interface Props {
@@ -191,6 +194,7 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
             // tooltip formatter에서 sector_minor, product 접근을 위한 보존
             sector_minor: s.sector_minor ?? null,
             product: s.product ?? null,  // SPEC-STOCK-TOOLTIP-PRODUCT-001
+            rs_1m: s.rs_1m ?? null,      // 툴팁 열기 배지 (SPEC-RS-REBALANCE-001 REQ-RSR-015)
             label: {
               show: topNSet.has(i),
               formatter: s.name,
@@ -378,12 +382,16 @@ export function StockBubbleChart({ stocks, sectorName, onStockClick, period = '1
             : ETC_LABEL
           // 주요제품 라인 (null/빈 문자열은 em-dash 표시, XSS 방어)
           const productLabel = d.product && d.product.trim() ? escapeHtml(d.product) : '—'
+          // 열기 배지 (REQ-RSR-015·016): RS Rating 줄 끝에 붙인다. 문구·title 은 상수 유래 고정 문자열이라 이스케이프 불요.
+          const heatBadge = isRsHeat(d.rs_1m, RS_TOP_THRESHOLD)
+            ? ` <span class="rs-heat-badge" title="${rsHeatTitle(RS_TOP_THRESHOLD)}">${RS_HEAT_LABEL}</span>`
+            : ''
           return [
             `<b>${name}</b>`,
             `산업명(중): ${sectorMinorLabel}`,
             `주요제품: ${productLabel}`,
             `가격변동: ${sign}${priceChange}%`,
-            `RS Rating: ${rs}`,
+            `RS Rating: ${rs}${heatBadge}`,
             `Stage: ${stageLabel}`,
             `거래대금: ${tv}`,
           ].join('<br/>')

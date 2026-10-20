@@ -18,6 +18,7 @@ function nullSector(name: string): SectorRankItem {
     // 의도적으로 null 주입 — 백엔드가 결측을 내리는 실제 상황
     excess_returns: { w1: null, m1: 0, m3: null } as unknown as SectorRankItem['excess_returns'],
     rs_avg: null as unknown as number,
+    rs_med: null,  // SPEC-RS-REBALANCE-001 REQ-RSR-017: RS Med 열 — 결측 픽스처에 명시
     rs_top_pct: null as unknown as number,
     nh_pct: null as unknown as number,
     stage2_pct: null as unknown as number,
@@ -81,8 +82,9 @@ describe('AC-SUX-053 — 순위표: null 픽스처에서 NaN / 0.0% / 50.0 대�
     const cells = screen.getAllByTestId('metric-cell')
     const missing = cells.filter(c => c.getAttribute('data-state') === 'missing')
     const ok = cells.filter(c => c.getAttribute('data-state') === 'ok')
-    // excess w1/m3 + rs_avg + rs_top + nh + stage2 + composite = 7 결측
-    expect(missing.length).toBe(7)
+    // excess w1/m3 + rs_avg + rs_med + rs_top + nh + stage2 + composite = 8 결측
+    // (SPEC-RS-REBALANCE-001 REQ-RSR-017 RS Med 열 추가로 7 → 8)
+    expect(missing.length).toBe(8)
     expect(missing.every(c => c.textContent === '–')).toBe(true)
     // excess m1 = 0 → 실제 0 이므로 0.0% 로 렌더 (결측이 아님)
     expect(ok.map(c => c.textContent)).toEqual(['0.0%'])
