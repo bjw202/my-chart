@@ -1207,7 +1207,7 @@ _<pending run-phase>_
 
 ```yaml
 sync_complete_at: 2026-10-20
-sync_commit_sha: pending-backfill
+sync_commit_sha: b2cfed7
 sync_status: audit-ready
 sync_route: A (main 직접 커밋, PR 없음, push 없음)
 frontmatter_status_transitions:
