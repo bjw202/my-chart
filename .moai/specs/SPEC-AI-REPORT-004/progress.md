@@ -1201,7 +1201,25 @@ AC-004는 `BRAVE_API_KEY=canary-9a1`을 Given으로 못 박고, AC-023은 `backe
 
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+```yaml
+run_status: audit-ready
+run_complete_at: 2026-10-20
+run_last_commit_sha: e59a8d4   # backend/frontend/.env.example를 마지막으로 바꾼 run 커밋 (git log e59a8d4..HEAD -- backend frontend .env.example 출력 0건)
+run_base_sha: 11f3e16
+milestone_commits:
+  M1: 66c8153                 # 헤드리스 goose 스파이크 관측 기록
+  M2: d16b4b6, 1029017, 1b6d5f8   # 벤더링 / 설치·무결성 검사 / 경계 재탐침 증거
+  M3: 4ec3073, 64b862f, 4d98076, dcb8b64   # RED / 구현 / 증거·전역 지침 탐침 / claudeMdExcludes 반영
+  M4: c0c677f, b214622, 0aa4826            # RED / 구현 / 검증 증거·재탐침
+  M5: 7450d45, 088e846, 6359c43, bd75c94, c4779cd   # RED / 시험 격리 / 구현 / 작업 폴더 10개 유지 / 증거
+  M6: 6941e90, 87d2eeb, 218f4f7            # RED / 구현 / 검증 증거
+  M7: 05c8da4, 65e0df3                     # Deep 파이프라인 삭제·축소 / 환경 변수·프롬프트 문서 정리와 검증 기록
+  live_run_fix: a07cf93, e59a8d4           # 권한 거부 시 거부 명령 기록 / 하네스 지침 셸 명령 규칙 (v0.4.4)
+evidence: "AC별 증거(명령·출력·기준선)는 §E.2의 M1~M7 절과 '라이브 실행 결함: Bash 거부' 절에 있다."
+```
+
+- 위 SHA는 `git log --oneline 11f3e16..b7ba1d1`에서 가져왔다. 같은 범위의 문서 전용 커밋(plan 개정 v0.4.x, 게이트 시간 상한 조정, 타 SPEC plan 산출물)은 위 목록에서 뺐다.
+- 라이브 결함 수정(`e59a8d4`) 뒤 라이브 재실행은 하지 않았다(미관측). 상세는 §E.2 해당 절.
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
@@ -1257,7 +1275,7 @@ AC-AIR4-025 라이브 (2026-10-20, 보관 폴더 `job.json` 직접 확인):
 
 ### sync 단계에서 하지 않은 것
 
-- §E.3 Run-phase Audit-Ready Signal은 manager-develop 소유라 채우지 않았다(자리표시 그대로). run 증거는 §E.2에 있다.
+- §E.3 Run-phase Audit-Ready Signal은 manager-develop 소유라 sync 때는 채우지 않았고(자리표시), sync 이후 manager-develop이 채웠다(`chore(SPEC-AI-REPORT-004): run-phase 완료 신호(§E.3) 기록`). run 증거는 §E.2에 있다.
 - `plan.md` 머리말 "상태: **in-progress** · 버전 0.4.1"은 본문이라 고치지 않았다.
 - README의 API 표(`mode=perplexity|deep`)와 하단 SPEC 링크 목록은 승인 범위 밖이라 그대로 두었다.
 
