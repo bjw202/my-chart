@@ -297,7 +297,11 @@ LOCKED ──[% / M / ESC]──> IDLE
 | GET | `/api/chart/{code}` | 종목 차트 데이터 (OHLCV + MA 오버레이 + RS Line) |
 | GET | `/api/sectors` | 필터 드롭다운용 섹터 목록 |
 | GET | `/api/analysis/{code}` | 종목 재무 분석 (FnGuide S-RIM 8개 섹션 대시보드) |
-| POST | `/api/ai-report/{code}` | AI 종목 분석 리포트 생성 (SSE 스트리밍, mode=perplexity\|deep) |
+| POST | `/api/ai-report/{code}` | AI 종목 분석 시작 (`mode=fast\|deep`, 기본 fast. fast: SSE 스트리밍 / deep: Goose 작업 시작, JSON `{job_id}` 반환 — 202 새 작업, 200 같은 종목 실행 중, 429 `goose_busy`·`goose_rate_limit`) |
+| GET | `/api/ai-report/jobs/{job_id}/events` | Goose 작업 진행 이벤트 (SSE, `Last-Event-ID`로 지난 이벤트 재생) |
+| POST | `/api/ai-report/jobs/{job_id}/cancel` | Goose 작업 취소 (없는 작업은 404) |
+| GET | `/api/ai-report/goose/active` | 실행 중인 Goose 작업 조회 (없으면 null) |
+| GET | `/api/ai-report/{code}/goose/{run}/report.html` | 보관된 Goose 리포트 HTML (CSP sandbox 헤더로 서빙) |
 | GET | `/api/ai-report/{code}/history` | 저장된 AI 분석 이력 목록 |
 | GET | `/api/ai-report/{code}/{filename}` | 저장된 AI 분석 파일 조회 |
 | GET | `/api/themes/v2/snapshot` | V2 테마 분석 스냅샷 (모바일 JSON API 기반, ~30초) |
@@ -389,8 +393,9 @@ DB 파일은 `Output/` 디렉토리에 저장됩니다:
 ### AI / 재무
 - [SPEC-FNGUIDE-ENGINE-001](/.moai/specs/SPEC-FNGUIDE-ENGINE-001/spec.md) — FnGuide S-RIM 8섹션 대시보드
 - [SPEC-AI-REPORT-001](/.moai/specs/SPEC-AI-REPORT-001/spec.md) — Perplexity 빠른 분석 (v1.1.6)
-- [SPEC-AI-REPORT-002](/.moai/specs/SPEC-AI-REPORT-002/spec.md) — 5-소스 심층 분석 (v1.0.5)
-- [SPEC-AI-REPORT-003](/.moai/specs/SPEC-AI-REPORT-003/spec.md) — Perplexity → Codex 전면 대체 (planning)
+- [SPEC-AI-REPORT-002](/.moai/specs/SPEC-AI-REPORT-002/spec.md) — 5-소스 심층 분석 (v1.0.5, superseded by SPEC-AI-REPORT-004)
+- [SPEC-AI-REPORT-003](/.moai/specs/SPEC-AI-REPORT-003/spec.md) — Perplexity → Codex 전면 대체 (Implemented)
+- [SPEC-AI-REPORT-004](/.moai/specs/SPEC-AI-REPORT-004/spec.md) — 심층 분석을 Goose 스킬 하네스로 교체 (2026-10-20)
 
 ### 인프라 / 기초
 - [SPEC-001](/.moai/specs/SPEC-001/spec.md) — Data Pipeline Validation & Optimization
