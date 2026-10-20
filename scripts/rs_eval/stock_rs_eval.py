@@ -1,16 +1,30 @@
 # -*- coding: utf-8 -*-
 """RS 공식 비교 실증 — 현재 공식 vs 대안, 종목/섹터 수준."""
-import sys, sqlite3, warnings
+import argparse, sys, sqlite3, warnings
 import numpy as np, pandas as pd
 warnings.filterwarnings("ignore")
 sys.path.insert(0, "/Users/byunjungwon/Dev/my-project-01/my_chart")
 from my_chart.registry import get_sector_registry
 
 DB = "/Users/byunjungwon/Dev/my-project-01/my_chart/Output/stock_data_weekly.db"
-H = int(sys.argv[1]) if len(sys.argv) > 1 else 4
 
-c = sqlite3.connect(DB)
+# CLI: <H> [--production] [--db <경로>] (SPEC-RS-REBALANCE-001 REQ-RSR-020)
+_ap = argparse.ArgumentParser(description=__doc__)
+_ap.add_argument("H", nargs="?", type=int, default=4, help="향후 주 수(기본 4)")
+_ap.add_argument("--production", action="store_true",
+                 help="점수를 relative_strength.RS_12M_Rating에서만 읽는다(원시 수익률 재계산 없음)")
+_ap.add_argument("--db", default=None, help="주간 DB 경로(지정 시 읽기 전용·immutable로 연다)")
+_args = _ap.parse_args()
+H = _args.H
+
+# --db로 받은 사본은 읽기만 한다 — WAL 사이드카(-wal/-shm)도 만들지 않도록 immutable로 연다.
+c = (sqlite3.connect(f"file:{_args.db}?mode=ro&immutable=1", uri=True)
+     if _args.db else sqlite3.connect(DB))
 px = pd.read_sql("SELECT Name, Date, Close, Volume, RS_1M, RS_3M, RS_6M, RS_9M, RS_12M FROM stock_prices", c)
+if _args.production:
+    # 프로덕션 등급을 같은 (Name, Date)에 붙인다. 등급이 없는 행은 아래 dropna에서 빠진다.
+    _rs = pd.read_sql("SELECT Name, Date, RS_12M_Rating FROM relative_strength", c)
+    px = px.merge(_rs, on=["Name", "Date"], how="left")
 px = px[~px.Name.isin(["KOSPI", "KOSDAQ"])]
 reg = get_sector_registry()[["Name", "Market", "산업명(대)"]].drop_duplicates("Name").set_index("Name")
 px = px.join(reg, on="Name")
@@ -62,6 +76,12 @@ SCORES = {
     "12-1 모멘텀": score_12_1,
 }
 
+# 프로덕션 모드 점수 — 테이블의 등급 열만 받아 유니버스 안에서 다시 순위를 매긴다.
+# 원시 수익률 컬럼으로 산식을 재계산하지 않는다(AC-RSR-014 기계적 독립성).
+def score_production(d): return pr(d.RS_12M_Rating)
+if _args.production:
+    SCORES = {"프로덕션(RS_12M_Rating)": score_production}
+
 def evaluate(filter_name, mask_fn):
     rows = []
     for name, fn in SCORES.items():
@@ -69,7 +89,8 @@ def evaluate(filter_name, mask_fn):
         fwd_top, fwd_bot, fwd_med, ics, persist, sec_top, sec_med = [], [], [], [], [], [], []
         fwd_mean, d_top, d_mean = [], [], []
         for d in dates[52:-H]:
-            day = by_date[d].dropna(subset=["RS_1M","RS_3M","RS_6M","RS_9M","RS_12M","fwd","fwd_d"])
+            day = by_date[d].dropna(subset=["RS_1M","RS_3M","RS_6M","RS_9M","RS_12M","fwd","fwd_d"]
+                                    + (["RS_12M_Rating"] if _args.production else []))
             day = day[mask_fn(day)]
             if len(day) < 200: continue
             day = day.assign(score=fn(day).values)

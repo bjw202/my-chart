@@ -425,6 +425,23 @@ def _filter_rs_universe(df: pd.DataFrame, preferred: frozenset[str]) -> pd.DataF
     return df[keep]
 
 
+# @MX:NOTE: [AUTO] RS_12M_Rating 종합 점수 — IBD식, 최근 분기 40% + 앞선 세 분기 각 20%.
+# @MX:SPEC: SPEC-RS-REBALANCE-001 REQ-RSR-005 (spec.md §2.3)
+def _ibd_composite_score(df: pd.DataFrame) -> pd.Series:
+    """누적 원시 수익률 `RS_3M/6M/9M/12M`에서 분기 수익률을 **비율**로 유도해 가중합한다.
+
+    누적 수익률은 곱으로 이어지므로(`1 + RS_6M = (1 + q1)(1 + q2)`) 분기 수익률은
+    비율식이 정확하다. 차분식(`RS_6M - RS_3M`)은 큰 수익률에서 크게 어긋난다.
+    분모 `1 + RS_3M/6M/9M`이 0 이하인 행은 `_filter_rs_universe()`가 이미 뺐다(REQ-RSR-007).
+    점수는 각 종목의 원시값만으로 정해지며 분모 집합에 의존하지 않는다.
+    """
+    q1 = df["RS_3M"]
+    q2 = (1 + df["RS_6M"]) / (1 + df["RS_3M"]) - 1
+    q3 = (1 + df["RS_9M"]) / (1 + df["RS_6M"]) - 1
+    q4 = (1 + df["RS_12M"]) / (1 + df["RS_9M"]) - 1
+    return 0.4 * q1 + 0.2 * q2 + 0.2 * q3 + 0.2 * q4
+
+
 def _delete_unprocessed_dates(conn: sqlite3.Connection) -> None:
     """(i) 처리 날짜 집합(기준 종목의 날짜) 밖의 relative_strength 행을 삭제한다(REQ-RSR-001)."""
     conn.execute(
@@ -517,15 +534,8 @@ def generate_rs_db(
         rank_1m = df["RS_1M"].rank(pct=True) * 100
         rank_3m = df["RS_3M"].rank(pct=True) * 100
         rank_6m = df["RS_6M"].rank(pct=True) * 100
-        rank_9m = df["RS_9M"].rank(pct=True) * 100
-        rank_12m = df["RS_12M"].rank(pct=True) * 100
 
-        # @MX:NOTE: [AUTO] RS composite weighting: recent periods weighted higher (1.0, 0.8, 0.6, 0.4, 0.2)
-        # Emphasizes recent momentum while incorporating long-term trend strength
-        df["RS_12"] = (
-            rank_1m + 0.8 * rank_3m + 0.6 * rank_6m
-            + 0.4 * rank_9m + 0.2 * rank_12m
-        )
+        df["RS_12"] = _ibd_composite_score(df)
         df["RS_12M_Rating"] = df["RS_12"].rank(pct=True) * 100
 
         df["RS_6"] = rank_1m + rank_3m + rank_6m
