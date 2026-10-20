@@ -1,7 +1,7 @@
 ---
 id: SPEC-AI-REPORT-004
 title: "AI 모달 Deep 모드를 goose 스킬 하네스(헤드리스 claude -p)로 교체"
-version: "0.4.4"
+version: "0.4.5"
 status: completed
 created: 2026-10-19
 updated: 2026-10-20
@@ -29,6 +29,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 | 0.4.2 | 2026-10-20 | manager-spec | run 단계 M3 차단 보고(B2) 반영, 재번호 없음(REQ 23·AC 25 유지): 사용자 전역 `~/.claude/CLAUDE.md`가 하네스 세션에 로드되는 관측에 따라 하네스 설정 키에 `claudeMdExcludes: ["**/.claude/CLAUDE.md"]`를 추가(사용자 결정 2026-10-20, REQ-002, AC-002, design §2.2·§9.1). 근거: M3 탐침 4회 — 설정 키는 전역 지침만 빼고 하네스 `CLAUDE.md`는 남김, 인증 유지(`progress.md §E.2 ### M3 실행기 goose_runner` E4). 설치본 경로 재탐침은 M4 진입 확인 항목 |
 | 0.4.3 | 2026-10-20 | manager-spec | run 단계 M7 차단(AC-023 (1)과 AC-004 충돌) 반영, 재번호 없음(REQ 23·AC 25 유지): AC-023 첫 `git grep`에서 `backend/tests/test_goose_runner.py`를 제외 — AC-004가 실제 민감 변수 이름을 canary로 써야 하므로(사용자 결정 2026-10-20, 근거 `progress.md §E.2 ### M7 기존 Deep 정리`). v0.4.2 잔여 표기 정리: design·acceptance·spec-compact 머리말 버전, acceptance §H 전역 `CLAUDE.md` 항목을 해소로 표시(M4 1부 설치본 재탐침), design §9 설정 파일 키 행을 4개로 |
 | 0.4.4 | 2026-10-20 | manager-spec | run 단계 라이브 실행 결함(Bash 거부 뒤 렌더 미실행, job `bb4c0b2d…` `empty_output`) 반영, REQ·AC 변경 없음(REQ 23·AC 25 유지): 하네스 지침 4번에 셸 명령 규칙 4-1(`runs/<job_id>/`는 이미 있고 출력 폴더는 스크립트가 만든다, `mkdir`·`cd`·`ls`·절대 경로 명령 금지, 파일은 Write 도구로, 참고 문서 예시 대신 4번 형식)과 4-2(Bash 거부 메시지는 명령 1건 거부일 뿐 Bash 전체 거부가 아님, 렌더 없이 끝내지 않음) 추가(design §2.1), design §2.2에 `mode` 거부 메시지가 도구 단위로 쓰인다는 관측 추가, 벤더링 원본 `references/report-input.md` 8-9행 실행 예시를 상대 경로 형식으로 고치는 로컬 수정 1건 기록(design §2, plan §3)과 §6 기존 자산 제외 항목에 그 예외 표기. 권한 허용·거부 규칙은 그대로(사용자 결정 2026-10-20, 근거 `progress.md §E.2 ### 라이브 실행 결함: Bash 거부`) |
+| 0.4.5 | 2026-10-20 | manager-spec | 완료 후 문서 정정(sync 감사 F1, `.moai/reports/sync-audit-SPEC-AI-REPORT-004-20261020.md`), REQ·AC·코드 변경 없음, 상태 `completed` 유지: design §2.3·§6.1·§9 결정표와 acceptance §H가 약속한 "세션 종료 직후 무결성 재검사·경고 로그"는 구현에 없어 문구를 실제 동작으로 고침 — 서버 시작 때 원본·매니페스트 대조, 작업 시작 직전마다 설치본 대조, 세션 중·후 변경은 다음 작업 시작에서 `error`/`integrity`로 막힘(닫힌 실패). 사용자 결정 2026-10-20(약속 삭제, 코드 미변경). sync 감사 F4에 따라 plan.md 머리말 상태·버전과 design·acceptance·spec-compact 머리말 버전을 맞춤 |
 
 관계: 이 SPEC은 **SPEC-AI-REPORT-002**(Deep 5소스 수집 + claude 합성)를 대체한다(supersedes). 002 문서 자체는 수정하지 않으며, 상태 정리는 sync 단계에서 한다. SPEC-AI-REPORT-003(Fast/Codex)은 유지된다.
 

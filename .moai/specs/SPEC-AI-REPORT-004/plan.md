@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 구현 계획 — Deep 모드를 goose 하네스로 교체
 
-> 상태: **in-progress**(run 단계, M1 완료) · 버전 0.4.1 · 작성 2026-10-19 · 작성 manager-spec · Tier L(사용자 확정)
+> 상태: **completed**(plan·run·sync 3단계 종료, 2026-10-20) · 버전 0.4.5 · 작성 2026-10-19 · 작성 manager-spec · Tier L(사용자 확정)
 > 승인된 기획: `.moai/plans/ai-refactored-snowglobe.md`
 > 관련 문서: `spec.md`(요구사항), `acceptance.md`(인수 기준), `design.md`(구조·보안 경계), `research.md`(조사), `spec-compact.md`(압축본)
 > 감사 이력: plan-audit 1회차 FAIL 0.78 → v0.3.0 반영, 2회차 FAIL 0.90 → v0.3.1 반영, 3회차 FAIL 0.91 → 사용자 부채 수용 → v0.3.2 반영, 4회차(run 단계 Phase 1) PASS 0.93 → 선택 결함 일부를 M1 관측과 함께 v0.4.0에서 반영(§2.3, §2.4), 5회차(v0.4.0 delta) FAIL 0.83(점수 하락 → STOP, 단일 수정) → v0.4.1 반영(§2.4). 감사 결함 ID는 회차 접두어(`R1-`~`R5-`)를 붙여 결정 ID(D1~D10, T1~T11)와 구분한다.

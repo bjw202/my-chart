@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-004 (압축본)
 
-> 원문: `spec.md` v0.4.4, `acceptance.md`. 요구사항·인수 기준·변경 파일·제외 사항만 담는다.
+> 원문: `spec.md` v0.4.5, `acceptance.md`. 요구사항·인수 기준·변경 파일·제외 사항만 담는다.
 
 ## 요구사항
 
