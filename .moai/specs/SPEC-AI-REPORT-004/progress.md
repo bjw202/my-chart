@@ -447,6 +447,115 @@ plan M2: "(6a)~(6f) 중 하나라도 하네스 밖 읽기 전용 Bash가 거부�
 - `ruff`가 venv·PATH에 없어 lint를 실행하지 못했다.
 - 시작 설치는 동기 파일 I/O로 lifespan에서 실행된다(스킬 34개 파일, 측정상 즉시 끝남). 서버 시작 시간 영향은 재지 않았다.
 
+### M3 실행기 goose_runner
+
+기준: HEAD `1b6d5f8`(시작), 커밋 `4ec3073`(테스트, RED) → `64b862f`(구현). `claude` 2.1.304. 증거 파일: `.moai/state/verify/m3/`(git 미추적).
+
+산출물: `backend/services/goose_runner.py`(신규), `backend/tests/test_goose_runner.py`(신규 51건). 경계(design §8): 실행기는 무결성 검사·쿼터·작업 등록·`runs/{job_id}/` 생성을 하지 않는다. 취소는 `run_goose` 태스크 cancel → 그룹 종료 후 `CancelledError` 재전파이며, 상태 `cancelled`는 M4 작업 서비스가 정한다. §5.2 선택 규칙(`select_report`)은 `empty_output` 분류에 필요해 실행기에 두었고, 복사·`job.json`은 M5 몫이다.
+
+#### E1 — 인수 기준 행렬
+
+명령: `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest backend/tests/test_goose_runner.py -v -p no:cacheprovider`(HEAD `64b862f`, 이 트리) → `51 passed, 1 warning in 9.35s`
+
+| AC | 상태 | 테스트 | 관측 출력 |
+|---|---|---|---|
+| AC-002 | PASS | `test_ac002_argv_and_cwd`(모델 미설정/opus × 하네스 경로 미설정/`/tmp/h2` 4조합), `test_ac002_settings_source_keys`, `test_ac002_subprocess_gets_cwd_and_argv` | `ac002: 6 passed, 0 failed` |
+| AC-004 | PASS | `test_ac004_env_allowlist`, `test_ac004_env_only_existing_keys`, `test_ac004_subprocess_env_is_allowlisted`(하위 프로세스 `env` 덤프) | `ac004: 3 passed, 0 failed` |
+| AC-005 | PASS | `test_ac005_timeout_kills_whole_group[sigterm]`, `[sigkill-after-grace]`(리더·자식 모두 `trap '' TERM`) — 시간 상한 1초, 유예 0.5초, 시작 후 3초 안에 리더·자식 PID `ProcessLookupError` | `ac005: 2 passed, 0 failed` |
+| AC-006 | PASS | `test_ac006_binary_missing`, `test_ac006_auth_failure`(stderr `not logged in`, exit 1), `test_ac006_exit0_without_report_is_empty_output`, `test_ac006_exit7_is_exit_error` | `ac006: 4 passed, 0 failed` |
+| AC-012 | PASS | `test_ac012_fixture_stage_sequence`(녹화 196줄 + 알 수 없는 타입 1줄 + 깨진 JSON 1줄, 기대 순서 리터럴 39개), `test_ac012_permission_denied_makes_no_stage`, 경계 사례 16건, `test_ac012_runner_emits_stages_from_stream`(가짜 claude가 녹화를 stdout으로 냄) | `ac012: 19 passed, 0 failed` |
+
+AC-012 기대 순서(테스트에 리터럴로 고정, R5-8): `goose_start` → `plan`×6 → `research_tick`×3 → `fetch_start` → `research_tick` → `fetch_start` → `research_tick`×9 → `fetch_done` → `research_tick` → `fetch_done` → `fetch_start` → `research_tick`×8 → `fetch_done` → `compose` → `render_draft`×2 → `session_end`. 녹화를 줄 단위로 읽어 design §3.5 표에 대응시켜 손으로 도출했다(테스트 안에 줄 번호 주석). `research_tick` 22회(메인 WebSearch 4 + 서브에이전트 WebFetch 18), `fetch_start`·`fetch_done` 각 3회, `render_report.py --help`(125행)·`permission_denied`(119행)는 단계 없음.
+
+추가 시험(AC 밖): 취소 시 그룹 종료와 `CancelledError` 재전파(`test_cancel_kills_group_and_reraises`), 리더 exit 0 후 손자가 stdout 파이프를 쥔 경우 `done` + 손자 종료(`test_leader_exit_with_orphan_holding_pipe_is_not_timeout`), 시간 초과여도 선택 가능한 초안 정보 반환(T10), 심볼릭 링크 리포트 무시, stderr 꼬리 50줄, 4MB 초과 줄 버림, 비동기 콜백.
+
+#### E2 — 테스트 수 (기준 대비)
+
+```
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest backend/tests -q -p no:cacheprovider --continue-on-collection-errors -rfE   # 기준: HEAD 1b6d5f8, 변경 전
+38 failed, 214 passed, 1 warning, 63 errors in 37.76s
+$ (같은 명령)   # 변경 후, 구현 포함 작업 트리
+38 failed, 265 passed, 2 warnings, 63 errors in 46.44s
+$ comm -13 baseline_fails.txt after_fails.txt   # FAILED/ERROR 항목 id 정렬 목록(각 101줄) 비교
+(출력 없음 — 새 실패 0건, 해소 0건)
+```
+
+통과 수 +51 = 새 테스트 51건. 기존 38 failed / 63 errors는 `test_ai_report_router_deep_mode.py`의 `my_chart` 스텁 영향(이미 알려진 기준선)이다.
+
+#### E3 — 커버리지
+
+```
+$ python -m coverage run --include='backend/services/goose_runner.py' -m pytest backend/tests/test_goose_runner.py -q -p no:cacheprovider
+$ python -m coverage report -m
+backend/services/goose_runner.py     261      8    97%   245, 294-295, 316-317, 348, 457-458
+```
+
+97%(기준 85%). 미실행 줄은 `PermissionError` 분기(그룹 생존 판정), 4MB 초과 stderr 줄, `ProcessLookupError`가 SIGKILL 직전에 나는 경쟁, 회수 실패 로그다.
+
+#### E4 — 사용자 전역 `~/.claude/CLAUDE.md` 차단 조사 (B2)
+
+방법: `.moai/state/verify/m3/b2probe.py` — cwd `~/.goose-harness`, design §3.1 argv(모델만 `haiku`, 출력 `json`), env는 허용 목록 중 부모에 있는 6개 + 후보 변수, 120초 상한(넘으면 그룹 SIGKILL). 프롬프트: 도구 없이 컨텍스트의 `Contents of <path>` 블록마다 `<path> | <첫 제목 줄>`, 없으면 `NONE`. 설치본 `~/.goose-harness`와 사용자 `~/.claude/CLAUDE.md`는 수정하지 않았다(후보 설정은 검증 폴더의 사본으로 `--settings`에 넘김).
+
+후보는 `claude --help`와 실행 파일 문자열(`strings`)에서 찾았다: 환경 변수 `CLAUDE_CODE_DISABLE_CLAUDE_MDS`, 설정 키 `claudeMdExcludes`. `--bare`는 구독 인증 불가로 금지(design §3.1), `HOME` 변경은 인증 위험으로 시험하지 않음.
+
+```
+[P0-control] exit=0 extra_env=[] settings=/Users/byunjungwon/.goose-harness/.claude/settings.json
+[P0-control] is_error=False result:
+/Users/byunjungwon/.claude/CLAUDE.md | # 전역 지침
+/Users/byunjungwon/.goose-harness/CLAUDE.md | # Goose 헤드리스 실행 규칙
+
+[P1-disable-claude-mds] exit=0 extra_env=['CLAUDE_CODE_DISABLE_CLAUDE_MDS'] settings=/Users/byunjungwon/.goose-harness/.claude/settings.json
+[P1-disable-claude-mds] is_error=False result:
+NONE
+
+[P2-claudeMdExcludes] exit=0 extra_env=[] settings=…/.moai/state/verify/m3/settings_excl.json   # 설치본 설정 + "claudeMdExcludes": ["/Users/byunjungwon/.claude/CLAUDE.md"]
+[P2-claudeMdExcludes] is_error=False result:
+/Users/byunjungwon/.goose-harness/CLAUDE.md | # Goose 헤드리스 실행 규칙
+
+[P3-claudeMdExcludes-glob] exit=0 extra_env=[] settings=…/.moai/state/verify/m3/settings_excl_glob.json   # 설치본 설정 + "claudeMdExcludes": ["**/.claude/CLAUDE.md"]
+[P3-claudeMdExcludes-glob] is_error=False result:
+/Users/byunjungwon/.goose-harness/CLAUDE.md | Goose 헤드리스 실행 규칙
+$ pgrep -fl "claude -p" → (출력 없음)
+```
+
+결론:
+- `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`은 전역 지침과 함께 **하네스 `CLAUDE.md`까지 없앤다**(P1 `NONE`). 하네스 규칙(질문 금지 등)이 사라지므로 쓸 수 없다.
+- 설정 키 `claudeMdExcludes`는 전역 지침만 빼고 하네스 `CLAUDE.md`는 남긴다. 절대 경로(P2)와 이식 가능한 글롭 `**/.claude/CLAUDE.md`(P3) 둘 다 동작했고 구독 인증도 유지됐다(exit 0, `is_error=False`).
+- 이 방법은 design §3.1 argv나 §3.3 환경 변수가 아니라 하네스 설정 파일(추적 원본 `backend/goose_harness_src/claude-settings.json`, design §2.2, REQ-002·AC-002 설정 키, 매니페스트)을 바꿔야 한다. M3 범위(B7)와 SPEC 본문 밖이라 **구현하지 않았고, 차단 보고로 올린다**(오케스트레이터 → manager-spec).
+- 관측 근거는 모델의 자기 보고(컨텍스트 블록 인용)다. 기계적 신호는 아니지만 P0 대조군이 두 파일을 정확히 인용했고 P1·P2·P3가 서로 다른 결과를 냈다.
+
+#### E5 — 관측하지 못한 것 (Gaps)과 잔여 위험
+
+- 실제 `claude`로 goose 세션 전체를 돌리지 않았다(B3, 이번 범위 아님). 실행기 배선은 가짜 실행 파일로만 시험했다 — 실제 claude의 stdout·stderr 분리, 종료 코드, 인증 실패 문구가 `stderr`에 나오는지는 AC-025 라이브에서 확인해야 한다. 인증 실패가 stream-json `result`(`is_error`)로만 나오면 `exit_error`로 분류될 수 있다.
+- `audit`·`render_final` 단계는 녹화에 없어(design §9.1) 합성 줄로만 시험했다.
+- `fetch_done`은 `system/task_notification`을 모두 센다. 녹화에서는 web-fetch 3건과 1:1이었지만, 다른 종류의 백그라운드 작업이 생기면 과다 집계될 수 있다.
+- 가짜 claude 시험은 macOS(`/bin/bash`)에서만 했다. 프로세스 그룹 동작은 POSIX 전용이다(Windows 미지원 — 백엔드 실행 환경과 같음).
+- 리더 종료 후 드레인 2초는 고정값이다. 정상 종료 직후 큰 출력이 2초 넘게 이어지면 그룹 종료로 잘릴 수 있다(관측 사례 없음).
+- `ruff`가 venv·PATH에 없어 lint를 실행하지 못했다.
+- `claudeMdExcludes` 적용 시 `--settings`로 넘기는 파일이 프로젝트 설정 파일과 같은 경로일 때도 동작하는지는 사본 경로로만 확인했다(P2·P3는 다른 경로). 반영 후 재탐침 필요.
+
+#### E8 — RED 증거 (GREEN 전 실패 출력)
+
+```
+$ python -m pytest backend/tests/test_goose_runner.py -q -p no:cacheprovider   # 구현 모듈 작성 전
+E   ModuleNotFoundError: No module named 'backend.services.goose_runner'
+1 passed, 1 warning, 49 errors in 0.78s
+```
+(통과 1건은 기존 설정 원본 파일만 읽는 `test_ac002_settings_source_keys`.)
+
+1차 구현 뒤 추가한 회귀 테스트(리더 exit 0 + 손자가 파이프 보유)의 RED:
+```
+$ python -m pytest backend/tests/test_goose_runner.py -q -p no:cacheprovider -k orphan
+>           assert (result.status, result.error_kind) == ("done", None)
+E           AssertionError: assert ('error', 'timeout') == ('done', None)
+1 failed, 50 deselected, 1 warning in 20.58s
+```
+원인: asyncio `Process.wait()`는 파이프가 모두 닫혀야 돌아온다. `returncode` 폴링 + 드레인 후 그룹 종료로 고쳐 GREEN(51 passed).
+
+#### M4 진입 조건
+
+M3 소유 AC 5개(002·004·005·006·012) 자동 시험 PASS, 전체 백엔드 새 실패 0, 커버리지 97%. B2 전역 지침 차단은 SPEC 변경이 필요한 별도 결정으로, M4 진입을 막지 않는다(실행기 인터페이스와 무관한 설정 파일 변경).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
