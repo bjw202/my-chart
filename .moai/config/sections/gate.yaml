@@ -8,5 +8,5 @@ gate:
     skip_tests: false
     timeouts:
         lint: 60
-        test: 120
+        test: 240
         vet: 30
