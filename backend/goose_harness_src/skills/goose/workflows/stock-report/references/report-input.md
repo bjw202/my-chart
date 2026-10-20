@@ -5,8 +5,8 @@
 ## 실행
 
 ```sh
-python3 scripts/render_report.py --input /path/to/company-input.json --validate-only
-python3 scripts/render_report.py --input /path/to/company-input.json --output-dir /path/to/reports/company/review-01
+python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py --input runs/<job_id>/company-input.json --validate-only
+python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py --input runs/<job_id>/company-input.json --output-dir runs/<job_id>/draft
 ```
 
 개발용 회귀 테스트는 소스 저장소에만 있고 사용자 ZIP에는 없습니다. ZIP 실행에서 해당 테스트가 있다고 가정하지 않습니다. 입력·출력 경로는 호출 환경에 맞게 지정합니다. 출력은 `report.html`, 입력 바이트를 보존한 `report-input.json`, `source-ledger.json`, `render-validation.json`입니다. 같은 종목의 개정본은 새 출력 디렉터리에 만들어 이전 보고서를 보존합니다. 입력 파일은 출력 파일 중 하나와 같은 경로일 수 없습니다. 오류 시 종료 코드는 2이며 렌더링 전에 검증합니다. 검증 JSON에는 원본 SHA-256과 문단별 출처 연결·문장 수가 포함됩니다. 이 해시는 원문 보존 확인용이며 내용의 진실성을 증명하지 않습니다.

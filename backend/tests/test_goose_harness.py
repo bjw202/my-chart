@@ -456,3 +456,36 @@ def test_committed_settings_deny_reads_outside_harness():
     for rule in ("Bash(*..*)", "Read(../**)", "Edit(./.claude/**)", "Write(./.claude/**)"):
         assert rule in deny
     assert "bypassPermissions" not in json.dumps(settings)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v0.4.4 셸 명령 규칙 (design §2.1 4-1·4-2, §2 벤더링 원본의 로컬 수정)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_harness_instructions_state_shell_command_rules():
+    """4-1: 이미 있는 폴더·금지 명령·Write 도구 / 4-2: 거부 메시지는 명령 하나에 대한 것."""
+    text = (_REAL_SOURCE / "harness-instructions.md").read_text(encoding="utf-8")
+
+    assert "4-1." in text
+    assert "`runs/<job_id>/`는 이미 있다" in text
+    assert "`mkdir`·`cd`·`ls`와 절대 경로가 들어간 명령은 쓰지 않는다" in text
+    assert "Write 도구로 쓴다" in text
+    assert "4-2." in text
+    assert '"Permission to use Bash has been denied"' in text
+    assert "그 명령 하나가 거부됐다는 뜻이지 Bash 전체를 쓸 수 없다는 뜻이 아니다" in text
+    assert "렌더링(`render_report.py`)을 실행하지 않은 채 작업을 끝내지 않는다" in text
+
+
+def test_vendored_report_input_example_uses_harness_command_form():
+    """report-input.md 실행 예시가 절대 경로·`python3 scripts/…` 형식을 보이지 않아야 한다."""
+    text = (
+        _REAL_SOURCE / "skills/goose/workflows/stock-report/references/report-input.md"
+    ).read_text(encoding="utf-8")
+
+    assert "/path/to/" not in text
+    assert "python3 scripts/" not in text
+    assert (
+        "python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py"
+        " --input runs/<job_id>/company-input.json --validate-only"
+    ) in text

@@ -26,12 +26,12 @@
     ".claude/skills/goose/workflows/stock-report/assets/modu-stock-wordmark.png": "9f859a9d720238dd4edd7f462ca00b16a144eec420b6ca8a6d7eaa5df3ece8af",
     ".claude/skills/goose/workflows/stock-report/assets/report.css": "4393881528d873a468e7286ca52fbb96a738f292a941867cd30a654b218aaf80",
     ".claude/skills/goose/workflows/stock-report/references/agent-team.md": "14ab20fecf56845b15e021c46bb5ef013ebd864e9ebb23acf849d24c5bf61cb6",
-    ".claude/skills/goose/workflows/stock-report/references/report-input.md": "0cf708e41fbc87eedb9b1071b2dcaaac71141d1983eed8a50810d4c648855fe5",
+    ".claude/skills/goose/workflows/stock-report/references/report-input.md": "b571d2d0c924f26227a45bfd6ad3dfe0f79d666c928862bfca1073eb5c90bd60",
     ".claude/skills/goose/workflows/stock-report/references/report-standard.md": "f888aa088fd4daede30ae956e2d9cad8b5a53a2ce50f8f4b2bc4d0a530908057",
     ".claude/skills/goose/workflows/stock-report/references/research-contract.md": "3316f4ba42a8b257765449983a5f7835d81533a233150bfe3f5a1aaf42cac8a4",
     ".claude/skills/goose/workflows/stock-report/references/workflow-map.json": "c559eaf5c4487d796f1462400b65dd087c8084d4b93e2bd8df6ab5070a2e1bf9",
     ".claude/skills/goose/workflows/stock-report/scripts/render_report.py": "bffdf0516b93d4081eb7d94e3d920b7cd242267a6732c610bbc21570912c6560",
     ".claude/skills/goose/workflows/watchlist-review/GUIDE.md": "ee6779f470b93f375ca79c711ec607ea884d492806b572085db2abb51cf05c3a",
-    "CLAUDE.md": "1606c694a9e60708b2ea9a7495a4533e84f68e41348c0232e8bcdfaed724dde2"
+    "CLAUDE.md": "8e3deb897e0aaa9fa041d691dacc70018594afdaa7ff1a89787abe1e4ba07298"
   }
 }
