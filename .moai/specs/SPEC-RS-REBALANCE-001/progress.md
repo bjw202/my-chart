@@ -234,6 +234,92 @@ RED 단계에서 통과한 2건은 현행 동작을 고정하는 테스트다: A
 - 스팩 판별은 등록부가 아니라 그 날짜 가격 행의 종목명에 적용한다(등록부 종목명과 같은 이름이므로 등록부 기준의 상위 집합). 등록부에 없는 이름도 `스팩`이 들어 있으면 제외된다.
 - 커밋은 워크트리 브랜치에만 있다. `main` 반영(빨리 감기)은 오케스트레이터 몫이다.
 
+### M2 (pre-regeneration) — IBD식과 계측 도구, 기준선 (manager-develop, cycle_type=tdd, 2026-10-20)
+
+**범위.** 이번 실행은 라이브 DB 재생성 **직전까지**다. `Output/stock_data_weekly.db`(공용 체크아웃)에는 쓰지 않았고 `weekly_after_rsr.db`도 만들지 않았다. 따라서 AC-RSR-014의 목표(≥ 60)와 AC-RSR-001·002·017의 라이브 단계 질의는 아직 열려 있다.
+
+**작업 위치.** 런타임 L1 워크트리 `.claude/worktrees/agent-a902f867f6e063330`(브랜치 `worktree-agent-a902f867f6e063330`). 기준점이 `fd5f11f`라 `git merge --ff-only main`으로 `f07b520`까지 빨리 감기한 뒤 작업했다. 커밋은 이 워크트리 브랜치에만 있다.
+
+**커밋.**
+
+| SHA | 내용 | `git show --stat` |
+|---|---|---|
+| `366206a` | 운영 변경(IBD식) + 계측 도구 `--production`·`--db` + AC 테스트 | `my_chart/db/weekly.py` 28 (+19 −9), `scripts/rs_eval/stock_rs_eval.py` 29 (+25 −4), `tests/test_rsr_m2_eval_production.py` +107, `tests/test_rsr_m2_ibd.py` +52 |
+
+**기준선 (AC-RSR-014 첫 명령, 재생성 전).** 사본 확인: `shasum -a 256 …/Output/snapshots/weekly_before_rsr.db | cut -c1-16` → `949f29639a86da86`(오케스트레이터 기록과 같음). 명령(워크트리 cwd, `366206a`의 스크립트와 같은 내용):
+
+```
+/Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db /Users/byunjungwon/Dev/my-project-01/my_chart/Output/snapshots/weekly_before_rsr.db
+exit=0
+registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=052770 종목명=아이톡시
+
+=== 필터: 20주 평균 주간거래대금 >= 50억 | 향후 4주 ===
+                      주수  상위10_초과pp  상하위스프레드pp  상위10_vs평균pp  지연진입_vs평균pp  IC양수비율  상위10_지속률
+공식
+프로덕션(RS_12M_Rating)  295       1.62      -0.47        -0.55        -0.58   32.88     29.24
+```
+
+증거: `.moai/state/verify/rsr-m2/baseline.log`(워크트리). **기준선 `상위10_지속률` = 29.24** — 계획서 31%와 ±3%p(28~34) 안이다. 측정 뒤 `ls -la …/Output/snapshots/`에는 `weekly_before_rsr.db` 한 파일뿐이었다(`--db`는 `mode=ro&immutable=1`로 열어 `-wal`/`-shm`을 만들지 않음).
+
+- 같은 사본에서 원시 산식 모드(`… stock_rs_eval.py 4 --db <같은 경로>`, 증거 `baseline_rawmode.log`)는 `현행(1M 33%가중) 30.88`, `IBD식(최근분기 40%) 65.28`, `12M 단독 74.78`, `주수 298` — `scripts/rs_eval/rs_final_h4.out`과 같은 값이다. 스크립트 수정이 기존 모드를 바꾸지 않았다는 회귀 근거이기도 하다.
+- **주수 295 대 298의 원인(프로브).** 프로덕션 모드는 `RS_12M_Rating`이 없는 행을 더 뺀다. 루프 날짜(`dates[52:-4]`, 299개) 중 `relative_strength`에 날짜 자체가 없는 것이 정확히 3개다: `2020-12-30`, `2021-01-08`, `2021-01-15`(immutable 읽기 파이썬 프로브 출력 `loop 299 loop_missing_in_rs ['2020-12-30', '2021-01-08', '2021-01-15']`). 298 − 3 = 295. 지속률 차이(29.24 대 30.88)는 이 3주와 research.md R9.1의 분모 의존(프로덕션 등급은 전체 분모에서 매긴 순위합)으로 설명되는 범위로 본다 — 가설이며 분리 측정은 하지 않았다.
+
+**RED (구현 전).**
+- 계측 도구(`f07b520` 트리, 테스트만 추가): `pytest tests/test_rsr_m2_eval_production.py -q` → `2 failed in 1.09s`. 원문: `ValueError: invalid literal for int() with base 10: '--production'`(증거 `red_eval.log`). 테스트가 인자를 `--production --db <tmp> 4` 순서로 넘기므로, 옛 스크립트는 DB를 열기 전에 실패한다 — 라이브 DB를 건드리지 않는 RED다.
+- IBD식: `pytest tests/test_rsr_m2_ibd.py -q` → `1 failed, 1 passed in 0.29s`. 원문: `Differing items: {'B': 50.0} != {'B': 75.0}`, `{'D': 75.0} != {'D': 50.0}`(증거 `red_ibd.log`) — acceptance.md의 "현행 가중치로 되돌리면 B 50, D 75"와 같은 값. 통과한 1건은 AC-RSR-016 상수 고정 테스트로, 현행 값을 고정하는 테스트라 RED 단계에서 통과하는 것이 정상이다. 판별력은 대조 K8로 따로 확인했다.
+
+**GREEN (`366206a`).** `pytest tests/test_rsr_m2_ibd.py tests/test_rsr_m2_eval_production.py tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py -v` → `18 passed in 2.23s`(증거 `green.log`).
+
+| AC | 상태 | 테스트 / 명령 | 출력 |
+|---|---|---|---|
+| AC-RSR-005 | PASS | `test_ac_rsr_005_rs_12m_rating_is_ratio_based_ibd_percentile` — 기대값 A 100 / B 75 / C 25 / D 50은 research.md R10 리터럴 | `PASSED` |
+| AC-RSR-006 | PASS | `test_characterize_generate_rs_db_r10_6m_3m_1m_golden`, `test_characterize_relative_strength_schema_unchanged`(M1 골든, 수정 없음) + `tests/test_weekly_insert.py`(수정 없음) | `PASSED` ×2, 영향 범위 실행에서 `test_weekly_insert.py` 포함 통과 |
+| AC-RSR-016 | PASS | `test_ac_rsr_016_sector_composite_weights_unchanged` + 기존 7개 파일 `pytest tests/test_market_breadth.py tests/test_sector_metrics.py tests/test_ac_sag_044_regression.py tests/test_sector_benchmark_ranking.py tests/test_golden_baseline.py tests/test_market_api.py tests/test_m6_gap_closure.py -q` | `PASSED`; 7개 파일 `140 passed in 16.12s`(증거 `ac016_composite.log`) |
+| AC-RSR-014 (도구) | PASS | `test_ac_rsr_014_production_mode_reads_rs_12m_rating_only`(고정 등급 → 지속률 `100.0`), `test_ac_rsr_014_db_flag_without_production_keeps_raw_formula_mode`(같은 픽스처의 원시 IBD식 `13.64` < 50) | `PASSED` ×2 |
+| AC-RSR-014 (기계적 독립성) | PASS | `grep -n "def score_production" scripts/rs_eval/stock_rs_eval.py` → `81:def score_production(d): return pr(d.RS_12M_Rating)`; 같은 줄에 `grep -cE "RS_(1|3|6|9|12)M\b"` → `0` | — |
+| AC-RSR-014 (기준선) | 측정 완료 | 위 기준선 명령 | `29.24` (< 60, 기준선 자체가 대조 관측) |
+| AC-RSR-014 (목표 ≥ 60) | **열림** | 재생성 후 `weekly_after_rsr.db`에서 같은 명령 | 재생성 전이라 미측정 |
+
+**대조 RED (lessons #9).** 실행기 `.moai/state/verify/rsr-m2/contrasts.py`가 회귀를 문자열 치환으로 하나씩 넣고 대상 테스트를 돌린 뒤 원본 바이트로 복구했다. 9건 모두 `exit=1`, 끝줄 `ALL_RED`(원문 `contrasts.log`).
+
+| # | 넣은 회귀 | 대상 | 관측(원문 발췌) |
+|---|---|---|---|
+| K1 | 현행 1M 가중 순위합으로 되돌림 | 005 | `{'B': 50.0} != {'B': 75.0}`, `{'D': 75.0} != {'D': 50.0}` |
+| K2 | 분기 수익률을 차분식으로 | 005 | `{'B': 100.0} != {'B': 75.0}`, `{'A': 75.0} != {'A': 100.0}` |
+| K3 | 12M 단독 | 005 | `{'A': 75.0} != {'A': 100.0}`, `{'B': 100.0} != {'B': 75.0}` |
+| K4 | 분기 가중치 0.25 균등 | 005 | `{'A': 75.0} != {'A': 100.0}`, `{'B': 100.0} != {'B': 75.0}` |
+| K5 | `RS_6`에서 `rank_1m` 제거 | 006 골든 | `AssertionError: B / assert np.float64(50.0) == 25.0` |
+| K6 | `RS_3`에서 `rank_1m` 제거 | 006 골든 | `AssertionError: A / assert np.float64(100.0) == 50.0` |
+| K7 | `RS_1M_Rating`을 `rank_3m`으로 | 006 골든 | `AssertionError: A / assert np.float64(100.0) == 25.0` |
+| K8 | 섹터 가중치 `1w` 0.30 → 0.35 | 016 | `{'1w': 0.35} != {'1w': 0.3}` |
+| K9 | 프로덕션 점수를 원시 `RS_12M`에서 계산 | 014 | `assert 12.12 == 100.0` |
+
+복구 증명: 실행 직후 `git status --short` → `M my_chart/db/weekly.py`, `M scripts/rs_eval/stock_rs_eval.py`, `?? .moai/logs/`, `?? tests/test_rsr_m2_eval_production.py`, `?? tests/test_rsr_m2_ibd.py`(대조 전과 같은 목록), `git diff --stat` → `weekly.py | 28`, `stock_rs_eval.py | 29`(대조 전과 같음). 그 뒤 영향 범위 실행이 전부 통과했다(아래).
+
+**함정 기록(대조 실행기).** 첫 대조 실행 직후 영향 범위 테스트에서 4건이 실패했다(`RS_1M_Rating`이 모두 62.5). 원인은 K7이 같은 길이(`rank_1m` → `rank_3m`)로 바꿔 같은 초 안에 복구되어, 파이썬이 크기·mtime이 같은 낡은 `.pyc`를 재사용한 것이다. 소스는 정상이었다(`grep -n 'df\["RS_1M_Rating"\] = ' my_chart/db/weekly.py` → `547:        df["RS_1M_Rating"] = rank_1m`). `.pyc`를 지우고, 실행기가 대조마다 새 `PYTHONPYCACHEPREFIX`를 쓰게 고친 뒤 대조 9건을 다시 돌려 모두 RED, 영향 범위를 다시 돌려 모두 통과했다. 같은 길이 치환을 쓰는 대조 실행기는 바이트코드 캐시를 격리해야 한다.
+
+**영향 범위 회귀.** `pytest tests/test_rsr_m2_ibd.py tests/test_rsr_m2_eval_production.py tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py tests/test_weekly_insert.py tests/test_db_service.py tests/test_universe.py tests/test_stage_classifier.py tests/test_sector_metrics.py tests/test_market_breadth.py tests/test_consumer_dates.py -q` → `134 passed in 2.66s`(증거 `lane.log`). 작업 전 같은 목록(신규 2개 파일 제외)은 `130 passed in 1.29s`. 커밋 시 pre-commit 게이트(`moai gate`) 통과(exit 0). 첫 시도는 게이트가 새로 만든 워크트리 `.venv`의 `setuptools 82.0.1`에 `pkg_resources`가 없어 `test_ac_sag_045_r4_mut_rs_zero_fill_control` 1건이 실패했고(`ModuleNotFoundError: No module named 'pkg_resources'`), `setuptools<81`(→ 80.10.2)을 설치한 뒤 통과했다. 우회 플래그는 쓰지 않았다.
+
+**린트.** `uvx ruff check --output-format concise my_chart/db/weekly.py scripts/rs_eval/stock_rs_eval.py tests/test_rsr_m2_ibd.py tests/test_rsr_m2_eval_production.py` → 16건(`weekly.py` F402 1, `stock_rs_eval.py` E401 2·E402 1·E701 1·E702 10·I001 1). 변경 전 두 파일(`git show HEAD:…`, 같은 디렉터리에 임시 복사해 같은 설정 적용) → 같은 16건. 새 경고 0, 신규 테스트 파일 0건.
+
+**커버리지.** `coverage run --include='my_chart/db/weekly.py' -m pytest tests/test_rsr_m2_ibd.py tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py` → `my_chart/db/weekly.py 233 119 49%`, 미커버 `89-92, 122-131, 140-149, 155, 179, 204-208, 239-300, 326-387, 558, 561-562`. 새 함수 `_ibd_composite_score`(`430-445`)는 미커버 목록에 없다. 나머지는 M1과 같은 범위 밖 경로다.
+
+**코드베이스 주장과 프로브 (lessons #10).**
+- `generate_rs_db()`의 기본 경로는 cwd 상대가 아니라 **모듈 위치 기준 절대 경로**다: `my_chart/config.py:36` `OUTPUT_DIR = Path(__file__).parent.parent / "Output"`, `:43` `DEFAULT_DB_WEEKLY = str(OUTPUT_DIR / "stock_data_weekly")`. 프로브: 워크트리 cwd에서 `python -c "import my_chart.config as c; print(c.DEFAULT_DB_WEEKLY)"` → `…/agent-a902f867f6e063330/Output/stock_data_weekly`. `db_path = f"{db_name}.db"`가 cwd 상대가 되는 것은 상대 경로를 넘길 때뿐이다.
+- `-I`로 실행하면 `my_chart`가 **다른 디렉터리**에서 import된다: `python -I -c "import importlib.util as u; print(u.find_spec('my_chart').origin)"` → `/Users/byunjungwon/Dev/my_chart/my_chart/__init__.py`. `-I` 없이 cwd에서 실행하면 cwd의 패키지가 잡힌다(`…/agent-a902f867f6e063330/my_chart/__init__.py`). 재생성 명령은 `-I`를 쓰면 안 된다.
+- `backend/services/db_service.py:79-82` Phase 2는 `generate_rs_db(db_name=weekly_db_path.removesuffix(".db"), progress_callback=…)`이고, `weekly_db_path`는 `backend/deps.py:11` `WEEKLY_DB_PATH = f"{DEFAULT_DB_WEEKLY}.db"`에서 온다.
+- `backend/services/meta_service.py:217`의 `rebuild_stock_meta()`가 `weekly.relative_strength`의 `RS_12M_Rating`을 `stock_meta.rs_12m`으로 복사한다. 따라서 RS만 재생성하면 `stock_meta.rs_12m`은 다음 Phase 4까지 옛 산식 값으로 남는다.
+
+**미검증 (Gaps).**
+- 라이브 재생성, `weekly_after_rsr.db` 생성, AC-RSR-014 목표(≥ 60), AC-RSR-001·002·017 라이브 단계 질의: 모두 이번 범위 밖이며 실행하지 않았다.
+- `--db`가 실제로 무시되지 않음을 "라이브 경로를 읽는 회귀"로 주입해 RED를 보는 대조는 하지 않았다 — 그 회귀는 라이브 DB를 열기 때문이다. 대신 테스트 픽스처(210종목, 고정 등급)가 라이브 DB에서는 나올 수 없는 출력(`주수 7`, 지속률 `100.0`)을 내는 것으로 간접 확인했다.
+- 기준선 29.24와 원시 모드 30.88의 차이를 3주 결측과 분모 의존으로 나눠 재지는 않았다(가설).
+- `backend/tests` 스위트는 돌리지 않았다(게이트가 돌린 범위만).
+
+**잔여 위험.**
+- `stock_rs_eval.py`의 `sys.path`(`:6`)는 여전히 공용 체크아웃 절대 경로다. 스크립트가 거기서 가져오는 것은 `get_sector_registry`뿐이라 측정값에는 영향이 없지만, 워크트리에서 돌려도 등록부는 공용 체크아웃 코드로 읽는다.
+- 재생성은 20개 날짜마다 커밋하므로, 서버가 실행 중이면 재생성 도중 일부 날짜만 새 산식인 상태를 읽을 수 있다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
