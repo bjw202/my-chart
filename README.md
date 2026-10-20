@@ -1,6 +1,6 @@
 # KR Stock Screener
 
-한국 주식 시장(KOSPI/KOSDAQ) 통합 스크리닝·분석 데스크탑 도구. 차트 그리드, AI 심층 리포트, S-RIM 재무, 네이버 테마, Minervini 검증된 스크리너 — 모두 로컬에서.
+한국 주식 시장(KOSPI/KOSDAQ) 통합 스크리닝·분석 데스크탑 도구. 차트 그리드, AI 종목 리포트(Codex 빠른 분석 · Goose HTML 리포트), S-RIM 재무, 네이버 테마, Minervini 검증된 스크리너 — 모두 로컬에서.
 
 ## 🔒 로컬 전용 프라이버시
 클라우드 미사용. SQLite 단일 source, KRX 인증/AI 키 모두 로컬 `.env`
@@ -9,7 +9,7 @@
 KRX 세션 인증 / FnGuide S-RIM / 네이버 테마 (finance.naver.com) 직접 통합
 
 ## 🤖 2-tier AI 통합
-Perplexity 빠른 분석 (~$0.05) + Claude CLI 5-소스 심층 합성 (~$0.20)
+Codex CLI 빠른 분석 + Goose(헤드리스 `claude -p` 스킬 하네스) HTML 리포트 — 두 모드 모두 구독 로그인으로 동작하며 API 키가 필요 없음
 
 ## 📈 검증된 스크리너
 Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
@@ -59,9 +59,10 @@ Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
 | SPEC | 기능 |
 |------|------|
 | SPEC-FNGUIDE-ENGINE-001 | FnGuide 재무 분석 엔진 (S-RIM 8-섹션 대시보드) |
-| SPEC-AI-REPORT-001 | AI 빠른 분석 — Perplexity `sonar-reasoning-pro` 단일 호출 (~$0.05/건) |
-| SPEC-AI-REPORT-002 | AI 심층 분석 — 5-소스 병렬 + Claude CLI 합성 (~$0.20/건) |
-| SPEC-AI-REPORT-003 | Perplexity → Codex 전면 대체 (Plan 완료, Step 1 승인 대기 — 2026-04-23) |
+| SPEC-AI-REPORT-001 | AI 빠른 분석 — Perplexity `sonar-reasoning-pro` 단일 호출 (SPEC-AI-REPORT-003에서 Codex로 대체) |
+| SPEC-AI-REPORT-002 | AI 심층 분석 — 5-소스 병렬 + Claude CLI 합성 (**superseded by SPEC-AI-REPORT-004**, 코드 삭제됨) |
+| SPEC-AI-REPORT-003 | Perplexity → Codex 전면 대체 — 빠른 분석이 Codex CLI를 쓰도록 전환 (Implemented) |
+| SPEC-AI-REPORT-004 | 심층 분석을 Goose 스킬 하네스로 교체 — 헤드리스 `claude -p` 작업 큐 + SSE 진행 표시 + sandbox iframe HTML 리포트 (2026-10-20) |
 
 ### 🛠️ 데이터 인프라
 
@@ -176,9 +177,9 @@ KRX_PW=your_krx_password
 
 **재무 분석 (FS 버튼)** — SPEC-FNGUIDE-ENGINE-001: FnGuide S-RIM 8섹션 대시보드 (사업실적·건전성·대차대조표·수익률분해·이익워터폴·활동성·추세신호·5개질문)
 
-**AI 기업 분석 (AI 버튼)** — SPEC-AI-REPORT-001/002: 2모드 AI 분석
-- **빠른 분석** (~40-90초, ~$0.05): Perplexity `sonar-reasoning-pro` 단일 호출
-- **심층 분석** (~3-5분, ~$0.20): 5-소스 병렬 (Perplexity+Brave+Tavily+Naver+YouTube) + Claude CLI 합성
+**AI 기업 분석 (AI 버튼)** — SPEC-AI-REPORT-003/004: 2모드 AI 분석
+- **빠른 분석** (약 2~9분): Codex CLI(`codex exec`) 단일 호출로 markdown 리포트를 스트리밍
+- **Goose** (약 3~6분): 헤드리스 `claude -p`가 goose 스킬 하네스로 종목 리포트를 작성해 단일 HTML로 보여줌 (모달을 닫아도 서버에서 계속 진행)
 
 ### 5️⃣ Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001/002/003, SPEC-STOCK-TOOLTIP-PRODUCT-001
 
@@ -188,38 +189,48 @@ KRX_PW=your_krx_password
 
 ## 🤖 AI 분석 시스템
 
-### 빠른 분석 vs 심층 분석
+### 빠른 분석 vs Goose
 
-| 구분 | 빠른 분석 | 심층 분석 |
+| 구분 | 빠른 분석 | Goose |
 |------|---------|---------|
-| 비유 | 한 리서처의 의견 | 5인 리서치팀 + 시니어 애널리스트 |
-| 소요 시간 | 40~90초 | 3~5분 (캐시 hit 시 1초) |
-| 비용 | ~$0.05/건 | ~$0.10~0.30/건 |
-| 결과 | Perplexity 답변 (뉴스/테마/모멘텀) | 6컬럼 표 + 교차 검증 + 리스크/촉매 분리 |
-| 적합한 상황 | "어제 왜 올랐지?" 빠른 확인 | "내일 진입할지" 의사결정 직전 검토 |
+| 실행 방식 | Codex CLI(`codex exec`) 단일 호출, 요청 연결 동안 SSE로 스트리밍 | 서버 작업 큐에서 헤드리스 `claude -p`가 goose 스킬 하네스를 실행 — 요청과 분리되어 모달을 닫거나 새로고침해도 계속 진행 |
+| 소요 시간 | 약 2~9분 | 약 3~6분 (2026-10-20 라이브 2건 관측: 3분 37초, 2분 40초). 작업 1건 상한 900초 |
+| 인증 | `codex login` (ChatGPT 구독) | `claude` 로그인 (Claude Code 구독) |
+| 결과 | markdown 리포트 | 단일 HTML 리포트를 sandbox iframe으로 표시, 초안이면 배너 표시 |
+| 하루 한도 | `AI_REPORT_DAILY_QUOTA` (기본 50) | `AI_REPORT_GOOSE_DAILY_QUOTA` (기본 5, 빠른 분석과 별개) |
+| 동시 실행 | 같은 종목 중복 요청 차단 | 서버 전체에서 한 번에 1건. 실행 중인 종목은 차트 셀 AI 버튼에 표시 |
 
-### 환경변수 설정 (필수)
+### Goose 동작 방식
+
+1. **하네스 설치와 무결성 검사** — 서버가 시작할 때 리포에 추적된 원본(`backend/goose_harness_src/`)을 매니페스트(`goose-manifest.json`) sha256과 대조한 뒤 `~/.goose-harness`에 설치한다. 원본이 매니페스트와 다르거나 설치본이 바뀌면 Goose 작업을 시작하지 않는다(닫힌 실패). 작업 폴더 `runs/`는 설치 때 보존된다.
+2. **실행** — 작업마다 하네스 폴더에서 `claude -p --permission-mode dontAsk --settings <하네스>/.claude/settings.json --setting-sources project --strict-mcp-config`로 실행한다. 하네스 밖 읽기·쓰기와 `.claude/` 수정은 권한 규칙으로 거부되고, 하위 프로세스에는 허용 목록의 환경 변수만 넘어간다(API 키 등 `.env` 비밀 값은 전달하지 않음).
+3. **진행 표시** — `GET /api/ai-report/jobs/{job_id}/events`(SSE)가 단계 이벤트를 재생과 함께 보내므로, 모달을 다시 열면 진행 상황이 이어진다. `POST /api/ai-report/jobs/{job_id}/cancel`로 취소한다.
+4. **초안과 최종본** — goose가 `final/report.html`과 `delivery_allowed: true` 검증 결과를 함께 남기면 최종본(`final`), 그렇지 않고 `draft/report.html`만 있으면 초안(`draft`)으로 전달한다. 초안은 리포트 위에 배너가 붙는다.
+5. **보관** — 결과는 `backend/reports/<종목명>/goose/<날짜>/`에 보관된다(같은 날 두 번째 실행은 `<날짜>_2`). 허용 목록 파일(`report.html`, `report-input.json`, `source-ledger.json`, `render-validation.json`, `delivery-audit.json`)과 goose가 세운 가정을 적은 `assumptions.md`, 작업 메타데이터 `job.json`만 복사한다. 기록 탭에서 빠른 분석 markdown 항목과 함께 볼 수 있다.
+
+**알려진 한계**
+- Goose 하루 한도 카운터는 서버 메모리에 있어 서버를 재시작하면 초기화된다. 실행 중 작업 기록도 재시작 시 사라진다.
+- 시작 시 차감한 한도는 취소·오류로 끝나도 돌려주지 않는다.
+- goose의 WebFetch로는 DART 공시 원문(목록 POST 조회, 자바스크립트로 그리는 목차)을 읽지 못해, 현재 리포트는 대부분 초안(`draft`)으로 끝난다. 서버가 DART 본문을 받아 넘기는 방식을 후속 과제로 남겼다.
+
+### 환경변수 설정
+
+두 모드 모두 API 키가 필요 없다. 아래 값은 모두 선택이며 기본값 사용을 권장한다.
 
 ```bash
-# 빠른 분석 (필수)
-PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxx
+# 빠른 분석 (Codex CLI — 터미널에서 `codex login` 1회)
+AI_REPORT_DAILY_QUOTA=50          # 빠른 분석 하루 최대 횟수
+AI_REPORT_BURST_LIMIT=3           # 빠른 분석 분당 최대 요청 수
 
-# 심층 분석 (필수)
-BRAVE_API_KEY=
-TAVILY_API_KEY=
-NAVER_CLIENT_ID=
-NAVER_CLIENT_SECRET=
-YOUTUBE_API_KEY=
-
-# 비용 제어 (선택, 기본값 사용 권장)
-AI_REPORT_DAILY_QUOTA=50          # 빠른 분석 일일 한도
-AI_REPORT_BURST_LIMIT=3           # 빠른 분석 분당 한도
-AI_REPORT_DEEP_DAILY_QUOTA=15     # 심층 분석 일일 한도
-AI_REPORT_DEEP_BURST_LIMIT=1      # 심층 분석 분당 한도
-AI_REPORT_DEEP_MODEL=sonnet       # 합성 모델 (sonnet 또는 opus)
+# Goose (Claude Code — 서버 실행 계정에서 `claude` 로그인 상태 필요)
+AI_REPORT_GOOSE_MODEL=sonnet      # 분석 모델 (기본 sonnet)
+AI_REPORT_GOOSE_TIMEOUT=900       # 작업 1건 시간 상한(초)
+AI_REPORT_GOOSE_DAILY_QUOTA=5     # Goose 하루 최대 횟수 (빠른 분석 한도와 별개)
+AI_REPORT_GOOSE_RUNS_KEEP=10      # 하네스에 남길 작업 폴더 수 (오래된 것부터 정리)
+# AI_REPORT_GOOSE_HARNESS_DIR=~/.goose-harness   # 하네스 설치 위치. 리포 아래 경로는 거부됨
 ```
 
-상세 설명은 `.moai/specs/SPEC-AI-REPORT-001/spec.md`, `.moai/specs/SPEC-AI-REPORT-002/spec.md`를 참조하세요.
+상세 설명은 `.moai/specs/SPEC-AI-REPORT-003/spec.md`(빠른 분석)와 `.moai/specs/SPEC-AI-REPORT-004/spec.md`(Goose)를 참조하세요.
 
 ---
 

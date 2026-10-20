@@ -1205,7 +1205,61 @@ _<pending run-phase>_
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+```yaml
+sync_complete_at: 2026-10-20
+sync_commit_sha: pending-backfill
+sync_status: audit-ready
+sync_route: A (main 직접 커밋, PR 없음, push 없음)
+frontmatter_status_transitions:
+  spec.md: in-progress → completed (updated 2026-10-20)
+  plan.md / acceptance.md / progress.md: frontmatter 없음 — 전이 대상 아님
+  SPEC-AI-REPORT-002: 미적용 — `* → superseded`는 manager-spec 소유(blocker 보고)
+b12_self_test_a: "grep -c 'SPEC-AI-REPORT-004' CHANGELOG.md → 0 (추가 전)"
+b12_self_test_b: "acceptance.md 고유 AC-AIR4-* 25개 = CHANGELOG 언급 25개 (원시 grep 32는 본문의 축약 별칭 AC-001 등 7개 포함)"
+b12_self_test_c: "CHANGELOG에 적은 경로 18개 ls 존재 확인, 삭제 경로 4개 부재 확인"
+changelog_entry_position: "[Unreleased] 첫 항목 — ### Changed (SPEC-AI-REPORT-004 v0.4.4 …)"
+```
+
+### AC 요약 (근거는 §E.2 각 마일스톤 표)
+
+| AC | 판정 | 근거 |
+|---|---|---|
+| AC-AIR4-001 | PASS | M2 하네스 쪽 (1)~(5)·보조, M4 라우터 쪽 (2b)(3)(4)(5) |
+| AC-AIR4-002 | PASS | M2 설정 파일, M3 argv·cwd `ac002: 6 passed` |
+| AC-AIR4-003 | PASS [라이브] | M2 음성 탐침 11/11 거부, 카나리 출력 0건 |
+| AC-AIR4-004 ~ 006 | PASS | M3 |
+| AC-AIR4-007 ~ 009, 011, 021 | PASS | M4 |
+| AC-AIR4-010 | PASS | M4(구독 해제 후 작업 지속) + M5(보관 절반) |
+| AC-AIR4-012 | PASS | M3 |
+| AC-AIR4-013 ~ 017 | PASS | M5 |
+| AC-AIR4-018 ~ 020, 022 | PASS | M6 |
+| AC-AIR4-023 | PASS | M7 (2)(3) + sync 재실행 (1): `git grep -nI -e deep_research … -- backend .env.example ':!backend/tests/test_goose_runner.py'` → 출력 0줄, `grep_exit=1` (HEAD `e59a8d4`, v0.4.3 범위) |
+| AC-AIR4-024 | PASS | M7 `38 passed`, 검사 순서 3 passed |
+| AC-AIR4-025 | 부분 [라이브] | 아래 |
+
+AC-AIR4-025 라이브 (2026-10-20, 보관 폴더 `job.json` 직접 확인):
+
+| job | 종목 | 시작 → 종료 | 결과 | `assumptions.md` |
+|---|---|---|---|---|
+| `5695985a…` | 하나기술(299030) | 14:54:47 → 14:58:24 (217초) | `done` · `draft` · `interrupted: false` | 1343바이트 |
+| `bb4c0b2d…` | 한빛레이저(452190) | 15:00:56 → | `error/empty_output` (Bash 거부, §E.2 "라이브 실행 결함") | — |
+| `1d261a37…` | 한빛레이저(452190) | 15:28:58 → 15:31:38 (160초) — v0.4.4 커밋 `e59a8d4`(15:25) 이후 | `done` · `draft` · `interrupted: false` | 1205바이트 |
+
+- 관측: 사람 입력 없이 종료(두 `done` 작업), 시간 상한 900초 안, `assumptions.md` 존재·비어 있지 않음, 초안 전달.
+- 오케스트레이터 라이브 확인 보고(이 문서에 명령 출력 미기록): 모달 재오픈 시 진행 이어짐, iframe 리포트와 초안 배너 표시.
+- 미관측 2건: (1) 한 종목의 기록 탭에 `kind: goose` 항목과 빠른 분석 markdown 항목이 함께 보이는지 (2) 실제 goose 세션의 `final/` 생성 — 두 작업 모두 `draft`로 끝났다.
+
+### 알려진 한계
+
+- Goose 하루 한도 카운터(`GooseRateLimiter._counts`)가 서버 메모리에 있어 서버를 재시작하면 초기화된다.
+- goose의 WebFetch로는 DART 공시 원문을 읽지 못한다(목록이 POST 조회, 목차를 자바스크립트가 들고 있음). 두 작업의 `assumptions.md` 모두 DART 원문 미확보를 적었고 리포트는 `draft`로 끝났다. 후속 카드 t16(`moai todo`에 queued).
+- AC-AIR4-025 미관측 2건(위).
+
+### sync 단계에서 하지 않은 것
+
+- §E.3 Run-phase Audit-Ready Signal은 manager-develop 소유라 채우지 않았다(자리표시 그대로). run 증거는 §E.2에 있다.
+- `plan.md` 머리말 "상태: **in-progress** · 버전 0.4.1"은 본문이라 고치지 않았다.
+- README의 API 표(`mode=perplexity|deep`)와 하단 SPEC 링크 목록은 승인 범위 밖이라 그대로 두었다.
 
 ---
 

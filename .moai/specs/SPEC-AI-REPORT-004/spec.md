@@ -2,7 +2,7 @@
 id: SPEC-AI-REPORT-004
 title: "AI 모달 Deep 모드를 goose 스킬 하네스(헤드리스 claude -p)로 교체"
 version: "0.4.4"
-status: in-progress
+status: completed
 created: 2026-10-19
 updated: 2026-10-20
 author: manager-spec

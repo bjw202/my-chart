@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (SPEC-AI-REPORT-004 v0.4.4 — AI 모달 심층 분석을 Goose 스킬 하네스로 교체, 2026-10-20)
+
+- **차트 셀 AI 모달의 Deep 모드를 goose 스킬 하네스(헤드리스 `claude -p`)로 교체** — 옛 5-소스 병렬 수집 + Claude CLI 합성 파이프라인(SPEC-AI-REPORT-002)을 지우고, 전용 하네스 폴더에서 띄운 `claude -p`가 goose `company_report` 리포트를 단일 HTML로 만들도록 바꿨다. 작업은 HTTP 요청과 분리된 서버 작업 큐에서 돌아 모달을 닫거나 새로고침해도 이어진다. 모드 버튼 이름은 "심층 분석" → "Goose". 빠른 분석(Codex, SPEC-AI-REPORT-003)은 그대로다
+  - **하네스 설치·무결성** (`backend/services/goose_harness.py`, 원본 `backend/goose_harness_src/` + `goose-manifest.json`): 서버 시작(lifespan) 때 원본을 매니페스트 sha256과 대조해 `~/.goose-harness`(`AI_REPORT_GOOSE_HARNESS_DIR`)에 설치하고, 작업마다 설치본을 다시 검사한다. 원본·설치본이 어긋나면 작업을 시작하지 않는다(닫힌 실패). 원본은 `.claude/`·`CLAUDE.md` 이름을 쓰지 않아 이 리포의 Claude Code 세션이 goose 스킬을 발견하지 않는다
+  - **실행기** (`backend/services/goose_runner.py`): `claude -p --output-format stream-json --setting-sources project --settings <하네스>/.claude/settings.json --strict-mcp-config --permission-mode dontAsk --no-session-persistence --model <AI_REPORT_GOOSE_MODEL>`, 하네스 폴더를 cwd로 실행. 환경 변수는 허용 목록 8종만 넘기고, 시간 상한(`AI_REPORT_GOOSE_TIMEOUT`, 기본 900초) 초과 시 프로세스 그룹 전체를 종료한다. stream-json을 진행 단계로 바꾸고, 권한 거부 시 거부된 도구·명령을 로그에 남긴다
+  - **작업 서비스·라우터** (`backend/services/goose_job_service.py`, `backend/routers/ai_report.py`): `POST /api/ai-report/{code}?mode=deep` → 202 `{job_id}`(같은 종목 실행 중이면 200 기존 `job_id`, 다른 종목 실행 중이면 429 `goose_busy`, 한도 소진 시 429 `goose_rate_limit`). `GET /api/ai-report/jobs/{job_id}/events`(SSE, 재생 + `Last-Event-ID`), `POST /api/ai-report/jobs/{job_id}/cancel`, `GET /api/ai-report/goose/active`. Goose 전용 하루 한도 `AI_REPORT_GOOSE_DAILY_QUOTA`(기본 5)
+  - **보관·서빙** (`backend/services/goose_storage.py`): `final/report.html` + `delivery_allowed: true`일 때만 최종본, 아니면 `draft/` 초안으로 판정해 `backend/reports/<종목명>/goose/<날짜>/`에 허용 목록 파일과 `assumptions.md`·`job.json`만 복사한다. `GET /api/ai-report/{code}/goose/{run}/report.html`은 `sandbox` CSP 헤더와 함께 서빙하고, 기록 API에 `kind: goose` 항목을 더했다. 하네스 작업 폴더는 최근 `AI_REPORT_GOOSE_RUNS_KEEP`(기본 10)개만 남긴다
+  - **프론트엔드** (`frontend/src/components/AiReportModal.tsx`, `GooseReportView.tsx`, `ProgressPanel.tsx`, `frontend/src/hooks/useAiReport.ts`, `useGooseActive.ts`, `frontend/src/utils/gooseJob.ts`, `frontend/src/api/aiReport.ts`, `frontend/src/components/ChartGrid/ChartCell.tsx`): 작업 구독·재구독, 진행 패널, sandbox iframe 리포트와 초안 배너, 기록 탭 Goose 항목, 실행 중 종목의 AI 버튼 표시
+  - **삭제·정리**: `backend/services/deep_research_service.py`·`deep_research_collector.py`·`backend/prompts/stock_synthesis_prompt.md`와 그 시험, `frontend/e2e/ai-report-deep.spec.ts` 삭제. `backend/services/claude_cli_streamer.py`는 라인 파서·종료 함수만 남김. `.env.example`에서 검색 API 키 5종·`AI_REPORT_DEEP_*` 3종을 빼고 `AI_REPORT_GOOSE_{MODEL,TIMEOUT,DAILY_QUOTA,RUNS_KEEP}`(+ 주석 `AI_REPORT_GOOSE_HARNESS_DIR`)를 넣었다
+  - **검증**: 인수 기준 AC-AIR4-001~025 25개 중 자동 23개 PASS(되돌림 RED 관측 기록 포함), 라이브 AC-AIR4-003 권한 음성 탐침 11/11 거부 PASS, 라이브 AC-AIR4-025는 부분 확인 — 2026-10-20 하나기술(299030)·한빛레이저(452190) 2건이 사람 입력 없이 `done`·`draft`로 끝났다(3분 37초, 2분 40초, `assumptions.md` 비어 있지 않음). goose 시험 6파일 `201 passed`(v0.4.4 기준)
+  - **알려진 한계**: (a) Goose 하루 한도 카운터가 서버 메모리에 있어 재시작하면 초기화된다 · (b) goose의 WebFetch로는 DART 공시 원문을 읽지 못한다(목록이 POST 조회이고 목차를 자바스크립트가 들고 있음) — 그래서 리포트가 초안으로 끝난다. 서버가 DART 본문을 받아 넘기는 방식은 후속 카드 t16 · (c) AC-AIR4-025 중 두 항목은 미관측 — 한 종목의 기록 탭에 Goose 항목과 빠른 분석 항목이 함께 보이는지, 실제 goose 세션의 `final/` 생성
+  - **근거**: `.moai/specs/SPEC-AI-REPORT-004/progress.md` §E.2·§E.4 · `.moai/state/verify/m7/` · `.moai/state/verify/goose-bash-denial/`
+
 ### Fixed (네이버 모바일 테마 API 스키마 변경 대응 — 테마 수집 0건 복구, 2026-10-17)
 
 - **테마 분석 화면이 테마 0건을 받던 문제 해소** — 네이버 모바일 테마 API의 스키마가 바뀌어 수집 결과가 0건이 됐다. 목록 필드명이 `sectorCode`/`sectorName`/`unChangedCount` → `code`/`name`/`unchangedCount`로 바뀌었고, 페이지 방식이 `page` 번호에서 `cursor` 기반으로 바뀌었으며, 상세 필드가 `result.sectorInfo` 아래로 옮겨졌다. 세 변경에 맞춰 파서·크롤러·서비스를 고쳤다 (Kanban t13 선행 수정 — SPEC 없음)
