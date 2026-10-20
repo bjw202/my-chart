@@ -728,6 +728,169 @@ E       assert [] == [1]
 
 M4 소유 AC(001 라우터 쪽, 007~009, 011, 021) 자동 시험 PASS, AC-010은 M5 보관 부분만 남음, 전체 백엔드 새 실패 0, `goose_job_service.py` 커버리지 99%. M5는 `GooseJobService(on_finish=…)` 훅에 §5.2 선택·복사·`job.json`을 연결하면 된다(훅은 취소·오류 경로에서도 `result=None` 또는 실패 결과로 호출된다).
 
+### M5 저장과 서빙
+
+기준: HEAD `0aa4826`(시작). 커밋 `088e846`(B1 테스트 격리 수정) → `7450d45`(M5 테스트, RED) → `6359c43`(M5 구현). 증거 파일: `.moai/state/verify/m5/`(git 미추적). 테스트 실행기: `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest`. 실제 `claude`·실제 홈·실제 `backend/reports`는 쓰지 않았다(가짜 실행 파일, `_REPORTS_BASE`·하네스 경로를 tmp로 교체).
+
+산출물: `backend/services/goose_storage.py`(신규 — 보관·기록 항목·HTML 경로 해석), `goose_job_service.py`(훅 전 `job.ending` 기록, 운영용 인스턴스에만 보관 훅 연결), `ai_report_service.py`(`report_dir`, `get_history` goose 병합, `get_goose_report_path`), 라우터(`GET /ai-report/{code}/goose/{run}/report.html`, 기록 응답 확장), `schemas/ai_report.py`(`HistoryItem.kind·run·delivery_status·interrupted`), `goose_runner.select_report`에 `@MX:ANCHOR`(주석만), `backend/tests/test_goose_storage.py`(신규 52건).
+
+#### B1 — 테스트 격리 오류 수정 (커밋 `088e846`)
+
+원인: `test_goose_runner.py`의 `gr` 픽스처와 `test_main_goose_lifespan.py`의 `real_main` 픽스처가 끝날 때 `sys.modules.clear(); sys.modules.update(saved)`로 **전체**를 되돌렸다. 픽스처 안에서 처음 불러온 numpy C 확장이 함께 빠져, 다음 파일이 numpy를 다시 불러오며 오류가 났다. 수정: 복원 대상을 `my_chart*`·`backend*` 항목으로 한정(단언 변경 없음).
+
+```
+$ python -m pytest backend/tests/test_goose_runner.py backend/tests/test_main_goose_lifespan.py -q -p no:cacheprovider   # 수정 전
+ERROR backend/tests/test_main_goose_lifespan.py::test_lifespan_installs_goose_harness_once_and_survives_failure
+ERROR backend/tests/test_main_goose_lifespan.py::test_lifespan_shutdown_cancels_running_goose_job
+51 passed, 1 warning, 2 errors in 8.30s
+$ python -m pytest backend/tests/test_main_goose_lifespan.py backend/tests/test_goose_runner.py -q -p no:cacheprovider   # 수정 전, 역순
+3 passed, 1 warning, 50 errors in 2.18s
+E   ImportError: cannot load module more than once per process
+```
+
+게이트(수정 후, M5 구현 포함 트리 `6359c43`):
+
+```
+$ python -m pytest backend/tests/test_goose*.py backend/tests/test_main_goose_lifespan.py -q -p no:cacheprovider
+182 passed, 1 warning in 14.63s
+$ python -m pytest backend/tests/test_main_goose_lifespan.py backend/tests/test_goose_storage.py backend/tests/test_goose_runner.py backend/tests/test_goose_router.py backend/tests/test_goose_job_service.py backend/tests/test_goose_harness.py -q -p no:cacheprovider   # 역순
+182 passed, 1 warning in 13.51s
+```
+
+(B1 커밋 시점 게이트: 정순·역순 모두 `130 passed`.)
+
+#### E1 — 인수 기준 행렬
+
+명령: `python -m pytest backend/tests/test_goose_storage.py -v -p no:cacheprovider`(HEAD `6359c43`) → `52 passed, 1 warning in 4.26s`. 키워드별 집계(같은 출력 `final_v.txt`에서 `grep -c PASSED`/`FAILED`).
+
+| AC | 상태 | 테스트 | 관측 출력 |
+|---|---|---|---|
+| AC-010 보관 절반 | PASS | `test_ac010_report_archived_after_subscriber_disconnect` — 첫 이벤트 수신 후 구독 제너레이터 `aclose()`, 그 뒤 실행기가 초안을 쓰고 정상 종료 | `ac010: 1 passed / 0 failed` — 상태 `done`, `goose/2026-10-19/report.html` 내용 `<html>LATE</html>` |
+| AC-013 | PASS | `test_ac013_copies_only_allowlisted_files_and_ignores_model_paths` — `draft/`에 허용 4종 + `evil.sh` + 루트 밖 파일을 가리키는 심볼릭 링크 `delivery-audit.json`, 작업 디렉터리에 `assumptions.md`·`notes/secret.txt`·`input.json`, 가짜 claude가 stdout에 `리포트: ../../x.html`, 그 경로에 미끼 파일 | `ac013: 1 passed` — 보관 파일 목록 = {허용 4종, `assumptions.md`, `job.json`} 정확히 일치, 미끼·비밀 문자열 0, 심볼릭 링크 0 |
+| AC-014 (a)~(g) | PASS | `test_ac014_final_judgement_fixtures[a..g]` — 실제 `run_goose` + 가짜 claude(프롬프트의 `runs/<job_id>`에 산출물 기록), (e)(g) 시간 상한 1초, (f) `.ready` 표시 후 `cancel()` | `ac014: 7 passed / 0 failed` (a) `done`·`final`·보관 = `final/report.html` 바이트 동일 (b) `done`·`draft` (c) `final/` 있으나 `delivery_allowed: false` → `draft` (d) `error/empty_output`·보관 폴더 없음·기록에 goose 0 (e) `error/timeout`·보관 = `draft/report.html`·`job.json`·종료 이벤트·기록 API 모두 `draft` + `interrupted: true` (f) `cancelled`·오류 종류 `None`·(e)와 같은 보관 (g) `error/timeout`·`final` 바이트 동일·`interrupted: true` |
+| AC-015 | PASS | `test_ac015_serves_report_with_sandbox_csp` | `ac015: 1 passed` — 200, 본문 일치, `content-type` `text/html; charset=utf-8`, CSP = design §5.4 문자열과 정확히 같음(첫 지시어 토큰에 `sandbox`, `allow-scripts`·`allow-same-origin` 없음), `x-content-type-options: nosniff` |
+| AC-016 | PASS | 아래 E4 목록 | `ac016: 19 passed`, `resolver: 15 passed` — 모두 404 또는 `None`, 응답 본문에 루트 밖 비밀 문자열 0 |
+| AC-017 | PASS | `test_ac017_history_lists_markdown_and_goose_runs`, `test_history_markdown_only_is_unchanged_with_kind`, `test_history_skips_malformed_goose_runs`, `test_history_unknown_stock_and_empty` | `ac017: 1 passed`, `history_: 4 passed` — 항목 5개, md 2개 `kind: markdown`, goose `[(2026-10-20, draft, True), (2026-10-19_2, draft, False), (2026-10-19, final, False)]`, 날짜 순서 `10-20, 10-19, 10-19, 10-02, 10-01`. md만 있는 종목은 기존 순서 그대로 + `kind: markdown`, `run: null`, `interrupted: false` |
+
+추가 시험(AC 밖): `assumptions.md` 없음은 오류 아님(`assumptions: 1 passed`), 같은 날 세 번째 실행 `2026-10-19_3`(`same_day: 1 passed`), 실행기 예외(`error/exit_error`)에도 선택 가능한 초안을 `interrupted: true`로 보관(`runner_exception: 1 passed`), 운영용 모듈 인스턴스가 보관 훅과 기본 경로(하네스 `runs`, `ai_report_service.report_dir`)를 씀(`production: 1 passed`).
+
+대조 단언 되돌림(구현 줄을 하나씩 무력화 → `test_goose_storage.py` 실행 → 원복. 스크립트 `.moai/state/verify/m5/mutate.py`, 출력 `mutate.txt`):
+
+```
+== M-a final 판정을 폴더 존재만으로(AC-014 c)          FAILED …test_ac014_final_judgement_fixtures[c]
+== M-b 원본 폴더 통째 복사(AC-013)                    FAILED …test_ac013_copies_only_allowlisted_files_and_ignores_model_paths
+== M-c assumptions.md 빠뜨림(AC-013)                  FAILED …test_ac013_copies_only_allowlisted_files_and_ignores_model_paths
+== M-d 중단 시 보관 안 함(AC-014 e f g)               FAILED …[e] / […f] / […g] / …test_runner_exception_still_archives_selectable_draft_as_interrupted
+== M-e 중단이면 draft로 바꿈(AC-014 g)                FAILED …test_ac014_final_judgement_fixtures[g]
+== M-f CSP 헤더 없음(AC-015)                          FAILED …test_ac015_serves_report_with_sandbox_csp
+== M-g run 정규식 제거(AC-016)                        FAILED …test_resolver_rejects_bad_runs_without_reading[2026-10-19/]
+== M-h resolve 이탈 검사 제거(AC-016)                 FAILED …test_ac016_invalid_or_escaping_run_is_404[2026-10-21] / [2026-10-22] / …resolver…[2026-10-21] / [2026-10-22] / …test_resolver_rejects_stock_dir_outside_root
+== M-i 기록에 goose 미포함(AC-017)                    FAILED …[a] [b] [c] [e] [f] [g] … (+2) / …test_history_skips_malformed_goose_runs
+== M-j 기록 interrupted 누락(AC-017)                  FAILED …[e] [f] [g] / …test_ac017_history_lists_markdown_and_goose_runs
+== M-k 운영 서비스 보관 훅 미배선(AC-010)              (검출 못 함 — 아래 참고)
+== M-l 훅 전 종료 상태 미기록                          FAILED …[e] [f] [g] / …test_runner_exception_still_archives_selectable_draft_as_interrupted
+RESTORED
+```
+
+M-k는 처음 시험 묶음이 잡지 못했다(시험이 서비스를 직접 만들어 훅을 넣기 때문). `test_production_service_has_archive_hook_with_default_paths`를 추가한 뒤 같은 되돌림의 RED:
+
+```
+$ python -m pytest backend/tests/test_goose_storage.py -q -p no:cacheprovider -k production   # _service = GooseJobService() 로 되돌린 상태
+E       assert None is not None
+1 failed, 51 deselected, 1 warning in 0.47s
+```
+
+M-g는 정규식만 빼도 `resolve()` 검사가 `..`류를 막으므로 `2026-10-19/`(같은 폴더로 해석되는 형식 오류) 1건만 실패했다. 두 방어가 서로 겹친다는 뜻이며, 각 방어를 따로 뺐을 때 각각 RED가 난다(M-g, M-h).
+
+되돌림 뒤 남은 프로세스: `pgrep -fl "sleep 30"` → 출력 없음(exit 1).
+
+#### E2 — 테스트 수 (기준 대비)
+
+```
+$ python -m pytest backend/tests -q -p no:cacheprovider --continue-on-collection-errors -rfE   # 기준: HEAD 0aa4826 (테스트 두 파일도 HEAD 내용으로 되돌려 측정)
+38 failed, 310 passed, 3 xfailed, 2 warnings, 63 errors in 47.90s
+$ (같은 명령, B1 커밋 088e846 내용)
+38 failed, 310 passed, 3 xfailed, 1 warning, 63 errors in 48.20s
+$ (같은 명령, M5 구현 6359c43 내용)
+38 failed, 362 passed, 3 xfailed, 1 warning, 63 errors in 50.19s
+$ comm -13 baseline_bad.txt after_bad.txt   # 새 실패·오류 (FAILED/ERROR id 정렬 목록, 각 101줄)
+(출력 없음)
+$ comm -23 baseline_bad.txt after_bad.txt   # 사라진 실패
+(출력 없음)
+```
+
+통과 수 310 → 362 = 신규 52. 기존 38 failed / 63 errors는 `test_ai_report_router_deep_mode.py`의 `my_chart` 스텁 영향(알려진 기준선).
+
+#### E3 — 커버리지
+
+```
+$ python -m coverage run --include='backend/services/goose_storage.py,backend/services/goose_job_service.py,backend/routers/ai_report.py,backend/services/ai_report_service.py,backend/schemas/ai_report.py' -m pytest backend/tests/test_goose_storage.py backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py -q -p no:cacheprovider
+99 passed, 1 warning in 5.96s
+$ python -m coverage report -m
+backend/routers/ai_report.py              119     22    82%   82, 93, 106, 114-115, 126-128, 198-199, 226, 298-322
+backend/schemas/ai_report.py               17      0   100%
+backend/services/ai_report_service.py     169    108    36%   49-83, 115-118, 172-291, 330, 334, 338, 356-376, 452-470
+backend/services/goose_job_service.py     207      1    99%   269
+backend/services/goose_storage.py         122      3    98%   89-91
+```
+
+신규 `goose_storage.py` 98%(미실행: `job.json` 원자적 쓰기 실패 시 임시 파일 삭제), `goose_job_service.py` 99%. 라우터·`ai_report_service.py`의 미실행 줄은 기존 Fast·쿼터·markdown 조회 경로이며, M5가 바꾼 줄(라우터 기록 항목·HTML 엔드포인트, `report_dir`·`get_history`·`get_goose_report_path`)은 모두 실행됐다.
+
+#### E4 — 경로 검증 시험 목록 (AC-016, B3)
+
+HTTP(ASGI 앱 직접 호출 — httpx가 `..` 세그먼트를 지우므로 서버가 받는 그대로 보냄), 응답 404 + 본문에 `OUTSIDE-SECRET`·`ROOT-SECRET`·`X-SECRET` 없음:
+- `run` 인코딩·형식: `..%2F..`, `2026-10-19%2F..%2F..%2Fx`, `..%2Freports`, `2026-10-19_x`, `latest`, `%2e%2e`, `..`, `%2Fetc%2Fpasswd`
+- 심볼릭 링크 이탈: `2026-10-21`(`report.html` 파일 링크 → 루트 밖), `2026-10-22`(실행 폴더 링크 → 루트 밖), 없는 실행 `2026-10-23`
+- 점 세그먼트 원문: `/goose/2026-10-19/../../x/report.html`, `/goose/../reports/report.html`, `/goose/../../report.html`
+- 코드: `29903`, `abcdef`, `2990300`, `..`, `999999`(없는 종목)
+
+해석 함수 `resolve_report_html` 단위(파일을 읽지 않고 `None`): `..`, `../..`, `2026-10-19/../../x`, `../reports`, `2026-10-19_x`, `latest`, `/etc/passwd`, `2026-10-19/`, `2026-10-19\x00`, `%2e%2e`, `2026-10-21`, `2026-10-22`, 빈 문자열, 그리고 리포트 루트 밖 종목 폴더. 정상 `2026-10-19`는 경로 반환.
+
+#### E5 — 바꾼 기존 테스트와 사유
+
+| 파일 | 변경 | 사유 |
+|---|---|---|
+| `test_goose_runner.py::gr` 픽스처 | `sys.modules` 복원 범위를 `my_chart*`·`backend*`로 한정 | B1. 단언 변경 없음 |
+| `test_main_goose_lifespan.py::real_main` 픽스처 | 같음 | B1. 단언 변경 없음 |
+| `test_goose_router.py::env` 픽스처 | `ai_report_service` 스텁에 `get_goose_report_path=MagicMock(return_value=None)` 1줄 | 라우터가 새 이름을 불러온다. 없으면 import 오류 |
+
+Fast 기록 동작(B6): 기존 기록 시험은 없었다(`grep -rn "get_history\|/history" backend/tests` → 라우터 스텁 1줄만). 새 `test_history_markdown_only_is_unchanged_with_kind`가 md만 있을 때 순서(파일명 내림차순)와 필드가 그대로이고 `kind: markdown`만 더해짐을 확인한다. `HistoryItem` 새 필드는 모두 기본값이 있어 기존 응답과 호환된다.
+
+#### E8 — RED 증거 (GREEN 전 실패 출력)
+
+M5 테스트, 구현 모듈 작성 전(커밋 `7450d45`):
+
+```
+$ python -m pytest backend/tests/test_goose_storage.py -q -p no:cacheprovider
+E   ModuleNotFoundError: No module named 'backend.services.goose_storage'   (51건 모두 같은 원인)
+1 warning, 51 errors in 0.82s
+```
+
+B1 RED는 위 B1 절, M-k 보완 시험의 RED는 E1 되돌림 절에 있다(이 시험은 구현 뒤 추가했으므로 되돌림으로 RED를 관측했다).
+
+#### 설계 메모 (구현에서 정한 값)
+
+- 보관 폴더 날짜는 훅 실행 시각(완료 시각, KST) 기준. 같은 이름은 `mkdir` 성공으로 자리를 잡아 `_2`, `_3`…(동시 생성 경쟁 방지).
+- `job.json` 필드: `job_id`, `code`, `stock_name`, `started_at`, `finished_at`, `status`, `error_kind`, (`cancel_reason`), `run`, `delivery_status`, `interrupted`. 임시 파일 + `os.replace`로 원자적 쓰기.
+- 종료 이벤트 데이터: 보관했으면 `{run, delivery_status, report_url}`, 중단이면 `interrupted: true` 추가. `report_url` = `/api/ai-report/{code}/goose/{run}/report.html`.
+- 기록 항목의 goose `filename`은 `report.html`, `created_at`은 `job.json` 수정 시각. 형식이 맞지 않는 실행 폴더(이름·JSON·`delivery_status`·심볼릭 링크)는 건너뛴다.
+- `GooseJobService` 생성자의 기본값은 훅 없음으로 두고 운영용 모듈 인스턴스에만 보관 훅을 붙였다. 시험이 만든 서비스가 실제 `backend/reports`에 쓰지 않게 하기 위해서다.
+- `get_history`·`get_goose_report_path`는 `goose_storage`를 함수 안에서 불러온다. `ai_report_service.py`를 스텁 환경에서 경로로 단독 로드하는 기존 시험들(`test_ai_report_service.py` 등)이 `backend.services` 패키지 초기화를 타지 않게 하려는 것이다.
+- HTML 경로 검증은 design §5.4보다 한 단계 좁다: `_REPORTS_BASE` 하위에 더해 해당 종목의 `goose/` 하위인지도 확인한다.
+
+#### 관측하지 못한 것 (Gaps)
+
+- `runs/{job_id}/` 정리(design §5.2 "복사 후 정리 대상, 보존 기간은 구현 단계에서 정함")는 구현하지 않았다. 작업 디렉터리는 하네스 `runs/`에 그대로 남는다. 보존 기간 결정이 필요하다.
+- 서버 종료 시 보관(design §4.6, best-effort)은 같은 취소 경로(`cancel_reason="shutdown"`)를 타지만, 실제 앱 lifespan 안에서 실행 중 작업을 끝내며 보관까지 되는지 통합 시험은 하지 않았다(acceptance §H 보류 항목과 같음).
+- `final/` 폴더 구조는 여전히 goose 지침 기준 이름으로 만든 픽스처다(M1 미관측, design §9.1). 실제 goose 세션의 `final/` 산출물은 AC-025 라이브에서 확인해야 한다.
+- CSP 폰트 출처 목록은 **[잠정 — 렌더 확인]** 그대로다. 실제 goose 리포트가 이 CSP에서 깨지지 않고 보이는지는 M6·AC-025 브라우저 확인 몫이다.
+- `ruff`가 venv·PATH에 없어 lint를 실행하지 못했다.
+- 실제 `claude`로 goose 작업 전체를 돌리지 않았다(가짜 실행 파일만).
+
+#### M6 진입 조건
+
+M5 소유 AC(013·014 (a)~(g)·015·016·017)와 AC-010 보관 절반 자동 시험 PASS, 전체 백엔드 새 실패 0, 신규 `goose_storage.py` 98%·`goose_job_service.py` 99%. M6 프론트가 쓸 계약: 종료 이벤트 `{run, delivery_status, report_url[, interrupted]}`, 기록 항목 `{kind, run, delivery_status, interrupted}`, HTML URL `/api/ai-report/{code}/goose/{run}/report.html`.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
