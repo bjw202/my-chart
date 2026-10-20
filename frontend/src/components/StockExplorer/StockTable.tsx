@@ -5,7 +5,8 @@ import { COLLAPSE_ORDER, hiddenColumnKeys, INVARIANT_COLUMN_KEYS } from './stock
 // D6 / AC-SUX-052: 셀 5상태는 공용 MetricCell 이 전담한다 (화면별 표기 발산 방지).
 import { MetricCell, percent1, percent2, rating0 } from '../common/MetricCell'
 // REQ-SDU-003: s2-strong 술어 임계값 상수 — 라벨 없던 술어에 상수 유래 title 을 붙인다.
-import { RS_S2_STRONG_THRESHOLD } from '../../utils/rsMetrics'
+// SPEC-RS-REBALANCE-001 REQ-RSR-019: RS 체크 술어·라벨도 RS_STRONG_THRESHOLD 단일 출처를 쓴다.
+import { RS_S2_STRONG_THRESHOLD, RS_STRONG_THRESHOLD } from '../../utils/rsMetrics'
 import { filterCandidates } from './stockFilter'
 
 interface StockTableProps {
@@ -29,14 +30,14 @@ type SortDir = 'asc' | 'desc'
 interface ChecklistResult {
   ma: boolean    // close > sma50 > sma200
   vol: boolean   // volume_ratio >= 1.5
-  rs: boolean    // rs_12m >= 70
+  rs: boolean    // rs_12m >= RS_STRONG_THRESHOLD
 }
 
 function computeChecklist(c: Stage2Candidate): ChecklistResult {
   return {
     ma: c.close > c.sma50 && c.sma50 > c.sma200,
     vol: c.volume_ratio >= 1.5,
-    rs: c.rs_12m >= 70,
+    rs: c.rs_12m >= RS_STRONG_THRESHOLD,
   }
 }
 
@@ -260,7 +261,7 @@ export function StockTable({
                 <td className="checklist-cell">
                   <CheckDot pass={checklist.ma} label="MA Aligned (close > SMA50 > SMA200)" checkKey="ma" />
                   <CheckDot pass={checklist.vol} label="Vol Surge (ratio ≥ 1.5)" checkKey="vol" />
-                  <CheckDot pass={checklist.rs} label="RS Strong (≥ 70)" checkKey="rs" />
+                  <CheckDot pass={checklist.rs} label={`RS Strong (≥ ${RS_STRONG_THRESHOLD})`} checkKey="rs" />
                 </td>
               </tr>
             )

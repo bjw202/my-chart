@@ -32,11 +32,14 @@ function resolveFromModuleUrl(rel: string): string {
 }
 
 const PY_PATH = resolveFromModuleUrl('../../../../my_chart/analysis/sector_metrics.py')
+// SPEC-RS-REBALANCE-001 REQ-RSR-019 (D13): 70/60 은 프론트 소유 상수로 남되, 값은
+// stage_classifier.py 의 Stage 2 상수와 같아야 한다 — 교차 언어 등식으로 기계가 지킨다.
+const STAGE_PY_PATH = resolveFromModuleUrl('../../../../my_chart/analysis/stage_classifier.py')
 
-function extractPyNumber(symbol: string): number {
-  const src = readFileSync(PY_PATH, 'utf-8')
+function extractPyNumber(symbol: string, path: string = PY_PATH): number {
+  const src = readFileSync(path, 'utf-8')
   const m = src.match(new RegExp(`^${symbol}\\s*=\\s*([0-9]+(?:\\.[0-9]+)?)`, 'm'))
-  if (!m) throw new Error(`${symbol} 정의를 sector_metrics.py에서 찾지 못했다 — 경로/심볼 확인 필요`)
+  if (!m) throw new Error(`${symbol} 정의를 ${path}에서 찾지 못했다 — 경로/심볼 확인 필요`)
   return parseFloat(m[1])
 }
 
@@ -47,11 +50,26 @@ describe('rsMetrics — 백엔드 상수 미러 (REQ-SDU-003)', () => {
     expect(RS_TOP_THRESHOLD).toBe(backend)
   })
 
-  it('프론트 소유 상수 3종은 명세 값을 유지한다', () => {
-    // 70/60/50 은 백엔드에 같은 이름의 상수가 없는 프론트 소유 임계값이다
-    // (REQ-SDU-003 이 값 자체를 규정). 값 고정으로 우발 변경을 방지한다.
-    expect(RS_STRONG_THRESHOLD).toBe(70)
-    expect(RS_S2_STRONG_THRESHOLD).toBe(60)
+  it('RS_STRONG_THRESHOLD === 백엔드 _STAGE2_ENTRY_RS_MIN (수치 등식)', () => {
+    // 소유권은 REQ-SDU-003 그대로(프론트 상수). 값만 Stage 2 진입 하한과 함께 움직인다.
+    const backend = extractPyNumber('_STAGE2_ENTRY_RS_MIN', STAGE_PY_PATH)
+    expect(Number.isFinite(backend)).toBe(true)
+    expect(RS_STRONG_THRESHOLD).toBe(backend)
+  })
+
+  it('RS_S2_STRONG_THRESHOLD === 백엔드 _STAGE2_RS_STRONG (수치 등식)', () => {
+    const backend = extractPyNumber('_STAGE2_RS_STRONG', STAGE_PY_PATH)
+    expect(Number.isFinite(backend)).toBe(true)
+    expect(RS_S2_STRONG_THRESHOLD).toBe(backend)
+  })
+
+  it('상위 임계값 80 은 재보정 대상이 아니다 (REQ-RSR-022, B-3)', () => {
+    expect(extractPyNumber('_RS_TOP_THRESHOLD')).toBe(80)
+    expect(RS_TOP_THRESHOLD).toBe(80)
+  })
+
+  it('RS_UNIVERSE_MIDPOINT 는 명세 값을 유지한다', () => {
+    // 50 은 백엔드에 대응 상수가 없는 프론트 소유 임계값이다(REQ-SDU-003).
     expect(RS_UNIVERSE_MIDPOINT).toBe(50)
   })
 })

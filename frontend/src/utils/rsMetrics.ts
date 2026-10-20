@@ -9,10 +9,12 @@
 // 'RS 80+ 비중' 열(RS≥80 종목 비율)의 정의와 rsHighlight 술어가 공유한다.
 export const RS_TOP_THRESHOLD = 80
 
-// 강세 등급 임계값 — 백엔드 산출의 강세 판정과 정렬.
+// 강세 등급 임계값 — 백엔드 stage_classifier._STAGE2_ENTRY_RS_MIN(Stage 2 진입 RS 하한)의 거울.
+// 값 동일성은 __tests__/rsMetrics.test.ts 교차 언어 등식이 지킨다 (SPEC-RS-REBALANCE-001 D13).
 export const RS_STRONG_THRESHOLD = 70
 
 // Stage 2 strong 판정 임계값 — StockTable getStageBadgeClass 의 s2-strong 술어.
+// 백엔드 stage_classifier._STAGE2_RS_STRONG 의 거울 (교차 언어 등식으로 고정).
 export const RS_S2_STRONG_THRESHOLD = 60
 
 // 유니버스 백분위 중앙 — 섹터 버블 markLine(RS 중앙선)의 Y 좌표.

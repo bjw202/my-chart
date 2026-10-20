@@ -14,6 +14,7 @@ from backend.schemas.screen import (
     StockItem,
 )
 from backend.services.meta_service import _MINERVINI_META_COLS
+from my_chart.analysis import stage_classifier
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ _OPERATOR_SQL: dict[str, str] = {
 
 
 # @MX:NOTE: 순수 상수 SQL이므로 파라미터 바인딩/이스케이프 불필요 — SQL injection 표면 없음.
+#   T8의 보간 값도 모듈 float 상수(stage_classifier._STAGE2_ENTRY_RS_MIN)뿐이며 요청 입력이 아니다.
 def _build_minervini_where() -> str:
     """research.md §2.1 Minervini 8조건 strict-gate WHERE 식을 반환."""
     return (
@@ -58,7 +60,8 @@ def _build_minervini_where() -> str:
         " AND close > sma50"                             # T5
         " AND close >= low52w * 1.25"                    # T6
         " AND close >= high52w * 0.75 AND close <= high52w"  # T7
-        " AND rs_12m >= 70"                              # T8
+        # T8: Stage 2 진입 RS 하한을 공유 상수에서 읽는다 (SPEC-RS-REBALANCE-001 REQ-RSR-019, D13)
+        f" AND rs_12m >= {stage_classifier._STAGE2_ENTRY_RS_MIN}"  # T8
         ")"
     )
 
