@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import WEEKLY_DB_PATH
+from backend.deps import DAILY_DB_PATH, WEEKLY_DB_PATH
 from backend.schemas.market import MarketOverviewResponse
 from backend.schemas.sector_advanced import TreemapResponse
 from backend.services.market_service import get_market_overview
@@ -22,7 +22,7 @@ async def market_overview() -> MarketOverviewResponse:
     Returns 503 if weekly DB is not available.
     """
     try:
-        return get_market_overview(WEEKLY_DB_PATH)
+        return get_market_overview(WEEKLY_DB_PATH, daily_db_path=DAILY_DB_PATH)
     except Exception as exc:
         raise HTTPException(
             status_code=503,

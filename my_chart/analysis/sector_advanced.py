@@ -910,7 +910,63 @@ class SectorAlerts:
     weakening_sectors: list[SectorAlert]
 
 
-def detect_sector_transitions(db_path: str) -> SectorAlerts:
+@dataclass(frozen=True)
+class _TransitionMetrics:
+    """전환 감지가 한 기준일에서 섹터별로 읽는 값(순위·종합점수·RS 평균·Stage 2 비율)."""
+
+    rank: int
+    composite_score: float
+    rs_avg: float | None
+    stage2_pct: float | None  # % 단위(0~100)
+
+
+def _transition_rankings(
+    db_path: str, current_date: str, prev_date: str, daily_db_path: str | None = None,
+) -> tuple[dict[str, _TransitionMetrics], dict[str, _TransitionMetrics]]:
+    """(현재, 4주 전) 기준일의 섹터명 → :class:`_TransitionMetrics` 맵.
+
+    순위가 매겨진(``rank is not None``) 섹터만 담는다 — 표에서 순위 제외된 섹터는 알림
+    대상에서도 빠진다. ``rs_avg`` / ``stage2_pct`` 는 집계값을 그대로 옮기며 결측이면
+    ``None`` 이다(레거시처럼 0.0 으로 바꾸지 않는다 — 판정은 호출부 몫).
+    """
+    # 섹터 집계 import (순환 import 방지를 위해 함수 내부에서 import)
+    from my_chart.analysis.sector_metrics import (  # noqa: PLC0415
+        _load_registry_mapping,
+        _SharedInputs,
+        _valid_universe,
+        compute_sector_aggregates,
+    )
+
+    # @MX:NOTE: [AUTO] 알림 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=None)`
+    #   (순위 백분위 AG-8 + 시총가중). 종전에는 레거시 `compute_sector_ranking`(min-max
+    #   `_normalize_list`, daily DB 미전달 → 등가중 폴백)을 타서 "순위 3단계 상승/하락"·RS·
+    #   Stage 2 판정이 표와 다른 기준이었다(라이브 2026-10-16 비철금속: 레거시 1위, 표 5위).
+    #   `as_of=d` 로 고정해 오늘 날짜에 기대지 않는다. 격자·유효 유니버스·registry 매핑은
+    #   두 기준일에 공통이므로 한 번만 계산한다 — 근거는 `_SharedInputs` docstring 과 같다
+    #   (두 기준일 모두 격자 최신 바 L 이하이고, 유니버스·registry 매핑은 as_of 를 읽지 않는다).
+    shared = _SharedInputs(
+        grid=compute_weekly_grid(db_path, current_date),
+        universe=_valid_universe(db_path, daily_db_path, None, current_date),
+        registry_mapping=_load_registry_mapping(None))
+
+    def _by_name(d: str) -> dict[str, _TransitionMetrics]:
+        result = compute_sector_aggregates(
+            db_path, d, daily_db_path, as_of=d,
+            compute_rank_change=False, period=None, shared=shared)
+        return {
+            a.name: _TransitionMetrics(
+                rank=a.rank,
+                # period=None 이면 순위가 매겨진 섹터는 composite 가 항상 존재한다(_rank_sectors)
+                composite_score=float(a.composite_score.value),
+                rs_avg=a.rs_avg.value,
+                stage2_pct=a.stage2_pct.value)
+            for a in result.aggregates if a.rank is not None
+        }
+
+    return _by_name(current_date), _by_name(prev_date)
+
+
+def detect_sector_transitions(db_path: str, daily_db_path: str | None = None) -> SectorAlerts:
     """섹터 강세/약세 전환을 감지한다.
 
     강세 전환(emerging strength): 3개 이상 조건 충족 시
@@ -929,6 +985,9 @@ def detect_sector_transitions(db_path: str) -> SectorAlerts:
 
     Args:
         db_path: weekly SQLite DB 경로
+        daily_db_path: 일봉 DB 경로(시총가중 원천). ``None`` 이면 시총 결측 → 등가중
+            폴백(표 집계와 같은 규칙). 순위·RS·Stage 2 는 섹터 표와 같은
+            ``compute_sector_aggregates(period=None)`` 값이다(:func:`_transition_rankings`).
 
     Returns:
         SectorAlerts (강세/약세 전환 섹터 목록)
@@ -944,22 +1003,15 @@ def detect_sector_transitions(db_path: str) -> SectorAlerts:
     current_date = all_dates[-1]
     prev_date = all_dates[0]  # 4주 전 (또는 가능한 가장 오래된 날짜)
 
-    # 섹터 랭킹 데이터 import (순환 import 방지를 위해 함수 내부에서 import)
-    from my_chart.analysis.sector_metrics import compute_sector_ranking  # noqa: PLC0415
-
-    # 현재 및 4주 전 랭킹 계산
+    # 현재 및 4주 전 랭킹 계산 (섹터명 → _TransitionMetrics)
     try:
-        current_ranks_list = compute_sector_ranking(db_path, current_date)
-        prev_ranks_list = compute_sector_ranking(db_path, prev_date)
+        current_by_name, prev_by_name = _transition_rankings(
+            db_path, current_date, prev_date, daily_db_path=daily_db_path)
     except Exception:
         return SectorAlerts(emerging_leaders=[], weakening_sectors=[])
 
-    if not current_ranks_list:
+    if not current_by_name:
         return SectorAlerts(emerging_leaders=[], weakening_sectors=[])
-
-    # 섹터명 → SectorRank 딕셔너리 생성
-    current_by_name = {r.name: r for r in current_ranks_list}
-    prev_by_name = {r.name: r for r in prev_ranks_list}
 
     # RRG 데이터 계산 (현재 사분면)
     try:
@@ -989,10 +1041,10 @@ def detect_sector_transitions(db_path: str) -> SectorAlerts:
         # 현재 및 이전 지표
         cur_rank = cur.rank
         prev_rank = prev.rank if prev else cur_rank
-        cur_rs = cur.sector_rs_avg
-        prev_rs = prev.sector_rs_avg if prev else cur_rs
-        cur_stage2 = cur.sector_stage2_pct
-        prev_stage2 = prev.sector_stage2_pct if prev else cur_stage2
+        cur_rs = cur.rs_avg
+        prev_rs = prev.rs_avg if prev else cur_rs
+        cur_stage2 = cur.stage2_pct
+        prev_stage2 = prev.stage2_pct if prev else cur_stage2
         cur_tv = current_tv_by_name.get(sector_name, 0.0)
         # 거래대금 비교를 위한 이전 값 (없으면 현재 값으로 동일 처리)
         prev_tv = prev_tv_by_name.get(sector_name, cur_tv)
@@ -1014,13 +1066,16 @@ def detect_sector_transitions(db_path: str) -> SectorAlerts:
             strength_signals.append(f"순위 {rank_delta}단계 상승 ({prev_rank}위 → {cur_rank}위)")
 
         # 조건 2: RS 평균 10포인트 이상 상승
-        rs_delta = cur_rs - prev_rs
-        if rs_delta >= 10:
+        # 어느 한쪽이라도 결측(None)이면 변화량을 판정하지 않는다(시그널 없음) — 결측을 0 으로
+        # 메워 가짜 ±변화를 만들지 않기 위함. 4주 전에 섹터 자체가 없으면 종전대로 변화 0.
+        rs_delta = cur_rs - prev_rs if cur_rs is not None and prev_rs is not None else None
+        if rs_delta is not None and rs_delta >= 10:
             strength_signals.append(f"RS 평균 {rs_delta:.1f}pt 상승")
 
-        # 조건 3: Stage 2 비율 10%p 이상 상승
-        stage2_delta = cur_stage2 - prev_stage2
-        if stage2_delta >= 10:
+        # 조건 3: Stage 2 비율 10%p 이상 상승 (stage2_pct 는 % 단위 — 10 = 10%p)
+        stage2_delta = (cur_stage2 - prev_stage2
+                        if cur_stage2 is not None and prev_stage2 is not None else None)
+        if stage2_delta is not None and stage2_delta >= 10:
             strength_signals.append(f"Stage 2 비율 {stage2_delta:.1f}%p 상승")
 
         # 조건 4: 거래대금 4주 평균 대비 1.5배 이상
@@ -1045,11 +1100,11 @@ def detect_sector_transitions(db_path: str) -> SectorAlerts:
             weakness_signals.append(f"순위 {abs(rank_delta)}단계 하락 ({prev_rank}위 → {cur_rank}위)")
 
         # 조건 2: RS 평균 10포인트 이상 하락
-        if rs_delta <= -10:
+        if rs_delta is not None and rs_delta <= -10:
             weakness_signals.append(f"RS 평균 {abs(rs_delta):.1f}pt 하락")
 
         # 조건 3: Stage 2 비율 10%p 이상 하락
-        if stage2_delta <= -10:
+        if stage2_delta is not None and stage2_delta <= -10:
             weakness_signals.append(f"Stage 2 비율 {abs(stage2_delta):.1f}%p 하락")
 
         # 조건 4: 거래대금 4주 평균 대비 0.5배 이하

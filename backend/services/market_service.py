@@ -96,11 +96,15 @@ def _breadth_to_history_item(breadth: BreadthResult) -> BreadthHistoryItem:
     )
 
 
-def get_market_overview(weekly_db_path: str) -> MarketOverviewResponse:
+def get_market_overview(
+    weekly_db_path: str, daily_db_path: str | None = None,
+) -> MarketOverviewResponse:
     """Compute and return full market overview response.
 
     Args:
         weekly_db_path: Full path to weekly SQLite database file.
+        daily_db_path: 일봉 DB 경로 — 섹터 전환 알림의 시총가중 원천(섹터 표와 같은 집계).
+            ``None`` 이면 등가중 폴백.
 
     Returns:
         MarketOverviewResponse with all breadth, cycle, and index data.
@@ -158,7 +162,7 @@ def get_market_overview(weekly_db_path: str) -> MarketOverviewResponse:
         from my_chart.analysis.sector_advanced import detect_sector_transitions
         from backend.schemas.market import SectorAlertItem, SectorAlertsData
 
-        alerts = detect_sector_transitions(weekly_db_path)
+        alerts = detect_sector_transitions(weekly_db_path, daily_db_path=daily_db_path)
         sector_alerts: SectorAlertsData | None = SectorAlertsData(
             emerging_leaders=[
                 SectorAlertItem(name=a.name, signals=a.signals)
