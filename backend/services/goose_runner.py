@@ -157,6 +157,10 @@ def _regular_file(path: Path) -> bool:
     return path.is_file() and not path.is_symlink()
 
 
+# @MX:ANCHOR: [AUTO] select_report — final/draft 판정의 단일 규칙(REQ-AIR4-014, design §5.2, 결정 T7).
+# @MX:REASON: 실행기의 empty_output 분류, goose_storage.archive_job의 복사 원본·delivery_status,
+#             AC-014 (a)~(g)가 모두 이 함수에 의존한다(fan_in 3). final은 report.html과
+#             delivery_allowed: true가 함께 있을 때만이다 — 폴더 존재만으로 final을 붙이면 AC-014 (c)가 깨진다.
 def select_report(job_dir: Path) -> tuple[str, Path] | None:
     """design §5.2 선택 규칙. 모델이 출력한 경로는 쓰지 않고 작업 디렉터리만 본다.
 

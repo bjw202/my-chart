@@ -350,6 +350,25 @@ async def test_ac010_report_archived_after_subscriber_disconnect(env):
     assert (run_dir / "report.html").read_text() == "<html>LATE</html>"
 
 
+async def test_production_service_has_archive_hook_with_default_paths(env, monkeypatch):
+    """운영용 모듈 인스턴스는 보관 훅을 갖고, 기본 경로(하네스 runs·ai_report_service.report_dir)를 쓴다."""
+    monkeypatch.setenv("AI_REPORT_GOOSE_HARNESS_DIR", str(env.harness))
+    hook = env.real.gjs.get_service()._on_finish
+    assert hook is not None
+    job = env.real.gjs.Job(job_id="jobprod1", code="299030", stock_name="하나기술")
+    draft = env.runs / "jobprod1" / "draft"
+    draft.mkdir(parents=True)
+    (draft / "report.html").write_text("<html>PROD</html>")
+    job.ending = ("done", None)
+
+    data = await hook(job, None)
+
+    run_dir = env.stock_dir / "goose" / data["run"]
+    assert (run_dir / "report.html").read_text() == "<html>PROD</html>"
+    assert data["report_url"] == f"/api/ai-report/299030/goose/{data['run']}/report.html"
+    assert "interrupted" not in data
+
+
 async def test_runner_exception_still_archives_selectable_draft_as_interrupted(env):
     gr = env.real.gr
 

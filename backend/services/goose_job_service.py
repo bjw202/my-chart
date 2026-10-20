@@ -5,8 +5,10 @@
 
 경계:
 - 무결성 검사는 goose_harness.check_job_integrity(), 실행은 goose_runner.run_goose()에 맡긴다.
-- 리포트 복사·job.json(M5)은 ``on_finish`` 훅으로 붙인다. 훅이 돌려준 dict는 종료 이벤트
-  데이터에 합쳐진다(run, report_url, interrupted 등). M4 기본값은 훅 없음.
+- 리포트 복사·job.json(M5)은 ``on_finish`` 훅(goose_storage.make_finish_hook)으로 붙인다. 훅이
+  돌려준 dict는 종료 이벤트 데이터에 합쳐진다(run, report_url, interrupted 등). 훅은 취소·오류
+  경로에서도 불리며, 그 전에 ``job.ending``에 종료 상태를 기록한다. 생성자 기본값은 훅 없음이고
+  운영용 모듈 인스턴스에만 보관 훅을 붙인다.
 - 쿼터는 goose 전용(`AI_REPORT_GOOSE_DAILY_QUOTA`, 기본 5)이며 Fast·옛 Deep 카운터와 무관하다.
 """
 
@@ -23,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.services import goose_harness, goose_runner
+from backend.services import goose_harness, goose_runner, goose_storage
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +108,7 @@ class Job:
     created_at: datetime = field(default_factory=lambda: datetime.now(_KST))
     finished_at: datetime | None = None
     cancel_reason: str | None = None
+    ending: tuple[str, str | None] | None = None  # 훅 호출 직전에 정한 (종료 상태, 오류 종류)
     result: dict[str, Any] = field(default_factory=dict)
     events: list[JobEvent] = field(default_factory=list)
     cond: asyncio.Condition = field(default_factory=asyncio.Condition)
@@ -222,22 +225,28 @@ class GooseJobService:
             # 실행기는 그룹을 정리한 뒤 CancelledError를 다시 던진다(M3). 취소는 오류 종류가 아니다.
             reason = job.cancel_reason or "cancel"
             logger.info("goose 작업 %s 취소(사유 %s)", job.job_id, reason)
-            extra = await self._call_finish_hook(job, None)
+            extra = await self._call_finish_hook(job, None, ("cancelled", None))
             await self._finish(job, "cancelled", None, extra)
             raise
         except Exception:  # noqa: BLE001 - 실행기 밖 예외도 작업을 종료 상태로 닫는다
             logger.exception("goose 작업 %s 실행 중 예외", job.job_id)
-            extra = await self._call_finish_hook(job, None)
+            extra = await self._call_finish_hook(job, None, ("error", "exit_error"))
             await self._finish(job, "error", "exit_error", extra)
             return
-        extra = await self._call_finish_hook(job, result)
         if result.status == "done":
+            extra = await self._call_finish_hook(job, result, ("done", None))
             data = {"delivery_status": result.delivery_status, **extra}
             await self._finish(job, "done", None, data)
         else:
-            await self._finish(job, "error", result.error_kind or "exit_error", extra)
+            kind = result.error_kind or "exit_error"
+            extra = await self._call_finish_hook(job, result, ("error", kind))
+            await self._finish(job, "error", kind, extra)
 
-    async def _call_finish_hook(self, job: Job, result: goose_runner.RunResult | None) -> dict[str, Any]:
+    async def _call_finish_hook(
+        self, job: Job, result: goose_runner.RunResult | None, ending: tuple[str, str | None]
+    ) -> dict[str, Any]:
+        # 훅(M5 보관)은 종료 상태를 알아야 interrupted·job.json을 쓴다. 종료 이벤트보다 먼저 확정해 둔다.
+        job.ending = ending
         if self._on_finish is None:
             return {}
         try:
@@ -322,7 +331,9 @@ class GooseJobService:
 # @MX:WARN: [AUTO] 프로세스 전역 작업 서비스 — 라우터·lifespan이 같은 인스턴스를 쓴다.
 # @MX:REASON: 서버 전체 동시 1개(D10)와 이벤트 재생은 단일 uvicorn 워커의 메모리 상태에 의존한다.
 #             워커를 늘리면 작업이 워커별로 갈라진다. 테스트는 set_service()로 교체한다.
-_service = GooseJobService()
+# 보관 훅(M5)은 이 운영용 인스턴스에만 붙인다. 생성자 기본값은 훅 없음 — 테스트가 만든 서비스가
+# 실제 backend/reports에 쓰지 않게 한다.
+_service = GooseJobService(on_finish=goose_storage.make_finish_hook(runs_root=_default_runs_root))
 
 
 def get_service() -> GooseJobService:

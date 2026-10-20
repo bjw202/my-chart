@@ -17,6 +17,7 @@ from backend.services.ai_report_service import (
     _active_analyses,
     RateLimitError,
     check_rate_limit,
+    get_goose_report_path,
     get_history,
     get_report_content,
     get_stock_name,
@@ -240,10 +241,48 @@ async def get_report_history(code: str) -> HistoryResponse:
             filename=item["filename"],
             date=item["date"],
             created_at=item["created_at"],
+            kind=item.get("kind", "markdown"),
+            run=item.get("run"),
+            delivery_status=item.get("delivery_status"),
+            interrupted=item.get("interrupted", False),
         )
         for item in history
     ]
     return HistoryResponse(items=items)
+
+
+# @MX:NOTE: goose 리포트는 모델이 만든 HTML이다. 스크립트·동일 출처를 허용하지 않는 CSP sandbox로만
+#           서빙한다(REQ-AIR4-015, design §5.4). 프론트 iframe sandbox(REQ-018)와 이중 방어.
+_GOOSE_REPORT_HEADERS = {
+    "Content-Security-Policy": (
+        "sandbox allow-popups allow-popups-to-escape-sandbox allow-downloads; "
+        "default-src 'none'; style-src 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+        "font-src https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src data:"
+    ),
+    "X-Content-Type-Options": "nosniff",
+}
+
+
+@router.get("/ai-report/{code}/goose/{run}/report.html")
+async def get_goose_report(code: str, run: str) -> Response:
+    """보관된 goose 리포트 HTML (CSP sandbox). 코드·종목·run·경로 검증 실패는 모두 404 (design §5.4)."""
+    not_found = HTTPException(
+        status_code=404,
+        detail={"error": "not_found", "detail": "리포트를 찾을 수 없습니다."},
+    )
+    if not _CODE_PATTERN.match(code):
+        raise not_found
+    stock_name = get_stock_name(code)
+    if stock_name is None:
+        raise not_found
+    path = get_goose_report_path(stock_name, run)
+    if path is None:
+        raise not_found
+    return Response(
+        content=path.read_bytes(),
+        media_type="text/html; charset=utf-8",
+        headers=_GOOSE_REPORT_HEADERS,
+    )
 
 
 @router.get("/ai-report/{code}/{filename}", response_model=ReportContentResponse)

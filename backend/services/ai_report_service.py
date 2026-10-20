@@ -376,7 +376,12 @@ def save_report(stock_name: str, content: str) -> str:
     return target.name
 
 
-def get_history(stock_name: str) -> list[dict[str, str]]:
+def report_dir(stock_name: str) -> Path:
+    """종목 리포트 폴더(`_REPORTS_BASE/<sanitize(종목명)>`). goose 보관(SPEC-AI-REPORT-004)도 이 폴더를 쓴다."""
+    return _REPORTS_BASE / _sanitize_name(stock_name)
+
+
+def get_history(stock_name: str) -> list[dict]:
     """저장된 리포트 히스토리 조회.
 
     Args:
@@ -384,16 +389,16 @@ def get_history(stock_name: str) -> list[dict[str, str]]:
 
     Returns:
         날짜 내림차순 정렬된 리포트 목록.
-        각 항목: {"filename": str, "date": str, "created_at": str}
+        markdown 항목: {"filename", "date", "created_at", "kind": "markdown"}
+        goose 항목(SPEC-AI-REPORT-004 design §5.3): + {"kind": "goose", "run", "delivery_status", "interrupted"}
     """
-    safe_name = _sanitize_name(stock_name)
-    report_dir = _REPORTS_BASE / safe_name
+    stock_dir = report_dir(stock_name)
 
-    if not report_dir.exists():
+    if not stock_dir.exists():
         return []
 
     items = []
-    for path in report_dir.glob("*.md"):
+    for path in stock_dir.glob("*.md"):
         # 파일명에서 날짜 추출 (예: "2026-04-12.md" → "2026-04-12")
         stem = path.stem
         # 시퀀스 번호가 있으면 제거 (예: "2026-04-12_2" → "2026-04-12")
@@ -405,12 +410,29 @@ def get_history(stock_name: str) -> list[dict[str, str]]:
                 "filename": path.name,
                 "date": date_part,
                 "created_at": mtime.strftime("%Y-%m-%d %H:%M:%S"),
+                "kind": "markdown",
             }
         )
 
     # 날짜 내림차순 정렬 (파일명 기준)
     items.sort(key=lambda x: x["filename"], reverse=True)
+
+    # SPEC-AI-REPORT-004: goose 실행(goose/*/job.json)을 더한다. 늦은 import — 이 모듈을 스텁 환경에서
+    # 단독 로드하는 테스트들이 backend.services 패키지 초기화를 타지 않게 한다.
+    from backend.services.goose_storage import list_goose_runs
+
+    goose_items = list_goose_runs(stock_dir)
+    if goose_items:
+        # 안정 정렬: 같은 날짜 안에서는 markdown(기존 순서)이 먼저, goose는 실행 순번 내림차순
+        items = sorted(items + goose_items, key=lambda x: x["date"], reverse=True)
     return items
+
+
+def get_goose_report_path(stock_name: str, run: str) -> Path | None:
+    """보관된 goose `report.html` 경로 또는 None(형식 오류·루트 이탈·없음). design §5.4, REQ-AIR4-016."""
+    from backend.services.goose_storage import resolve_report_html  # 늦은 import (get_history와 같은 이유)
+
+    return resolve_report_html(_REPORTS_BASE, report_dir(stock_name), run)
 
 
 # @MX:ANCHOR: [AUTO] v1.1.4 - 외부 입력(filename) path traversal 방지 게이트. fan_in >= 2.
