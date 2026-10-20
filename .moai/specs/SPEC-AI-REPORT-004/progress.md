@@ -1321,3 +1321,5 @@ ls: .moai/specs/SPEC-AI-REPORT-004: No such file or directory   (작성 전, 중
 **개정 v0.4.2 (2026-10-20, manager-spec, M3 차단 보고 B2 재위임)**: 사용자 결정에 따라 하네스 설정 키 `claudeMdExcludes: ["**/.claude/CLAUDE.md"]` 반영 — spec REQ-002, acceptance AC-002 설정 파일 줄, spec-compact REQ-002·AC-002 행, design §2.2 설정 키·§9.1 행(해소, 근거 §E.2 `### M3 실행기 goose_runner` E4). `status`는 `in-progress` 그대로. M4 진입 확인: 설치본 설정 파일로 재탐침.
 
 **개정 v0.4.3 (2026-10-20, manager-spec, M7 차단 재위임)**: 사용자 결정에 따라 acceptance AC-023 첫 `git grep`에 `':!backend/tests/test_goose_runner.py'` 제외를 넣고 이유(AC-004 canary)를 비고에 적음, spec-compact AC-023 행 동기화. v0.4.2 잔여 표기 정리 — design·acceptance·spec-compact 머리말 버전, acceptance §H 전역 `CLAUDE.md` 항목 해소 표시(근거 §E.2 `### M4 작업 서비스와 라우터` E4), design §9 설정 파일 키 4개. `status`는 `in-progress` 그대로.
+
+**개정 v0.4.4 (2026-10-20, manager-spec, 라이브 실행 결함 재위임)**: 사용자 결정(지침과 벤더링 예시로 고치고 권한 규칙은 그대로)에 따라 design §2.1 4번에 4-1·4-2 셸 명령 규칙, §2.2 `mode` 거부 메시지 관측, §2 벤더링 원본 로컬 수정 기록(`references/report-input.md` 8-9행, 재벤더링 시 재적용·매니페스트 갱신), plan §3 파일 목록 표기, spec §6 제외 항목 예외 표기. REQ·AC 변경 없음, `status`는 `in-progress` 그대로. 근거 §E.2 `### 라이브 실행 결함: Bash 거부`.

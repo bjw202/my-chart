@@ -133,7 +133,7 @@ Tier L(사용자 확정). 산출물 5종 + `spec-compact.md` + `progress.md`. �
 
 | 구분 | 파일 |
 |---|---|
-| 신규(추적 원본, T11) | `backend/goose_harness_src/harness-instructions.md`(→ 설치본 `CLAUDE.md`), `backend/goose_harness_src/claude-settings.json`(→ `.claude/settings.json`), `backend/goose_harness_src/goose-manifest.json`(설치본 경로 기준), `backend/goose_harness_src/skills/goose/**`(벤더링, 작성 아님) |
+| 신규(추적 원본, T11) | `backend/goose_harness_src/harness-instructions.md`(→ 설치본 `CLAUDE.md`), `backend/goose_harness_src/claude-settings.json`(→ `.claude/settings.json`), `backend/goose_harness_src/goose-manifest.json`(설치본 경로 기준), `backend/goose_harness_src/skills/goose/**`(벤더링, 작성 아님. 로컬 수정 1건 — `workflows/stock-report/references/report-input.md` 8-9행 실행 예시를 상대 경로 형식으로, v0.4.4, design §2. 다시 벤더링하면 재적용) |
 | 런타임(리포 밖, 커밋 안 함) | `~/.goose-harness/{CLAUDE.md, .claude/settings.json, .claude/skills/goose/**, runs/}` — 서버 시작 시 설치 |
 | 삭제(미추적) | `backend/goose_harness/` — M1 임시 하네스. 리포 안 `.claude/skills`라 MoAI 세션에 발견됨. M2에서 원본으로 옮긴 뒤 삭제 |
 | 신규 | `backend/services/goose_runner.py`, `backend/services/goose_job_service.py` |

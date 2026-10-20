@@ -1,7 +1,7 @@
 ---
 id: SPEC-AI-REPORT-004
 title: "AI 모달 Deep 모드를 goose 스킬 하네스(헤드리스 claude -p)로 교체"
-version: "0.4.3"
+version: "0.4.4"
 status: in-progress
 created: 2026-10-19
 updated: 2026-10-20
@@ -28,6 +28,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 | 0.4.1 | 2026-10-19 | manager-spec | plan-audit 5회차(FAIL 0.83, 점수 하락 → 단일 수정) 반영, 재번호 없음(REQ 23·AC 25 유지): 서버 시작 원본 대조가 실패하면 실패를 기록하고 이후 모든 goose 작업을 `error`/`integrity`로 끝냄 — 기존 설치본이 매니페스트와 맞아도 마찬가지(사용자 결정 2026-10-19, 닫힌 실패, R5-1, REQ-001·008, AC-001 (2b)), 원본 쪽 목록 밖 파일 규칙과 제외 목록(`goose-manifest.json`, `.DS_Store`)을 요구사항으로 올림(R5-2, AC-001 (1)(2c)), 하네스 밖 읽기 전용 Bash 탐침을 `cat`·`head`·`grep`·`~`·`$HOME`·허용 스크립트 뒤 복합 명령으로 넓힘(R5-3, REQ-003, AC-003 (6a)~(6f)), M1 해시 비교를 "오탐 없음 관측"으로 정정(R5-4). 선택 결함 R5-5·R5-7·R5-9 반영, R5-6·R5-8·R5-10 보류. 감사 보고서의 결함 번호 D1~D10을 결정 ID와 구분하려고 `R5-1`~`R5-10`으로 적는다 |
 | 0.4.2 | 2026-10-20 | manager-spec | run 단계 M3 차단 보고(B2) 반영, 재번호 없음(REQ 23·AC 25 유지): 사용자 전역 `~/.claude/CLAUDE.md`가 하네스 세션에 로드되는 관측에 따라 하네스 설정 키에 `claudeMdExcludes: ["**/.claude/CLAUDE.md"]`를 추가(사용자 결정 2026-10-20, REQ-002, AC-002, design §2.2·§9.1). 근거: M3 탐침 4회 — 설정 키는 전역 지침만 빼고 하네스 `CLAUDE.md`는 남김, 인증 유지(`progress.md §E.2 ### M3 실행기 goose_runner` E4). 설치본 경로 재탐침은 M4 진입 확인 항목 |
 | 0.4.3 | 2026-10-20 | manager-spec | run 단계 M7 차단(AC-023 (1)과 AC-004 충돌) 반영, 재번호 없음(REQ 23·AC 25 유지): AC-023 첫 `git grep`에서 `backend/tests/test_goose_runner.py`를 제외 — AC-004가 실제 민감 변수 이름을 canary로 써야 하므로(사용자 결정 2026-10-20, 근거 `progress.md §E.2 ### M7 기존 Deep 정리`). v0.4.2 잔여 표기 정리: design·acceptance·spec-compact 머리말 버전, acceptance §H 전역 `CLAUDE.md` 항목을 해소로 표시(M4 1부 설치본 재탐침), design §9 설정 파일 키 행을 4개로 |
+| 0.4.4 | 2026-10-20 | manager-spec | run 단계 라이브 실행 결함(Bash 거부 뒤 렌더 미실행, job `bb4c0b2d…` `empty_output`) 반영, REQ·AC 변경 없음(REQ 23·AC 25 유지): 하네스 지침 4번에 셸 명령 규칙 4-1(`runs/<job_id>/`는 이미 있고 출력 폴더는 스크립트가 만든다, `mkdir`·`cd`·`ls`·절대 경로 명령 금지, 파일은 Write 도구로, 참고 문서 예시 대신 4번 형식)과 4-2(Bash 거부 메시지는 명령 1건 거부일 뿐 Bash 전체 거부가 아님, 렌더 없이 끝내지 않음) 추가(design §2.1), design §2.2에 `mode` 거부 메시지가 도구 단위로 쓰인다는 관측 추가, 벤더링 원본 `references/report-input.md` 8-9행 실행 예시를 상대 경로 형식으로 고치는 로컬 수정 1건 기록(design §2, plan §3)과 §6 기존 자산 제외 항목에 그 예외 표기. 권한 허용·거부 규칙은 그대로(사용자 결정 2026-10-20, 근거 `progress.md §E.2 ### 라이브 실행 결함: Bash 거부`) |
 
 관계: 이 SPEC은 **SPEC-AI-REPORT-002**(Deep 5소스 수집 + claude 합성)를 대체한다(supersedes). 002 문서 자체는 수정하지 않으며, 상태 정리는 sync 단계에서 한다. SPEC-AI-REPORT-003(Fast/Codex)은 유지된다.
 
@@ -165,7 +166,7 @@ tags: "ai-report, goose, claude-cli, headless, job-queue, sse, security, sandbox
 
 ### Out of Scope — 기존 자산
 
-- goose 스킬 내용 수정과 자동 업데이트(업데이트는 수동 벤더링).
+- goose 스킬 내용 수정과 자동 업데이트(업데이트는 수동 벤더링). 예외 1건: `references/report-input.md` 8-9행 실행 예시를 하네스 명령 형식으로 고친다(v0.4.4, design §2).
 - Fast(codex) 모드 변경.
 - 기존 markdown 리포트 파일의 삭제·이동·변환.
 - SPEC-AI-REPORT-002 문서 본문 수정.
