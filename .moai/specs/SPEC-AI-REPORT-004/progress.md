@@ -961,6 +961,144 @@ E3 — `coverage run --include=backend/services/goose_job_service.py -m pytest b
 
 Gaps: 실제 `~/.goose-harness/runs`에서의 정리는 관측하지 않았다(tmp 경로만). 삭제는 이벤트 루프 안에서 동기로 돈다(폴더 수가 적어 짧다고 보았으며 측정하지 않음). 정렬 기준은 폴더 수정 시각이므로, 끝난 작업 폴더 바로 아래에 파일이 나중에 생기거나 지워지면 순서가 바뀔 수 있다.
 
+### M6 프론트엔드
+
+기준: HEAD `bd75c94`(0부 커밋 뒤 시작). 커밋 `6941e90`(시험, RED) → `87d2eeb`(구현), 둘 다 게이트 시험 상한 240초 변경(`90b6419`, 사용자 결정) 뒤에 우회 없이 통과. 아래 증거는 커밋 직전 작업 트리(커밋 내용과 같음) 기준이다. 증거 파일: `.moai/state/verify/m6/`(git 미추적). 프론트 명령은 모두 `npm --prefix frontend run …`(리포 루트 vitest가 `.claude/worktrees` 시험을 섞는 문제 회피). 실제 네트워크·실제 `claude`·dev 서버는 쓰지 않았다(fetch·EventSource·API 함수는 가짜, 라이브 확인은 오케스트레이터 몫).
+
+백엔드 계약 대조(구현 전 `backend/routers/ai_report.py`·`goose_job_service.py`를 직접 읽음): 시작 `POST /ai-report/{code}?mode=deep` → 202/200 `{job_id}`, 429 `{detail: {error: goose_busy|goose_rate_limit, detail}}`, 503 `claude_cli_missing`. SSE 이벤트 이름 `progress`(`{stage, detail}`)·`done`·`error`(`{error_kind, message, …}`)·`cancelled`, 각 이벤트 `id: seq`, 없는 작업 404. 종료 이벤트 데이터는 보관 시 `{run, delivery_status, report_url[, interrupted]}`. 취소 `POST /ai-report/jobs/{id}/cancel`, 실행 중 조회 `GET /ai-report/goose/active` → 객체 또는 `null`.
+
+산출물:
+- `utils/gooseJob.ts`(신규): sessionStorage `goose_job:{code}` 읽기·쓰기·지우기(job_id가 같을 때만 지움), 쓸 때 `window`에 `goose-job-started` 신호(같은 탭에는 `storage` 이벤트가 오지 않으므로, design §7.2), 진행 단계 순서 `GOOSE_STAGES`와 누적 함수.
+- `api/aiReport.ts`: `startGooseJob`(fetch, 429 본문 해석), `subscribeGooseJob`(EventSource, 종료 이벤트에서 `close()`, `CLOSED` 상태 오류만 작업 상실로 처리), `cancelGooseJob`, `fetchGooseActive`, `gooseReportUrl`.
+- `types/aiReport.ts`: `HistoryItem`에 `kind·run·delivery_status·interrupted`, goose 타입 추가. 옛 `DeepProgress`·`SourceProgress`·`SynthesisProgress` 제거(쓰는 곳이 ProgressPanel뿐).
+- `hooks/useAiReport.ts`: `goose` 상태, `startGoose`·`resumeGoose`·`cancelGoose`. `reset()`은 goose 구독만 끊는다(저장 키 유지). 시작 응답을 기다리는 사이 모달이 닫히면(세대 번호) 구독하지 않고 저장 키만 남긴다. Fast 스트리밍 경로는 그대로(옛 딥 소스 진행 콜백만 제거).
+- `hooks/useGooseActive.ts`(신규): 저장 키가 있는 셀만 즉시 1회 + 5초 주기 `GET /goose/active`. 응답 job_id가 저장값과 같으면 활성, `null`·다른 job_id면 비활성 + 폴링 정지. `goose-job-started` 신호로 재개.
+- `components/ProgressPanel.tsx`: 5소스 + Claude 합성 패널 → design §3.5 단계 10개(가장 늦게 도달한 단계 = 진행 중, 앞 단계 = 완료 또는 건너뜀, 검색 횟수·열람 건수·최근 열람 설명).
+- `components/GooseReportView.tsx`(신규): `sandbox="allow-popups allow-popups-to-escape-sandbox allow-downloads"` 고정 iframe, `draft`면 배너 "최종 감사 미통과 초안" + 설명 한 줄, `interrupted`면 "분석이 중단되었습니다".
+- `components/AiReportModal.tsx`: 모드 버튼 "Goose", goose 작업이 있으면 Goose 모드로 열림, 실행 중 진행 패널 + "분석 취소", 결과 iframe, 오류·취소 안내 + 다시 시도, 429 `goose_busy`(서버 문구 "<종목명> 분석이 진행 중입니다" + "진행 중인 분석이 끝난 뒤 다시 시도하세요.")·`goose_rate_limit`(서버 한도 문구 + "내일 다시 시도하세요."), 기록 탭 kind별 표시(goose: "Goose" + 최종/초안 + 중단), goose 기록 항목은 모달 안에서 iframe으로 바로 연다. 실행 중에는 모드 토글을 잠근다.
+- `components/ChartGrid/ChartCell.tsx`: 열 때 `reset()` 뒤 `resumeGoose(code)`, 닫기는 기존대로 `abort()` + `reset()`(goose는 구독만 해제, 취소 요청 없음), `mode=deep`이면 `startGoose`, 버튼 `--active` = Fast 스트리밍 OR goose 실행 중.
+- `styles/global.css`: goose 배너·중단 안내·iframe·건너뜀 단계·기록 배지 스타일(추가만).
+
+#### E1 — 인수 기준 행렬
+
+명령: `npm --prefix frontend run test -- --reporter=verbose <M6 시험 7개 파일>` → `Test Files 7 passed (7) / Tests 75 passed (75)`(`m6_final_v_plain.txt`). AC별 집계는 같은 출력에서 시험 이름의 AC 번호로 `grep -c "✓"`/`"×"`.
+
+| AC | 상태 | 시험 | 관측 출력 |
+|---|---|---|---|
+| AC-018 | PASS | `AiReportModal.goose.test.tsx` "AC-AIR4-018 —" 3건 | `3 passed / 0 failed` — 모드 버튼 이름 "Goose"(옛 "심층 분석" 없음), iframe 1개·`sandbox` 문자열 정확히 일치·`src`=report_url·`title` "Goose 리포트", `ReactMarkdown`(가짜 `data-testid=markdown`) 0개, DOM에 `allow-scripts`·`allow-same-origin` 없음 |
+| AC-019 | PASS | 결과 탭 4조합(draft/final × interrupted 유무) + 오류 종료 1건, 기록 탭 목록 1건 + 항목 4개 열기 + markdown 항목 1건 | `11 passed / 0 failed` — draft 두 버전만 배너 1개, final 두 버전 0개, interrupted 두 버전만 중단 안내 1개(final이어도 표시), 기록 탭에서 연 경우도 같은 개수(데이터 출처: 기록 항목 `delivery_status`·`interrupted`) |
+| AC-020 | PASS | `ChartCellGoose.test.tsx` 2건(실제 ChartCell의 AI 버튼·닫기 버튼), `useAiReport.goose.test.ts` "재구독과 종료" 7건 | `9 passed / 0 failed` — 저장된 J1: 열기 → `subscribeGooseJob` 1회(J1), 닫기 → 구독 해제 1회, `startGooseJob` 0회, `cancelGooseJob` 0회, 저장값 J1 유지. 재생 끝 `done` → iframe·배너 표시 후 저장값 삭제. 404(작업 상실) → 저장값 삭제·idle |
+| AC-022 | PASS | `ChartCellGoose.test.tsx` "AC-AIR4-022 —" 6건(가짜 타이머 `vi.advanceTimersByTimeAsync`) | `6 passed / 0 failed` — (1) 실행 중 응답 → `chart-cell-ai-btn--active` (2) `null` → 해제 (3) 이후 두 주기 추가 요청 0 (4) 새 마운트 첫 폴링 후 활성(요청 1회) (5) 저장 키 없는 셀 요청 0 (6) 정지 뒤 같은 셀에서 J2 시작 → 닫기 → 주기 경과 → 요청 재개·활성. 추가: 다른 job_id 응답이면 비활성 + 정지, Fast 스트리밍 중 `--active` 유지(goose 요청 0) |
+
+보조 시험(AC 밖): `gooseJob.test.ts` 6건, `aiReport.goose.test.ts` 17건(202/200·429 두 종류·본문 없는 429·503·네트워크 오류, EventSource URL·progress 전달·종료 3종 닫힘·CLOSED/CONNECTING 오류 구분·해제 후 무시·깨진 JSON, 취소·실행 중 조회·URL 모양), `ProgressPanel.test.tsx` 6건, `AiReportModal.goose.test.tsx`의 진행 패널·취소·토글 잠금·429 두 종류·취소 후 다시 시도 5건.
+
+대조 단언 되돌림(구현 줄을 하나씩 바꿔 M6 시험 5개 파일 실행 → 원복, `diff -r`로 원본 사본과 비교 → `RESTORED`. 출력 `m6_mutate.txt`):
+
+```
+== M-a sandbox에 allow-scripts allow-same-origin 추가 (AC-018)   5 failed | 58 passed — AC-018 final 결과 + 기록 항목 0~3 열기
+== M-b 라벨을 심층 분석으로 되돌림 (AC-018)                       9 failed | 54 passed
+== M-c 초안 배너 항상 표시 (AC-019)                               4 failed | 59 passed — final, final+interrupted, 기록 항목 1·3
+== M-d final이면 중단 안내 숨김 (AC-019)                          2 failed | 61 passed — final+interrupted, 기록 항목 3
+== M-e 기록에서 연 경우 interrupted 상태 잃음 (AC-019)            2 failed | 61 passed — 기록 항목 2·3
+== M-f 닫을 때 취소 POST (AC-020)                                 1 failed | 62 passed — 저장된 J1 열기·닫기
+== M-g 열 때마다 새 작업 시작 (AC-020)                            4 failed | 59 passed
+== M-h 닫아도 구독 유지(reset이 구독을 끊지 않음) (AC-020)        3 failed | 60 passed
+== M-i --active가 Fast 스트리밍만 봄 (AC-022)                     3 failed | 60 passed — (1)~(3), (4), (6)
+== M-j null 받아도 폴링 계속 (AC-022 (3))                         3 failed | 60 passed
+== M-k 저장 키 없어도 폴링 (AC-022 (5))                           2 failed | 61 passed
+== M-l 같은 탭 시작 신호 무시 (AC-022 (6))                        1 failed | 62 passed — (6)
+== M-m 종료 이벤트 뒤 EventSource를 닫지 않음                     3 failed | 60 passed — done/error/cancelled
+RESTORED
+```
+
+#### E2 — 기준 대비 (기준 HEAD `c4779cd` 작업 트리 → M6 구현 뒤 작업 트리)
+
+```
+$ npm --prefix frontend run typecheck        # tsc -b
+기준: exit=0      변경 후: exit=0
+$ npm --prefix frontend run lint             # eslint .
+기준:   ✖ 50 problems (45 errors, 5 warnings)  exit=1
+변경 후: ✖ 50 problems (45 errors, 5 warnings)  exit=1
+$ comm -13 base_lint_norm.txt after_lint_norm.txt   # (파일, 규칙) 정규화 목록 각 50줄 — 새 문제
+(출력 없음)
+$ comm -23 base_lint_norm.txt after_lint_norm.txt   # 사라진 문제
+(출력 없음)
+$ npm --prefix frontend run test             # vitest run (frontend 루트)
+기준:   Test Files 2 failed | 85 passed (87)   Tests 760 passed (760)   exit=1
+변경 후: Test Files 2 failed | 90 passed (92)   Tests 816 passed (816)   exit=1
+```
+
+- 린트의 `ChartCell.tsx` 기존 오류 4건(`react-hooks` 규칙)은 줄 번호만 15줄 밀렸다(405→420, 407→422). 새 파일·바꾼 파일에서 새 린트 문제 0.
+- vitest 실패 파일 2개는 기준과 같은 `e2e/ai-report-deep.spec.ts`·`e2e/preset-flow.spec.ts`(Playwright 명세가 vitest에 수집되는 기존 문제, 시험 0건). 시험 수 760 → 816(+56): 신규 파일 5개 62건 + ProgressPanel 11→6.
+- 백엔드는 M6에서 바뀌지 않았다(0부 E2: `38 failed, 370 passed, 3 xfailed, 63 errors`, 새 실패 0).
+
+#### E3 — 커버리지
+
+```
+$ npx --prefix frontend vitest run --root frontend --coverage --coverage.reporter=text --coverage.include=<바꾼 7개 모듈> <M6 시험 7개>
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+  aiReport.ts      |    37.6 |    32.14 |   58.82 |   39.44 | 15-159
+  ...portModal.tsx |   82.81 |    89.42 |      75 |   86.44 | ...55,193,230,309
+  ...eportView.tsx |     100 |      100 |     100 |     100 |
+  ...ressPanel.tsx |     100 |      100 |     100 |     100 |
+  useAiReport.ts   |   79.62 |    84.37 |   72.72 |   80.19 | ...30-234,239-246
+  ...ooseActive.ts |   96.87 |    84.61 |     100 |     100 | 25,40
+  gooseJob.ts      |   96.29 |    92.85 |     100 |   95.65 | 27
+```
+
+`aiReport.ts`의 미실행 15-159행은 기존 Fast SSE·기록 조회 코드다(이 시험 묶음이 다루지 않음). goose 부분(160행 이후)은 모두 실행됐다. `useAiReport.ts` 미실행 230-246행은 기존 `loadHistory`·`loadSavedReport`, `AiReportModal.tsx` 미실행 줄은 기존 Fast 경로(복사·ESC 등)다. 신규 모듈 4개는 96~100%.
+
+#### E5 — 바꾼 기존 시험과 사유
+
+| 파일 | 변경 | 사유 |
+|---|---|---|
+| `AiReportModal.test.tsx` 4곳 | 탭 이름 `/심층 분석/` → `'Goose'`, 시험 이름·머리 주석 문구 | REQ-018 라벨 변경. 단언 내용(활성 전환·스트리밍 중 비활성·`onRetry('deep')`)은 그대로 |
+| 같은 파일 마지막 시험 | "deep 모드가 아닐 때 progress가 있어도 패널 없음" → "goose 작업이 idle이면 진행 패널 없음" | 옛 `progress`(DeepProgress) prop 제거. 앞 시험("progress 없으면 패널 없음")은 이름만 goose로 |
+| `ProgressPanel.test.tsx` 전체 | 5소스·합성 단계 시험 11건 → goose 단계 시험 6건 | 계획 §M6 "5소스 전용 → goose 단계" 교체. 옛 패널 동작 자체가 없어졌다 |
+
+Fast 동작(B6): `ChartCell`의 Fast 시작은 `startStream(code, 'fast')` 그대로, 닫기의 `abort()`+`reset()` 그대로, `--active`는 Fast 스트리밍 조건을 유지한다(`ChartCellGoose` "Fast 스트리밍 중 --active 조건은 그대로다"). Fast 관련 기존 시험은 단언 변경 없이 통과한다.
+
+#### E8 — RED 증거 (GREEN 전 실패 출력, `m6_red.txt`)
+
+시험 7개 파일, 구현 전:
+
+```
+Error: Failed to resolve import "../gooseJob" from "src/utils/__tests__/gooseJob.test.ts". Does the file exist?
+Error: Failed to resolve import "../../utils/gooseJob" from "src/hooks/__tests__/useAiReport.goose.test.ts". Does the file exist?
+Error: Failed to resolve import "../../utils/gooseJob" from "src/components/__tests__/ProgressPanel.test.tsx". Does the file exist?
+Error: Failed to resolve import "../../utils/gooseJob" from "src/components/__tests__/AiReportModal.goose.test.tsx". Does the file exist?
+Error: Failed to resolve import "../../../hooks/useGooseActive" from "src/components/ChartGrid/__tests__/ChartCellGoose.test.tsx". Does the file exist?
+TypeError: startGooseJob is not a function        (5건)
+TypeError: subscribeGooseJob is not a function    (6건)
+TypeError: cancelGooseJob / fetchGooseActive / gooseReportUrl is not a function (각 1건)
+TestingLibraryElementError: Unable to find an accessible element with the role "tab" and name "Goose"   (4건)
+ Test Files  7 failed (7)
+      Tests  20 failed | 5 passed (25)
+```
+
+(통과 5건은 `AiReportModal.test.tsx` 중 라벨과 무관한 기존 시험이다.)
+
+#### 설계 메모 (구현에서 정한 값)
+
+- 셀 폴링 주기 5초(`GOOSE_ACTIVE_POLL_MS`, design §7.2 "구현 단계에서 확정").
+- 시작 요청은 axios 인터셉터가 429 본문을 문자열로 바꾸므로 `fetch`를 썼다. 취소·실행 중 조회는 기존 axios 클라이언트.
+- 서버가 종료 이벤트 뒤 스트림을 닫으면 `EventSource`는 자동 재접속한다. 그래서 종료 이벤트를 받으면 클라이언트가 먼저 닫는다. HTTP 상태를 볼 수 없으므로 `readyState === CLOSED`인 오류(404 등 연결 실패)만 작업 상실로 보고, 재접속 중 오류는 기다린다.
+- 같은 탭 저장 키는 결과를 보여 준 뒤(종료 이벤트 수신) 또는 작업 상실 때만 지운다. 셀 폴링은 `null`을 받으면 스스로 멈추고 저장값은 건드리지 않는다(design §7.2).
+- 한 화면 원칙: Fast를 시작하면 goose 화면을 내리고(구독만 해제, 작업·저장 키 유지), goose를 시작하면 Fast 화면을 비운다. 기록에서 연 goose 리포트는 모달 안 상태로 보여 준다.
+- goose 실행 중에는 모드 토글을 잠근다.
+
+#### 관측하지 못한 것 (Gaps)
+
+- 커밋 경과: 처음 두 번은 pre-commit `moai gate`가 `quality gate timed out: pytest exceeded 2m0s`로 거부했다(수동 실행도 `2:22.40 total`, `gate_manual.txt`). 상한을 240초로 올린 `90b6419` 뒤 우회 없이 커밋했다. pytest가 2분을 넘는 원인 자체는 조사하지 않았다.
+- 실제 브라우저 `EventSource` 동작(종료 후 재접속 억제, 404 시 `CLOSED` 전이, 끊김 재접속 시 `Last-Event-ID`)은 가짜 객체로만 시험했다. 브라우저 확인은 AC-025 라이브 몫.
+- 실제 리포트가 sandbox iframe + 서버 CSP 아래에서 깨지지 않고 보이는지(폰트 출처 **[잠정 — 렌더 확인]**)는 시험하지 않았다.
+- dev 서버를 띄우지 않았고 라이브 UI를 확인하지 않았다(B4).
+- `e2e/ai-report-deep.spec.ts`(옛 Deep 흐름 Playwright 명세)는 고치지 않았다. Playwright로 실행하면 옛 화면 문구를 찾다 실패할 수 있다(M7 정리 후보).
+
+#### M7 진입 조건
+
+M6 소유 AC(018·019·020·022) 자동 시험 PASS, 되돌림 13종 모두 RED, typecheck exit 0, 린트·vitest 새 문제 0, 백엔드 변경 없음(0부 제외), M6 커밋 `6941e90`·`87d2eeb` 완료. 프론트에 남은 옛 Deep 흔적은 `types/aiReport.ts`의 `SourceName`·옛 `PhaseEvent` 소스 단계(Fast 콜백 타입과 같이 정의됨)와 `e2e/ai-report-deep.spec.ts`다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
