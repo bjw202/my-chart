@@ -1,10 +1,10 @@
 ---
 id: SPEC-SECTOR-METRIC-UNIFY-001
 title: Sector Analysis 지표 산출 원천 단일화
-version: "0.5.0"
+version: "0.5.1"
 status: completed
 created: 2026-08-18
-updated: 2026-08-18
+updated: 2026-10-21
 author: manager-spec
 priority: P1
 phase: "v0.5.0 target"
@@ -25,6 +25,7 @@ depends_on: [SPEC-SECTOR-AGGREGATION-001, SPEC-SECTOR-UX-001, SPEC-SECTOR-GRID-0
 | 버전 | 날짜 | 변경 |
 |---|---|---|
 | 0.1.0 | 2026-08-18 | 승인된 계획 `rs-purring-key.md` 전사, 검증 절을 기계 검증 가능한 AC로 형식화 |
+| 0.5.1 | 2026-10-21 | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 커밋 `d99abbc`가 §5 M8 잔여를 해소했다. `/api/sectors/ranking`의 `sectors[]`를 집계 경로(`compute_sector_aggregates(period=None)`: `ALL_CAPPED` 벤치마크 초과수익률, 순위 백분위 composite, 순위 없는 섹터 생략)에서 만들고, 레거시 `compute_sector_ranking`·`_compute_sector_metrics`·`_normalize_list`·`_COMPOSITE_W_*`·`_load_kospi_returns`·`SectorRank`를 삭제했다. 본 SPEC이 구현한 것이 아니며 범위 규정도 바꾸지 않는다. 주석 위치: spec.md §1.2·D5·REQ-SMU-001 주석·§5 M8, acceptance.md AC-SMU-001 [HARD] 우변 절. 출처: `CHANGELOG.md` [Unreleased]. |
 | 0.5.0 | 2026-08-18 | plan-audit iteration 3 (PASS 0.92) 잔여 2건. D-A: AC-SMU-001의 "왜 항진명제가 아닌가"에 남아 있던 stale "기준선 20건 실측" 주장 제거 → 구조적 근거(양변이 서로 다른 서비스 모듈)와 경험적 근거(M0 고정 `N`)로 분리. D-B: M4 스케치에 `excluded` 가드 밖 초기화 + 가드 안 `result.excluded` 바인딩 추가(누락 시 M5 배선에서 `NameError` → 503, E-6 분기 B 관측량 붕괴). M5에 `excluded=excluded` 전달 명시 |
 | 0.4.0 | 2026-08-18 | plan-audit iteration 2 (PASS-WITH-DEBT 0.85) 대응. D-1: AC-SMU-001 RED 목표를 M0 고정값 `N`으로 전환 + 조정 규칙 신설(`N==0`은 blocker). D-2: E-6를 2분기 측정 게이트로 재작성(갭 G-8). D-3: `§4.4` 중복 → `§4.5`. D-4: ThemeAnalysis 이관처 정정. D-5: `types/bubble.ts` `:6-8` → `:6-9`. D-6/7/8: 인용 정정(`if date:` `:136`, `date=` `:58`, 라우터 `:89`). D-9: AC-SMU-015→REQ-SMU-012, AC-SMU-027→REQ-SMU-026 역참조 |
 | 0.3.0 | 2026-08-18 | D7 결정(A) 반영 — M6/M7을 형제 SPEC `SPEC-SECTOR-DISPLAY-UNIFY-001`로 분리. 본 SPEC 범위는 M0~M5 + M8 기록. REQ-SMU-016~022·024는 tombstone(번호 재사용 금지). `PERIOD_SIZE_LADDER`(REQ-SMU-023)는 M4 완결 조건이므로 예외 잔류 |
@@ -49,6 +50,8 @@ Sector Analysis Bubble 차트에서 섹터 RS가 좁은 구간(26~63)에 뭉쳐 
 ### §1.2 `compute_sector_ranking`이 아니라 `compute_sector_aggregates`인 이유
 
 레거시 `SectorRank`에는 거래대금 필드가 아예 없고, `sector_metrics.py:993-996`이 모든 지표를 `or 0.0`으로 강제해 **동일한 0-대체 결함을 다른 옷으로 재현**하며, 초과수익률이 KOSPI 기준이다.
+
+> **후속 변경 (2026-10-21, 커밋 d99abbc)**: 여기서 기각한 `compute_sector_ranking`·`SectorRank`는 삭제됐다. 인용된 `sector_metrics.py:993-996`(`or 0.0` 강제)은 더 이상 존재하지 않으며, 레거시 `sectors[]`도 이제 `compute_sector_aggregates`에서 만든다. 이 절의 선택(단일 원천 = `compute_sector_aggregates`)은 그 결정으로 모든 소비처에 확장됐다.
 
 ---
 
@@ -89,6 +92,8 @@ bubble `close * volume` 주봉 1개(`sector_advanced.py:592`) vs ranking VolumeW
 ### D5 — Table 기간 토글 무동작
 `frontend/src/api/market.ts:12-19`가 `period`를 안 보냄. **중요**: `period`만 추가해도 화면은 안 바뀐다. 기간별 `rank` 재배정은 `data[]`에만 있고(`sector_metrics.py:695-706`), 프론트가 읽는 `sectors[]`는 `compute_sector_ranking`이 `period`를 받지 않아 항상 composite 기준이다. **`data[]`를 읽어야 실제로 동작한다.**
 
+> **후속 변경 (2026-10-21, 커밋 d99abbc)**: `compute_sector_ranking`은 삭제됐다. `sectors[]`는 이제 `compute_sector_aggregates(period=None)`의 composite 순위로 만든다. 요청에 `period`가 있어도 `sectors[]`는 composite 순위이고 기간별 순위는 여전히 `data[]`에만 있으므로, "`data[]`를 읽어야 실제로 동작한다"는 결론은 그대로다. 두 배열의 초과수익률·composite 값은 이제 같은 원천에서 온다.
+
 ### D6 — 라벨·표시 부정확
 `'RS 중앙'`이 계산된 중앙값이 아닌 50 상수(`SectorBubbleChart.tsx:217`) / `'RS Top %'`가 RS 점수처럼 보이나 실제로는 "RS≥80 비율"(임계값 미표기) / UI에서 "RS"가 세 가지를 지칭(등급·RRG RS-Ratio·RS Line, `ChartCell.tsx:326`과 `:352`가 한 셀에 공존) / 같은 지표 반올림 제각각(`Math.round` / `toFixed(1)` / 반올림 없음) / `MetricCard`가 null에 `null%` 문자열 렌더(ER-2 위반).
 
@@ -100,6 +105,8 @@ bubble `close * volume` 주봉 1개(`sector_advanced.py:592`) vs ranking VolumeW
 
 - **REQ-SMU-001** (Ubiquitous) — `/api/sectors/bubble` 응답의 섹터 지표는 `compute_sector_aggregates` 산출을 투영한 값이어야 하며, `/api/sectors/ranking` 응답의 **봉투 `data[]`**(= `agg.aggregates`, `backend/services/sector_ranking_service.py:106`)와 일치해야 한다. 버블 전용 산식을 별도로 두지 않는다.
   > **일치 대상은 `data[]`이며 레거시 `sectors[]`가 아니다.** `SectorRankItem`(`backend/schemas/sector.py`)에는 `trading_value` 필드가 **존재하지 않으므로** 그 비교는 좌변 자체가 없고, `sectors[]`의 `excess_returns`는 정의 A(KOSPI)라 M5 이후에도 시장·기간별 상수만큼 다르다 — §5 M8이 그 잔여를 **설계상 의도된 것**으로 명시한다. 따라서 `sectors[]`는 일치 검증에서 **의도적으로 제외**한다.
+  >
+  > **후속 변경 (2026-10-21, 커밋 d99abbc)**: 위 주석의 "`sectors[]`의 `excess_returns`는 정의 A(KOSPI)라 시장·기간별 상수만큼 다르다"는 더 이상 사실이 아니다. `sectors[]`의 초과수익률은 이제 정의 B(`ALL_CAPPED`)이며 `data[]`와 같은 원천이다(2026-10-20 `period` 미지정 라이브 비교에서 29개 섹터의 순위·composite·1M 초과수익률 불일치 0건, `.moai/state/verify/a41fe4b/live_after.json`). `SectorRankItem`에 `trading_value` 필드가 없다는 점은 그대로이므로 본 REQ의 일치 대상이 `data[]`라는 규정은 유지된다.
 - **REQ-SMU-002** (Ubiquitous) — 섹터 `rs_avg` 산출기는 `relative_strength` 결측 종목을 분모에서 제외해야 한다. 0점 대체 후 전체 N으로 나누지 않는다.
 - **REQ-SMU-003** (When) — 섹터의 전 구성 종목이 RS 결측일 때, 산출기는 `0.0`이 아니라 `None`을 반환해야 한다.
 - **REQ-SMU-004** (Ubiquitous) — 섹터 초과수익률은 정의 B(시장별 상한 시총가중 유니버스 벤치마크) 기준이어야 하며, `returns[p] - benchmark.returns[p] == excess_returns[p]` 항등식을 만족해야 한다.
@@ -181,6 +188,8 @@ bubble `close * volume` 주봉 1개(`sector_advanced.py:592`) vs ranking VolumeW
 
 ### Out of Scope — M8 잔여 (별도 판단)
 - M5 이후에도 레거시 `sectors[]`는 KOSPI 기준이라 Table과 Bubble이 **시장·기간별 상수**(`상한가중 벤치마크 − KOSPI 지수`)만큼 차이 난다. 모든 섹터에 동일하게 적용되므로 **순서는 같고 x=0 선만 이동**한다. 오늘의 섹터별 제각각 불일치보다 훨씬 작은 잔여이며, `sectors[]`를 `data[]`로 이관할지는 **별도 결정** 사항으로 본 SPEC에서 구현하지 않는다.
+
+> **후속 변경 (2026-10-21, 커밋 d99abbc)**: 이 잔여는 해소됐다. "`sectors[]`를 `data[]`와 같은 원천으로 옮길지"라는 별도 결정이 `d99abbc`로 내려졌고, `sectors[]`는 집계 경로(`ALL_CAPPED` 벤치마크 초과수익률, 순위 백분위 composite)에서 만들어진다. KOSPI 지수 기준의 상수 차이는 라이브에서 더 이상 나타나지 않는다(CHANGELOG 기록: 2026-10-20 1M 기준 표본 세 섹터 모두 −8.3%p 이동, `period` 미지정 `sectors[]`↔`data[]` 불일치 0건). 대신 순위 없는 섹터는 `sectors[]`에서 생략된다. 본 SPEC은 이 변경을 구현하지 않았으며 이 Out of Scope 규정은 바꾸지 않는다.
 
 ---
 

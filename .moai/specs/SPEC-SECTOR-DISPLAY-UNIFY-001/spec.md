@@ -1,10 +1,10 @@
 ---
 id: SPEC-SECTOR-DISPLAY-UNIFY-001
 title: Sector Analysis 프론트 표시 통일 및 기간 토글 실동작
-version: "0.3.0"
+version: "0.3.1"
 status: completed
 created: 2026-08-18
-updated: 2026-08-19
+updated: 2026-10-21
 author: manager-spec
 priority: P2
 phase: "v0.5.0 target"
@@ -23,6 +23,7 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-UX-001]
 
 | 버전 | 날짜 | 변경 |
 |---|---|---|
+| 0.3.1 | 2026-10-21 | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 커밋 `d99abbc`가 `sectors[]`를 `data[]`와 같은 집계 경로(`compute_sector_aggregates(period=None)`)로 옮기고 `compute_sector_ranking`을 삭제했다. 두 배열의 값(초과수익률·composite)은 같은 원천이 됐지만, `period` 지정 시 `sectors[]`는 composite 순위, `data[]`는 기간 순위라 순위 순서 차이는 남는다. 주석 위치: spec.md §1.2, acceptance.md AC-SDU-006·AC-SDU-007. 출처: `CHANGELOG.md` [Unreleased]. |
 | 0.3.0 | 2026-08-18 | plan-audit iteration 2 (PASS-WITH-DEBT 0.875) 잔여 4건. D11: G-F5 소진 경계를 **M6 첫 커밋 이전**으로 명시(+2가 기계적으로 확정임을 소스 대조로 근거화), `plan.md §F.2` 결정 후보표 신설 — (a) 예외 사전 선언을 **추정 정답**, (b) 모듈 분리 기각 방향, (c) 화살표 const는 `allowConstantExport` 가설로 기록(미측정). D12: A가 **다중집합**이며 `A \ B`(소실)는 의도적 미확인임을 명시. D6: G-F1에 `frontend/`→루트 경계 + Node `fs`/`import.meta.url` 위험 기록. D7: REQ-SDU-002·AC-SDU-002에 `MetricCard`는 `:22-30`, `null%` 생산 지점은 호출부 `:100` 기록(수정 아님) |
 | 0.2.0 | 2026-08-18 | plan-audit iteration 1 (FAIL 0.70) 대응. D1+D4: eslint 범위를 M6 변경 디렉터리 3곳까지 넓혀 **기준선 27건 축자 고정**, AC-SDU-012/013을 절대 통과 → **기준선 대비 신규 0건** 델타 단언으로 재작성. D2: 명시적 REQ↔AC 매핑표 신설(009/010/011 어긋남 해소). D3: `depends_on` 미충족 시 run 단계 분기 지시(§2.1) 신설. D5: 형제 파일 되돌림 안전 규약. D8: REQ-SDU-007 `(While)` / REQ-SDU-011 `(When)` |
 | 0.1.0 | 2026-08-18 | `SPEC-SECTOR-METRIC-UNIFY-001`에서 M6/M7 분리 신설 (D7 결정 A) |
@@ -40,6 +41,8 @@ depends_on: [SPEC-SECTOR-METRIC-UNIFY-001, SPEC-SECTOR-UX-001]
 
 ### §1.2 D5 — Table 기간 토글 무동작
 `frontend/src/api/market.ts:12-19`가 `period`를 안 보낸다. **`period`만 추가해도 화면은 안 바뀐다** — 기간별 `rank` 재배정은 봉투 `data[]`에만 있고(`my_chart/analysis/sector_metrics.py:695-706`), 프론트가 읽는 `sectors[]`는 `compute_sector_ranking`이 `period`를 받지 않아 항상 composite 기준이다. **`data[]`를 읽어야 실제로 동작한다.**
+
+> **후속 변경 (2026-10-21, 커밋 d99abbc)**: `compute_sector_ranking`은 삭제됐다. `sectors[]`는 이제 `compute_sector_aggregates(period=None)`의 composite 순위로 만들어진다. 요청에 `period`가 있어도 `sectors[]`는 composite 순위이고 기간별 순위는 `data[]`에만 있으므로, "`data[]`를 읽어야 실제로 동작한다"는 결론은 그대로다.
 
 ---
 

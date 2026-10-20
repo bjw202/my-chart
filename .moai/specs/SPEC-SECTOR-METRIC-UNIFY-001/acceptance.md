@@ -36,6 +36,7 @@ curl -s "http://localhost:8000/api/sectors/ranking?market=all&period=1m" > /tmp/
 ```
 
 - **[HARD] 우변은 봉투 `data[]`이며 레거시 `sectors[]`가 아니다.** `data[]`는 `agg.aggregates`로 채워진다(`backend/services/sector_ranking_service.py:106`). 레거시 `sectors[]`(`SectorRankItem`, `backend/schemas/sector.py`)를 우변으로 쓰면 **두 번 불가능**하다: (1) 그 모델에 `trading_value` 필드가 **아예 없어** 좌변에 대응할 우변이 없고, (2) 그 `excess_returns`는 정의 A(KOSPI)라 M5 이후에도 시장·기간별 **상수만큼 다르며, spec.md §5 M8이 그 잔여를 설계상 의도된 것으로 명시**한다. `sectors[]`는 일치 검증에서 **의도적으로 제외**한다.
+  > **후속 변경 (2026-10-21, 커밋 d99abbc)**: 근거 (2)는 더 이상 성립하지 않는다. `sectors[]`의 초과수익률은 이제 정의 B(`ALL_CAPPED`)이며 `data[]`와 같은 `compute_sector_aggregates` 원천이고, spec.md §5 M8 잔여도 해소됐다. 근거 (1)(`SectorRankItem`에 `trading_value` 없음)은 그대로이므로 우변이 `data[]`라는 규정은 유지된다.
 - **[HARD] RED 목표 건수 조정 규칙 (M0 귀속)**: 되돌림의 RED 목표는 **M0 특성화가 고정한 불일치 건수 `N`**이다. 이 SPEC은 `N`을 리터럴로 박지 않는다.
   - 조사 시점의 참고값은 "29개 중 20개 불일치"이나, 그 20은 **이번 개정에서 처음 명명한 `sectors[]`↔봉투 `data[]` 쌍으로 측정된 적이 없다**(원본 조사가 어느 배열을 우변으로 썼는지 기록이 없다). 재현 명령도 관측일도 붙일 수 없는 값을 기준선으로 박으면 귀속 없는 단언이 된다.
   - 따라서 **M0가 이 배열 쌍으로 `N`을 측정해 리터럴로 고정**하고, 본 AC는 그 `N`을 참조한다. `N ≠ 20`이어도 결함이 아니다 — 20은 다른(혹은 미상의) 배열 쌍에서 나온 참고값이다.

@@ -164,6 +164,7 @@
 - **And (Bump 반대 방향 단언 — 미적용 계약의 실증)** 같은 `market` 파라미터의 `/sectors/history` 응답을 렌더한 Bump 차트에는 `순위 대상 제외` 영역이 **렌더되지 않으며**, `excluded`로 분류된 섹터(`디스플레이`·`스마트폰`)의 선이 Bump에 **정상적으로 존재한다**.
   - **대조 단언 (Lesson #9 — 되돌림 RED 실증 필수)**: 이 단언은 항진명제가 아니다. Bump 소비자에 Table과 동일한 `excluded` 필터링을 주입하는 변형 `mut_bump_applies_ag5`(렌더 직전 `data[]`의 섹터 집합으로 Bump 시계열을 교집합)를 적용하면 두 섹터의 선이 사라져 **RED가 관측되어야 한다**. RED 출력을 verbatim 캡처해 `progress.md §E.2`에 기록하고, 트리 복원을 `git status --short`로 증명한다. 실증하지 못하면 GREEN이 아니라 **Gaps**로 기록한다.
   - **배경 실측 (2026-08-14)**: `/sectors/history` → `compute_sector_history` → `compute_sector_ranking` → `_compute_sector_metrics`. 이 함수는 `my_chart/analysis/sector_metrics.py:947-948`에서 *"AG-5 제외는 여기에 적용하지 않는다 — 규칙 AG-5는 `data[]`가 소유한다"* 를 명시한다. `get_sector_history`(`backend/services/sector_advanced_service.py:218`)는 `SectorHistoryResponse` 생성 3곳 어디에서도 `excluded=`를 전달하지 않으므로 봉투의 `excluded[]`는 항상 빈 배열이다.
+  > **후속 변경 (2026-10-21, 커밋 6ae45d7·2ef3644·d99abbc)**: 위 호출 경로는 더 이상 존재하지 않는다. `compute_sector_ranking`·`_compute_sector_metrics`는 `d99abbc`에서 삭제됐고, `compute_sector_history`는 히스토리 날짜마다 `compute_sector_aggregates(as_of=d, period=None, apply_min_members=False, equal_weight_fallback=True)`를 호출한다(`6ae45d7`·`2ef3644`). AG-5 미적용의 근거는 이제 인용된 `sector_metrics.py:947-948` 주석이 아니라 `apply_min_members=False` 인자이며, AG-4/AG-7로 시총가중 수익률이 null인 섹터는 등가중 수익률 − 벤치마크로 순위를 받는다. `get_sector_history`가 `excluded=`를 넘기지 않아 봉투 `excluded[]`가 빈 배열이라는 사실은 그대로다. 따라서 이 AC의 계약은 계속 성립한다 — CHANGELOG 기록 기준 라이브 `market=kospi`에서 표는 27개(디스플레이·스마트폰 제외), Bump는 두 섹터를 포함한 29개다.
 
 ### AC-SUX-020 — 선택 섹터가 제외될 때 (규칙 CT-3)
 
@@ -494,6 +495,8 @@ R5와 **AC-SUX-019**(제외 섹터 가시성)는 v0.3.0까지 "AG-5(최소 구�
 - **`connectNulls:false` 선 끊김 단언은 도입하지 않는다.** 그 단언은 "Bump에도 적용" 분기에서만 필요했다. `connectNulls:false` 자체는 §1.2 보존 항목으로 **그대로 유지**되며(다른 사유의 결측 처리), 본 결정으로 변경되지 않는다.
 - **잔여 위험 (범위 밖, 관측만)**: Bump와 Table은 서로 다른 섹터 모집단 위에서 순위를 매긴다(Bump = 전 섹터, Table `data[]` = AG-5 통과 섹터). 따라서 같은 주·같은 섹터의 rank가 두 화면에서 다를 수 있다. 이는 본 결정의 **의도된 귀결**이며 회귀가 아니다. `CT-4`(AC-SUX-021)의 rank 일치 단언은 **순위표 내부**(rank 열 ↔ 행 순서)에 한정되며 Table↔Bump 교차 일치를 요구하지 않는다 — 요구하도록 확대하지 말 것.
 
+> **후속 변경 (2026-10-21, 커밋 6ae45d7·2ef3644)**: 위 결정 근거 중 "②의 출하 구현이 이미 그렇게 동작한다(`sector_metrics.py:947-948` 주석 + `excluded=` 미전달)"는 이제 등가중 대체 경로가 설명한다. Bump 순위는 표와 같은 `compute_sector_aggregates(period=None)` composite에서 오고, Bump만 AG-5를 끄며(`apply_min_members=False`) 시총가중이 불가능한 섹터(AG-4/AG-7)는 등가중 수익률로 대체한다(`equal_weight_fallback=True`). 그래서 이 잔여 위험의 범위가 좁아졌다. 대체 섹터가 없는 날짜(CHANGELOG 기록: 라이브 8주 `market=all`·`kosdaq` 불일치 0)에서는 Bump 순위가 표 composite 순위와 같고, Table↔Bump 순위 집합 차이는 제외·대체 섹터가 생기는 시장 필터(예: `market=kospi`의 디스플레이·스마트폰)에서만 남는다. 이때 대체 섹터는 주마다 크게 오르내릴 수 있고, 같은 순위 분모를 쓰는 다른 섹터의 Bump 순위도 표와 조금 어긋날 수 있다. CT-4(AC-SUX-021)를 Table↔Bump 교차 일치로 넓히지 말라는 지시는 그대로 유효하다.
+
 ### ~~AC-SUX-057~~ — **결번** (REQ-SUX-054 철회)
 
 산업명(중) 필터는 구현하지 않기로 결정되어(2026-08-12 사용자 결정, spec.md §3.7) 이 AC는 삭제되었다. **번호는 재사용하지 않는다** — 재사용하면 이력 추적이 끊긴다.
@@ -570,6 +573,7 @@ R5와 **AC-SUX-019**(제외 섹터 가시성)는 v0.3.0까지 "AG-5(최소 구�
 - [ ] **AC-SUX-048 (색상 채널 회귀 금지) PASS** — `SPEC-SECTOR-MINOR-COLOR-001` 보존 계약
 - [ ] `SPEC-SECTOR-AGGREGATION-001` close 확인
 - [x] ~~**②의 O-A7(최소 구성수 5의 Bump 적용) 해소 확인**~~ — **해결 (2026-08-14): 미적용 확정.** AC-SUX-019 / AC-SUX-056 R5의 검증 범위를 Table·섹터 Bubble·RRG로 한정. ② 백엔드 변경 없음
+  > **후속 변경 (2026-10-21, 커밋 2ef3644)**: "② 백엔드 변경 없음"은 이후 달라졌다. `2ef3644`가 Bump 히스토리 경로에 AG-5 미적용(`apply_min_members=False`)과 AG-4/AG-7 섹터의 등가중 대체(`equal_weight_fallback=True`)를 명시 인자로 넣었다. 미적용 결정 자체는 바뀌지 않았다.
 - [ ] **AC-SUX-019의 Bump 반대 방향 단언 PASS** — 제외 섹터의 선이 Bump에 남아 있음 + `mut_bump_applies_ag5` 되돌림 **RED 관측** verbatim 기록 (Lesson #9 [HARD] 게이트)
 - [ ] **tsc 게이트 (a) HARD**: `npx tsc -p tsconfig.app.json --noEmit 2>&1 | grep -c "error TS2353"` → **0**
 - [ ] **tsc 게이트 (b) 회귀**: 총 오류 수 `<= N` (baseline `N`을 progress.md §E.2에 기록 — 측정 시점 실측 `N = 33`) **AND** ③가 수정한 파일에서 NEW 오류 0건

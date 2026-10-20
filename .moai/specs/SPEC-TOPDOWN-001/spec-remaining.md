@@ -298,6 +298,8 @@ The `/api/stage/overview` response already includes `close`, `sma50`, `sma200`, 
 | `my_chart/analysis/sector_metrics.py` | Add `market` parameter to `compute_sector_ranking()` to filter stocks by market before aggregation |
 | API route handler | Accept `?market=KOSPI` or `?market=KOSDAQ` query parameter on `/api/sectors/ranking` |
 
+> **후속 변경 (2026-10-21, 커밋 d99abbc)**: `compute_sector_ranking()`은 삭제됐다. 시장 필터는 `compute_sector_aggregates(market=...)`가 담당한다.
+
 **Frontend Changes**:
 
 | File | Change |

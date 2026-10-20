@@ -205,6 +205,8 @@ Response: {
 - `compute_sector_ranking(db_path, date) -> list[SectorRank]`
 - `compute_sector_history(db_path, weeks=12) -> list[list[SectorRank]]`
 
+> **후속 변경 (2026-10-21, 커밋 d99abbc·6ae45d7)**: `compute_sector_ranking`과 `SectorRank`는 `d99abbc`에서 삭제됐다. 섹터 순위는 `compute_sector_aggregates`(시총가중, `ALL_CAPPED` 벤치마크 초과수익률, 순위 백분위 composite)가 만들고, `compute_sector_history`는 `(dates, list[list[SectorAggregate]])`를 반환한다(`6ae45d7`).
+
 **DB Schema additions**: None needed for MVP. All computations are derived from existing stock_prices + relative_strength + stock_meta tables at query time.
 
 ### Acceptance Criteria
@@ -224,6 +226,8 @@ Response: {
 - [ ] AC7: `screen_stage2_entry()` filters only stocks meeting all 6 entry conditions
 
 - [ ] AC8: `compute_sector_ranking()` ranks sectors by composite score
+
+> **후속 변경 (2026-10-21, 커밋 d99abbc)**: 이 AC가 가리키는 함수는 삭제됐다. composite 기준 섹터 순위는 `compute_sector_aggregates(period=None)`가 담당하며, 이 AC의 단언은 `tests/test_sector_metrics.py::test_ranks_are_contiguous_and_follow_composite_descending`(구 AC8)으로 이관됐다. 체크박스 상태는 바꾸지 않는다.
 
 - [ ] AC9: Sector rank_change correctly compares current vs 4-week-ago rank
 
@@ -614,3 +618,11 @@ Week 7: Integration & Polish
 5. **Context API over Redux**: Continue with existing React Context pattern. Add MarketContext and TabContext. No state management library change.
 
 6. **API caching strategy**: Market overview data changes weekly. Cache with 1-hour TTL on frontend (stale-while-revalidate pattern).
+
+---
+
+## 후속 변경 주석
+
+| 날짜 | 커밋 | 내용 |
+| --- | --- | --- |
+| 2026-10-21 | `6ae45d7`·`2ef3644`·`d99abbc` | 섹터 순위 계산 경로 통일(SPEC-RS-REBALANCE-001 라이브 점검 후속). 레거시 `compute_sector_ranking`·`SectorRank`가 삭제되고, 섹터 순위와 히스토리는 `compute_sector_aggregates`가 산출한다. 본문은 고치지 않고 해당 위치에 주석만 달았다: spec.md 001A New module 절·AC8, spec-remaining.md 시장 필터 Backend Changes 표. 출처: `CHANGELOG.md` [Unreleased] "Fixed (섹터 순위 계산 경로 통일 …, 2026-10-21)". |
