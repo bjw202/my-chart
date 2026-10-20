@@ -631,9 +631,163 @@ RED가 나지 않아 손대지 않은 §G "M4 조건부" 파일: `tests/conftest
 - 미확인: 버블 툴팁 배지의 실제 호버 표시(단위 테스트로만 검증)
 - 계획 밖 변경(M5 에이전트 보고, sync에서 SPEC 반영 대상): `er2-screens.test.tsx` 결측 셀 7→8, `SectorRankingTable.m4/.test.tsx` 픽스처·인덱스, `SectorAnalysis.tsx` `rs_med` 정렬 case, `global.css` 배지 규칙 1개
 
+### M6 — 회귀 실측 기록과 문서 (manager-develop, 2026-10-20)
+
+**작업 위치.** L1 워크트리 `.claude/worktrees/agent-a6de872dcbdaa9ca3`(브랜치 `worktree-agent-a6de872dcbdaa9ca3`). 기준점 `fd5f11f`에서 `git merge --ff-only main`으로 빨리 감은 뒤 `git rev-parse --short HEAD` → `c2fe4ac`(= `main`). `git diff --stat main -- scripts/rs_eval/stock_rs_eval.py` → 출력 없음(측정 스크립트는 M2 `366206a`판 그대로). 운영 코드 변경 없음, 라이브 DB 쓰기 없음, 서버 재시작 없음. 증거 파일은 전부 워크트리 `.moai/state/verify/c1bf371e/m6/`에 있다.
+
+**사본 무결성.** 측정 전후 `shasum -a 256 …/Output/snapshots/weekly_{before,after}_rsr.db`를 `sha_pre.txt`·`sha_post.txt`에 남기고 `diff` → `SHA_IDENTICAL`. 값은 before `949f29639a86da86…`, after `abecc43e98dc47b0…`로 M2·M3 기록과 같다. 측정 뒤 `ls Output/snapshots/` → `weekly_after_rsr.db`, `weekly_before_rsr.db` 두 파일뿐(`-wal`/`-shm` 없음).
+
+**REQ-RSR-020 / AC-RSR-014 재측정 (원문).** 두 명령 모두 워크트리 cwd, `S=/Users/byunjungwon/Dev/my-project-01/my_chart/Output/snapshots`.
+
+```
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db $S/weekly_before_rsr.db
+registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=052770 종목명=아이톡시
+
+=== 필터: 20주 평균 주간거래대금 >= 50억 | 향후 4주 ===
+                      주수  상위10_초과pp  상하위스프레드pp  상위10_vs평균pp  지연진입_vs평균pp  IC양수비율  상위10_지속률
+공식                                                                                        
+프로덕션(RS_12M_Rating)  295       1.62      -0.47        -0.55        -0.58   32.88     29.24
+exit=0
+```
+
+```
+$ /Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db $S/weekly_after_rsr.db
+registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=052770 종목명=아이톡시
+
+=== 필터: 20주 평균 주간거래대금 >= 50억 | 향후 4주 ===
+                      주수  상위10_초과pp  상하위스프레드pp  상위10_vs평균pp  지연진입_vs평균pp  IC양수비율  상위10_지속률
+공식                                                                                        
+프로덕션(RS_12M_Rating)  295       1.66      -0.25        -0.52        -0.55   30.85     65.17
+exit=0
+```
+
+증거: `eval_before.log`, `eval_after.log`.
+
+**before/after 표 (REQ-RSR-020).** 열 이름은 스크립트 출력 그대로다. 열의 뜻(`stock_rs_eval.py` `evaluate()` 본문): `상위10_초과pp` = 상위 10% 향후 4주 수익 평균 − 그날 중앙값, `상하위스프레드pp` = 상위 10% − 하위 10%, `상위10_vs평균pp` = 상위 10% − 그날 평균, `지연진입_vs평균pp` = 1주 늦게 진입했을 때의 같은 차이, `IC양수비율` = 점수와 향후 4주 수익의 스피어만 상관이 양수인 주의 비율, `상위10_지속률` = 4주 전 상위 10% 중 지금도 상위 10%인 비율.
+
+| 사본 | 주수 | 상위10_초과pp | 상하위스프레드pp | 상위10_vs평균pp | 지연진입_vs평균pp | IC양수비율 | 상위10_지속률 |
+|---|---|---|---|---|---|---|---|
+| 변경 전 `weekly_before_rsr.db` (예전 산식) | 295 | 1.62 | −0.47 | −0.55 | −0.58 | 32.88 | **29.24** |
+| 변경 후 `weekly_after_rsr.db` (IBD식) | 295 | 1.66 | −0.25 | −0.52 | −0.55 | 30.85 | **65.17** |
+| 차이 (후 − 전) | 0 | +0.04 | +0.22 | +0.03 | +0.03 | −2.03 | **+35.93** |
+
+판정: 변경 후 `상위10_지속률` 65.17 ≥ 60 → AC-RSR-014 목표 충족. 변경 전 29.24는 60 미만(대조 관측)이고 계획서 31%의 ±3%p(28~34) 안이다.
+
+**초과수익 재측정 (plan.md §F M6).** 계획서 §2의 "상위 10% 종목의 향후 4주 수익 − 유니버스 평균은 모든 창에서 0 이하" 주장을 프로덕션 등급으로 다시 쟀다. `상위10_vs평균pp`는 −0.55 → −0.52, `지연진입_vs평균pp`는 −0.58 → −0.55로 변경 후에도 0 이하다. 같은 열의 원시 산식 모드 값(`scripts/rs_eval/rs_final_h4.out`): `현행(1M 33%가중)` −0.60·−0.59, `IBD식(최근분기 40%)` −0.58·−0.62. 해석: 이번 변경은 수익 예측력을 바꾸지 않았고(초과수익 차이 +0.03~+0.04pp, IC양수비율 −2.03%p), 명단 안정성(지속률 +35.93%p)만 크게 올렸다. 계획서 §2의 "종목 RS는 필터" 해석과 같은 방향이다. 이 해석은 단일 구간(2022~2026)·겹치는 4주 수익 표본이라는 spec.md §1.2의 한계를 그대로 진다.
+
+**§E.2 기존 수치와의 대조.** 겹치는 값은 모두 같다.
+- 변경 전 7개 열: `### M2 (pre-regeneration)` 기준선 블록(`295 1.62 -0.47 -0.55 -0.58 32.88 29.24`)과 한 자리도 다르지 않다.
+- 변경 후: `### M2 (live regeneration)`의 AC-RSR-014 줄(주수 295, 상위10_초과pp 1.66, 상하위스프레드pp −0.25, IC양수비율 30.85, 지속률 65.17)과 같다.
+- 새로 기록하는 값: 변경 후 `상위10_vs평균pp` −0.52와 `지연진입_vs평균pp` −0.55. M2 라이브 기록에는 이 두 열이 없었다.
+- 불일치: 없음.
+
+**문서 갱신 — `docs/rs-timeline-eli5.html`.**
+- **추적 상태(프로브):** `git check-ignore -v docs/rs-timeline-eli5.html docs/rs-rebalance-plan-brief.md` → 두 파일 모두 `.gitignore:251:docs/`. `git log --all --oneline -- docs/rs-timeline-eli5.html` → 출력 없음. 두 파일은 공용 체크아웃 `/Users/byunjungwon/Dev/my-project-01/my_chart/docs/`에만 있고 이 워크트리에는 없다. 그래서 공용 체크아웃의 그 파일을 직접 고쳤다. **커밋 대상이 아니다.**
+- **백업:** 수정 전 사본을 세션 스크래치패드 `rs-timeline-eli5.before-m6.html`에 두었다. sha256 `4f448b98…5c`는 원본과 같다. 수정 후 sha256은 `2a2eae9d…6a00`, 326줄 → 368줄.
+- **편집 방식:** `m6_edit_html.py`가 앵커 문자열마다 정확히 1회 일치를 단언하고 치환했다(`applied 34 edits`). 이어 `m6_edit_table.py`가 12번 카드의 비교 블록을 HTML 표로 바꿨다. 한글이 섞인 고정폭 블록은 열이 어긋났기 때문이다(렌더 확인에서 관측).
+- **구조 확인:** 파이썬 `html.parser` 태그 짝 검사 → `unclosed []`, `mismatch []`. `<section` 12개, `</section>` 12개.
+- **렌더 확인:** 헤드리스 Chromium(`shot.mjs`) → `cards 12`, 가로 넘침 블록 `[]`. 스크린샷은 `card5/8/10/11/12.png`.
+
+| 카드 | 편집 | 숫자 출처 |
+|---|---|---|
+| 머리말 | eyebrow에 "같은 날 반영", 리드에 12번 안내 한 문장 | — |
+| 1 | 제목 2,490명 → 2,387명, 정리 전 2,490명 주석 | `### M2 (live regeneration)` "최신 주차 등급 종목: 2490 → 2387" |
+| 2·3·4·6·9 | "현행/지금" → "예전/바꾸기 전"(본문·SVG 라벨·aria-label). 4번 범위 "−0.1 ~ −1.1%p" → "공식 12개 모두 −0.04 ~ −1.40%p"로 정정, 원시 재계산 값이라는 주석 추가 | `rs_final_h4.out` `상위10_vs평균pp` 열: 최대 −0.04(12-1 모멘텀), 최소 −1.40(3M 단독). 기존 "−1.1"은 3M 단독(−1.40)을 빠뜨린 값이었다 |
+| 5 | "권고 A/B" → "채택한 공식(IBD식)". 비율식 유도식, `S = 0.4·Q1 + 0.2·Q2 + 0.2·Q3 + 0.2·Q4`, 나누기 예시, 버린 안 A(57%)·B(75%)와 B의 기각 사유. 임계값 재측정 결과(70·60 유지, 80 대상 아님) | spec.md §2.3(유도식·예시 `RS_3M = 1.0`, `RS_6M = 1.2` → `q2 = 0.10`, 차분식 0.20), §2.2 Q1(기각 사유), `rs_final_h4.out`(57.46·74.78), `### M3` 판정(99.48 → 94.42, 허용 9.948; 33.53 → 33.72), `### M2 (live regeneration)` "80 이상 몫 20.03%" |
+| 8 | 식 블록을 "그대로 둠 / 새로 추가 / 이미 있던 열"로 바꾸고, 섹터 테이블의 RS Avg → RS Med → RS 80+ 비중 배치와 반영 당일 관측 문단 추가 | `### M5 (live dev-server check)`: PCB 62/74, 방송미디어 28/16, 섹터 29개, 중앙값<평균 14 |
+| 9 | 정리 블록 "열기 배지 (RS_1M_Rating ≥ 80)", 배지 동작 문단(80은 섹터 화면과 같은 상수, 478/2,387, 상장 12개월 미만은 배지 없음) | spec.md Q4·REQ-RSR-015·REQ-RSR-023, `### M5 (live dev-server check)` `rs_1m` 비NULL 2387, 배지 478 |
+| 10 | 분모 정의를 실제 필터 다섯 가지(지수, 거래량 0, 우선주 코드 끝자리 ≠ 0·스팩, `1+R ≤ 0`, 결측 행)로 교체하고 ETF/ETN·거래대금 50억 줄 삭제. 우선주·스팩 현재 0개, 50억은 분모 비적용, 옛 행 119,881개 정리 문단 추가 | spec.md REQ-RSR-002·003·007·008·023, §2.4 B-1, §2.2 Q3, `### M2 (live regeneration)` AC-RSR-001 119881 → 0, "거래량 0 101 + 지수 2" |
+| 11 | "바꿀 것 넷, 둘 것 하나" → "바꾼 것 넷, 그대로 둔 것 둘". 항목별 반영 결과로 교체, 임계값 항목은 유지(`=`) 표시. 한계 주석에 progress.md 경로 추가 | 위 행들과 같음 |
+| 12 (신설) | "바꾼 뒤 다시 쟀다" — 29.24% → 65.17% 막대(목표 60% 선), 7행 비교 표, 수익 지표 불변 해석, 29.24 대 31% 차이 가설(분리 측정 안 함 명시), 측정 조건 | 이 절의 재측정 원문 |
+
+표기 원칙: 페이지의 숫자는 모두 위 출처에서 옮겼고, 새로 만든 숫자는 없다. 문체는 기존 페이지의 합니다체를 유지했고, 카드 구조·CSS 변수·SVG 양식도 기존 것을 그대로 썼다. CSS에는 `.tbl` 규칙 5줄만 더했다.
+
+**미검증 (Gaps).**
+- `docs/rs-timeline-eli5.html`은 gitignore 대상이라 커밋되지 않는다. 변경은 공용 체크아웃 작업 트리에만 있고 git 이력으로 되돌릴 수 없다. 되돌릴 때는 스크래치패드 백업을 쓴다. 이 파일을 추적할지는 이 SPEC 범위 밖이며 sync 단계 판단에 맡긴다.
+- 렌더 확인은 라이트 테마 데스크톱 폭(900px) 한 가지뿐이다. 다크 테마와 모바일 폭은 보지 않았다.
+- M6은 코드를 바꾸지 않아 테스트 스위트를 따로 돌리지 않았다. 커밋 시 pre-commit 게이트가 도는 것이 전부다.
+- 12번 카드의 "29.24 대 31%" 차이 원인은 `### M2 (pre-regeneration)`의 가설(결측 3주 + 분모 의존)을 그대로 옮긴 것이며 분리 측정하지 않았다.
+
+**잔여 위험.**
+- 측정 스크립트의 `sys.path`(`:6`)가 공용 체크아웃 절대 경로라, 등록부는 공용 체크아웃 코드로 읽힌다(`### M2 (pre-regeneration)` 잔여 위험과 같음). 출력 첫 줄의 등록부 중복 코드 경고(`052770 아이톡시`)는 두 사본 측정에 똑같이 나온다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+**마일스톤 커밋 (프로브).** `git log --oneline -20`(`c2fe4ac` 트리) 출력에서 SPEC 커밋만 옮겼다(원문 순서는 최신이 위).
+
+| 마일스톤 | 커밋 (오래된 순) | `git log --oneline` 제목 |
+|---|---|---|
+| M1 | `f3b7066` `cec038b` `f07b520` | `test(…): M1 특성화 — 변경 전 generate_rs_db() RS_6M/3M/1M 골든값 캡처` / `feat(…): M1 RS 순위 분모 정리와 낡은 행 제거` / `docs(…): M1 run-phase 증거 기록 (progress.md §E.2)` |
+| M2 | `366206a` `42a405d` `305cdcb` | `feat(…): M2 RS_12M_Rating IBD식 재가중 + 회귀 계측 프로덕션 모드` / `docs(…): M2 재생성 전 증거 기록 (progress.md §E.2)` / `docs(…): M2 라이브 재생성 결과 기록` |
+| M3 | `6b09f06` `97831f4` | `feat(…): M3 Stage 2 임계값 재보정 측정 도구와 단일 정의 지점` / `docs(…): M3 재보정 측정·판정 기록` |
+| M4 | `15ba7b6` `73b02e8` `1516c25` | `feat(…): M4 백엔드 필드 — stock_meta.rs_1m·종목 rs_1m·섹터 rs_med` / `docs(…): M4 백엔드 필드 증거 기록 (라이브 재구축 전)` / `docs(…): M4 라이브 stock_meta 재구축 결과 기록` |
+| M5 | `b7ff135` `6a68ba8` `c2fe4ac` | `feat(frontend): 열기 배지와 섹터 RS 중앙값 열 표시 (SPEC-RS-REBALANCE-001 M5)` / `docs(…): M5 프론트 표시 실행 증거 기록` / `docs(…): M5 라이브 화면 확인 기록` |
+| M6 | 이 기록을 담은 커밋 | 커밋은 자기 SHA를 담을 수 없으므로 아래 `run_commit_sha`는 placeholder다 |
+
+**AC 최종 상태.** PASS = 픽스처·단위 테스트 단계 통과. PASS-live = 그에 더해 라이브 DB·API·화면 단계도 관측함. Gap = 관측하지 못한 부분.
+
+| AC | 최종 | 근거 (§E.2 위치) |
+|---|---|---|
+| AC-RSR-001 | PASS-live | `### M1` AC 표(`test_ac_rsr_001_*` ×2) + 대조 C10·C11; `### M2 (live regeneration)` 짝 없는 행 119881 → 0 |
+| AC-RSR-002 | PASS-live | `### M1` AC 표 + 대조 C1·C2·C3; `### M2 (live regeneration)` 지수 행 692 → 0, 거래량 0 짝 행 16369 → 0 |
+| AC-RSR-003 | PASS | `### M1` AC 표(`test_ac_rsr_003_*` ×2) + 대조 C4·C5·C6 |
+| AC-RSR-004 | PASS | `### M1` AC 표 + 대조 C7 |
+| AC-RSR-005 | PASS | `### M2 (pre-regeneration)` GREEN 표 + 대조 K1~K4 |
+| AC-RSR-006 | PASS | `### M1` 특성화 골든(단독 커밋 `f3b7066`); `### M2 (pre-regeneration)` GREEN 표 + 대조 K5~K7 |
+| AC-RSR-007 | PASS-live | `### M4 (pre-rebuild)` AC 표 + 대조 C4·C5·C10; `### M4 (live stock_meta rebuild)` `rs_1m` 불일치 0, `rs_12m` 불일치 0 |
+| AC-RSR-008 | PASS | `### M4 (pre-rebuild)` AC 표(레거시 27컬럼 → 끝에 `rs_1m`, 멱등) + 대조 C3 |
+| AC-RSR-008b | PASS | `### M4 (pre-rebuild)` AC 표 + 대조 C1·C2; 라이브 `stock_meta` 28컬럼·마지막 `rs_1m`(`### M4 (live stock_meta rebuild)`) |
+| AC-RSR-009 | PASS | `### M4 (pre-rebuild)` AC 표 + 대조 C6a·C6b·C7. 보강 관측: `### M5 (live dev-server check)` `/api/stage/overview` `rs_1m` 비NULL 2387, `/api/sectors/방송미디어/bubble` `rs_1m` 57종목 |
+| AC-RSR-010 | PASS | `### M4 (pre-rebuild)` AC 표(7건) + 대조 C8·C9. 보강 관측: `### M5 (live dev-server check)` 섹터 29개 모두 `rs_med`, 봉투 `data[0].rs_med` 존재 |
+| AC-RSR-011 | PASS-live (종목 테이블) / Gap (버블 툴팁 라이브) | `### M5` AC 표 + 대조 C1·C2a·C2b·C3; `### M5 (live dev-server check)` 배지 478개 = API 478. 버블 툴팁 배지의 실제 호버 표시는 라이브로 확인하지 않았다(단위 테스트만) |
+| AC-RSR-012 | PASS-live | `### M5` AC 표 + 대조 C4·C5; `### M5 (live dev-server check)` 헤더 `RS Avg → RS Med → RS 80+ 비중`, PCB 62/74 등 |
+| AC-RSR-013 | PASS | `### M3` GREEN 표(스캔 0줄, 교차 언어 74 passed, T8 2 passed) + 대조 A1~A6·B1~B5 |
+| AC-RSR-014 | PASS-live | `### M2 (pre-regeneration)` 도구·기계적 독립성(`grep -cE` → 0)·기준선 29.24 + 대조 K9; `### M2 (live regeneration)` 65.17; `### M6` 재측정 29.24 / 65.17 일치 |
+| AC-RSR-015 | PASS-live | `### M3` 두 사본 8회 측정: (a) 변경 후 사본 사전 조건 충족 → 70 유지(5.06 ≤ 9.948), 대조 80은 14.61 > 9.948; (b) 33.53 → 33.72, 60 유지 |
+| AC-RSR-016 | PASS | `### M2 (pre-regeneration)` GREEN 표(상수 고정 + 기존 7개 파일 140 passed) + 대조 K8 |
+| AC-RSR-017 | PASS-live | `### M1` AC 표 + 대조 C12; `### M2 (live regeneration)` 비기준 날짜 행 5 → 0 |
+| AC-RSR-018 | PASS | `### M1` AC 표 + 대조 C8·C9 |
+
+집계: AC 19개(001~018 + 008b) 중 FAIL 0. PASS-live 8개(001·002·007·011·012·014·015·017; 011은 종목 테이블만 라이브, 버블 툴팁은 Gap 병기), PASS 11개(003·004·005·006·008·008b·009·010·013·016·018).
+
+**sync로 넘길 이탈 사항.**
+1. **M1 기준 종목 부재 가드** — REQ-RSR-001 문구에 없는 안전장치다. 기준 종목 행이 0개면 아무것도 지우지 않고 경고만 남긴다. 근거: `### M1` 잔여 위험. SPEC 본문 반영 여부는 manager-spec 판단 대상이다.
+2. **스팩 판별 범위** — `스팩` 판별을 등록부가 아니라 그날 가격 행의 종목명에 적용한다(등록부 기준의 상위 집합). 근거: `### M1` 잔여 위험.
+3. **M5 계획 밖 변경** — `er2-screens.test.tsx` 결측 셀 7 → 8(plan.md §G 10번은 "변경 없음"으로 분류), `SectorRankingTable.m4.test.tsx`·`SectorRankingTable.test.tsx` 픽스처·인덱스, `SectorAnalysis.tsx` `rs_med` 정렬 case, `global.css` 배지 규칙 1개. 근거: `### M5` "기존 테스트 단언 3곳 갱신"·"범위 밖 파일 2개", `### M5 (live dev-server check)` 마지막 줄.
+4. **기존 실패(이 SPEC 원인 아님)**
+   - `backend/tests/test_minervini_template.py` 3건: 픽스처에 `sma5` 컬럼이 없음. 근거: `### M3` "§G M3 4개 파일 재실행", `305cdcb`에서도 같은 3건.
+   - `backend/tests` 전체 `4 failed … 58 errors`: 기준선 `97831f4`와 최종 `15ba7b6`의 노드 ID 62개가 같음(`IDENTICAL`). 근거: `### M4 (pre-rebuild)` 스위트 개수 표.
+   - vitest `e2e/preset-flow.spec.ts` 수집 실패: Playwright 스펙이 vitest에 수집되는 문제. 근거: `### M5` 전체 스위트, `### M5 (live dev-server check)`.
+5. **설명 문서는 커밋되지 않음** — `docs/rs-timeline-eli5.html`은 `.gitignore:251:docs/` 대상이라 공용 체크아웃 작업 트리에서만 갱신됐다. 근거: `### M6` 문서 갱신.
+
+**Gaps.**
+- AC-RSR-011 버블 툴팁 배지의 라이브 호버 표시(위 표).
+- `docs/rs-timeline-eli5.html` 다크 테마·모바일 렌더(`### M6` Gaps).
+
+```yaml
+run_complete_at: 2026-10-20
+run_commit_sha: pending-backfill-m6   # M6 커밋은 자기 SHA를 담을 수 없음 — 후속 커밋에서 채움
+run_status: audit-ready
+ac_pass_count: 19          # FAIL 0; PASS-live 8 (011은 테이블만 live, 버블 툴팁 Gap 병기) + PASS 11
+ac_fail_count: 0
+ac_gap_items:
+  - "AC-RSR-011: 버블 툴팁 열기 배지 라이브 호버 미확인 (단위 테스트로만 검증)"
+milestone_commits:
+  M1: [f3b7066, cec038b, f07b520]
+  M2: [366206a, 42a405d, 305cdcb]
+  M3: [6b09f06, 97831f4]
+  M4: [15ba7b6, 73b02e8, 1516c25]
+  M5: [b7ff135, 6a68ba8, c2fe4ac]
+  M6: [pending-backfill-m6]
+req_rsr_020_persistence: {before: 29.24, after: 65.17, target: ">= 60", source: "### M6 재측정 원문"}
+pre_existing_failures:
+  - "backend/tests/test_minervini_template.py 3 failed (sma5 픽스처 부재)"
+  - "backend/tests 4 failed / 58 errors (기준선과 노드 ID 동일)"
+  - "vitest e2e/preset-flow.spec.ts 수집 실패"
+known_deviations_for_sync: 5   # 위 '이탈 사항' 1~5
+new_warnings_or_lints_introduced: 0   # M1~M5 각 절의 린트 비교; M6은 코드 변경 없음
+spec_status_unchanged: in-progress    # sync가 이후 전이를 소유
+```
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
