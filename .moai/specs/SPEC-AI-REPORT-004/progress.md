@@ -1182,6 +1182,22 @@ AC-004는 `BRAVE_API_KEY=canary-9a1`을 Given으로 못 박고, AC-023은 `backe
 - dev 서버를 재시작하지 않았다(B4). AC-025 라이브는 미실행.
 - `ruff`가 venv에 없어 `ruff check backend`는 실행하지 못했다.
 
+### 라이브 실행 결함: Bash 거부
+
+2026-10-20 AC-025 라이브 2회 중 job `bb4c0b2d…`(한빛레이저 452190)가 `error/empty_output`으로 끝났다. 그 `assumptions.md`: "Bash 도구 사용이 거부되어(don't ask 모드) 디렉터리 생성과 `render_report.py` 실행을 하지 못했다." 두 실행 모두 `permission_denied` 1건이 `.dev-server.log`에 남았지만 옛 실행기는 이벤트를 300자로 잘라 기록해 명령을 알 수 없었다.
+
+| 실행 | 시작 → 거부 | `decision_reason_type` | 거부된 명령 |
+|---|---|---|---|
+| `5695985a…` 하나기술(초안 생성) | 14:54:47.989 → 14:54:51.527 (3.5초) | `subcommandResults` | 로그 80496줄 메시지에 일부만 남음: `cd /Users/byunjungwon/.goose-harness 2>/dev/null; ls; ls runs/5695985a17674623a35a2637…` |
+| `bb4c0b2d…` 한빛레이저(빈 출력) | 15:00:56.050 → 15:01:42.793 (46.7초) | `mode` | **미관측** — `mode` 이벤트 메시지에는 명령이 없다(로그 80559줄). `assumptions.md`의 "디렉터리 생성"으로 미루어 `mkdir` 계열이라는 가설만 있다 |
+
+- **이벤트 형태**: `permission_denied`에는 `tool_name`·`tool_use_id`·`decision_reason_type`·`message`만 있고 명령이 없다(녹화 119줄). 직전 assistant `tool_use`(118줄)의 `id`가 같다.
+- **수정**: `StageMapper`가 tool_use의 `id → (도구, command|file_path|url)`를 기억(상한 256)하고, 거부 시 `도구=… 사유=… 명령=<300자>`를 WARNING으로 남긴다. 환경 변수는 기록하지 않는다.
+- **RED**(구현 전, `pytest backend/tests/test_goose_runner.py -k permission_denied`): `2 failed, 2 passed` — `AssertionError: assert 'mkdir -p runs/x/draft' in "goose 세션 permission_denied: {'type': 'system', … 'decision_reason_type': 'mode'}"`. **GREEN**: goose 시험 6파일 `199 passed`(새 시험 3건 포함).
+- **정적 분석**: `harness-instructions.md` 4번은 `cd`·`..` 금지와 스크립트 형식만 말하고, `runs/<job_id>/`가 이미 있다는 것(작업 서비스가 만든다, `goose_job_service.py:253`)과 스크립트가 출력 폴더를 스스로 만든다는 것(`render_report.py:500·509`, `audit_report.py:112`의 `mkdir(parents=True)`)은 말하지 않는다. 스킬 참고 문서는 `python3 scripts/render_report.py --input /path/to/…`(상대 스크립트 경로·절대 경로 예시)를 보여 준다(`stock-report/references/report-input.md:8-9`).
+- **라이브 탐침 2회**(실행기의 `build_prompt`·`build_invocation`·`build_env` 그대로, 상한 120초, 증거 `.moai/state/verify/goose-bash-denial/probe{1,2}.json*`): 두 번 모두 120초 안에 `permission_denied`가 없었다. 각 실행의 Bash는 `ls -la runs/ runs/probe-bash-1 2>&1 | head -30`, `ls runs/ runs/probe-bash-2 2>&1 | head; ls .claude/…/references .claude/…/scripts` 하나씩이었고 `dontAsk`에서 자동 허용됐다(읽기 전용 자동 허용, design §2.2 관측과 같음). 탐침 1은 `input.json` 작성 직후 렌더 단계 전에 상한에 걸렸다. 탐침 폴더는 지웠고 `pgrep -fl "claude -p"` 출력 없음.
+- **원인 가설(미검증)**: `mode` 거부 메시지가 "Permission to use Bash has been denied because Claude Code is running in don't ask mode"로 명령이 아니라 도구 단위로 쓰여 있어, 모델이 명령 1건 거부를 "Bash 전체 거부"로 일반화하고 렌더를 시도하지 않았다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

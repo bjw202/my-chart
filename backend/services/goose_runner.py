@@ -52,6 +52,9 @@ _JOB_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 # stderr 인증 실패 문구(소문자 비교). AC-006은 `not logged in`.
 _AUTH_MARKERS = ("not logged in", "please run /login", "invalid api key", "authentication_error")
 _WORKFLOWS_MARK = ".claude/skills/goose/workflows/"
+# 권한 거부 로그에 남길 명령 길이 상한, tool_use 기억 개수 상한
+DENIED_COMMAND_LOG_CHARS = 300
+_TOOL_MEMORY_LIMIT = 256
 
 
 @dataclass(frozen=True)
@@ -211,6 +214,9 @@ class StageMapper:
 
     def __init__(self, job_id: str) -> None:
         self._input_suffix = f"runs/{job_id}/input.json"
+        # permission_denied 이벤트에는 명령이 없다(녹화 119줄). 직전 tool_use를 id로 기억해
+        # 거부된 명령을 로그에 남긴다. 세션당 도구 호출 수가 적어도 상한을 둔다.
+        self._tool_inputs: dict[str, tuple[str, str]] = {}
 
     def feed(self, line: str) -> list[ProgressEvent]:
         try:
@@ -237,8 +243,22 @@ class StageMapper:
         if subtype == "task_notification":
             return [ProgressEvent("fetch_done")]
         if subtype == "permission_denied":
-            logger.warning("goose 세션 permission_denied: %s", str(data)[:300])
+            tool = str(data.get("tool_name") or "?")
+            name, target = self._tool_inputs.pop(str(data.get("tool_use_id") or ""), (tool, "(명령 미상)"))
+            logger.warning(
+                "goose 세션 permission_denied: 도구=%s 사유=%s 명령=%s",
+                name, data.get("decision_reason_type"), target[:DENIED_COMMAND_LOG_CHARS],
+            )
         return []
+
+    def _remember_tool_use(self, item: dict, inp: dict) -> None:
+        tool_id = item.get("id")
+        if not isinstance(tool_id, str):
+            return
+        target = inp.get("command") or inp.get("file_path") or inp.get("url") or ""
+        if len(self._tool_inputs) >= _TOOL_MEMORY_LIMIT:
+            self._tool_inputs.pop(next(iter(self._tool_inputs)))
+        self._tool_inputs[tool_id] = (str(item.get("name")), str(target))
 
     def _assistant(self, data: dict) -> list[ProgressEvent]:
         message = data.get("message")
@@ -255,7 +275,8 @@ class StageMapper:
             inp = item.get("input")
             if not isinstance(inp, dict):
                 continue
-            stage = self._tool_stage(str(item.get("name")), inp, is_sub)
+            self._remember_tool_use(item, inp)
+            stage =self._tool_stage(str(item.get("name")), inp, is_sub)
             if stage is not None:
                 events.append(stage)
         return events

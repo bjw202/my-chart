@@ -510,6 +510,61 @@ def test_ac012_permission_denied_makes_no_stage(gr, caplog):
     assert any("permission_denied" in r.getMessage() for r in caplog.records)
 
 
+# 라이브 결함(2026-10-20, job bb4c0b2d): permission_denied 이벤트에는 명령이 없어
+# 로그만으로 거부된 명령을 알 수 없었다. 직전 assistant tool_use를 tool_use_id로 맞춰 기록한다.
+def _denied_records(caplog) -> list[str]:
+    return [
+        r.getMessage() for r in caplog.records
+        if r.levelname == "WARNING" and "permission_denied" in r.getMessage()
+    ]
+
+
+def test_permission_denied_logs_correlated_command_from_fixture(gr, caplog):
+    """녹화 118줄(Bash curl tool_use) → 119줄(permission_denied): 거부된 명령이 로그에 남는다."""
+    lines = _FIXTURE.read_text().splitlines()
+    mapper = gr.StageMapper(job_id="m1p4")
+    with caplog.at_level("WARNING"):
+        for line in lines[:119]:
+            mapper.feed(line)
+    records = _denied_records(caplog)
+    assert len(records) == 1
+    assert "Bash" in records[0]
+    assert 'curl -s -m 20 "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260814003482"' in records[0]
+
+
+def test_permission_denied_command_truncated(gr, caplog):
+    mapper = gr.StageMapper(job_id="m1p4")
+    command = "mkdir -p runs/x/draft && " + "A" * 1000
+    mapper.feed(json.dumps({
+        "type": "assistant",
+        "parent_tool_use_id": None,
+        "message": {"content": [
+            {"type": "tool_use", "id": "toolu_long", "name": "Bash", "input": {"command": command}},
+        ]},
+    }))
+    with caplog.at_level("WARNING"):
+        mapper.feed(json.dumps({
+            "type": "system", "subtype": "permission_denied",
+            "tool_name": "Bash", "tool_use_id": "toolu_long", "decision_reason_type": "mode",
+        }))
+    records = _denied_records(caplog)
+    assert len(records) == 1
+    assert "mkdir -p runs/x/draft" in records[0]
+    assert "A" * 301 not in records[0]
+    assert "A" * 250 in records[0]
+
+
+def test_permission_denied_uncorrelated_still_logs_tool(gr, caplog):
+    mapper = gr.StageMapper(job_id="m1p4")
+    with caplog.at_level("WARNING"):
+        assert mapper.feed(json.dumps({
+            "type": "system", "subtype": "permission_denied",
+            "tool_name": "Bash", "tool_use_id": "toolu_unknown", "decision_reason_type": "mode",
+        })) == []
+    records = _denied_records(caplog)
+    assert len(records) == 1 and "Bash" in records[0] and "mode" in records[0]
+
+
 def _tool_use(name: str, inp: dict, parent: str | None = None) -> str:
     return json.dumps({
         "type": "assistant",
