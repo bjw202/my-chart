@@ -31,6 +31,7 @@ from backend.routers.sectors import router as sectors_router
 from backend.routers.stage import router as stage_router
 from backend.routers.stocks import stocks_router
 from backend.routers.themes import router as themes_router
+from backend.services import goose_harness
 from backend.services.deep_research_service import (
     _cleanup_stale_staging_dirs,
     _load_synthesis_prompt,
@@ -63,6 +64,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except (FileNotFoundError, ValueError) as e:
         logger.error("Codex 프롬프트 검증 실패: %s", e)
         raise
+
+    # SPEC-AI-REPORT-004 REQ-001: goose 하네스 원본을 매니페스트로 대조해 리포 밖 설치본에 설치.
+    # 실패해도 서버는 계속 뜬다(Fast 모드 영향 없음). 실패는 프로세스 수명 동안 기록되어
+    # 이후 모든 goose 작업이 error/integrity로 끝난다(닫힌 실패).
+    goose_harness.install_at_startup()
 
     # @MX:NOTE Fast/Deep 양모드 lifespan block — codex binary required, claude binary required for Deep.
     # SPEC-AI-REPORT-003 NFR-001: codex 바이너리 부재 시 Fast Mode 비활성 (경고), claude 없으면 Deep 비활성.
