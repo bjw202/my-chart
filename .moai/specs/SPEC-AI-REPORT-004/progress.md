@@ -1099,6 +1099,89 @@ TestingLibraryElementError: Unable to find an accessible element with the role "
 
 M6 소유 AC(018·019·020·022) 자동 시험 PASS, 되돌림 13종 모두 RED, typecheck exit 0, 린트·vitest 새 문제 0, 백엔드 변경 없음(0부 제외), M6 커밋 `6941e90`·`87d2eeb` 완료. 프론트에 남은 옛 Deep 흔적은 `types/aiReport.ts`의 `SourceName`·옛 `PhaseEvent` 소스 단계(Fast 콜백 타입과 같이 정의됨)와 `e2e/ai-report-deep.spec.ts`다.
 
+### M7 기존 Deep 정리
+
+기준: HEAD `218f4f7` 작업 트리(측정 시점). 증거 파일은 `.moai/state/verify/m7/`(before_*·after_*). 작업 중 다른 세션이 `f747ce5`(SPEC-RS-REBALANCE-001 plan, 경로 겹침 없음)를 커밋해 HEAD가 움직였다 — 브랜치 가드의 Staleness 규칙에 따라 **커밋하지 않고 멈췄다**(아래 "커밋 상태").
+
+#### E1 — 인수 기준 행렬
+
+| AC | 판정 | 명령 | 관측 |
+|---|---|---|---|
+| AC-023 (1) git grep | **FAIL(3줄, SPEC 충돌)** | `git grep -nI -e deep_research -e stock_synthesis_prompt -e _load_synthesis_prompt -e BRAVE_API_KEY -e TAVILY_API_KEY -e NAVER_CLIENT -e YOUTUBE_API_KEY -- backend .env.example` | 아래 원문. 남은 3줄은 모두 `test_goose_runner.py`의 AC-004 canary(`BRAVE_API_KEY=canary-9a1`은 acceptance.md AC-004 Given의 리터럴) |
+| AC-023 (2) 하네스 이름 | PASS | `git ls-files backend \| grep -E '(^\|/)\.claude/\|(^\|/)CLAUDE\.md$'` | 출력 0줄, exit 1 |
+| AC-023 (3) import | PASS | venv 활성화 후 `python -c "import backend.main"` | exit 0 (pykrx `pkg_resources` 경고만) |
+| AC-024 | PASS | `python -m pytest backend/tests/test_ai_report_service.py backend/tests/test_codex_cli_runner.py -p no:cacheprovider -q` (두 파일 수정 없음) | `38 passed in 14.50s` |
+| AC-024 검사 순서 | PASS | `test_goose_router.py::test_fast_guard_order_503_then_duplicate_then_quota` (신규, 아래 E5) | 3 passed. 되돌림: 라우터에서 쿼터 검사를 중복 검사 앞으로 옮기면 `FAILED ...[dup-before-quota]` / `1 failed, 2 passed` (`red_guard_order.txt`), 라우터는 원복 |
+
+AC-023 (1) 원문:
+```
+backend/tests/test_goose_runner.py:225:        "BRAVE_API_KEY": "canary-9a1",
+backend/tests/test_goose_runner.py:229:        "NAVER_CLIENT_SECRET": "canary-n",
+backend/tests/test_goose_runner.py:233:    for key in ("KRX_PW", "BRAVE_API_KEY", "ANTHROPIC_API_KEY", "NAVER_CLIENT_SECRET"):
+exit 0
+```
+AC-004는 `BRAVE_API_KEY=canary-9a1`을 Given으로 못 박고, AC-023은 `backend` 전체에서 `BRAVE_API_KEY` 0줄을 요구한다. 두 기준이 같은 줄을 두고 충돌하므로 시험을 고치지 않았다(문자열을 쪼개 grep을 피하는 것은 속임수라 하지 않음). AC-023 (1) 충돌은 manager-spec 재위임으로 해소 예정(사용자 결정: AC-023 grep에서 `backend/tests/test_goose_runner.py` 제외, 시험은 그대로).
+
+#### E2 — 기준 대비
+
+| 묶음 | 명령 | 전 | 후 |
+|---|---|---|---|
+| 백엔드 | `.venv/bin/python -m pytest backend/tests -p no:cacheprovider -q -rfE --continue-on-collection-errors` | `38 failed, 370 passed, 3 xfailed, 1 warning, 63 errors in 53.27s` | `4 failed, 348 passed, 1 warning, 58 errors in 29.72s` |
+| 백엔드(옛 deep_mode 파일 제외 기준) | 위 + `--ignore=backend/tests/test_ai_report_router_deep_mode.py` | `4 failed, 411 passed, 1 warning, 58 errors in 51.59s` | (위 "후"와 비교) |
+| 루트 pytest(pre-commit 게이트) | `.venv/bin/python -m pytest -p no:cacheprovider -q` | `1032 passed, 1 skipped, 95 deselected, 1 xpassed in 62.24s` | `1032 passed, 1 skipped, 95 deselected, 1 xpassed in 60.99s` |
+| 타입 | `npm --prefix frontend run typecheck` | exit 0 | exit 0 |
+| 린트 | `npm --prefix frontend run lint` | `✖ 50 problems (45 errors, 5 warnings)` | `✖ 50 problems (45 errors, 5 warnings)` — 문제 줄 목록 `diff` 동일 |
+| vitest | `npx --prefix frontend vitest run --root frontend` | `Test Files 2 failed \| 90 passed (92)` / `Tests 816 passed (816)` | `Test Files 1 failed \| 90 passed (91)` / `Tests 816 passed (816)` |
+
+수 변화 설명:
+- 백엔드 실패 38→4, 오류 63→58: 옛 `test_ai_report_router_deep_mode.py`가 import 시점에 `my_chart`를 스텁으로 바꿔 다른 파일 34건 실패·수집 오류 2건 등을 일으키던 것이 파일 삭제로 사라졌다. 남은 4 failed·58 errors는 deep_mode 파일 제외 기준과 **목록이 완전히 같다**(`comm` 신규 0·소멸 0). 남은 58 errors는 `ImportError: cannot import name 'get_sector_registry' from '<unknown module name>'`(다른 시험 파일의 스텁 오염)로 이번 변경과 무관한 기존 결함.
+- 백엔드 통과 411→348(−63): 삭제 `test_deep_research_service.py` 22 + `test_deep_research_collector.py` 39 + `test_claude_cli_streamer.py` 8 = −69, `test_goose_router.py` +6(Fast 경로 1→3 파라미터 +2, 잘못된 mode 422 +1, 검사 순서 +3). 411−69+6=348.
+- xfail 3→0: M4에서 `strict=True`로 표시한 옛 Deep 시험 3건은 파일과 함께 삭제.
+- vitest 실패 파일 2→1: 삭제한 `e2e/ai-report-deep.spec.ts`는 vitest가 Playwright 명세를 집어 생기던 기존 로드 실패였다. 남은 1건 `e2e/preset-flow.spec.ts`는 기존 결함.
+
+#### E4 — 삭제·축소 파일과 §3 대응, 의존 grep
+
+| 파일 | 처리 | plan.md §3 행 |
+|---|---|---|
+| `backend/services/deep_research_service.py` | 삭제 | 삭제 |
+| `backend/services/deep_research_collector.py` | 삭제 | 삭제 |
+| `backend/prompts/stock_synthesis_prompt.md` | 삭제 | 삭제 |
+| `backend/tests/test_deep_research_service.py`, `test_deep_research_collector.py` | 삭제 | 삭제/교체 테스트 |
+| `backend/tests/test_ai_report_router_deep_mode.py` | 삭제(대체는 M4의 `test_goose_router.py`, Fast 시험은 이전) | 삭제/교체 테스트 |
+| `backend/services/claude_cli_streamer.py` | 축소: `stream_claude_synthesis` 삭제, 라인 파서·`_terminate_proc` 유지 | 축소/정리 |
+| `backend/tests/test_claude_cli_streamer.py` | 축소: 남은 함수 시험 12건만 | 축소/정리 |
+| `backend/main.py` | Deep import·프롬프트 로드·스테이징 정리 제거, claude 경고 문구 Goose로 | 수정 |
+| `backend/prompts/__init__.py`, `backend/prompts/README.md` | `stock_synthesis_prompt.md` 언급 제거 | 수정 |
+| `.env.example` | 검색 API 키 5종·`AI_REPORT_DEEP_*` 3종 제거, `AI_REPORT_GOOSE_{MODEL,TIMEOUT,DAILY_QUOTA,RUNS_KEEP}` + 주석 `AI_REPORT_GOOSE_HARNESS_DIR` 추가 | 수정 |
+| `frontend/e2e/ai-report-deep.spec.ts` | 삭제(옛 Deep·Perplexity 화면 Playwright 명세) | §3 목록 밖 — 오케스트레이터 지시(M6 Gaps 정리 후보) |
+| `backend/routers/ai_report.py` | 주석 1줄(“삭제는 M7” → “M7에서 삭제”) | 수정(M4 대상 파일, 동작 변화 없음) |
+
+의존 grep(삭제 전, `git grep -nI -e deep_research -e stock_synthesis_prompt -e _load_synthesis_prompt -e claude_cli_streamer -e stream_claude_synthesis ... -- backend frontend scripts tests`): 삭제 대상 밖 의존은 `backend/main.py`(import·호출, 수정함), `backend/tests/test_main_goose_lifespan.py`(`_load_synthesis_prompt`·`_cleanup_stale_staging_dirs` monkeypatch 2줄, 제거), `backend/tests/test_goose_router.py`(`deep_research_service` 스텁, 제거 — 라우터는 이미 이 모듈을 불러오지 않음), `backend/services/codex_cli_runner.py`의 주석 2곳(`claude_cli_streamer` 패턴 언급, 모듈이 남아 그대로 둠)뿐. `routers/`·`frontend/`·`scripts/`·루트 `tests/`에서 삭제 모듈 import 0건. 삭제 후 `git grep -nI -e stream_claude_synthesis -e AI_REPORT_DEEP_ -e deep_research -- backend frontend scripts tests .env.example`는 `claude_cli_streamer.py`·그 시험의 삭제 경위 설명 3줄만 남는다.
+
+@MX: `parse_stream_json_line`의 `@MX:ANCHOR`는 호출자(`stream_claude_synthesis`) 삭제로 fan_in이 시험 1곳이 되어 `@MX:NOTE`로 강등했다. `stream_claude_synthesis`의 ANCHOR·WARN은 함수와 함께 사라졌다. `main.py` lifespan NOTE는 Fast/Goose로 갱신.
+
+#### E5 — 지우거나 바꾼 시험과 사유
+
+| 시험 | 변경 | 사유 |
+|---|---|---|
+| `test_deep_research_service.py`(22), `test_deep_research_collector.py`(39) | 파일 삭제 | 대상 모듈 삭제 |
+| `test_ai_report_router_deep_mode.py` 전체(xfail 3건 포함) | 파일 삭제 | §3 교체 대상. Deep 라우팅·lifespan Deep 블록 시험은 대상이 사라짐. Fast 경로 시험은 아래로 이전 |
+| `test_claude_cli_streamer.py`의 실행기 시험 8건 | 삭제 | `stream_claude_synthesis` 삭제. 파서 9건·종료 함수 3건은 유지 |
+| `test_main_goose_lifespan.py` | monkeypatch 2줄·docstring | `main.py`에서 해당 이름이 사라져 `setattr`이 실패하므로 |
+| `test_goose_router.py` | Deep 스텁 제거, `test_fast_mode_path_is_unchanged_by_goose_routing`를 mode 없음·fast·perplexity 3개로 확장, `test_invalid_mode_returns_422_without_any_analysis`·`test_fast_guard_order_503_then_duplicate_then_quota`(3) 추가 | 삭제 파일의 Fast 경로 보장(기본 mode, perplexity 알리아스, 잘못된 mode 422)과 AC-024 검사 순서를 남은 시험이 맡게 함 |
+| `test_goose_runner.py` | 변경 없음 | AC-004 리터럴 canary — E1의 충돌 참조 |
+
+#### 커밋 상태
+
+처음 커밋 직전 재확인(`git rev-parse --short HEAD` → `f747ce5`)에서 HEAD가 측정 기준 `218f4f7`에서 움직였고, `moai session list --json`에 같은 체크아웃의 다른 세션(pid 26825)이 보여 멈췄다. `f747ce5`는 `.moai/specs/SPEC-RS-REBALANCE-001/`·`scripts/rs_eval/`만 바꿔 경로 겹침이 없다. 사용자 결정에 따라 공유 인덱스에 기대지 않는 경로 지정 커밋(`git commit -F <msg> -- <경로…>`)으로 두 커밋을 만들었다: ① `05c8da4` 코드·시험·삭제 7개(`git show --stat`: 13 files, 75 insertions, 4834 deletions, 다른 경로 없음), ② `.env.example`·prompts 문서·이 progress.md(이 커밋).
+
+#### 관측하지 못한 것 (Gaps)
+
+- 루트 `README.md`의 AI 리포트 절(Perplexity·5-소스 심층 분석·옛 키)은 고치지 않았다. plan §3이 지정한 README는 `backend/prompts/README.md`이고, 루트 README는 sync 단계 manager-docs 몫으로 남겼다.
+- 프론트 `types/aiReport.ts`의 `SourceName`·옛 `PhaseEvent` 소스 단계는 §3 목록 밖이라 그대로 두었다.
+- dev 서버를 재시작하지 않았다(B4). AC-025 라이브는 미실행.
+- `ruff`가 venv에 없어 `ruff check backend`는 실행하지 못했다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

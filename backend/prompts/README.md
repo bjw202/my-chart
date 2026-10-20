@@ -4,12 +4,12 @@ AI 리포트 기능이 사용하는 **시스템 자산(canonical prompt)** 보�
 
 ## 파일
 
-- **`codex_prompt.md`** — Codex CLI 호출용 프롬프트 (Fast Mode + Deep Mode 공용, SPEC-AI-REPORT-003)
+- **`codex_prompt.md`** — Codex CLI 호출용 프롬프트 (Fast Mode, SPEC-AI-REPORT-003)
   - 런타임에 `backend.services.codex_cli_runner.load_codex_prompt(code, stock_name)` 이 읽어서
     `〈종목명〉`, `〈종목코드〉` 플레이스홀더를 치환
   - 구조: 8단계 스윙 트레이더 리포트 (Executive Summary → 사업본질 → 최신이벤트 → 심리 → 실적/밸류/수급/테크 → Catalyst → 리스크 → 스윙 진입·청산)
-- **`stock_synthesis_prompt.md`** — Deep Research 최종 합성 프롬프트 (Claude CLI system prompt)
-  - 런타임에 `deep_research_service._load_synthesis_prompt()` 이 읽음
+
+Goose 모드(SPEC-AI-REPORT-004)는 이 폴더가 아니라 `backend/goose_harness_src/` 하네스 원본을 쓴다.
 
 ## 편집 시 주의사항
 
