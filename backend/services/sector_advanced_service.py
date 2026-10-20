@@ -334,13 +334,17 @@ def get_sector_history(
             rankings[date][name] = rank_item.rank
             if name not in sector_history:
                 sector_history[name] = []
+            # rank_item 은 표와 같은 경로의 SectorAggregate(순위 대상만)다. 순위가 매겨진
+            # 섹터는 3기간 초과수익률이 모두 present 이므로(AG-9) composite·1W 수익률·1W 초과
+            # 수익률은 None 이 아니다. rs_avg 만 결측 가능한데 스키마(float)와 프론트 타입이
+            # null 을 받지 않으므로 레거시 표면과 같은 0.0 으로 둔다(Bump 는 rs_avg 를 쓰지 않음).
             sector_history[name].append(SectorHistoryWeek(
                 date=date,
                 rank=rank_item.rank,
-                composite_score=rank_item.composite_score,
-                sector_return_1w=rank_item.sector_return_1w,
-                sector_excess_return_1w=rank_item.sector_excess_return_1w,
-                rs_avg=rank_item.sector_rs_avg,
+                composite_score=rank_item.composite_score.value,
+                sector_return_1w=rank_item.returns["1w"].value,
+                sector_excess_return_1w=rank_item.excess_returns["1w"].value,
+                rs_avg=rank_item.rs_avg.value or 0.0,
             ))
 
     sector_items = [

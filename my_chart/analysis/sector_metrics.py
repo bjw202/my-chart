@@ -780,6 +780,30 @@ def _valid_universe(
     return set(snap.valid_names)
 
 
+@dataclass(frozen=True)
+class _SharedInputs:
+    """여러 기준일을 연달아 집계할 때 **날짜와 무관한** 입력을 한 번만 계산해 넘기는 묶음.
+
+    ``compute_sector_history`` 전용이다(표 엔드포인트는 넘기지 않으므로 동작이 그대로다).
+    두 필드가 기준일 ``d`` 마다 새로 계산한 값과 같은 결과를 내는 근거:
+
+    * ``universe`` — :func:`compute_universe` 는 격자의 ``latest.date``(as_of 와 무관하게
+      DB 최신 정규 바)와 일봉 최신 거래일만 쓴다. ``as_of`` 는 ``is_partial_week`` 판정에만
+      들어가고 유니버스는 그 값을 읽지 않으므로, 어느 ``as_of`` 로 계산해도 같다.
+    * ``grid`` — ``as_of`` 가 다른 두 격자는 최신 바 ``L`` 이 ``history`` 에 들어가는지만
+      다르다. 히스토리 날짜 ``d`` 는 항상 ``d <= L`` 이고 앵커는 ``d − N``(N ∈ 7/28/91)
+      이하 바를 고르므로 ``L`` 이 앵커로 뽑힐 수 없다 — ``anchor()`` 결과가 같다.
+      (결과의 ``as_of_is_partial_week`` 필드만 달라질 수 있는데 히스토리는 읽지 않는다.)
+    * ``registry_mapping`` — :func:`_load_registry_mapping` 의 (섹터별 종목, 종목별 시장)은
+      registry 만의 함수라 기준일과 무관하다. 히스토리 호출은 ``registry_path=None``
+      (모듈 캐시)만 쓰므로 같은 값을 매 날짜 다시 순회할 이유가 없다.
+    """
+
+    grid: Any
+    universe: set[str] | None
+    registry_mapping: tuple[dict[str, list[str]], dict[str, str]]
+
+
 def _compute_sector_aggregates_core(
     weekly_db_path: str,
     date: str,
@@ -790,22 +814,30 @@ def _compute_sector_aggregates_core(
     as_of: str | None,
     apply_min_members: bool,
     period: str | None = None,
+    shared: _SharedInputs | None = None,
 ) -> SectorAggregationResult:
     """`compute_sector_aggregates` 의 rank_change 를 제외한 나머지 전체(벤치마크 ~ 순위).
 
     별도 함수로 분리한 이유는 rank_change 산출이 ``anchor(t, 28)`` 기준일에서 **같은
     집계를 재귀 없이 1회 더** 호출해야 하기 때문이다(M3) — 공개 함수가 이 core 를
     두 번(현재·기준일) 호출한다.
+
+    ``shared`` 가 주어지면 격자·유효 유니버스·registry 매핑을 다시 계산하지 않고 그 값을 쓴다
+    (:class:`_SharedInputs` — 히스토리 전용, 기본 ``None`` 이면 종전과 동일).
     """
-    grid = compute_weekly_grid(weekly_db_path, as_of or date)
+    grid = shared.grid if shared is not None else compute_weekly_grid(weekly_db_path, as_of or date)
     conn = sqlite3.connect(weekly_db_path, check_same_thread=False)
     try:
         snapshot = _load_weekly_snapshot(conn, date)
         returns_by_name, anchor_dates = _anchor_returns(conn, grid, date)
         high52_map = _high52_map(conn, date)
         caps = _load_market_caps(daily_db_path)
-        sector_to_stocks, market_of = _load_registry_mapping(registry_path)
-        universe = _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date)
+        sector_to_stocks, market_of = (
+            shared.registry_mapping if shared is not None
+            else _load_registry_mapping(registry_path))
+        universe = (
+            shared.universe if shared is not None
+            else _valid_universe(weekly_db_path, daily_db_path, registry_path, as_of or date))
         # M6-gap G16 — 섹터 집계 거래대금(기간별 합산, O-A4 창 공유). anchor_dates 는
         # 위 `_anchor_returns` 와 같은 호출에서 나온 값이므로 수익률과 창을 공유한다.
         trading_value_by_period = compute_trading_value_by_period(
@@ -894,6 +926,7 @@ def compute_sector_aggregates(
     apply_min_members: bool = True,
     compute_rank_change: bool = True,
     period: str | None = None,
+    shared: _SharedInputs | None = None,
 ) -> SectorAggregationResult:
     """섹터별 시총가중 집계(규칙 AG-1 ~ AG-9, BM-1 ~ BM-6) — 응답 ``data[]`` 의 단일 산출 경로.
 
@@ -916,10 +949,14 @@ def compute_sector_aggregates(
             그 기간의 초과수익률 단독으로 순위를 매긴다(AC-SAG-021 — M6-gap G22).
             기준일 재귀 호출에도 **같은 period** 를 넘겨 ``rank_change`` 가 동일
             기준(같은 period)의 순위 이동을 비교하도록 한다.
+        shared: 날짜 무관 입력(격자·유효 유니버스·registry 매핑) 사전 계산값 —
+            ``compute_sector_history`` 전용(:class:`_SharedInputs`). ``None``(기본)이면
+            종전과 동일하게 매번 계산한다.
+            rank_change 기준일 집계에는 넘기지 않는다.
     """
     result = _compute_sector_aggregates_core(
         weekly_db_path, date, daily_db_path, registry_path, market, cap, as_of,
-        apply_min_members, period=period)
+        apply_min_members, period=period, shared=shared)
 
     if compute_rank_change:
         grid = compute_weekly_grid(weekly_db_path, as_of or date)
@@ -1126,7 +1163,7 @@ def compute_sector_history(
     weeks: int = 12,
     daily_db_path: str | None = None,
     market: str = "all",
-) -> tuple[list[str], list[list[SectorRank]]]:
+) -> tuple[list[str], list[list[SectorAggregate]]]:
     """최근 N주 섹터 랭킹 히스토리를 계산한다.
 
     날짜는 정규 주간 격자(SPEC-SECTOR-GRID-001 REQ-SGR-001 ``compute_weekly_grid``)의
@@ -1137,13 +1174,15 @@ def compute_sector_history(
     Args:
         db_path: weekly SQLite DB 경로.
         weeks: 조회 주수.
-        daily_db_path: 일봉 DB 경로 — M6 신설. ``compute_sector_ranking`` 에 그대로
+        daily_db_path: 일봉 DB 경로 — M6 신설. ``compute_sector_aggregates`` 에 그대로
             넘긴다(시총가중 원천).
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
 
     Returns:
         (dates, rankings) 튜플. dates는 정규 격자 history 의 최근 weeks 개(오름차순),
-        rankings는 각 날짜의 섹터 랭킹 리스트. 둘은 같은 길이·같은 순서.
+        rankings는 각 날짜에서 **순위가 매겨진** 섹터의 :class:`SectorAggregate` 리스트
+        (rank 오름차순). 순위 제외 섹터(``rank is None``)는 그 날짜에서 빠진다.
+        둘은 같은 길이·같은 순서.
     """
     grid = compute_weekly_grid(db_path)
     all_history = [bar.date for bar in grid.history]
@@ -1152,8 +1191,24 @@ def compute_sector_history(
     if not history_dates:
         return [], []
 
-    rankings = [
-        compute_sector_ranking(db_path, date, daily_db_path, market)
-        for date in history_dates
-    ]
+    # @MX:NOTE: [AUTO] Bump 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=None)`.
+    #   종전에는 레거시 `compute_sector_ranking`(min-max `_normalize_list`)을 탔고, 3M 초과수익률
+    #   극단값 섹터가 Bump 에서만 1위로 뛰는 불일치가 있었다(라이브 2026-10-16 비철금속: Bump 1위,
+    #   표 5위). 이제 각 날짜 d 의 순위·composite 는 표의 순위 백분위(AG-8) 값과 같다.
+    #   `as_of=d` 로 고정해 오늘 날짜에 기대지 않는다(acceptance.md §8.4 규약 8).
+    #   격자·유효 유니버스·registry 매핑은 날짜와 무관하므로 한 번만 계산해 넘긴다
+    #   (_SharedInputs 근거 참조) — 유니버스 산출이 registry xlsx 를 매번 다시 읽어
+    #   날짜당 ~0.5초가 들었다.
+    shared = _SharedInputs(
+        grid=grid,
+        universe=_valid_universe(db_path, daily_db_path, None, history_dates[-1]),
+        registry_mapping=_load_registry_mapping(None))
+    rankings: list[list[SectorAggregate]] = []
+    for date in history_dates:
+        result = compute_sector_aggregates(
+            db_path, date, daily_db_path, market=market, as_of=date,
+            compute_rank_change=False, period=None, shared=shared)
+        ranked = [a for a in result.aggregates if a.rank is not None]
+        ranked.sort(key=lambda a: a.rank)
+        rankings.append(ranked)
     return history_dates, rankings

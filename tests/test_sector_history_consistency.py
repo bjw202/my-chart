@@ -13,8 +13,10 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from my_chart.analysis.sector_metrics import compute_sector_history
@@ -75,25 +77,40 @@ def _make_sector_row(
     )
 
 
-def _insert_full_date(conn: sqlite3.Connection, date: str) -> None:
-    """정상 날짜: 3개 종목 + KOSPI (mock_sectormap의 3종목 매핑)."""
+# Bump 순위는 섹터 표와 같은 `compute_sector_aggregates` 경로를 탄다(AG-5 최소 구성종목 5,
+# 시총가중 원천 = daily stock_meta, 3M 앵커 = t−91일 격자 바). 따라서 픽스처는 섹터당
+# 5종목·시총·3M 이력을 갖춰야 정상 날짜가 순위 대상이 된다.
+_SECTOR_MEMBERS: dict[str, list[tuple[str, float]]] = {
+    # 섹터 → [(종목, 주간 종가 성장률)] — 섹터 간 수익률을 달리해 순위가 갈리게 한다.
+    "전기전자": [("삼성전자", 0.012), ("SK하이닉스", 0.011), ("LG전자", 0.010),
+              ("삼성전기", 0.009), ("LG디스플레이", 0.008)],
+    "철강금속": [("POSCO홀딩스", 0.001), ("현대제철", 0.000), ("고려아연", -0.001),
+              ("동국제강", -0.002), ("세아베스틸지주", -0.003)],
+}
+# 정상(전체) 날짜: 2023-09-22 ~ 2024-01-12 금요일 17개 — 마지막 3개 날짜 모두 3M 앵커 보유.
+_FULL_DATES: list[str] = [
+    (date(2023, 9, 22) + timedelta(weeks=i)).isoformat() for i in range(17)
+]
+
+
+def _insert_full_date(conn: sqlite3.Connection, date_str: str) -> None:
+    """정상 날짜: 2섹터 × 5종목 + KOSPI."""
+    week_i = _FULL_DATES.index(date_str)
     conn.execute(
         "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        _make_sector_row("KOSPI", date, close=2500.0, chg_1w=0.01, chg_1m=0.03, chg_3m=0.08),
+        _make_sector_row("KOSPI", date_str, close=2500.0, chg_1w=0.01, chg_1m=0.03, chg_3m=0.08),
     )
-    for name, chg_1w, rs in [
-        ("삼성전자", 0.03, 85.0),
-        ("SK하이닉스", 0.025, 72.0),
-        ("POSCO홀딩스", -0.01, 45.0),
-    ]:
-        conn.execute(
-            "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            _make_sector_row(name, date, chg_1w=chg_1w),
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
-            (name, date, rs),
-        )
+    for members in _SECTOR_MEMBERS.values():
+        for name, growth in members:
+            close = 100.0 * (1 + growth) ** week_i
+            conn.execute(
+                "INSERT OR REPLACE INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                _make_sector_row(name, date_str, close=close),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+                (name, date_str, 70.0),
+            )
 
 
 def _insert_partial_date(conn: sqlite3.Connection, date: str) -> None:
@@ -109,26 +126,53 @@ def _insert_partial_date(conn: sqlite3.Connection, date: str) -> None:
 
 
 @pytest.fixture
-def history_db(tmp_path: Path, mock_sectormap) -> str:  # noqa: F811
-    """정상 날짜 2개 + 부분 데이터 날짜 1개를 가진 weekly DB.
+def history_db(tmp_path: Path, monkeypatch) -> str:
+    """정상 날짜 17개(… 2024-01-05, 2024-01-12) + 부분 데이터 날짜 1개를 가진 weekly DB.
 
     Dates:
-      2024-01-05 (정상, 4행)
+      2023-09-22 ~ 2024-01-12 금요일 (정상, 11행) — 3M 앵커 이력
       2024-01-10 (부분, 1행)  ← 버그 유발
-      2024-01-12 (정상, 4행)
+    같은 디렉터리에 시총 원천 daily DB(``_daily_db``)도 만든다.
     """
     db_path = str(tmp_path / "test_history.db")
     conn = sqlite3.connect(db_path)
     conn.execute(_WEEKLY_DDL)
     conn.execute(_RS_DDL)
 
-    _insert_full_date(conn, "2024-01-05")
+    for d in _FULL_DATES:
+        _insert_full_date(conn, d)
     _insert_partial_date(conn, "2024-01-10")  # 부분 데이터
-    _insert_full_date(conn, "2024-01-12")
 
     conn.commit()
     conn.close()
+
+    all_names = [n for members in _SECTOR_MEMBERS.values() for n, _g in members]
+    dconn = sqlite3.connect(_daily_db(db_path))
+    dconn.execute("CREATE TABLE stock_meta (name TEXT PRIMARY KEY, market_cap REAL)")
+    dconn.execute("CREATE TABLE stock_prices (Name TEXT, Date TEXT, VolumeWon REAL)")
+    dconn.executemany("INSERT INTO stock_meta VALUES (?, ?)",
+                      [(n, 1.0e12) for n in all_names])
+    dconn.commit()
+    dconn.close()
+
+    registry = pd.DataFrame([
+        {"Code": f"{i:06d}", "Name": n, "Market": "KOSPI", "산업명(대)": sector,
+         "산업명(중)": sector, "주요제품": "-"}
+        for i, (sector, n) in enumerate(
+            (s, n) for s, members in _SECTOR_MEMBERS.items() for n, _g in members)
+    ])
+    monkeypatch.setattr("my_chart.registry._load_sectormap", lambda *a, **k: registry.copy())
+    monkeypatch.setattr("my_chart.registry._df_sector", None)
+    # 유효 유니버스(UN-3)는 라이브 registry xlsx 를 읽는다 — 이 테스트의 관심사(날짜 정합성)가
+    # 아니므로 제한 없음(None)으로 고정한다.
+    monkeypatch.setattr(
+        "my_chart.analysis.sector_metrics._valid_universe", lambda *a, **k: None)
     return db_path
+
+
+def _daily_db(weekly_db: str) -> str:
+    """history_db 픽스처가 같은 디렉터리에 만드는 daily DB 경로."""
+    return str(Path(weekly_db).with_name("test_history_daily.db"))
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +186,7 @@ def test_compute_sector_history_excludes_partial_dates(history_db: str) -> None:
     RED (현재): 3개 날짜 모두 반환 → 부분 데이터(2024-01-10) 포함
     GREEN (수정 후): 정상 날짜 2개만 반환 (2024-01-05, 2024-01-12)
     """
-    result = compute_sector_history(history_db, weeks=3)
+    result = compute_sector_history(history_db, weeks=3, daily_db_path=_daily_db(history_db))
 
     # 수정 후 시그니처: (dates, rankings) 튜플 반환
     # 현재 시그니처: list[list[SectorRank]] 반환
@@ -169,7 +213,7 @@ def test_compute_sector_history_all_dates_have_sufficient_stocks(history_db: str
     임계값 미만 날짜가 섞이면 섹터별 history 길이가 달라져
     프론트엔드 인덱스 매핑이 깨지고 마지막 날 섹터가 누락됨.
     """
-    result = compute_sector_history(history_db, weeks=3)
+    result = compute_sector_history(history_db, weeks=3, daily_db_path=_daily_db(history_db))
 
     if isinstance(result, tuple):
         dates, rankings = result
@@ -194,7 +238,7 @@ def test_compute_sector_history_returns_dates_for_ssot(history_db: str) -> None:
     compute_sector_history의 정제 로직과 불일치가 발생할 수 있음.
     날짜를 함께 반환하면 단일 진실 공급원이 됨.
     """
-    result = compute_sector_history(history_db, weeks=3)
+    result = compute_sector_history(history_db, weeks=3, daily_db_path=_daily_db(history_db))
 
     assert isinstance(result, tuple), (
         "compute_sector_history는 (dates, rankings) 튜플을 반환해야 함. "
