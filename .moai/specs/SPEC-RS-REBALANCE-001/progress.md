@@ -320,6 +320,26 @@ registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=052770 종목
 - `stock_rs_eval.py`의 `sys.path`(`:6`)는 여전히 공용 체크아웃 절대 경로다. 스크립트가 거기서 가져오는 것은 `get_sector_registry`뿐이라 측정값에는 영향이 없지만, 워크트리에서 돌려도 등록부는 공용 체크아웃 코드로 읽는다.
 - 재생성은 20개 날짜마다 커밋하므로, 서버가 실행 중이면 재생성 도중 일부 날짜만 새 산식인 상태를 읽을 수 있다.
 
+### M2 (live regeneration, orchestrator-run, 2026-10-20)
+
+- 사용자 확인 후 실행(§F.1). 백업 `Output/stock_data_weekly.db.bak_20261020`·변경 전 사본 `Output/snapshots/weekly_before_rsr.db` — 원본과 크기 390672384, sha256 앞 16자리 `949f29639a86da86`, `PRAGMA quick_check` ok, RS 794818행 동일 확인 후 진행
+- 명령: 코드 cwd에서 `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -W ignore -c "import my_chart, my_chart.db.weekly as w; assert my_chart.__file__ == '…/my-project-01/my_chart/my_chart/__init__.py'; assert hasattr(w, '_ibd_composite_score'); w.generate_rs_db(db_name='…/Output/stock_data_weekly')"` → `[RS] Done: 355 dates processed`, `exit=0` (17:5x~18:13:58, 로그 `.moai/state/verify/c1bf371e/m2_regen.log`)
+- 변경 후 사본 `Output/snapshots/weekly_after_rsr.db` (`quick_check` ok)
+- 라이브 질의(immutable 읽기, `.moai/state/verify/c1bf371e/m2_live_queries.log`):
+
+| AC | 질의 | 변경 전 | 변경 후 |
+|---|---|---|---|
+| AC-RSR-001 | 짝 없는 행 `LEFT JOIN stock_prices … WHERE sp.Name IS NULL` | 119881 | **0** |
+| AC-RSR-002 | 지수 행 `Name IN ('KOSPI','KOSDAQ')` | 692 | **0** |
+| AC-RSR-002 | 거래량 0 짝 행 `JOIN … WHERE sp.Volume = 0` | 16369 | **0** |
+| AC-RSR-017 | 기준 종목 날짜가 아닌 날짜의 행 | 5 | **0** |
+
+- 테이블 전체: 657965행 / 300개 날짜 / 최신 2026-10-16. 사라진 날짜 46개 = 가격 테이블에 없는 날짜 42 + 비기준 날짜 4, 기준 날짜 0 (research.md R2 예측과 일치)
+- 최신 주차 등급 종목: 2490 → 2387 (거래량 0 101 + 지수 2 제외, 2490−103=2387)
+- `RS_12M_Rating` 범위 0.0417~100.0, 80 이상 몫 20.03% (B-3 근거 ≈20% 유지)
+- **AC-RSR-014 목표**: `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -I scripts/rs_eval/stock_rs_eval.py 4 --production --db Output/snapshots/weekly_after_rsr.db` → 상위10_지속률 **65.17** (기준선 29.24, 목표 ≥ 60) — **PASS**. 같은 줄: 주수 295, 상위10_초과pp 1.66, 상하위스프레드pp −0.25, IC양수비율 30.85 (`.moai/state/verify/c1bf371e/m2_after_eval.log`)
+- 미반영: `stock_meta.rs_12m`(일봉)은 M4 메타 재구축 전까지 옛 산식 값
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
