@@ -556,6 +556,178 @@ E           AssertionError: assert ('error', 'timeout') == ('done', None)
 
 M3 소유 AC 5개(002·004·005·006·012) 자동 시험 PASS, 전체 백엔드 새 실패 0, 커버리지 97%. B2 전역 지침 차단은 SPEC 변경이 필요한 별도 결정으로, M4 진입을 막지 않는다(실행기 인터페이스와 무관한 설정 파일 변경).
 
+### M4 작업 서비스와 라우터
+
+기준: HEAD `a126d68`(시작). 커밋 `dcb8b64`(1부 설정 변경) → `c0c677f`(M4 테스트, RED) → `b214622`(M4 구현). `claude` 2.1.304. 증거 파일: `.moai/state/verify/m4/`(git 미추적). 테스트 실행기: `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest`.
+
+#### 1부 — 하네스 설정 `claudeMdExcludes` 반영과 설치본 재탐침 (v0.4.2 REQ-002·AC-002)
+
+- `backend/goose_harness_src/claude-settings.json`에 `"claudeMdExcludes": ["**/.claude/CLAUDE.md"]` 추가. 매니페스트는 `python -m backend.services.goose_harness`로 재생성(바뀐 줄은 `.claude/settings.json` 해시 하나: `5bf240b6…` → `e8b527cc…`).
+- AC-002 설정 파일 줄: `test_ac002_settings_source_keys`에 단언 추가. RED(설정 변경 전):
+
+```
+E       KeyError: 'claudeMdExcludes'
+FAILED backend/tests/test_goose_runner.py::test_ac002_settings_source_keys - ...
+1 failed, 50 deselected in 0.04s
+```
+
+- 설치본 재설치: `install_at_startup()` → `HarnessStatus(ok=True, reason='installed', harness_dir=PosixPath('/Users/byunjungwon/.goose-harness'))`, `check_job_integrity()` → `IntegrityResult(ok=True, reason='ok')`. `shasum -a 256 ~/.goose-harness/.claude/settings.json` → `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3`, 31행 `"claudeMdExcludes": ["**/.claude/CLAUDE.md"],`.
+- 재탐침(E4 아래) 결과 게이트 통과 → 2부 진행.
+
+#### E1 — 인수 기준 행렬
+
+명령: `python -m pytest backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py -v -p no:cacheprovider`(HEAD `c0c677f` 작업 트리 = `b214622` 내용) → `47 passed in 1.52s`. 테스트 이름 키워드별 집계(같은 출력 파일 `final_v.txt`에서 `grep -c PASSED`/`FAILED`):
+
+| AC | 상태 | 테스트 | 관측 출력 |
+|---|---|---|---|
+| AC-001 라우터 쪽 (2b)(3)(4)(5) | PASS | `test_ac001_2b_source_changed_after_install_fails_closed`, `test_ac001_3_installed_file_changed_blocks_job`, `test_ac001_4_unlisted_installed_file_blocks_job`, `test_ac001_5_restart_restores_install_and_runs_once` — tmp 원본 사본을 tmp 하네스에 실제 설치, 실제 무결성 검사, 실제 `run_goose` + 호출 횟수를 파일에 적는 가짜 claude | `ac001: 4 passed / 0 failed`. (2b)(3)(4): 202, 작업 `error`/`integrity`, 가짜 명령 호출 0, `GET /goose/active` → `null`, 쿼터 0; (2b) 설치본 sha256 불변·`runs/keep.txt` 유지; (5) 재시작 후 202 + 호출 1회, 쿼터 1(가짜 claude는 리포트 없이 exit 0 → `empty_output`) |
+| AC-001 (2b) 닫힌 실패 서비스 쪽 (B5) | PASS | `test_b5_fail_closed_startup_failure_blocks_every_later_start`(시작 대조 실패 기록 후 3회 시작), `test_integrity_failure_records_error_job_without_run_quota_or_active` | `b5_fail_closed: 1 passed`, `integrity_failure: 1 passed` — 3회 모두 `("integrity","error","integrity")`, 실행기 호출 `[]`, 쿼터 0, active `None`, `runs/{job_id}` 미생성, 이벤트 `[(1,"error")]` |
+| AC-002 설정 파일 줄 | PASS | `test_ac002_settings_source_keys` | `2 passed, 51 deselected`(lifespan 종료 테스트와 함께 실행) |
+| AC-007 | PASS | `test_ac007_second_same_code_request_returns_200_same_job`(HTTP), `test_ac007_same_code_twice_returns_existing_job_without_quota`(서비스) | `ac007: 2 passed` — 202 J1 → 200 J1, 실행기 호출 `["299030"]`, 쿼터 1 |
+| AC-008 1~7행 | PASS | `test_ac008_decision_order[1..7]` | `ac008: 7 passed` — 429 `goose_rate_limit` / 422 / 404 / 503 / 200 + 실행 중 job_id / 429 `goose_busy`(본문에 `하나기술`) / 429 `goose_busy` + 실행기 추가 호출 0; 모든 행에서 Fast `check_rate_limit`·옛 `check_deep_rate_limit` 호출 0 |
+| B5 동시성 | PASS | `test_b5_concurrent_starts_different_codes_exactly_one_runs`, `test_b5_concurrent_starts_same_code_one_job`, `test_b5_two_simultaneous_requests_exactly_one_runs`(HTTP 동시 2건) | `b5_concurrent: 2 passed`, `b5_two: 1 passed` — 결과 `[202, 429]`·`["busy","started"]`, 실행 1회, 쿼터 1. 동기화는 `asyncio.gather` + `asyncio.Event`(고정 sleep 없음), 5회 반복 실행 모두 `47 passed` |
+| AC-009 | PASS | `test_ac009_replay_then_live_and_last_event_id`(서비스: 대기 중 작업 재생 1~5, `after=3` → 4·5 후 실시간 6), `test_ac009_sse_replay_and_last_event_id_over_http`(HTTP: 전체 1~6, `Last-Event-ID: 3` → 4·5·6, 잘못된 헤더 → 처음부터, 없는 id → 404), `test_ac009_subscribe_unknown_job_raises_keyerror` | `ac009: 3 passed` |
+| AC-010 | 부분 PASS | `test_ac010_subscriber_disconnect_does_not_cancel_job` — 구독 제너레이터를 닫은 뒤 실행기 정상 종료 → 상태 `done` | `ac010: 1 passed`. "보관 폴더에 `report.html` 존재"는 M5(복사·`job.json`) 몫이라 시험하지 않음(Gaps) |
+| AC-011 | PASS | `test_ac011_cancel_running_finished_and_unknown`, `test_ac011_shutdown_cancels_running_job_and_kills_group`(실제 `run_goose` + 자식 `sleep 30`을 띄우는 가짜 claude), `test_ac011_cancel_routes`(HTTP), `test_lifespan_shutdown_cancels_running_goose_job` | `ac011: 3 passed` + lifespan 1 passed — (1) 마지막 이벤트 `cancelled`, 데이터 `{}`, 상태 `cancelled`, `error_kind` `None`, 리더·자식 PID 모두 `ProcessLookupError` (2) `done` 그대로 (3) `None`/404 (4) `shutdown()` → `cancelled`, `cancel_reason == "shutdown"`, PID 소멸; lifespan 종료가 `shutdown()`을 1회 호출 |
+| AC-021 | PASS | `test_ac021_active_running_and_null`, `test_ac021_active_route_registered_before_code_filename_route` | `ac021: 2 passed` — 실행 없음 `(200, None)`, 실행 중 `{job_id, code:"299030", stock_name:"하나기술", status:"running"}`, 종료 후 `None`; 라우트 순서 `goose/active` < `{code}/{filename}` |
+| goose 전용 쿼터 | PASS | `test_quota_default_is_5_and_env_override`, `test_quota_counts_per_kst_day`, `test_goose_limiter_does_not_touch_deep_counters`, `test_quota_is_judged_before_integrity` 등 | `quota: 6 passed`, `limiter: 1 passed` — 기본 5, 환경 변수 2, 잘못된 값 → 5, KST 날짜 경계에서 초기화 |
+
+대조 단언 되돌림(구현 줄을 하나씩 무력화 → 두 테스트 파일 실행 → 원복, `cmp` → `CMP-OK`/`RESTORED`. 스크립트 `.moai/state/verify/m4/mutate.py`):
+
+```
+== M-a 단일 잠금 제거(B5)
+FAILED …test_goose_job_service.py::test_b5_concurrent_starts_different_codes_exactly_one_runs
+FAILED …test_goose_job_service.py::test_b5_concurrent_starts_same_code_one_job
+FAILED …test_goose_router.py::test_b5_two_simultaneous_requests_exactly_one_runs
+3 failed, 44 passed in 1.48s
+== M-b 무결성 실패도 쿼터 차감(AC-001)
+FAILED …::test_integrity_failure_records_error_job_without_run_quota_or_active
+FAILED …::test_b5_fail_closed_startup_failure_blocks_every_later_start
+FAILED …::test_ac001_2b_source_changed_after_install_fails_closed
+FAILED …::test_ac001_3_installed_file_changed_blocks_job
+FAILED …::test_ac001_4_unlisted_installed_file_blocks_job
+FAILED …::test_ac001_5_restart_restores_install_and_runs_once
+6 failed, 41 passed in 1.37s
+== M-c 쿼터를 같은 종목 판정 앞에(AC-008 5행)
+FAILED …::test_quota_exhausted_blocks_new_start_but_not_same_code
+FAILED …::test_ac008_decision_order[5-True-False-299030-True-200-None]
+FAILED …::test_ac008_decision_order[6-True-False-005930-True-429-goose_busy]
+3 failed, 44 passed in 1.80s
+== M-d Last-Event-ID 무시(AC-009)
+FAILED …::test_ac009_replay_then_live_and_last_event_id
+FAILED …::test_subscribe_after_last_seq_of_finished_job_ends_immediately
+FAILED …::test_ac009_sse_replay_and_last_event_id_over_http
+3 failed, 44 passed in 1.44s
+== M-e 취소 시 실행기 태스크 cancel 안 함(AC-011)
+TIMEOUT 60s — 취소가 끝나지 않아 test_ac011_* / test_ac011_cancel_routes가 멈춤(검출)
+== M-f 무결성 실패 작업을 active로 등록(AC-001)
+(M-b와 같은 6건) 6 failed, 41 passed in 1.31s
+== 라우트 순서: goose/active를 /{code}/{filename} 뒤로 (AC-021)
+FAILED …::test_ac021_active_running_and_null
+FAILED …::test_ac021_active_route_registered_before_code_filename_route
+FAILED …::test_ac001_2b … / _3 … / _4 … / _5 …
+6 failed, 12 passed in 0.37s
+RESTORED
+```
+
+M-e는 실패 대신 멈춤으로 드러났다(테스트에 개별 시간 상한이 없다 — `pytest-timeout` 미설치). 되돌림 뒤 남은 프로세스: `pgrep -fl "sleep 30"` → 출력 없음.
+
+#### E2 — 테스트 수 (기준 대비)
+
+```
+$ python -m pytest backend/tests -q -p no:cacheprovider --continue-on-collection-errors -rfE   # 기준: HEAD a126d68, 변경 전
+38 failed, 265 passed, 2 warnings, 63 errors in 47.07s
+$ (같은 명령, 변경 후 작업 트리 = b214622 내용)
+38 failed, 310 passed, 3 xfailed, 2 warnings, 63 errors in 47.36s
+$ comm -13 baseline_bad.txt after_bad.txt   # 새 실패·오류 (FAILED/ERROR 항목 id 정렬 목록, 각 101줄)
+(출력 없음)
+$ comm -23 baseline_bad.txt after_bad.txt   # 사라진 실패
+(출력 없음)
+```
+
+통과 수 265 → 310 = 신규 47 + lifespan 1 − xfail 전환 3. 중간 실행에서 라우터가 `from backend.services import goose_job_service`로 패키지 `__init__`을 불러 `test_ai_report_router_deep_mode.py`의 스텁 환경에서 11건이 새로 실패했다 → 라우터를 기존 import 형식(`from backend.services.goose_job_service import get_service`)으로 바꾸고 아래 E5 조정을 한 뒤 0건이 됐다.
+
+#### E3 — 커버리지
+
+```
+$ python -m coverage run --include='backend/services/goose_job_service.py,backend/routers/ai_report.py' -m pytest backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py -q -p no:cacheprovider
+47 passed in 1.67s
+$ python -m coverage report -m
+backend/routers/ai_report.py              106     29    73%   81, 92, 105, 113-114, 125-127, 197-198, 224-246, 259-283
+backend/services/goose_job_service.py     203      2    99%   135, 260
+```
+
+`goose_job_service.py` 99%(쿼터 코드 `GooseRateLimiter`가 이 모듈 안에 있다, 기준 85%). 라우터의 미실행 줄은 기존 Fast·기록·파일 조회 경로(이 두 파일이 시험하지 않음)와 새 SSE 생성기의 `KeyError` 분기(197-198)다. `pytest-cov`가 없어 `coverage run`을 썼다.
+
+#### E4 — 1부 재탐침 (설치본 설정 파일, 실제 `claude -p` 1회)
+
+방법: M3 E4와 같은 스크립트 `.moai/state/verify/m3/b2probe.py`(cwd `~/.goose-harness`, design §3.1 argv에서 모델만 `haiku`·출력 `json`, 허용 목록 환경 변수, 120초 상한), `--settings`에 **설치본** `~/.goose-harness/.claude/settings.json`을 넘김.
+
+```
+$ /usr/bin/python3 -I .moai/state/verify/m3/b2probe.py P4-installed /Users/byunjungwon/.goose-harness/.claude/settings.json
+[P4-installed] exit=0 extra_env=[] settings=/Users/byunjungwon/.goose-harness/.claude/settings.json
+[P4-installed] is_error=False result:
+/Users/byunjungwon/.goose-harness/CLAUDE.md | Goose 헤드리스 실행 규칙
+[P4-installed] stderr tail: Ignoring 9 permissions.allow entries from .claude/settings.json: this workspace has not been trusted. …
+$ pgrep -fl "claude -p"
+(출력 없음, exit 1)
+```
+
+판정: 하네스 지침 제목 있음, `# 전역 지침` 없음, exit 0, `is_error=False` → 게이트 통과. stderr 경고는 design §2.2의 알려진 무해한 경고(프로젝트 설정 allow 무시, `--settings`로 적용)다. M3 E5의 잔여 위험("설정 파일이 프로젝트 설정 파일과 같은 경로일 때도 동작하는지")이 이 탐침으로 해소됐다. 근거는 모델의 자기 보고(컨텍스트 블록 인용)다.
+
+#### E5 — 바꾼 기존 테스트와 사유
+
+| 파일 | 변경 | 사유 |
+|---|---|---|
+| `test_goose_runner.py::test_ac002_settings_source_keys` | 단언 1줄 추가 | v0.4.2 AC-002 설정 파일 줄(약화 아님) |
+| `test_ai_report_router_deep_mode.py::TestDeepModeRouting::test_mode_deep_routes_to_stream_deep_analysis` | `xfail(strict=True)` | `mode=deep`가 옛 Deep SSE(`stream_deep_analysis`) 대신 goose 작업 202를 돌려주는 의도된 동작 변경. 정리는 M7. 새 동작은 `test_goose_router.py` |
+| 같은 파일 `test_deep_mode_rate_limit_returns_429` | `xfail(strict=True)` | 옛 `deep_rate_limit` 429 → goose `goose_rate_limit`(AC-008 1행)로 대체 |
+| 같은 파일 `test_deep_mode_duplicate_returns_429` | `xfail(strict=True)` | 옛 `deep_already_running` 429 → 같은 종목은 200 기존 job_id(AC-007)로 대체 |
+| 같은 파일 `_load_service_module` | 라우터를 불러오는 동안만 `backend.services.goose_job_service` 스텁을 넣었다가 뺌 | 이 파일의 `my_chart` 스텁 환경에서는 `backend.services` 패키지 `__init__`이 실패한다. 스텁은 로드 직후 제거되어 다른 테스트로 새지 않는다. Fast 경로·422·404·503 테스트 8건은 그대로 통과 |
+| `test_main_goose_lifespan.py::real_main` | 픽스처 범위 함수 → 모듈 | 두 번째 lifespan 테스트를 추가하자 실제 `my_chart`(numpy C 확장)를 한 프로세스에서 두 번 불러와 `ImportError: cannot load module more than once per process`가 났다 |
+
+`strict=True`라 옛 동작이 다시 통과하면 XPASS로 실패한다. 옛 Deep 서비스·main.py의 Deep lifespan 블록은 그대로 두었다(M7).
+
+#### E8 — RED 증거 (GREEN 전 실패 출력)
+
+M4 테스트, 구현 모듈 작성 전(커밋 `c0c677f`):
+
+```
+$ python -m pytest backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py -q -p no:cacheprovider
+E   ModuleNotFoundError: No module named 'backend.services.goose_job_service'   (47건 모두 같은 원인)
+47 errors in 0.50s
+```
+
+lifespan 종료 테스트, `main.py` 종료 줄 추가 전:
+
+```
+>       assert shutdowns == [1]
+E       assert [] == [1]
+1 failed, 1 passed, 1 warning in 0.57s
+```
+
+1차 구현 뒤 실패 1건은 테스트 쪽 타이밍 문제였다(`test_other_code_while_running_is_busy_with_running_name`이 실행기 태스크가 시작되기 전에 호출 수를 셈 → `runner.started.wait()` 추가).
+
+#### 설계 메모 (구현에서 정한 값)
+
+- 무결성 검사는 `asyncio.to_thread`로 돌린다(설치본 해시 계산이 이벤트 루프를 막지 않게). 이 때문에 잠금 안에 await가 생기므로 단일 잠금이 실제로 필요하다(M-a 되돌림이 이를 보여 준다).
+- 진행 이벤트 타입은 `progress`, 데이터 `{stage, detail}`. 종료 이벤트 `done` → `{delivery_status, …훅 결과}`, `error` → `{error_kind, message, …}`, `cancelled` → `{}`(design §4.4). `run`·`report_url`·`interrupted`는 M5가 `on_finish` 훅으로 채운다.
+- 완료 작업 보관 한도 50개(design §4.2 "구현 단계에서 값 확정").
+- 쿼터 날짜 기준은 KST. 버스트 제한은 두지 않았다(서버 전체 동시 1개가 대신한다).
+
+#### 관측하지 못한 것 (Gaps)
+
+- AC-010의 "보관 폴더에 `report.html` 존재"는 M5 복사 기능이 없어 시험하지 않았다. M4는 구독 해제 후에도 작업이 `done`으로 끝나는 것만 확인했다.
+- AC-011 (4)는 `service.shutdown()` 직접 호출과 "lifespan 종료가 `shutdown()`을 1회 부른다"를 따로 시험했다. 실제 앱 lifespan 안에서 실행 중 작업을 띄우고 끝내는 통합 시험은 하지 않았다.
+- design §4.6의 "서버 종료 시 리포트 보관 시도"는 M5 훅 몫이다.
+- SSE는 끝난 작업에 대해서만 HTTP로 시험했다(ASGITransport가 응답 전체를 모은다). 대기 중 작업의 실시간 전달은 서비스 수준(`subscribe`)에서만 시험했다. 실제 브라우저 `EventSource` 재접속은 M6·AC-025에서 확인한다.
+- `ruff`가 venv·PATH에 없어 lint를 실행하지 못했다.
+- 실제 `claude`로 goose 작업 전체를 돌리지 않았다(B3 — 1부 탐침 1회만).
+
+#### M5 진입 조건
+
+M4 소유 AC(001 라우터 쪽, 007~009, 011, 021) 자동 시험 PASS, AC-010은 M5 보관 부분만 남음, 전체 백엔드 새 실패 0, `goose_job_service.py` 커버리지 99%. M5는 `GooseJobService(on_finish=…)` 훅에 §5.2 선택·복사·`job.json`을 연결하면 된다(훅은 취소·오류 경로에서도 `result=None` 또는 실패 결과로 호출된다).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
