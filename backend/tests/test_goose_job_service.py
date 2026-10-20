@@ -183,6 +183,7 @@ async def test_other_code_while_running_is_busy_with_running_name(mods, tmp_path
     runner = FakeRunner(mods.gr)
     svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
     first = await svc.start("299030", "하나기술")
+    await runner.started.wait()
     busy = await svc.start("005930", "삼성전자")
     assert busy.kind == "busy"
     assert busy.job.stock_name == "하나기술"

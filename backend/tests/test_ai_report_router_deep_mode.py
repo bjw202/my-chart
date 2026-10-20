@@ -113,7 +113,18 @@ def _load_service_module(name: str, path: Path, stubs: dict[str, Any] | None = N
     if stubs:
         for k, v in stubs.items():
             sys.modules[k] = v
-    spec.loader.exec_module(mod)  # type: ignore[arg-type]
+    # SPEC-AI-REPORT-004 M4: 라우터가 goose_job_service를 import한다. 이 파일의 my_chart 스텁 환경에서는
+    # backend.services 패키지 __init__이 실패하므로, 라우터를 불러오는 동안만 스텁을 넣었다가 뺀다.
+    # goose 경로(mode=deep) 자체는 test_goose_router.py가 실제 서비스로 검증한다.
+    goose_key = "backend.services.goose_job_service"
+    added = path == _ROUTER_PATH and goose_key not in sys.modules
+    if added:
+        sys.modules[goose_key] = types.SimpleNamespace(get_service=MagicMock())
+    try:
+        spec.loader.exec_module(mod)  # type: ignore[arg-type]
+    finally:
+        if added:
+            del sys.modules[goose_key]
     return mod
 
 
@@ -356,6 +367,10 @@ class TestDeepModeRouting:
         app.include_router(router_mod.router, prefix="/api")
         return app, router_mod
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="SPEC-AI-REPORT-004 M4: mode=deep는 goose 작업(202 job_id)으로 바뀌어 옛 Deep 파이프라인 동작을 더 이상 따르지 않는다. 옛 Deep 테스트·서비스 정리는 M7 소관. 새 동작은 test_goose_router.py가 검증.",
+    )
     def test_mode_deep_routes_to_stream_deep_analysis(self):
         """?mode=deep → stream_deep_analysis 호출, SSE 200 응답, content-type=text/event-stream."""
         call_count = {"n": 0}
@@ -413,6 +428,10 @@ class TestDeepModeRouting:
         body = response.json()
         assert body["detail"]["error"] == "claude_cli_missing"
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="SPEC-AI-REPORT-004 M4: mode=deep는 goose 작업(202 job_id)으로 바뀌어 옛 Deep 파이프라인 동작을 더 이상 따르지 않는다. 옛 Deep 테스트·서비스 정리는 M7 소관. 새 동작은 test_goose_router.py가 검증.",
+    )
     def test_deep_mode_rate_limit_returns_429(self):
         """check_deep_rate_limit()가 DeepRateLimitError 발생 시 429 반환."""
         DeepRateLimitError = type("DeepRateLimitError", (Exception,), {})
@@ -451,6 +470,10 @@ class TestDeepModeRouting:
         body = response.json()
         assert "일일 쿼터 초과" in str(body)
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="SPEC-AI-REPORT-004 M4: mode=deep는 goose 작업(202 job_id)으로 바뀌어 옛 Deep 파이프라인 동작을 더 이상 따르지 않는다. 옛 Deep 테스트·서비스 정리는 M7 소관. 새 동작은 test_goose_router.py가 검증.",
+    )
     def test_deep_mode_duplicate_returns_429(self):
         """_active_deep_analyses에 코드가 이미 있으면 429 반환, '이미 진행' 포함."""
         app, _ = self._make_app_with_deep(active_deep={"005930"})

@@ -17,7 +17,9 @@ import sys
 import pytest
 
 
-@pytest.fixture()
+# 모듈 범위: 실제 my_chart(numpy C 확장 포함)를 한 프로세스에서 두 번 불러오면 ImportError가 나므로
+# 이 파일의 테스트들이 한 번 불러온 모듈을 함께 쓴다(M4에서 두 번째 테스트 추가).
+@pytest.fixture(scope="module")
 def real_main():
     saved = dict(sys.modules)
     for name in list(sys.modules):
@@ -57,3 +59,21 @@ async def test_lifespan_installs_goose_harness_once_and_survives_failure(light_l
         pass
 
     assert len(calls) == 1
+
+
+async def test_lifespan_shutdown_cancels_running_goose_job(light_lifespan, monkeypatch):
+    """design §4.6: lifespan 종료 단계에서 goose 작업 서비스의 shutdown()을 1회 호출한다(AC-011 (4))."""
+    main_module, _ = light_lifespan
+    goose_job_service = importlib.import_module("backend.services.goose_job_service")
+    shutdowns: list[int] = []
+
+    class FakeService:
+        async def shutdown(self):
+            shutdowns.append(1)
+
+    monkeypatch.setattr(goose_job_service, "get_service", lambda: FakeService())
+
+    async with main_module.lifespan(main_module.app):
+        assert shutdowns == []
+
+    assert shutdowns == [1]

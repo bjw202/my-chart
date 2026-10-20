@@ -31,7 +31,7 @@ from backend.routers.sectors import router as sectors_router
 from backend.routers.stage import router as stage_router
 from backend.routers.stocks import stocks_router
 from backend.routers.themes import router as themes_router
-from backend.services import goose_harness
+from backend.services import goose_harness, goose_job_service
 from backend.services.deep_research_service import (
     _cleanup_stale_staging_dirs,
     _load_synthesis_prompt,
@@ -95,6 +95,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
     logger.info("Server shutting down.")
+    # SPEC-AI-REPORT-004 design §4.6: 실행 중 goose 작업을 사유 shutdown으로 끝내고 프로세스 그룹을 정리한다.
+    await goose_job_service.get_service().shutdown()
 
 
 app = FastAPI(
