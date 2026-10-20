@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS stock_meta (
     sma150 REAL,
     low52w REAL,
     sma200_20d_ago REAL,
-    sma5 REAL
+    sma5 REAL,
+    rs_1m REAL
 )
 """
 
@@ -57,6 +58,11 @@ CREATE TABLE IF NOT EXISTS stock_meta (
 # sma5는 SPEC-SMA5-FILTER-001 ship 후 라이브 검증에서 'no such column: sma5' 오류로
 # SMA5 패턴 필터가 0건 반환된 사례를 반영해 추가됨 (daily.py SMA5 ALTER 패턴과 대칭).
 _MINERVINI_META_COLS = ("sma150", "low52w", "sma200_20d_ago", "sma5")
+
+# SPEC-RS-REBALANCE-001 REQ-RSR-011: rs_1m(주간 RS_1M_Rating 사본)도 같은 멱등 ALTER 경로로
+# 레거시 테이블 끝에 붙인다. 순서가 곧 물리 컬럼 순서이므로 반드시 _MINERVINI_META_COLS 뒤에 둔다
+# (위치 삽입 튜플의 28번째 값과 짝을 이룬다).
+_RS_META_COLS = ("rs_1m",)
 
 _INDEX_DDLS = [
     "CREATE INDEX IF NOT EXISTS idx_meta_sector ON stock_meta(sector_major)",
@@ -112,11 +118,13 @@ def rebuild_stock_meta(daily_db_path: str, weekly_db_path: str) -> None:
 def _ensure_meta_minervini_columns(conn: sqlite3.Connection) -> None:
     """REQ-MIN-008: stock_meta에 Minervini 신규 컬럼이 없으면 멱등 ALTER로 추가한다.
 
+    SPEC-RS-REBALANCE-001 REQ-RSR-011: rs_1m도 같은 루프에서 테이블 끝에 추가한다.
+
     Defense path: 레거시 DB에 신규 컬럼이 없을 때만 ALTER 실행.
     Primary path(새 DB): CREATE TABLE에 이미 포함되므로 ALTER가 실행되지 않는다.
     """
     existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(stock_meta)").fetchall()}
-    for col in _MINERVINI_META_COLS:
+    for col in _MINERVINI_META_COLS + _RS_META_COLS:
         if col not in existing_cols:
             try:
                 conn.execute(f"ALTER TABLE stock_meta ADD COLUMN {col} REAL")
@@ -130,7 +138,7 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
     for ddl in _INDEX_DDLS:
         conn.execute(ddl)
 
-    # REQ-MIN-008: 레거시 DB 방어 — 누락된 Minervini 컬럼 멱등 추가
+    # REQ-MIN-008 / REQ-RSR-011: 레거시 DB 방어 — 누락된 Minervini·rs_1m 컬럼 멱등 추가
     _ensure_meta_minervini_columns(conn)
 
     # --- Latest daily date ---
@@ -202,6 +210,7 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
 
     weekly_by_name: dict[str, tuple] = {}
     rs_by_name: dict[str, float | None] = {}
+    rs_1m_by_name: dict[str, float | None] = {}
 
     if latest_weekly_date:
         w_rows = conn.execute(
@@ -214,10 +223,12 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
         weekly_by_name = {r[0]: r[1:] for r in w_rows}
 
         rs_rows = conn.execute(
-            "SELECT Name, RS_12M_Rating FROM weekly.relative_strength WHERE Date = ?",
+            "SELECT Name, RS_12M_Rating, RS_1M_Rating FROM weekly.relative_strength WHERE Date = ?",
             (latest_weekly_date,),
         ).fetchall()
         rs_by_name = {r[0]: r[1] for r in rs_rows}
+        # REQ-RSR-010: rs_12m과 같은 최신 주차의 RS_1M_Rating — RS 행 없는 종목은 NULL
+        rs_1m_by_name = {r[0]: r[2] for r in rs_rows}
 
     # --- Load sectormap ---
     df_sector = get_sector_registry()
@@ -335,13 +346,14 @@ def _rebuild(conn: sqlite3.Connection, weekly_db_path: str) -> None:
             sma150,           # sma150 (REQ-MIN-001)
             low52w,           # low52w (REQ-MIN-002)
             sma200_20d_ago,   # sma200_20d_ago (REQ-MIN-003)
-            sma5,             # sma5 (SPEC-SMA5-FILTER-001 REQ-SMA5-003) — 맨 끝 append
+            sma5,             # sma5 (SPEC-SMA5-FILTER-001 REQ-SMA5-003)
+            rs_1m_by_name.get(name),  # rs_1m (SPEC-RS-REBALANCE-001 REQ-RSR-011) — 28번째, 맨 끝 append
         ))
 
     conn.execute("DELETE FROM stock_meta")
     conn.executemany(
         """INSERT OR REPLACE INTO stock_meta
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         rows_to_insert,
     )
     conn.commit()

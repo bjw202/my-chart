@@ -80,6 +80,7 @@ def get_sector_ranking(
                 m3=round(r.sector_excess_return_3m, 4),
             ),
             rs_avg=r.sector_rs_avg,
+            rs_med=r.sector_rs_med,  # SPEC-RS-REBALANCE-001 REQ-RSR-013
             rs_top_pct=r.sector_rs_top_pct,
             nh_pct=r.sector_nh_pct,
             stage2_pct=r.sector_stage2_pct,

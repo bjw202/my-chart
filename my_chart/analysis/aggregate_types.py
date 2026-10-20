@@ -209,6 +209,8 @@ class SectorAggregate:
     # 위 주석 참조) — 이 필드는 그 게이팅 로직과 무관한 별도 값 필드다.
     trading_value: dict[str, MetricValue] = field(default_factory=dict)
     rs_avg: MetricValue = field(default_factory=missing)
+    # SPEC-RS-REBALANCE-001 REQ-RSR-013 — 구성 종목 RS_12M_Rating 중앙값(결측 제외)
+    rs_med: MetricValue = field(default_factory=missing)
     rs_top_pct: MetricValue = field(default_factory=missing)
     nh_pct: MetricValue = field(default_factory=missing)
     stage2_pct: MetricValue = field(default_factory=missing)

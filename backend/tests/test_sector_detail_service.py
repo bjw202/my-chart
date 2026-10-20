@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS relative_strength (
     Name TEXT NOT NULL,
     Date TEXT NOT NULL,
     RS_12M_Rating REAL,
+    RS_1M_Rating REAL,
     PRIMARY KEY (Name, Date)
 )
 """
@@ -80,7 +81,7 @@ def _create_weekly_db(rows: list[tuple], rs_ratings: dict[str, float] | None = N
         "INSERT INTO stock_prices VALUES (" + ",".join("?" * 33) + ")", rows)
     for name, rating in (rs_ratings or {}).items():
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?, ?, ?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
             (name, _WEEKLY_DATE, rating))
     conn.commit()
     conn.close()

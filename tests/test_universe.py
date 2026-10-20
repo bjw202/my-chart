@@ -379,7 +379,7 @@ def _make_weekly_db_full(path: Path, names: list[str], d: str) -> None:
     conn = sqlite3.connect(str(path))
     try:
         conn.execute(f"CREATE TABLE stock_prices ({_WEEKLY_FULL_COLS})")
-        conn.execute("CREATE TABLE relative_strength (Name TEXT, Date TEXT, RS_12M_Rating REAL)")
+        conn.execute("CREATE TABLE relative_strength (Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL)")
         allnames = list(names) + ["KOSPI"]
         conn.executemany(
             "INSERT INTO stock_prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -387,7 +387,7 @@ def _make_weekly_db_full(path: Path, names: list[str], d: str) -> None:
              for n in allnames],
         )
         conn.executemany(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             [(n, d, 80.0) for n in allnames],
         )
         conn.commit()

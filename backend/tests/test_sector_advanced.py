@@ -56,7 +56,8 @@ def _create_test_db() -> str:
         CREATE TABLE relative_strength (
             Name TEXT,
             Date TEXT,
-            RS_12M_Rating REAL
+            RS_12M_Rating REAL,
+            RS_1M_Rating REAL
         );
     """)
 
@@ -133,7 +134,7 @@ def _create_test_db() -> str:
         price_rows,
     )
     conn.executemany(
-        "INSERT INTO relative_strength VALUES (?,?,?)",
+        "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
         rs_rows,
     )
     conn.commit()
@@ -696,7 +697,7 @@ def test_compute_stock_bubble_propagates_sector_minor() -> None:
             market TEXT, market_cap REAL, product TEXT
         );
         CREATE TABLE relative_strength (
-            Name TEXT, Date TEXT, RS_12M_Rating REAL
+            Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL
         );
     """)
 
@@ -742,11 +743,11 @@ def test_compute_stock_bubble_propagates_sector_minor() -> None:
         )
         # RS 데이터
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             ("삼성전자", date, min(70.0 + i * 3, 100.0)),
         )
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             ("카카오", date, max(40.0 - i * 2, 0.0)),
         )
 
@@ -798,7 +799,7 @@ def test_compute_stock_bubble_sector_minor_null_fallback() -> None:
             market TEXT, market_cap REAL, product TEXT
         );
         CREATE TABLE relative_strength (
-            Name TEXT, Date TEXT, RS_12M_Rating REAL
+            Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL
         );
     """)
 
@@ -827,7 +828,7 @@ def test_compute_stock_bubble_sector_minor_null_fallback() -> None:
              0.015, 0.06, 0.18, close_lg * 1.1),
         )
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             ("LG화학", date, min(55.0 + i * 3, 100.0)),
         )
 
@@ -967,7 +968,7 @@ def test_compute_stock_bubble_propagates_product() -> None:
             market TEXT, market_cap REAL, product TEXT
         );
         CREATE TABLE relative_strength (
-            Name TEXT, Date TEXT, RS_12M_Rating REAL
+            Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL
         );
     """)
 
@@ -1008,11 +1009,11 @@ def test_compute_stock_bubble_propagates_product() -> None:
              -0.005, -0.02, -0.06, close_kk * 1.05),
         )
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             ("삼성전자", date, min(70.0 + i * 3, 100.0)),
         )
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             ("카카오", date, max(40.0 - i * 2, 0.0)),
         )
 
@@ -1062,7 +1063,7 @@ def test_compute_stock_bubble_product_null_fallback() -> None:
             market TEXT, market_cap REAL, product TEXT
         );
         CREATE TABLE relative_strength (
-            Name TEXT, Date TEXT, RS_12M_Rating REAL
+            Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL
         );
     """)
 
@@ -1091,7 +1092,7 @@ def test_compute_stock_bubble_product_null_fallback() -> None:
              0.015, 0.06, 0.18, close_lg * 1.1),
         )
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             ("LG화학", date, min(55.0 + i * 3, 100.0)),
         )
 
@@ -1134,7 +1135,7 @@ def _make_volume_ratio_db(volume_sma10: float | None) -> str:
             market TEXT, market_cap REAL, product TEXT
         );
         CREATE TABLE relative_strength (
-            Name TEXT, Date TEXT, RS_12M_Rating REAL
+            Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL
         );
     """)
     conn.execute(

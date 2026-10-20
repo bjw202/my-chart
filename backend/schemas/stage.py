@@ -44,6 +44,8 @@ class StageStock(BaseModel):
     stage: int
     stage_detail: str
     rs_12m: float
+    # SPEC-RS-REBALANCE-001 REQ-RSR-012 — 같은 주차 주간 RS_1M_Rating. RS 행 없으면 None.
+    rs_1m: float | None = None
     chg_1m: float
     volume_ratio: float
     close: float

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import statistics
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -111,6 +112,8 @@ class SectorRank:
     composite_score: float         # 0-100 ranking score
     rank: int = 0
     rank_change: int = 0           # positive = improved, negative = declined
+    # SPEC-RS-REBALANCE-001 REQ-RSR-013 — RS_12M_Rating 중앙값(결측 제외). 유효 RS 가 없으면 None.
+    sector_rs_med: float | None = None
 
 
 def _load_weekly_snapshot(
@@ -527,6 +530,8 @@ def _aggregate_members(
         trading_value[label] = present(sum(valid_tv)) if valid_tv else missing()
 
     rs_avg = _equal_mean(rs_values)                       # 결측 제외(§2.3)
+    # REQ-RSR-013: 중앙값도 결측 제외 — 유효 값이 없으면 None(0 반환 금지)
+    rs_med = statistics.median(rs_values) if rs_values else None
     rs_top = (sum(1 for r in rs_values if r >= _RS_TOP_THRESHOLD) / len(rs_values) * 100
               if rs_values else None)
     nh_pct = sum(1 for v in nh_values if v) / len(nh_values) * 100 if nh_values else None
@@ -553,6 +558,7 @@ def _aggregate_members(
         # 초과수익률을 여기에 실으면 규칙 BM-1(지수 행 사용 금지)을 어기게 된다.
         excess_returns={label: missing() for label in _PERIODS},
         rs_avg=_metric(rs_avg),
+        rs_med=_metric(rs_med),
         rs_top_pct=_metric(rs_top),
         nh_pct=_metric(nh_pct),
         stage2_pct=_metric(stage2_pct),
@@ -981,6 +987,8 @@ def _compute_sector_metrics(
         sector_excess_return_3m=round(avg_3m - kospi_returns["chg_3m"], 4),
         sector_rs_avg=round(aggregate.rs_avg.value or 0.0, 2),
         sector_rs_top_pct=round(aggregate.rs_top_pct.value or 0.0, 2),
+        sector_rs_med=(round(aggregate.rs_med.value, 2)
+                       if aggregate.rs_med.value is not None else None),
         sector_nh_pct=round(aggregate.nh_pct.value or 0.0, 2),
         sector_stage2_pct=round(aggregate.stage2_pct.value or 0.0, 2),
         composite_score=0.0,  # computed after normalization

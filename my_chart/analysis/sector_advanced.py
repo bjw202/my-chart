@@ -92,6 +92,8 @@ class StockBubble:
     chg_1w: float | None = None
     chg_3m: float | None = None
     near_52w_high: bool | None = None
+    # SPEC-RS-REBALANCE-001 REQ-RSR-012 — 같은 주차 주간 RS_1M_Rating. RS 행 없으면 None.
+    rs_1m: float | None = None
 
 
 @dataclass
@@ -237,15 +239,23 @@ def _get_price_on_date(
     return result
 
 
+# @MX:ANCHOR: [AUTO] 주간 RS 등급 조회 — compute_sector_bubble·compute_stock_bubble·compute_treemap_data가 호출한다.
+# @MX:REASON: 첫 dict(RS_12M_Rating, 결측 0.0)의 의미는 세 호출부의 기존 계약이다. 두 번째 dict
+#   (RS_1M_Rating, 결측 None)는 SPEC-RS-REBALANCE-001 REQ-RSR-012의 종목 버블 rs_1m 공급원이다.
 def _get_rs_on_date(
     conn: sqlite3.Connection, date: str
-) -> dict[str, float]:
-    """특정 날짜의 RS_12M_Rating을 종목명 키로 반환한다."""
+) -> tuple[dict[str, float], dict[str, float | None]]:
+    """특정 날짜의 ``(RS_12M_Rating, RS_1M_Rating)``을 종목명 키 dict 두 개로 반환한다.
+
+    RS_12M_Rating 은 기존 관용대로 NULL 을 0.0 으로, RS_1M_Rating 은 NULL 을 None 으로 둔다.
+    """
     rows = conn.execute(
-        "SELECT Name, RS_12M_Rating FROM relative_strength WHERE Date = ?",
+        "SELECT Name, RS_12M_Rating, RS_1M_Rating FROM relative_strength WHERE Date = ?",
         (date,),
     ).fetchall()
-    return {str(r[0]): float(r[1] or 0.0) for r in rows}
+    rs_12m = {str(r[0]): float(r[1] or 0.0) for r in rows}
+    rs_1m = {str(r[0]): (float(r[2]) if r[2] is not None else None) for r in rows}
+    return rs_12m, rs_1m
 
 
 # ---------------------------------------------------------------------------
@@ -573,7 +583,7 @@ def compute_sector_bubble(
         stock_meta = _get_stock_meta(db_path)
         sector_map = _build_sector_stock_map(stock_meta, market_filter=market_filter)
         price_data = _get_price_on_date(conn, latest_date)
-        rs_data = _get_rs_on_date(conn, latest_date)
+        rs_data, _rs_1m = _get_rs_on_date(conn, latest_date)
 
         # KOSPI 기간 수익률 계산
         kospi_row = price_data.get("KOSPI", {})
@@ -675,7 +685,7 @@ def compute_stock_bubble(
 
         stock_meta = _get_stock_meta(db_path)
         price_data = _get_price_on_date(conn, latest_date)
-        rs_data = _get_rs_on_date(conn, latest_date)
+        rs_data, rs_1m_data = _get_rs_on_date(conn, latest_date)
         raw_extended = _load_raw_chg_max52(conn, latest_date)
 
         # 해당 섹터 종목 필터링 (+ M6-gap G20 — market 필터)
@@ -765,6 +775,8 @@ def compute_stock_bubble(
             chg_1w=round(chg_1w, 4) if chg_1w is not None else None,
             chg_3m=round(chg_3m, 4) if chg_3m is not None else None,
             near_52w_high=near_52w_high,
+            rs_1m=(round(rs_1m_data[name], 2)
+                   if rs_1m_data.get(name) is not None else None),  # REQ-RSR-012
         ))
 
     return results
@@ -800,7 +812,7 @@ def compute_treemap_data(
         stock_meta = _get_stock_meta(db_path)
         sector_map = _build_sector_stock_map(stock_meta)
         price_data = _get_price_on_date(conn, latest_date)
-        rs_data = _get_rs_on_date(conn, latest_date)
+        rs_data, _rs_1m = _get_rs_on_date(conn, latest_date)
 
     finally:
         conn.close()

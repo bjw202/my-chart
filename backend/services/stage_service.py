@@ -45,6 +45,11 @@ def _pct(decimal_value: float | None) -> float | None:
     return round(decimal_value * 100, 2) if decimal_value is not None else None
 
 
+def _round_or_none(value: float | None) -> float | None:
+    """RS 등급 반올림(rs_12m 과 같은 소수 2자리). None 은 결측으로 보존(REQ-RSR-012)."""
+    return round(float(value), 2) if value is not None else None
+
+
 def _load_extended_weekly_fields(
     weekly_db_path: str, date: str, daily_db_path: str | None = None,
 ) -> dict[str, dict]:
@@ -254,6 +259,7 @@ def get_stage_overview(
             stage=c["stage"],
             stage_detail=c.get("stage_detail", "Stage 2"),
             rs_12m=round(c["rs_12m"], 2),
+            rs_1m=_round_or_none(c.get("rs_1m")),
             chg_1m=round(c["chg_1m"] * 100, 2),  # decimal → %
             chg_1w=_pct(extended.get(c["name"], {}).get("chg_1w")),
             chg_3m=_pct(extended.get(c["name"], {}).get("chg_3m")),
@@ -298,6 +304,7 @@ def get_stage_overview(
             stage=stage_val,
             stage_detail=detail_val,
             rs_12m=round(rs, 2),
+            rs_1m=_round_or_none(stock.get("RS_1M_Rating")),
             chg_1m=round(chg_1m_val * 100, 2),
             chg_1w=_pct(ext.get("chg_1w")),
             chg_3m=_pct(ext.get("chg_3m")),

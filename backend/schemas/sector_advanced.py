@@ -63,6 +63,8 @@ class StockBubbleItem(BaseModel):
     chg_1w: float | None = None
     chg_3m: float | None = None
     near_52w_high: bool | None = None
+    # SPEC-RS-REBALANCE-001 REQ-RSR-012 — 같은 주차 주간 RS_1M_Rating. RS 행 없으면 None.
+    rs_1m: float | None = None
 
 
 class StockBubbleResponse(EnvelopeMixin):

@@ -175,16 +175,23 @@ def classify_stage_or_none(stock_row: dict[str, Any]) -> tuple[int | None, str |
     return result.stage, result.detail
 
 
+# @MX:ANCHOR: [AUTO] 주간 Stage 분류 입력의 단일 원천 — classify_all·screen_stage2_entry·
+#   stage_service·sector_detail_service·scripts/rs_eval/stage2_ratio_eval.py가 호출한다.
+# @MX:REASON: 반환 dict 키(RS_12M_Rating·RS_1M_Rating 등)가 호출부 계약이다. RS_1M_Rating은
+#   운영 스키마(REQ-RSR-009)의 컬럼이므로 부재 허용 분기를 두지 않는다(SPEC-RS-REBALANCE-001 REQ-RSR-012).
 def _load_stocks_for_classification(
     conn: sqlite3.Connection,
     date: str,
 ) -> list[dict[str, Any]]:
-    """Load weekly stock data with RS ratings for stage classification."""
+    """Load weekly stock data with RS ratings for stage classification.
+
+    ``RS_1M_Rating``(REQ-RSR-012)은 같은 주차 값이며 RS 행이 없으면 ``None`` 이다.
+    """
     # Get base stock data
     rows = conn.execute(
         """SELECT sp.Name, sp.Close, sp.SMA10, sp.SMA40,
                   sp.SMA40_Trend_4M, sp.CHG_1M, sp.Volume, sp.VolumeSMA10,
-                  rs.RS_12M_Rating
+                  rs.RS_12M_Rating, rs.RS_1M_Rating
            FROM stock_prices sp
            LEFT JOIN relative_strength rs
              ON sp.Name = rs.Name AND sp.Date = rs.Date
@@ -211,6 +218,7 @@ def _load_stocks_for_classification(
             "Volume": r[6],
             "VolumeSMA10": r[7],
             "RS_12M_Rating": r[8],
+            "RS_1M_Rating": r[9],
         })
     return result
 
@@ -300,6 +308,8 @@ def screen_stage2_entry(db_path: str, date: str) -> list[dict[str, Any]]:
             "stage": stage_result.stage,
             "stage_detail": stage_result.detail,
             "rs_12m": rs,
+            # REQ-RSR-012: 결측은 None 그대로(0 치환 금지)
+            "rs_1m": stock.get("RS_1M_Rating"),
             "chg_1m": chg_1m,
             "volume_ratio": volume_ratio,
             "close": close,

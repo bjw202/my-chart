@@ -75,7 +75,7 @@ def _build_fixture_max_ne_canonical(db_path: str) -> None:
             "CHG_3M REAL, Volume REAL, VolumeSMA10 REAL, MAX52 REAL)"
         )
         conn.execute(
-            "CREATE TABLE relative_strength (Name TEXT, Date TEXT, RS_12M_Rating REAL)"
+            "CREATE TABLE relative_strength (Name TEXT, Date TEXT, RS_12M_Rating REAL, RS_1M_Rating REAL)"
         )
         _row = lambda n, d, chg1w: (n, d, 100.0, 95.0, 93.0, 90.0, 89.0, chg1w, 0.05,
                                     0.10, 1_000_000.0, 800_000.0, 110.0)
@@ -92,7 +92,7 @@ def _build_fixture_max_ne_canonical(db_path: str) -> None:
             [_row(n, WEEKLY_PARTIAL_DATE, CHG_1W_ON_PARTIAL) for n in partial_names],
         )
         conn.executemany(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             [(n, WEEKLY_FULL_DATE, 80.0) for n in full_names]
             + [(n, WEEKLY_PARTIAL_DATE, 80.0) for n in partial_names],
         )

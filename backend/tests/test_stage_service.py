@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS relative_strength (
     Name TEXT NOT NULL,
     Date TEXT NOT NULL,
     RS_12M_Rating REAL,
+    RS_1M_Rating REAL,
     PRIMARY KEY (Name, Date)
 )
 """
@@ -71,7 +72,7 @@ def _make_db(rows: list[tuple], rs: dict[str, float] | None = None) -> str:
         "INSERT INTO stock_prices VALUES (" + ",".join("?" * 33) + ")", rows)
     for name, rating in (rs or {}).items():
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?, ?, ?)", (name, _DATE, rating))
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)", (name, _DATE, rating))
     conn.commit()
     conn.close()
     return tmp.name

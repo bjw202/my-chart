@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS relative_strength (
     Name TEXT NOT NULL,
     Date TEXT NOT NULL,
     RS_12M_Rating REAL,
+    RS_1M_Rating REAL,
     PRIMARY KEY (Name, Date)
 )
 """
@@ -114,7 +115,7 @@ def api_weekly_db(tmp_path: Path, mock_sectormap) -> str:  # noqa: F811
                 ),
             )
             conn.execute(
-                "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+                "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
                 (name, dt, rs),
             )
 

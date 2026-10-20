@@ -449,6 +449,7 @@ class TestGroupB_MetaServiceAlter:
                 Name TEXT,
                 Date TEXT,
                 RS_12M_Rating REAL,
+                RS_1M_Rating REAL,
                 PRIMARY KEY (Name, Date)
             );
         """)
@@ -457,7 +458,7 @@ class TestGroupB_MetaServiceAlter:
             (stock_name, "2026-04-21", 0.02, 0.05, 0.10, 9800.0, 9700.0, 9500.0)
         )
         conn.execute(
-            "INSERT INTO relative_strength VALUES (?,?,?)",
+            "INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?,?,?)",
             (stock_name, "2026-04-21", 72.5)
         )
         conn.commit()

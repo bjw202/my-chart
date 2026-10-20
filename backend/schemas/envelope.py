@@ -93,6 +93,8 @@ class SectorAggregateModel(BaseModel):
     trading_value: dict[str, MetricValueModel] = Field(default_factory=dict)
     excess_returns: dict[str, MetricValueModel] = Field(default_factory=dict)
     rs_avg: MetricValueModel = Field(default_factory=MetricValueModel)
+    # SPEC-RS-REBALANCE-001 REQ-RSR-013 — RS_12M_Rating 중앙값(결측 제외)
+    rs_med: MetricValueModel = Field(default_factory=MetricValueModel)
     rs_top_pct: MetricValueModel = Field(default_factory=MetricValueModel)
     nh_pct: MetricValueModel = Field(default_factory=MetricValueModel)
     stage2_pct: MetricValueModel = Field(default_factory=MetricValueModel)
@@ -207,6 +209,7 @@ def aggregate_model(a: SectorAggregate) -> SectorAggregateModel:
         trading_value=_metric_map(a.trading_value),
         excess_returns=_metric_map(a.excess_returns),
         rs_avg=metric_model(a.rs_avg),
+        rs_med=metric_model(a.rs_med),
         rs_top_pct=metric_model(a.rs_top_pct),
         nh_pct=metric_model(a.nh_pct),
         stage2_pct=metric_model(a.stage2_pct),

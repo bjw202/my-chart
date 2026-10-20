@@ -31,6 +31,8 @@ class SectorRankItem(BaseModel):
     returns: SectorReturns
     excess_returns: SectorExcessReturns
     rs_avg: float
+    # SPEC-RS-REBALANCE-001 REQ-RSR-013 — RS_12M_Rating 중앙값(결측 제외). 유효 RS 없으면 None.
+    rs_med: float | None = None
     rs_top_pct: float
     nh_pct: float
     stage2_pct: float

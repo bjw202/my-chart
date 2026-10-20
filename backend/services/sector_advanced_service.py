@@ -185,6 +185,7 @@ def get_stock_bubble(
             chg_1w=s.chg_1w,
             chg_3m=s.chg_3m,
             near_52w_high=s.near_52w_high,
+            rs_1m=s.rs_1m,  # SPEC-RS-REBALANCE-001 REQ-RSR-012
         )
         for s in stocks
     ]

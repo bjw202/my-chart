@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS relative_strength (
     Name TEXT NOT NULL,
     Date TEXT NOT NULL,
     RS_12M_Rating REAL,
+    RS_1M_Rating REAL,
     PRIMARY KEY (Name, Date)
 )
 """
@@ -243,7 +244,7 @@ def stage_weekly_db(tmp_path: Path) -> str:
         ),
     )
     conn.execute(
-        "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
         ("Stage2Stock", test_date, 75.0),
     )
 
@@ -257,7 +258,7 @@ def stage_weekly_db(tmp_path: Path) -> str:
         ),
     )
     conn.execute(
-        "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
         ("Stage4Stock", test_date, 20.0),
     )
 
@@ -345,7 +346,7 @@ def entry_screen_db(tmp_path: Path) -> str:
         ),
     )
     conn.execute(
-        "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
         ("GoodStock", test_date, 75.0),  # RS >= 70 ✓
     )
 
@@ -361,7 +362,7 @@ def entry_screen_db(tmp_path: Path) -> str:
         ),
     )
     conn.execute(
-        "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
         ("LowRSStock", test_date, 60.0),  # RS < 70 → excluded
     )
 
@@ -377,7 +378,7 @@ def entry_screen_db(tmp_path: Path) -> str:
         ),
     )
     conn.execute(
-        "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
         ("NegReturnStock", test_date, 75.0),
     )
 
@@ -393,7 +394,7 @@ def entry_screen_db(tmp_path: Path) -> str:
         ),
     )
     conn.execute(
-        "INSERT OR REPLACE INTO relative_strength VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (?, ?, ?)",
         ("LowVolStock", test_date, 75.0),
     )
 
