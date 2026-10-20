@@ -154,7 +154,85 @@ Justification: M1→M2→M3이 데이터 순서로 묶이고(재생성 전 기�
 
 ## §E.2 Run-phase Evidence
 
-_<pending run-phase>_
+### M1 — 분모 정리와 낡은 행 제거 (manager-develop, cycle_type=tdd, 2026-10-20)
+
+**작업 위치.** 오케스트레이터 지시는 공용 체크아웃 `main`이었으나 이 실행은 런타임이 만든 L1 워크트리(`.claude/worktrees/agent-a6c66422cb17cb479`, 브랜치 `worktree-agent-a6c66422cb17cb479`) 안에 격리되어 있었다. 워크트리 기준점이 낡아(`fd5f11f`, SPEC 디렉터리 없음) `git merge --ff-only main`으로 `0b1dfc3`까지 빨리 감기한 뒤 작업했다. 커밋은 이 워크트리 브랜치에 있으며 `main`에는 아직 없다.
+
+**커밋.**
+
+| 순서 | SHA | 내용 | `git show --stat` |
+|---|---|---|---|
+| 1 | `f3b7066` | 특성화 골든값 + 공용 픽스처 빌더(운영 코드 변경 없음, 단독 커밋) | `tests/rsr_fixtures.py` +111, `tests/test_rsr_characterization.py` +72 |
+| 2 | `cec038b` | 운영 변경 + AC 테스트 + `spec.md` status `draft → in-progress` | `spec.md` 2 ±1, `my_chart/db/weekly.py` +83 −1, `tests/test_rsr_m1_denominator.py` +279 |
+
+**특성화가 변경 전 코드에서 통과했다는 근거.** 커밋 1 직전 `git diff --stat HEAD -- my_chart` → 출력 없음(운영 코드 무변경). 같은 트리에서 `pytest tests/test_rsr_characterization.py -q` → `2 passed in 2.13s`. 골든 테스트의 판별력: `RS_6`에서 `rank_1m`을 임시로 뺐을 때 `AssertionError: B / assert np.float64(50.0) == 25.0` → `1 failed, 1 passed`, 이후 `git checkout -- my_chart/db/weekly.py`로 복구, `git status --short`에 `weekly.py` 없음.
+
+**RED (구현 전, `0b1dfc3`+커밋 1 트리).** `pytest tests/test_rsr_m1_denominator.py -q` → `9 failed, 2 passed in 0.39s`(증거: `.moai/state/verify/rsr-m1/red.log`). 실패 요지(원문):
+
+```
+E       AssertionError: assert 6 == 0                      # AC-001
+E       AssertionError: assert 2 == 0                      # 필터 후 0행 날짜
+E       AssertionError: assert not ({'KOSDAQ', 'KOSPI', 'Z'} & {'KOSDAQ', 'KOSPI', 'L', 'S1', 'S2', 'S3', ...})   # AC-002
+E         Extra items in the left set: '가나다스팩1호' '가나다우'   # AC-003
+E         Left contains 1 more item: {'V': 100.0}           # AC-004
+E       assert 3 == 0                                       # AC-017
+E       AttributeError: ... has no attribute '_delete_unprocessed_dates'   # 대조 테스트 3건
+```
+
+RED 단계에서 통과한 2건은 현행 동작을 고정하는 테스트다: AC-018(현행 `dropna`가 이미 결측 행을 뺀다, REQ-RSR-023 "현행 유지")과 "등록부에 없는 이름은 우선주가 아니다"(현행 코드는 등록부를 보지 않는다). 둘 다 아래 대조(C8·C9, 그리고 C4가 보여 주는 이름 패턴 오탐)로 판별력을 따로 확인했다. 기준 종목 부재 가드는 구현 후 추가한 분기라, 가드를 임시로 `if False:`로 바꿔 `AssertionError: assert 0 == 2`(테이블 전체 삭제) RED를 본 뒤 복구해 GREEN(`1 passed`)을 확인했다.
+
+**GREEN (`cec038b`).** `/Users/byunjungwon/Dev/my_chart/.venv/bin/python -m pytest tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py -v -p no:warnings` → `14 passed in 0.36s`(증거: `.moai/state/verify/rsr-m1/final_m1.log`).
+
+| AC | 상태 | 테스트 | 출력 |
+|---|---|---|---|
+| AC-RSR-001 | PASS | `test_ac_rsr_001_unpaired_rows_removed` (+ 필터 후 0행 날짜 전체 삭제 `test_ac_rsr_001_date_with_no_rows_after_filter_is_cleared`) | `PASSED` ×2 |
+| AC-RSR-002 | PASS | `test_ac_rsr_002_index_and_zero_volume_excluded_before_ranking` | `PASSED` |
+| AC-RSR-003 | PASS | `test_ac_rsr_003_preferred_and_spac_excluded_common_kept`, `test_ac_rsr_003_name_absent_from_registry_is_not_preferred` | `PASSED` ×2 |
+| AC-RSR-004 | PASS | `test_ac_rsr_004_non_positive_one_plus_return_row_excluded` | `PASSED` |
+| AC-RSR-017 | PASS | `test_ac_rsr_017_paired_stale_rows_removed` | `PASSED` |
+| AC-RSR-018 | PASS | `test_ac_rsr_018_rows_with_any_null_column_get_no_rating` | `PASSED` |
+| AC-RSR-006 기준(골든) | PASS (M1 후에도 불변) | `test_characterize_generate_rs_db_r10_6m_3m_1m_golden`, `test_characterize_relative_strength_schema_unchanged` | `PASSED` ×2 |
+
+라이브 단계(AC-RSR-001·002·017의 `Output/` 질의)는 M2 재생성 후 몫이며 이번에 실행하지 않았다.
+
+**대조 RED (lessons #9).** 실행기 `.moai/state/verify/rsr-m1/contrasts.py`가 `cec038b` 트리의 `weekly.py`에 회귀를 하나씩 문자열 치환으로 넣고 대상 테스트를 돌린 뒤 원본 바이트로 복구했다. 12건 모두 `exit=1`. 원문 로그: `.moai/state/verify/rsr-m1/contrasts.log`.
+
+| # | 넣은 회귀 | 대상 AC | 관측(원문 발췌) |
+|---|---|---|---|
+| C1 | 지수·거래량 0 필터 제거 | 002 (a) | `assert not ({'KOSDAQ', 'KOSPI', 'Z'} & {'KOSDAQ', 'KOSPI', 'L', ...})` |
+| C2 | 전체로 순위 → 행만 사후 마스킹 | 002 (c) | `{'S2': 37.5} != {'S2': 60.0}`, `{'S4': 87.5} != {'S4': 100.0}` — (a)는 통과, (c)에서 RED |
+| C3 | 분모에 거래대금 필터(`Close*Volume >= 1e6`) | 002 (b) | `assert 'L' in {'S1': 25.0, 'S2': 50.0, 'S3': 75.0, 'S4': 100.0}` |
+| C4 | 우선주 판별을 이름 패턴 `우$`로 | 003 | `assert set() == {'성우', '에코글로우', '이오플로우'}` |
+| C5 | 코드 끝자리 판별 제거 | 003 | `Extra items in the left set: '가나다우'` |
+| C6 | `스팩` 판별 제거 | 003 | `Extra items in the left set: '가나다스팩1호'` |
+| C7 | `1+R <= 0` 가드 제거 | 004 | `{'S1': 20.0} != {'S1': 25.0}` (V가 분모에 들어옴) |
+| C8 | `dropna`를 `RS_*` 다섯 컬럼으로 좁힘 | 018 | `{'S1': 20.0} != {'S1': 25.0}` (W가 분모에 들어옴) |
+| C9 | 결측을 0으로 채움 | 018 | `{'S2': 33.33333333333333} != {'S2': 50.0}` (Y·W가 분모에 들어옴) |
+| C10 | (i)·(ii) 모두 제거 | 001 | `AssertionError: assert 6 == 0` |
+| C11 | (i)만 제거 | 001 | `AssertionError: assert 5 == 0` |
+| C12 | (i)·(ii)를 짝 기준 삭제로 바꿔치기 | 017 | `assert 3 == 0` |
+
+복구 증명: 실행 직후 `git status --short` → `?? .moai/logs/`(작업 전부터 있던 미추적 디렉터리)뿐, `git diff --stat HEAD` → 출력 없음. C10~C12와 같은 회귀는 monkeypatch 대조 테스트(`..._contrast_both_steps_disabled_leaves_6`, `..._contrast_step_i_disabled_leaves_5`, `..._contrast_pair_based_delete_leaves_3`)로도 상시 고정했다. 단언의 우변(6·5·3, 순위 상수 20/40/60/80/100·25/50/75/100)은 픽스처에 심은 행 수와 손으로 정한 값이며 프로덕션 함수에서 끌어오지 않았다.
+
+**구현 위치(프로브: `grep -n "def _registry_preferred_names\|def _filter_rs_universe\|if total_dates == 0\|_delete_unprocessed_dates(conn)$\|_delete_stale_rows_for_date(conn, str" my_chart/db/weekly.py`).** 출력: `398:def _registry_preferred_names`, `409:def _filter_rs_universe`, `496:    if total_dates == 0:`, `503:    _delete_unprocessed_dates(conn)`, `512:        _delete_stale_rows_for_date(conn, str(date), set(df["Name"].astype(str)))`. (ii)의 삭제와 삽입은 기존 커밋 주기(20개 날짜마다 + 마지막) 안에서 커밋 전에 일어나므로 같은 트랜잭션이다. `RS_12M_Rating` 산식은 바꾸지 않았다(M2 몫).
+
+**영향 범위 회귀.** `pytest tests/test_weekly_insert.py tests/test_db_service.py tests/test_universe.py tests/test_weekly_supersede.py tests/test_weekly_grid.py tests/test_consumer_dates.py tests/test_stage_classifier.py tests/test_sector_metrics.py tests/test_market_breadth.py -q` → `142 passed in 0.98s`(`cec038b`, 증거: `.moai/state/verify/rsr-m1/final_lane.log`). 전체 스위트는 두 커밋 모두 pre-commit 게이트(`moai gate`)가 돌려 통과했다.
+
+**린트.** `uvx ruff check my_chart/db/weekly.py tests/rsr_fixtures.py tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py` → `F402 Import date from line 18 shadowed by loop variable` 1건. 같은 명령을 `git show HEAD:my_chart/db/weekly.py`(`0b1dfc3`)에 돌려도 같은 1건 → 기존 기준선이며 새 경고 0.
+
+**커버리지.** `.venv/bin/python -m coverage run --include='my_chart/db/weekly.py' -m pytest tests/test_rsr_characterization.py tests/test_rsr_m1_denominator.py` (`cec038b`, 14 tests) → `my_chart/db/weekly.py 229 119 48%`, 미커버 `89-92, 122-131, 140-149, 155, 179, 204-208, 239-300, 326-387, 548, 551-552`. M1이 새로 쓴 기준 종목 부재 분기(`496-500`)와 함수(`_registry_preferred_names`, `_filter_rs_universe`, `_delete_unprocessed_dates`, `_delete_stale_rows_for_date`)는 미커버 목록에 없다. 나머지 미커버 줄은 M1 범위 밖인 가격 DB 수집 경로와 기존 진행 콜백(`548`)·20개 단위 커밋(`551-552`)이다.
+
+**환경 조치(코드 아님).** 첫 커밋 시도에서 게이트가 21건 실패했다 — 워크트리에 gitignore된 운영 DB가 없어서다(프로젝트 메모리 `project_worktree_precommit_db_trap`). 공용 체크아웃의 `Output/stock_data_weekly.db`·`stock_data_daily.db`를 이 워크트리 `Output/`에 **복사**했고(원본은 읽기만), 워크트리 `.venv`에 `setuptools<81`을 설치했다(`setuptools==82.0.1 → 80.10.2`, `pkg_resources` 복구). 이후 게이트가 한 번 4분 상한을 넘겼다(`quality gate timed out: pytest exceeded 4m0s`, 실측 4:04.8, 부하 평균 5.3). 부하가 3.8로 내려간 뒤 재시도에서 통과했다. 우회 플래그는 쓰지 않았다.
+
+**미검증 (Gaps).**
+- 라이브 DB 단계(AC-RSR-001·002·017의 `Output/stock_data_weekly.db` 질의 → 0): M2 재생성 후 수행 예정. 이번에는 실행하지 않았다.
+- `backend/tests` 스위트는 돌리지 않았다(M1이 건드리는 경로 아님). 지시에 적힌 기존 수집 오류(`cannot import name 'generate_price_db'`)는 관측하지 않았다.
+- 실제 등록부(`sectormap-original.xlsx`)로 `_registry_preferred_names()`를 돌린 결과는 측정하지 않았다. research.md R3의 기록(코드 끝자리 전부 `0`)에 따르면 제외 대상은 0개일 것이다.
+
+**잔여 위험.**
+- 기준 종목 부재 가드는 REQ-RSR-001 문구에 없는 안전장치다: 기준 종목 행이 0개면 (i)이 테이블 전체를 지우게 되므로 아무것도 바꾸지 않고 경고만 남긴다. SPEC 본문과 다르다고 판단되면 manager-spec 확인이 필요하다.
+- 스팩 판별은 등록부가 아니라 그 날짜 가격 행의 종목명에 적용한다(등록부 종목명과 같은 이름이므로 등록부 기준의 상위 집합). 등록부에 없는 이름도 `스팩`이 들어 있으면 제외된다.
+- 커밋은 워크트리 브랜치에만 있다. `main` 반영(빨리 감기)은 오케스트레이터 몫이다.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
