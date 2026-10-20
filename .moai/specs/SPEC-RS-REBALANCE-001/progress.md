@@ -465,6 +465,98 @@ registry 중복 Code 감지 — 첫 행 유지, 이 행 drop: Code=052770 종목
 - (a)의 분모가 날짜별 12~54개라 상대 ±10%(9.948%p)는 날짜에 따라 종목 1~5개 차이에 해당한다(T2). 70 유지 판정의 여유는 4.89%p(9.948 − 5.06)다.
 - 측정 스크립트는 `stage_classifier`의 모듈 전역(`sqlite3`, 두 상수)을 프로세스 안에서 덮어쓴다. 별도 프로세스로만 실행되므로 서버에는 영향이 없지만, 이 스크립트를 다른 코드에서 import해 `main()`을 부르면 그 프로세스의 상수가 바뀐다.
 
+### M4 (pre-rebuild) — 백엔드 필드 (manager-develop, cycle_type=tdd, 2026-10-20)
+
+**범위.** 라이브 `stock_meta` 재구축(Phase 4) **직전까지**. 라이브 DB에는 쓰지 않았다. 작업 위치는 L1 워크트리 `.claude/worktrees/agent-a078264dfa8653ed3`(브랜치 `worktree-agent-a078264dfa8653ed3`)이며, 시작 시 `git merge --ff-only main`으로 `97831f4`까지 빨리 감았다(`git rev-parse --short HEAD` → `97831f4`). 증거 파일은 전부 `.moai/state/verify/c1bf371e/m4/`에 있다.
+
+**커밋.** `15ba7b6` — 운영 12개 + 축약 DDL 테스트 8개 + 신규 테스트 3개, `git show --stat` → `23 files changed, 644 insertions(+), 42 deletions(-)`. 첫 커밋 시도는 pre-commit 게이트가 막았다(`tests/test_ac_sag_045_r1_r4_r5a.py`의 하위 프로세스가 `ModuleNotFoundError: No module named 'pkg_resources'` — 게이트가 새로 만든 워크트리 `.venv`에 setuptools 82.0.1이 깔린 환경 문제, M4 코드와 무관). `uv pip install --python .venv/bin/python "setuptools<81"`(→ `80.10.2`) 후 재시도에서 게이트 통과로 커밋이 생성됐다.
+
+**RED (구현 전, `97831f4` 트리 + 신규 테스트만).**
+- `pytest tests/test_rsr_m4_stock_meta_rs1m.py -q` → `3 failed in 0.38s` (`red_meta.log`): `sqlite3.OperationalError: no such column: rs_1m` ×2, AC-008은 `AssertionError: 컬럼 순서=[… 'sma5']` / `Right contains one more item: 'rs_1m'`.
+- `pytest tests/test_rsr_m4_rs1m_responses.py -q` → `2 failed in 1.38s` (`red_resp.log`): `AssertionError: /stage/overview all_stocks: BGF리테일 항목에 rs_1m 필드가 없다`, `/sectors/Auto/bubble: DN오토모티브 항목에 rs_1m 필드가 없다`.
+- `pytest tests/test_rsr_m4_rs_med.py -q` → `7 failed in 0.39s` (`red_med.log`): `AttributeError: 'SectorRankItem' object has no attribute 'rs_med'`, `'SectorAggregateModel' …`, `'SectorAggregate' …`.
+
+**AC 판정 (GREEN, `15ba7b6` 트리).** `pytest tests/test_rsr_m4_stock_meta_rs1m.py tests/test_rsr_m4_rs1m_responses.py tests/test_rsr_m4_rs_med.py -v` → `12 passed in 1.68s` (`green_ac.log`).
+
+| AC | Status | 테스트 | 양변 출처 |
+|---|---|---|---|
+| AC-RSR-007 (픽스처 단계) | PASS | `test_ac_rsr_007_rs_1m_copied_from_latest_week` | `stock_meta.rs_1m` 읽기 vs 리터럴(최신 주차 1M 값; 앞 주차·12M 값은 모두 다르게 심음; RS 행 없는 `라종목` → NULL) |
+| AC-RSR-007 (라이브 단계) | 미실행 | — | 라이브 재구축 후 오케스트레이터 몫 |
+| AC-RSR-008 | PASS | `test_ac_rsr_008_legacy_stock_meta_gets_rs_1m_appended` | 라이브 컬럼명(`ma50_w ma150_w ma200_w`) 27컬럼 레거시 테이블 → `PRAGMA table_info` 끝이 `rs_1m`, 기존 27개 값 = 픽스처 기대값, 2회 실행(멱등) |
+| AC-RSR-008b | PASS | `test_ac_rsr_008b_new_db_rs_1m_is_last_column_and_28th_value` | 마지막 행 `(27, 'rs_1m')`, `sma5 = 5.555`, `rs_1m = 11.0`, `rs_12m = 22.0` |
+| AC-RSR-009 | PASS | `test_ac_rsr_009_stage_overview_rs_1m`, `test_ac_rsr_009_stock_bubble_rs_1m` | TestClient 응답 vs 고정 픽스처 `aggregation-2026-08-11/weekly.db` 독립 SQL(immutable 읽기). `all_stocks`·`stage2_candidates`·RS 결측 종목이 있는 섹터 전부의 버블 |
+| AC-RSR-010 | PASS | `test_ac_rsr_010_*` 7건 | `get_sector_ranking()`의 `sectors[]`와 봉투 `data[]` vs 리터럴(P 30.0 / Q 50.0 / R 30.0, `rs_avg` 50.0, `rs_top_pct` 40.0·0.0) + 유효 RS 0개 섹터의 `rs_med` = `missing` |
+
+AC-RSR-010의 하위 호환(REQ-RSR-014): `tests/test_ac_sag_030_rs_avg.py`는 아래 전체 스위트 실행에서 통과(`tests/` 1070 passed 안에 포함).
+
+**대조 (lessons #9).** `contrast.py`가 운영 파일에 회귀를 주입 → 대상 테스트 실행 → 원래 바이트로 원복 → sha256 앞 16자리 비교 → 재실행. 원문 `contrast.log`·`contrast_c10.log`.
+
+| # | 주입 | 관측 RED(원문) | 원복 |
+|---|---|---|---|
+| C1 | 튜플에서 `rs_1m`을 `rs_12m` 다음으로(중간 삽입) | AC-008b `AssertionError: sma5=1011.0`(= `sma200_20d_ago` 값), AC-007 `rs_1m={'가종목': 1004.0, …}`, AC-008 실패 → `3 failed` | sha `626c4932201475a6` 일치, `3 passed` |
+| C2 | DDL에서 `rs_1m`을 `rs_12m` 다음으로 | `AssertionError: 마지막 컬럼=(27, 'sma5', 'REAL', 0, None, 0)` | 일치, `1 passed` |
+| C3 | ALTER 목록에서 `_RS_META_COLS` 제거 | `sqlite3.OperationalError: table stock_meta has 27 columns but 28 values were supplied` | 일치, `1 passed` |
+| C4 | Phase 4 복사 제거(`None`) | `stock_meta.rs_1m={'가종목': None, '나종목': None, '다종목': None, '라종목': None}` | 일치, `1 passed` |
+| C5 | `rs_1m`에 `RS_12M_Rating` 연결 | `stock_meta.rs_1m={'가종목': 91.0, '나종목': 42.0, '다종목': 12.0, '라종목': None}` | 일치, `1 passed` |
+| C10 | RS 질의를 앞 주차로 | `stock_meta.rs_1m={'가종목': 61.0, '나종목': 33.0, '다종목': 44.0, '라종목': None}` | 일치, `1 passed` |
+| C6a | 종목 응답 `RS_1M_Rating`에 12M 열(`r[8]`) | `BGF리테일 rs_1m=96.18 != RS_1M_Rating=80.28112449799197` | sha `9e1783948e087797` 일치, `1 passed` |
+| C6b | 버블 `rs_1m` dict를 12M 열에서 | `DN오토모티브 rs_1m=97.27 != RS_1M_Rating=80.56224899598394` | sha `0d2b32a5d89e2446` 일치, `1 passed` |
+| C7 | `RS_1M_Rating`을 SELECT에서 빼고 `None` | `BGF리테일 rs_1m=None != RS_1M_Rating=80.28112449799197` | sha `9e1783948e087797` 일치, `1 passed` |
+| C8 | `rs_med = rs_avg`(평균) | `섹터P rs_med=MetricValueModel(value=50.0, …)`, `섹터R rs_med=50.0` → `4 failed, 3 passed` | sha `bb4b55b5ccc5090a` 일치, `7 passed` |
+| C9 | 결측을 0으로 채운 중앙값 | `섹터R rs_med=25.0`, `assert 0.0 is None` → `3 failed, 4 passed` | 일치, `7 passed` |
+
+대조 전후 `git diff --stat` → 둘 다 `20 files changed, 110 insertions(+), 42 deletions(-)`(커밋 전 작업 트리, 같은 값).
+
+**축약 DDL RED 판정 (plan.md §G "M4 조건부").** 2단계(주간 질의 변경) 직후, 테스트 DDL을 고치기 전에 두 스위트를 돌렸다.
+- `pytest tests -q` → `22 failed, 1048 passed, 1 skipped, 95 deselected, 1 xpassed` (`post_step2_tests.log`)
+- `pytest backend/tests -q` → `38 failed, 319 passed, 1 warning, 58 errors` (`post_step2_backend.log`)
+- 실패 파일만 모아 `--tb=line`으로 재실행 → `59 failed, 114 passed` (`red_classify.log`). 원인 줄 집계: `no such column: RS_1M_Rating` 64줄, `no such column: rs.RS_1M_Rating` 36줄, `test_market_api.py`는 503 응답 본문 `'detail': 'no such column: rs.RS_1M_Rating'`. 나머지 실패 4건(`test_minervini_template.py` GroupC 3건 `S9가 결과에 없음` 등, `test_bubble_empty_date_edge.py` 1건)은 기준선에도 있던 실패다.
+
+| 파일 | RED 건수 | 경로 | 조치 |
+|---|---|---|---|
+| `tests/test_consumer_dates.py` | 1 (+ `tests/test_ac_sag_037_endpoint_date_consistency.py` 5건 — 이 파일의 `_build_fixture_max_ne_canonical`을 import) | `meta_service`·`stage_classifier`·`sector_advanced` | DDL 1줄 + INSERT 열 목록 |
+| `tests/test_market_api.py` | 6 | `stage_classifier` | DDL + INSERT 1곳 |
+| `tests/test_stage_classifier.py` | 7 | `stage_classifier` | DDL + INSERT 6곳 |
+| `tests/test_universe.py` | 3 | `stage_classifier` | DDL + INSERT |
+| `backend/tests/test_minervini_template.py` | 3 (GroupB) | `meta_service` | 주간 `_create_weekly_db` DDL만 — 일봉 DDL 2곳은 RS 질의를 타지 않아 손대지 않음 |
+| `backend/tests/test_sector_advanced.py` | 25 | `sector_advanced._get_rs_on_date` | DDL 9곳 중 RED 경로 6곳(`_create_test_db`, sector_minor·product 4건, `_make_volume_ratio_db`) + 해당 INSERT 7곳. 빈 DB·RRG·빈 알림 DDL 3곳은 변경 없이 통과 |
+| `backend/tests/test_sector_detail_service.py` | 3 | `stage_classifier` | DDL + INSERT |
+| `backend/tests/test_stage_service.py` | 3 | `stage_classifier` | DDL + INSERT |
+
+RED가 나지 않아 손대지 않은 §G "M4 조건부" 파일: `tests/conftest.py`, `tests/test_market_breadth.py`, `tests/test_sector_history_consistency.py`, `tests/test_sector_metrics.py`(섹터 집계 질의 `_load_weekly_snapshot`은 `RS_1M_Rating`을 읽지 않음), `backend/tests/test_bubble_rs_missing_exclusion.py`. INSERT를 열 목록 형태(`INSERT INTO relative_strength (Name, Date, RS_12M_Rating) VALUES (…)`)로 바꾼 것은 위치 삽입이 4번째 컬럼 때문에 `table has 4 columns but 3 values`로 깨지기 때문이다. 운영 코드에는 컬럼 부재 허용 분기를 넣지 않았다(REQ-RSR-009).
+
+**스위트 개수 (실행 확인).**
+
+| 시점 | `pytest tests -q` | `pytest backend/tests -q` |
+|---|---|---|
+| 기준선 `97831f4` | `1058 passed, 1 skipped, 95 deselected, 1 xpassed` (exit 0) | `4 failed, 353 passed, 1 warning, 58 errors` |
+| 2단계 직후(DDL 수정 전) | `22 failed, 1048 passed, …` | `38 failed, 319 passed, 1 warning, 58 errors` |
+| 최종 `15ba7b6` | `1070 passed, 1 skipped, 95 deselected, 1 xpassed` (exit 0, +12 = M4 신규) | `4 failed, 353 passed, 1 warning, 58 errors` |
+
+`backend/tests`의 실패·오류 노드 ID 62개는 기준선과 최종이 `diff` 결과 동일(`IDENTICAL`, `b.ids`/`a.ids`). 58 errors는 스위트 순서 오염(`ImportError: cannot import name 'get_sector_registry' from '<unknown module name>'`)이다. 이 오류 4개 파일(`test_bubble_characterization`·`test_bubble_ranking_parity`·`test_bubble_schema_nullable`·`test_stocks_master`)을 단독 실행하면 `97831f4`의 `git archive` 사본(scratchpad)과 최종 트리 모두 `11 failed, 54 passed`이고 실패 ID가 동일하다(`base_iso_4files.log`/`after_iso_4files.log`, `diff` → `IDENTICAL`). 실패 원인은 라이브 데이터 사본 기준 섹터 집합·거래대금 고정값 불일치로, M4 필드와 무관하다.
+
+**린트.** `uvx ruff check --output-format concise <변경 운영 12개 + 신규 테스트 3개>` → `I001` 9건(import 정렬). 같은 명령을 `97831f4` 사본에서 운영 12개에 돌리면 같은 9건(줄 번호만 이동) — 새 린트 0건. 신규 테스트 3개 단독 → `All checks passed!` (`ruff_after.log`).
+
+**커버리지.** `coverage run --include=<변경 서비스·분석 모듈 7개> -m pytest <M4 테스트 3개 + test_meta_service·test_stage_classifier·test_sector_metrics·test_sector_advanced·test_stage_service>` → `102 passed`, `TOTAL 1406 216 85%`(`meta_service.py` 91%, `stage_classifier.py` 100%, `sector_metrics.py` 90%). 변경 줄만 따로: `git diff -U0` 추가 줄 ∩ 미실행 줄 = 7개 파일 모두 `미실행 0` (`changed_cov.log`).
+
+**리허설(라이브 아님).** 워크트리 `Output/` 사본(주 원본에서 읽기 전용 복사)을 다시 `.moai/state/verify/c1bf371e/m4/rehearsal/daily_copy.db`로 복사해 `rebuild_stock_meta()`를 실행 → exit 0. 검증(`rehearsal/check.log`): 컬럼 28개, 마지막 `(27, 'rs_1m')`; 최신 주차 `2026-10-16`, 행 2527개, `rs_1m` 비NULL 2387개; 주간 `RS_1M_Rating`과 불일치 0건, `rs_12m`과 `RS_12M_Rating` 불일치 0건; 재구축 전 사본과 비교한 22개 컬럼에서 다른 칸 52개는 전부 `market`(예: `KOSDAQ` → `KOSDAQ GLOBAL`) — 워크트리 등록부(`Input/sectormap-original.xlsx`)와 주 체크아웃 등록부의 차이이며 위치 시프트는 0. 워크트리에는 `Input/basic_data.xlsx`가 없어 시가총액은 NULL로 들어갔다(라이브에서는 원본 파일을 읽는다).
+
+**코드베이스 주장과 프로브 (lessons #10).**
+- 라이브 `stock_meta`는 아직 `rs_1m`이 없다: 주 체크아웃 일봉 DB를 `mode=ro&immutable=1`로 열어 `PRAGMA table_info(stock_meta)` → `27 ['ma200_w', 'last_updated', 'sma150', 'low52w', 'sma200_20d_ago', 'sma5']`, `count(*), max(last_updated)` → `(2533, '2026-10-16T23:15:38.190921')`.
+- 라이브 재구축이 쓰는 파일은 `backend.deps.DAILY_DB_PATH = f"{DEFAULT_DB_DAILY}.db"`이고 `DEFAULT_DB_DAILY = str(OUTPUT_DIR / "stock_data_daily")`, `OUTPUT_DIR = Path(__file__).parent.parent / "Output"`(`my_chart/config.py:36`) — 즉 import된 `my_chart` 패키지 기준 `Output/`이다.
+- 스크립트 파일을 `python <경로>`로 실행하면 `sys.path[0]`이 스크립트 디렉터리가 되어 다른 `my_chart`(`/Users/byunjungwon/Dev/my_chart`, import 시 KRX 로그인 시도)가 잡힌다 — 리허설 검증 첫 시도에서 `ModuleNotFoundError: No module named 'my_chart.analysis.weekly_grid'`로 관측. `-c`로 실행하면 cwd가 먼저 잡혀 이 저장소 패키지가 쓰인다(`print(my_chart.__file__)` 확인).
+- `screen_stage2_entry()` 반환 dict에 `rs_1m` 키가 늘었다. 이를 소비하는 `scripts/rs_eval/stage2_ratio_eval.py`의 도구 테스트 6건은 최종 스위트에서 통과했다.
+
+**미검증 (Gaps).**
+- AC-RSR-007 라이브 단계(재구축 후 라이브 두 DB 대조)는 이번 실행 범위 밖이다.
+- 프론트 타입·화면(M5)과 dev 서버 재시작 후 응답 확인은 하지 않았다. 새 필드는 모두 선택 필드라 기존 프론트 타입은 그대로 컴파일된다고 보지만, `tsc`는 돌리지 않았다.
+- `backend/tests`의 기존 실패(4 failed / 58 errors, 단독 실행 시 11 failed)는 원인을 고치지 않았다.
+- `/sectors/bubble`(섹터 버블)·트리맵 경로는 `_get_rs_on_date` 반환형 변경 후 기존 테스트로만 확인했고 새 단언은 없다(두 경로는 `rs_1m`을 쓰지 않음).
+
+**잔여 위험.**
+- 라이브 재구축은 `stock_meta` 전체를 `DELETE` 후 다시 넣는다. 서버가 같은 파일을 읽는 중이면 짧은 쓰기 잠금 경합이 생길 수 있다.
+- 재구축은 `rs_1m`만이 아니라 `rs_12m`(M2 새 산식 값), `market_cap`, 등록부 기반 `market`·섹터, `last_updated`도 함께 갱신한다 — 일봉 화면의 `rs_12m` 기반 값(스크리닝 T8 등)이 이 시점에 새 산식으로 바뀐다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
