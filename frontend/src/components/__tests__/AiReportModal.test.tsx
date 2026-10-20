@@ -3,9 +3,9 @@
  *
  * AC-014 인수 기준 검증:
  * - 두 모드 버튼 렌더링 (빠른 분석 기본 선택)
- * - 심층 분석 클릭 시 활성 상태 전환
+ * - Goose(옛 심층 분석) 클릭 시 활성 상태 전환 — SPEC-AI-REPORT-004 M6 라벨 변경
  * - 스트리밍 중 양쪽 버튼 비활성화
- * - 심층 분석 선택 후 다시 시도 클릭 시 mode='deep' 전달
+ * - Goose 선택 후 다시 시도 클릭 시 mode='deep' 전달
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -60,7 +60,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
     render(<AiReportModal {...makeProps()} />)
 
     const fastBtn = screen.getByRole('tab', { name: '빠른 분석' })
-    const deepBtn = screen.getByRole('tab', { name: /심층 분석/ })
+    const deepBtn = screen.getByRole('tab', { name: 'Goose' })
 
     expect(fastBtn).toBeInTheDocument()
     expect(deepBtn).toBeInTheDocument()
@@ -74,10 +74,10 @@ describe('AiReportModal — 2단 모드 토글', () => {
     expect(deepBtn).not.toHaveClass('active')
   })
 
-  it('심층 분석 버튼 클릭 시 활성 상태가 전환된다', () => {
+  it('Goose 버튼 클릭 시 활성 상태가 전환된다', () => {
     render(<AiReportModal {...makeProps()} />)
 
-    const deepBtn = screen.getByRole('tab', { name: /심층 분석/ })
+    const deepBtn = screen.getByRole('tab', { name: 'Goose' })
     const fastBtn = screen.getByRole('tab', { name: '빠른 분석' })
 
     fireEvent.click(deepBtn)
@@ -92,7 +92,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
     render(<AiReportModal {...makeProps({ status: 'streaming' })} />)
 
     const fastBtn = screen.getByRole('tab', { name: '빠른 분석' })
-    const deepBtn = screen.getByRole('tab', { name: /심층 분석/ })
+    const deepBtn = screen.getByRole('tab', { name: 'Goose' })
 
     expect(fastBtn).toBeDisabled()
     expect(deepBtn).toBeDisabled()
@@ -114,7 +114,7 @@ describe('AiReportModal — 2단 모드 토글', () => {
     expect(fastBtn).not.toBeDisabled()
   })
 
-  it('심층 분석 선택 후 다시 시도 클릭 시 onRetry가 mode="deep"으로 호출된다', () => {
+  it('Goose 선택 후 다시 시도 클릭 시 onRetry가 mode="deep"으로 호출된다', () => {
     const onRetry = vi.fn()
     render(
       <AiReportModal
@@ -126,8 +126,8 @@ describe('AiReportModal — 2단 모드 토글', () => {
       />,
     )
 
-    // 심층 분석으로 전환
-    const deepBtn = screen.getByRole('tab', { name: /심층 분석/ })
+    // Goose로 전환
+    const deepBtn = screen.getByRole('tab', { name: 'Goose' })
     fireEvent.click(deepBtn)
 
     // 다시 시도 버튼 클릭
@@ -171,30 +171,29 @@ describe('AiReportModal — 2단 모드 토글', () => {
   // Progress Panel 자체의 렌더링 로직은 ProgressPanel.test.tsx에서 검증한다.
   // 여기서는 AiReportModal이 "언제 Panel을 숨기는가"만 확인한다.
 
-  it('progress가 없으면 ProgressPanel을 렌더하지 않는다 (legacy 호환)', () => {
-    // 빠른 분석 + streaming 상태 — progress 미제공
+  it('goose가 없으면 ProgressPanel을 렌더하지 않는다 (legacy 호환)', () => {
+    // 빠른 분석 + streaming 상태 — goose 미제공
     const { container } = render(
       <AiReportModal {...makeProps({ status: 'streaming', markdown: '# 분석 중' })} />,
     )
     expect(container.querySelector('.ai-report-progress-panel')).not.toBeInTheDocument()
   })
 
-  it('deep 모드가 아닐 때(빠른 분석)는 progress가 있어도 패널을 렌더하지 않는다', () => {
-    const progress = {
-      sources: {
-        codex: { state: 'running' as const },
-        brave: { state: 'pending' as const },
-        tavily: { state: 'pending' as const },
-        naver: { state: 'pending' as const },
-        youtube: { state: 'pending' as const },
-      },
-      synthesis: { state: 'idle' as const },
-      collectingDone: false,
-    }
+  it('goose 작업이 없으면(idle) 진행 패널을 렌더하지 않는다', () => {
     const { container } = render(
-      <AiReportModal {...makeProps({ status: 'streaming', progress })} />,
+      <AiReportModal
+        {...makeProps({
+          status: 'streaming',
+          goose: {
+            status: 'idle',
+            jobId: null,
+            progress: { reached: [], researchTicks: 0, fetchStarted: 0, fetchDone: 0, lastFetch: '' },
+            result: null,
+            message: '',
+          },
+        })}
+      />,
     )
-    // 기본 모드 = fast(빠른 분석), 토글 클릭 없음
     expect(container.querySelector('.ai-report-progress-panel')).not.toBeInTheDocument()
   })
 })
