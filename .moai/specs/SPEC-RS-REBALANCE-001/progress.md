@@ -564,6 +564,64 @@ RED가 나지 않아 손대지 않은 §G "M4 조건부" 파일: `tests/conftest
 - **AC-RSR-007 라이브 단계 PASS** (두 DB immutable 읽기, ATTACH 없음, `m4_live_ac007.log`): 최신 주차 2026-10-16, 주간 등급 종목 2387 / `stock_meta` 2533행·28컬럼·마지막 컬럼 `rs_1m`, 이름 일치 2387, `rs_1m` 불일치 **0**, `rs_12m` 불일치 **0**(M2 새 산식 반영), 이번 주 미등급 146종목은 `rs_1m` NULL(비NULL 0)
 - 이 시점부터 일봉 `stock_meta.rs_12m`도 IBD식 값
 
+### M5 — 프론트 표시 (manager-develop, cycle_type=tdd, 2026-10-20)
+
+**범위.** 열기 배지(REQ-RSR-015·016·022)와 섹터 순위 테이블 `rs_med` 열(REQ-RSR-017). 서버 재시작·라이브 화면 확인은 하지 않았다(오케스트레이터 몫). 작업 위치는 L1 워크트리 `.claude/worktrees/agent-af84ec440e38a9e6c`(브랜치 `worktree-agent-af84ec440e38a9e6c`), 시작 시 `git merge --ff-only main` → `git rev-parse --short HEAD` = `1516c25`. 증거 파일은 전부 `.moai/state/verify/rsr-m5/`에 있다. 프론트 명령은 모두 `npm --prefix frontend exec vitest -- run --root frontend …` 형태(저장소 루트에서 `--root` 없이 돌리면 `.claude/worktrees` 테스트가 섞인다).
+
+**커밋.** `b7ff135` — `git commit` 출력 `17 files changed, 415 insertions(+), 10 deletions(-)`. pre-commit 게이트(`moai gate`, Python pytest만 실행)는 첫 시험 실행에서 `ModuleNotFoundError: No module named 'pkg_resources'`로 실패(`gate1.txt`: `1 failed, 1069 passed` — 새 워크트리 `.venv`의 setuptools 82.0.1 문제, M4와 같은 환경 원인). `uv pip install --python .venv/bin/python "setuptools<81"`(→ `80.10.2`) 후 커밋 시 게이트 통과로 커밋이 생성됐다. 게이트용 `Output/stock_data_{weekly,daily}.db`는 주 체크아웃에서 워크트리로 복사(원본 읽기만).
+
+**설계 결정 1건.** 술어 `isRsHeat(rs1m, threshold)`는 임계값을 인자로 받고, 두 호출부가 `RS_TOP_THRESHOLD`를 넘긴다. 술어가 `rsMetrics.ts` 내부 바인딩의 상수를 직접 읽으면 AC-RSR-011이 지정한 `vi.mock('../../utils/rsMetrics')` 상수 주입(85)이 술어에 닿지 않아(ESM 모듈 내부 참조는 목 교체 대상이 아님), "리터럴 80" 대조를 구현과 구분할 수 없다. 대조 C2a·C2b로 두 위치의 리터럴 모두 RED가 됨을 확인했다.
+
+**RED (구현 전, `1516c25` 트리 + 신규 테스트 5파일만).** `vitest run --root frontend <신규 5파일>` → `Test Files 5 failed (5)`, `Tests 12 failed | 1 passed (13)` (`red.txt`). 통과 1건은 `RS_TOP_THRESHOLD === 80` 유지 단언(REQ-RSR-022, 현행 그대로가 정답). 실패 원문 발췌:
+- `TypeError: isRsHeat is not a function` ×2, `TypeError: rsHeatTitle is not a function`
+- StockTable `AssertionError: expected null not to be null`, `expected '' to contain '80'`
+- 버블 `expected '<b>종목B</b><br/>산업명(중): 반도체<br/>주요제품: …' to contain 'rs-heat-badge'`
+- 주입 테스트 `expected null not to be null`, `expected '<b>종목E</b>…' to contain 'rs-heat-badge'`
+- 섹터 `AssertionError: expected 'RS 80+ 비중' to be 'RS Med'`, `TypeError: Cannot read properties of undefined (reading 'textContent')` ×2
+
+**AC 판정 (GREEN, 구현 트리).** `vitest run --root frontend src/utils/__tests__/rsHeat.test.ts src/utils/__tests__/rsHeat.injected.test.tsx src/utils/__tests__/rsMetrics.test.ts src/components/StockExplorer/__tests__/StockTable.rsHeat.test.tsx src/components/SectorAnalysis/__tests__/StockBubbleChart.rsHeat.test.tsx src/components/SectorAnalysis/__tests__/SectorRankingTable.rsMed.test.tsx` → `Test Files 6 passed (6)`, `Tests 18 passed (18)` (`restored.txt`, 대조 원복 후 재실행).
+
+| AC | Status | 테스트 | 양변 출처 |
+|---|---|---|---|
+| AC-RSR-011 (종목 테이블) | PASS | `StockTable.rsHeat.test.tsx` 2건 | `StockTable` 렌더 DOM의 `[data-testid="rs-heat-badge"]` 유무 vs 리터럴 사례(`79.99`·`80`·`80.01`·`null` → 없음·있음·있음·없음), title ⊇ `String(RS_TOP_THRESHOLD)` |
+| AC-RSR-011 (버블 툴팁) | PASS | `StockBubbleChart.rsHeat.test.tsx` 2건 | `echarts-for-react` 목으로 붙잡은 `option.tooltip.formatter` 반환 HTML vs 같은 4사례, `class="rs-heat-badge"` 요소의 title ⊇ 상수 문자열 |
+| AC-RSR-011 (상수 유래) | PASS | `rsHeat.injected.test.tsx` 2건 | `vi.mock('../rsMetrics')`로 `RS_TOP_THRESHOLD`=85 주입 → 두 화면 모두 `80.01` 배지 없음, `85` 배지 있음 + title ⊇ `85` |
+| AC-RSR-011 (교차 언어 등식) | PASS | `rsMetrics.test.ts` 기존 단언(변경 없음) | `sector_metrics.py` 원문에서 추출한 `_RS_TOP_THRESHOLD` vs `RS_TOP_THRESHOLD` 수치 등식 |
+| AC-RSR-012 | PASS | `SectorRankingTable.rsMed.test.tsx` 3건 | 헤더 라벨 순서 `RS Avg`→`RS Med`→`RS 80+ 비중`(인접), P 행 `30`·Q 행 `50`(둘 다 `rs_avg` 50), `rs_med: null` → `0`도 빈칸도 아님 |
+| REQ-RSR-022 | PASS | `rsHeat.test.ts` 첫 단언 | `RS_TOP_THRESHOLD` === `80` (RED 단계에서도 통과 — 값 미변경의 증거) |
+
+**대조 (lessons #9).** 운영 파일 사본을 세션 스크래치에 떠 두고 `sed`로 주입 → 대상 테스트 실행 → 사본으로 원복 → `cmp`로 바이트 동일 확인(`restored-identical` 출력) → 위 AC 명령 재실행 `18 passed`. 원문은 `contrast-*.txt`.
+
+| # | 주입 | 관측 RED(원문) |
+|---|---|---|
+| C1 | 술어 `>=` → `>` | `rsHeat.test` `expected false to be true`, StockTable `expected null not to be null`, 버블 `… to contain 'rs-heat-badge'` → `Tests 5 failed \| 3 passed (8)` |
+| C2a | 술어가 인자 무시하고 리터럴 `rs1m >= 80` | 주입(85) 테스트 StockTable `expected <span class="rs-heat-badge" …(2)></span> to be null`, 버블 `expected '<b>종목C</b>…' not to contain 'rs-heat-badge'` → `Tests 2 failed (2)` |
+| C2b | 호출부 두 곳이 `isRsHeat(…, 80)` 리터럴 | C2a와 같은 두 실패 → `Tests 2 failed (2)` |
+| C3 | 결측을 높은 값으로 `(rs1m ?? 100) >= threshold` | `rsHeat.test` `expected true to be false`, 버블 `expected '<b>종목D</b>…' not to contain 'rs-heat-badge'`, StockTable `expected <span …> to be null` → `Tests 3 failed \| 5 passed (8)` |
+| C3b | 결측을 0으로 `(rs1m ?? 0) >= threshold` | **RED 아님** — `Tests 8 passed (8)`. acceptance.md AC-RSR-011이 명시한 대로 결과가 정상 동작과 같아 오구현으로 보지 않는다(0 < 80) |
+| C4 | 중앙값 셀이 `sector.rs_avg`를 읽음 | `expected '50' to be '30'` → `Tests 1 failed \| 2 passed (3)` |
+| C5 | 중앙값 결측을 0으로 `sector.rs_med ?? 0` | `expected '0' not to be '0'` → `Tests 1 failed \| 2 passed (3)` |
+| (열 누락) | 구현 전 트리 = 열 없음 | RED 단계 `expected 'RS 80+ 비중' to be 'RS Med'` |
+
+**기존 테스트 단언 3곳 갱신 (열 추가의 기계적 결과).** RS Med 열이 `RS Avg`와 `RS 80+ 비중` 사이에 들어가 위치·개수를 단언하던 기존 테스트가 깨졌다. 변경 전 관측(`after-vitest.txt` 1차 실행, 갱신 전): `er2-screens.test.tsx` `AssertionError: expected 8 to be 7`, `SectorRankingTable.m4.test.tsx` `Found multiple elements with the text: –`(픽스처에 `rs_med`가 없어 결측 `–` 셀이 순위변동 `–`와 겹침)·`expected 5 to be 4`(ⓔ 배지 수).
+- `er2-screens.test.tsx`: 결측 픽스처에 `rs_med: null` 명시, 결측 셀 수 7 → 8. **plan.md §G 10번은 이 파일을 "변경 없음"으로 분류했다** — §G는 `rs_12m` 등 문자열 신호로 기계적으로 판정했고(§G 본문 "판정은 이 신호에서 기계적으로 정했으며"), 이 파일이 `SectorRankingTable`의 결측 셀 전수를 센다는 점은 신호에 잡히지 않았다. 단언의 의도(결측은 `–`, 실제 0은 `0.0%`, 둘이 섞이지 않음)는 그대로다.
+- `SectorRankingTable.m4.test.tsx`(§G 목록 밖): `makeSector` 기본값에 `rs_med: 50`, ⓔ 4 → 5(RS Med는 구성 종목 중앙값 = 등가중 계열).
+- `SectorRankingTable.test.tsx`(§G 목록 밖): 색 채널 분리 단언의 비중 셀 인덱스 6 → 7. 이 파일은 갱신 전에도 통과했지만, 인덱스 6이 RS Med 결측 셀(`transparent`)을 가리켜 "등급 색 ≠ 비중 색" 단언이 공허해진 상태였다.
+
+**전체 스위트 (§G "변경 없음" 프론트 테스트 포함).**
+- 변경 전 기준선(`1516c25`, 신규 파일 없음): `vitest run --root frontend` → `Test Files 1 failed | 90 passed (91)`, `Tests 819 passed (819)`, exit 1 (`baseline-vitest.txt`). 실패 파일 1개는 `e2e/preset-flow.spec.ts` — `Playwright Test did not expect test.describe() to be called here.`(Playwright 스펙이 vitest에 수집되는 기존 문제, M5 무관)
+- 변경 후: 같은 명령 → `Test Files 1 failed | 95 passed (96)`, `Tests 832 passed (832)`, exit 1 (`after-vitest.txt`). 실패 파일은 같은 `e2e/preset-flow.spec.ts` 하나. 증가분 +5파일·+13테스트 = 신규 테스트 5파일의 13건
+
+**타입 검사·린트.**
+- `npm --prefix frontend run typecheck`(`tsc -b`) → 변경 전 `exit=0`(`baseline-tsc.txt`), 변경 후 `exit=0`(`after-tsc.txt`)
+- `npm --prefix frontend run lint`(`eslint .`) → 변경 전 `✖ 47 problems (45 errors, 2 warnings)`, exit 1 / 변경 후 `✖ 47 problems (45 errors, 2 warnings)`, exit 1. 행 번호를 지운 두 출력의 `diff`는 `SectorAnalysis.tsx`의 기존 `react-hooks/set-state-in-effect` 오류가 151 → 153행으로 밀린 것뿐(이번에 `getSortValue`에 2줄 추가). 새 린트 문제 0건
+
+**범위 밖 파일 2개 (L46 귀속).** plan.md §D 목록에 없는 파일을 REQ-RSR-015·017의 직접 결과로 수정했다.
+- `frontend/src/components/SectorAnalysis/SectorAnalysis.tsx`: `getSortValue`에 `case 'rs_med'` 2줄. 없으면 RS Med 헤더 클릭이 `default`(composite)로 조용히 정렬된다
+- `frontend/src/styles/global.css`: `.rs-heat-badge` 1규칙(`stage-badge`와 같은 기하, 주황 채널 — S3 호박색·S2 적색과 구분)
+
+**미검증(Gaps).** 라이브 dev 서버 화면 확인 미실행(오케스트레이터 몫). 툴팁 배지의 title은 ECharts 툴팁이 기본적으로 마우스 진입을 받지 않아(`enterable: false`) 화면에서 호버로 읽히지 않을 수 있다 — 표시 문구 `열기`는 보인다. 커버리지 수치 미측정.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
