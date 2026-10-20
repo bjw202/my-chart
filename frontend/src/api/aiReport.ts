@@ -1,7 +1,10 @@
-/** AI 리포트 API 클라이언트: SSE 스트리밍 + 히스토리 조회. */
+/** AI 리포트 API 클라이언트: Fast SSE 스트리밍 + 히스토리 조회 + goose 작업(SPEC-AI-REPORT-004). */
 
 import client from './client'
 import type {
+  GooseActiveJob,
+  GooseProgressEvent,
+  GooseTerminalData,
   HistoryResponse,
   PhaseEvent,
   ReportContentResponse,
@@ -154,4 +157,112 @@ export function createAiReportStream(
   })()
 
   return controller
+}
+
+// ── SPEC-AI-REPORT-004 M6: goose 작업 (mode=deep) ─────────────────────────────
+// 백엔드 계약(routers/ai_report.py): POST /ai-report/{code}?mode=deep → 202(새 작업)/200(같은 종목 실행 중)
+// {job_id}, 429 {detail: {error: goose_busy | goose_rate_limit, detail}}. 진행은 작업 이벤트 SSE로 받는다.
+
+export type GooseStartResult =
+  | { ok: true; jobId: string }
+  | { ok: false; error: string; message: string }
+
+const GOOSE_DEFAULT_MESSAGES: Record<string, string> = {
+  goose_busy: '다른 종목의 Goose 분석이 진행 중입니다',
+  goose_rate_limit: 'Goose 분석 일일 한도를 모두 사용했습니다.',
+}
+
+/** goose 작업 시작. 429 본문을 읽어야 해서 axios 인터셉터 대신 fetch를 쓴다. */
+export async function startGooseJob(code: string): Promise<GooseStartResult> {
+  try {
+    const response = await fetch(`/api/ai-report/${encodeURIComponent(code)}?mode=deep`, {
+      method: 'POST',
+    })
+    const body = await response.json().catch(() => ({}))
+    if (response.ok && typeof body?.job_id === 'string') {
+      return { ok: true, jobId: body.job_id }
+    }
+    const detail = body?.detail
+    const error: string =
+      typeof detail?.error === 'string' ? detail.error : `http_${response.status}`
+    const message: string =
+      typeof detail?.detail === 'string'
+        ? detail.detail
+        : typeof detail === 'string'
+          ? detail
+          : (GOOSE_DEFAULT_MESSAGES[error] ?? `Goose 분석을 시작하지 못했습니다 (HTTP ${response.status})`)
+    return { ok: false, error, message }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.'
+    return { ok: false, error: 'network', message }
+  }
+}
+
+export interface GooseSubscriptionHandlers {
+  onProgress: (event: GooseProgressEvent) => void
+  onTerminal: (type: 'done' | 'error' | 'cancelled', data: GooseTerminalData) => void
+  /** 연결이 닫힌 오류 — 없는 작업(404, 서버 재시작 등). 네트워크 끊김 재접속 중에는 부르지 않는다. */
+  onLost: () => void
+}
+
+const GOOSE_TERMINAL_EVENTS = ['done', 'error', 'cancelled'] as const
+
+// @MX:ANCHOR: [AUTO] goose 작업 이벤트 구독 — 모달(useAiReport)의 유일한 EventSource 진입점.
+// @MX:REASON: 종료 이벤트에서 반드시 close()한다. 서버는 종료 이벤트 뒤 스트림을 닫는데, 닫지 않으면
+//             EventSource가 Last-Event-ID로 재접속을 반복한다. 재접속 중 오류(CONNECTING)는 기다리고,
+//             연결이 닫힌 오류(CLOSED — 404 등)만 작업 상실로 본다(design §4.4·§7.1).
+export function subscribeGooseJob(jobId: string, handlers: GooseSubscriptionHandlers): () => void {
+  const source = new EventSource(`/api/ai-report/jobs/${encodeURIComponent(jobId)}/events`)
+  let closed = false
+  const close = () => {
+    closed = true
+    source.close()
+  }
+  const parse = (ev: MessageEvent): unknown => {
+    try {
+      return JSON.parse(ev.data as string)
+    } catch {
+      return undefined
+    }
+  }
+
+  source.addEventListener('progress', (ev) => {
+    if (closed) return
+    const data = parse(ev as MessageEvent) as GooseProgressEvent | undefined
+    if (data && typeof data.stage === 'string') {
+      handlers.onProgress({ stage: data.stage, detail: data.detail ?? null })
+    }
+  })
+  for (const type of GOOSE_TERMINAL_EVENTS) {
+    source.addEventListener(type, (ev) => {
+      if (closed) return
+      close()
+      const data = parse(ev as MessageEvent)
+      handlers.onTerminal(type, (data && typeof data === 'object' ? data : {}) as GooseTerminalData)
+    })
+  }
+  source.onerror = () => {
+    if (closed) return
+    if (source.readyState === EventSource.CLOSED) {
+      close()
+      handlers.onLost()
+    }
+  }
+  return close
+}
+
+/** 실행 중 작업 취소 (끝난 작업은 그대로, 결과는 구독 중인 cancelled 이벤트로 받는다). */
+export async function cancelGooseJob(jobId: string): Promise<void> {
+  await client.post(`/ai-report/jobs/${encodeURIComponent(jobId)}/cancel`)
+}
+
+/** 서버 전체에서 실행 중인 goose 작업 (셀 폴링 전용, design §4.5). */
+export async function fetchGooseActive(): Promise<GooseActiveJob | null> {
+  const res = await client.get<GooseActiveJob | null>('/ai-report/goose/active')
+  return res.data ?? null
+}
+
+/** 보관된 goose 리포트 HTML 경로 — 백엔드 종료 이벤트의 report_url과 같은 모양. */
+export function gooseReportUrl(code: string, run: string): string {
+  return `/api/ai-report/${encodeURIComponent(code)}/goose/${encodeURIComponent(run)}/report.html`
 }

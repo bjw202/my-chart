@@ -13,6 +13,7 @@ import { rating0 } from '../common/MetricCell'
 import { RS_TOP_THRESHOLD } from '../../utils/rsMetrics'
 import { AnalysisModal } from '../AnalysisModal'
 import { useAiReport } from '../../hooks/useAiReport'
+import { useGooseActive } from '../../hooks/useGooseActive'
 import { AiReportModal } from '../AiReportModal'
 
 // 시가총액(원 단위)을 간결하게 포맷
@@ -80,28 +81,42 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
   // AI 리포트
   const aiReport = useAiReport()
   const [aiModalOpen, setAiModalOpen] = useState(false)
+  // SPEC-AI-REPORT-004 M6: 같은 탭에서 시작한 goose 작업이 서버에서 실행 중인지 (design §7.2)
+  const gooseActive = useGooseActive(stock.code)
 
   // SPEC-AI-REPORT-002 v1.0.3: AI 버튼 클릭 시 즉시 분석 시작하지 않고
   // idle 상태로 모달만 열어 사용자가 모드(빠른/심층)를 명시적으로 선택 후 시작 버튼 누르도록 변경.
+  // SPEC-AI-REPORT-004 M6: 같은 탭에 저장된 goose 작업이 있으면 다시 구독(처음부터 전체 재생).
   const handleOpenAiReport = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     setAiModalOpen(true)
     aiReport.reset()  // 이전 결과 클리어 + status='idle'
-  }, [aiReport])
+    aiReport.resumeGoose(stock.code)
+  }, [stock.code, aiReport])
 
+  // @MX:NOTE: [AUTO] 닫기는 Fast 스트림을 끊고(abort) goose는 구독만 끊는다 — goose 작업은 서버에서
+  //           계속되고 저장 키(goose_job:{code})도 남는다. 취소는 모달의 취소 버튼으로만 한다(REQ-020).
   const handleCloseAiReport = useCallback(() => {
     setAiModalOpen(false)
     aiReport.abort()
     aiReport.reset()
   }, [aiReport])
 
-  const handleStartAiReport = useCallback((mode: 'fast' | 'deep') => {
-    aiReport.startStream(stock.code, mode)
+  const runAiReport = useCallback((mode: 'fast' | 'deep') => {
+    if (mode === 'deep') {
+      void aiReport.startGoose(stock.code)
+    } else {
+      aiReport.startStream(stock.code, 'fast')
+    }
   }, [stock.code, aiReport])
 
+  const handleStartAiReport = useCallback((mode: 'fast' | 'deep') => {
+    runAiReport(mode)
+  }, [runAiReport])
+
   const handleRetryAiReport = useCallback((mode?: 'fast' | 'deep') => {
-    aiReport.startStream(stock.code, mode ?? 'fast')
-  }, [stock.code, aiReport])
+    runAiReport(mode ?? 'fast')
+  }, [runAiReport])
 
   const handleLoadAiHistory = useCallback(() => {
     aiReport.loadHistory(stock.code)
@@ -392,7 +407,7 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           TR
         </button>
         <button
-          className={`chart-cell-ai-btn${aiReport.status === 'streaming' ? ' chart-cell-ai-btn--active' : ''}`}
+          className={`chart-cell-ai-btn${aiReport.status === 'streaming' || gooseActive ? ' chart-cell-ai-btn--active' : ''}`}
           onClick={handleOpenAiReport}
           title="AI 기업 분석"
         >
@@ -445,7 +460,8 @@ export function ChartCell({ stock, isSelected, onClick, timeframe }: ChartCellPr
           markdown={aiReport.markdown}
           errorMessage={aiReport.errorMessage}
           history={aiReport.history}
-          progress={aiReport.progress}
+          goose={aiReport.goose}
+          onCancelGoose={aiReport.cancelGoose}
           onClose={handleCloseAiReport}
           onStart={handleStartAiReport}
           onRetry={handleRetryAiReport}

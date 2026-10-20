@@ -1,18 +1,19 @@
 /**
  * AI 기업 분석 리포트 모달.
  *
- * Codex CLI SSE 스트리밍(Fast) 또는 Claude 합성(Deep)을 실시간 마크다운으로 렌더링하고,
- * 히스토리 탭에서 이전 분석을 조회할 수 있다.
+ * Codex CLI SSE 스트리밍(Fast)은 실시간 마크다운으로, goose 작업(SPEC-AI-REPORT-004)은 진행 패널 +
+ * sandbox iframe HTML 리포트로 보여 주고, 히스토리 탭에서 이전 분석(markdown / goose)을 조회할 수 있다.
  * AnalysisModal 패턴(portal + ESC + backdrop) 동일 적용.
- * SPEC-AI-REPORT-002 D4: 헤더에 2단 모드 토글(빠른 분석 / 심층 분석) 추가.
+ * SPEC-AI-REPORT-002 D4: 헤더에 2단 모드 토글(빠른 분석 / Goose) — 값은 'fast' | 'deep'.
  */
 import React, { useEffect, useCallback, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { AiReportStatus, DeepProgress, HistoryItem } from '../types/aiReport'
-import type { AiReportMode } from '../api/aiReport'
+import type { AiReportStatus, GooseJobState, HistoryItem } from '../types/aiReport'
+import { gooseReportUrl, type AiReportMode } from '../api/aiReport'
 import { ProgressPanel } from './ProgressPanel'
+import { GooseReportView } from './GooseReportView'
 
 // ── 탭 타입 ─────────────────────────────────────────────────────────────────
 
@@ -28,10 +29,12 @@ interface AiReportModalProps {
   errorMessage: string
   history: HistoryItem[]
   /**
-   * SPEC-AI-REPORT-002 v1.0.4: 심층 분석 진행 상태.
-   * 미제공 시 ProgressPanel을 렌더하지 않음 (backward compat — 테스트 호환).
+   * SPEC-AI-REPORT-004 M6: goose 작업 상태(진행·결과·오류).
+   * 미제공 시 goose 화면을 렌더하지 않음 (backward compat — 테스트 호환).
    */
-  progress?: DeepProgress
+  goose?: GooseJobState
+  /** goose 실행 중 취소 버튼 */
+  onCancelGoose?: () => void
   onClose: () => void
   /**
    * 스트림 재시작 콜백. mode 인자를 받아 해당 모드로 분석 시작.
@@ -44,7 +47,14 @@ interface AiReportModalProps {
    */
   onStart?: (mode: AiReportMode) => void
   onLoadHistory: () => void
+  /** markdown 기록 항목 선택. goose 기록 항목은 모달 안에서 iframe으로 바로 연다. */
   onSelectHistory: (filename: string) => void
+}
+
+// goose 시작 거부(429) 안내에 덧붙이는 한 줄 (design §7.1)
+const GOOSE_NOTICE_HINTS: Record<string, string> = {
+  goose_busy: '진행 중인 분석이 끝난 뒤 다시 시도하세요.',
+  goose_rate_limit: '내일 다시 시도하세요.',
 }
 
 // ── 컴포넌트 ────────────────────────────────────────────────────────────────
@@ -60,7 +70,8 @@ export function AiReportModal({
   markdown,
   errorMessage,
   history,
-  progress,
+  goose,
+  onCancelGoose,
   onClose,
   onRetry,
   onStart,
@@ -71,8 +82,26 @@ export function AiReportModal({
   const [activeTab, setActiveTab] = useState<TabType>('result')
   const [copied, setCopied] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
-  // SPEC-AI-REPORT-002 FR-011: 2단 모드 선택 상태 ('fast' 기본값)
-  const [mode, setMode] = useState<AiReportMode>('fast')
+  const gooseActive = goose !== undefined && goose.status !== 'idle'
+  const gooseBusy = goose?.status === 'starting' || goose?.status === 'running'
+  // SPEC-AI-REPORT-002 FR-011: 2단 모드 선택 상태 ('fast' 기본값).
+  // SPEC-AI-REPORT-004: 다시 열 때 goose 작업이 있으면 Goose 모드로 연다(모달은 열 때마다 새로 마운트).
+  const [mode, setMode] = useState<AiReportMode>(() => (gooseActive ? 'deep' : 'fast'))
+  // 기록 탭에서 연 goose 리포트 (선택 시 결과 탭에 iframe으로 표시)
+  const [selectedGoose, setSelectedGoose] = useState<HistoryItem | null>(null)
+  const toggleDisabled = status === 'streaming' || gooseBusy
+  // Fast 화면(스트리밍·완료·오류·기록 로딩)이 있으면 그것을 우선한다. 훅이 두 화면을 동시에 만들지 않는다.
+  const showGoose = mode === 'deep' && gooseActive && status === 'idle' && !selectedGoose
+
+  // 새 분석을 시작하면 기록에서 연 goose 리포트 화면을 내린다.
+  const handleStart = (m: AiReportMode) => {
+    setSelectedGoose(null)
+    onStart?.(m)
+  }
+  const handleRetry = (m: AiReportMode) => {
+    setSelectedGoose(null)
+    onRetry(m)
+  }
 
   // ESC 키로 모달 닫기
   useEffect(() => {
@@ -162,7 +191,7 @@ export function AiReportModal({
               aria-selected={mode === 'fast'}
               className={`ai-report-mode-btn${mode === 'fast' ? ' active' : ''}`}
               onClick={() => setMode('fast')}
-              disabled={status === 'streaming'}
+              disabled={toggleDisabled}
             >
               빠른 분석
             </button>
@@ -172,9 +201,9 @@ export function AiReportModal({
               aria-selected={mode === 'deep'}
               className={`ai-report-mode-btn${mode === 'deep' ? ' active' : ''}`}
               onClick={() => setMode('deep')}
-              disabled={status === 'streaming'}
+              disabled={toggleDisabled}
             >
-              심층 분석 (수분 소요)
+              Goose
             </button>
           </div>
           <div className="ai-report-actions">
@@ -214,66 +243,112 @@ export function AiReportModal({
         <div className="ai-report-body" ref={scrollRef}>
           {activeTab === 'result' && (
             <>
-              {/* SPEC-AI-REPORT-002 v1.0.4: 심층 분석 진행 상태 패널.
-                  딥 모드에서 streaming/done 상태일 때 본문 위에 노출.
-                  progress가 제공되지 않으면 렌더하지 않음 (빠른 분석 + legacy 호출). */}
-              {progress &&
-                mode === 'deep' &&
-                (status === 'streaming' || status === 'done') && (
-                  <ProgressPanel progress={progress} />
-                )}
-
-              {/* 스트리밍 / 완료: 마크다운 렌더링 */}
-              {(status === 'streaming' || status === 'done') && markdown && (
-                <div className="ai-report-content">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
-                </div>
+              {/* SPEC-AI-REPORT-004 M6: 기록 탭에서 연 goose 리포트 */}
+              {selectedGoose && selectedGoose.run && (
+                <GooseReportView
+                  reportUrl={gooseReportUrl(code, selectedGoose.run)}
+                  deliveryStatus={selectedGoose.delivery_status === 'final' ? 'final' : 'draft'}
+                  interrupted={selectedGoose.interrupted === true}
+                />
               )}
 
-              {/* 완료 후: 선택한 모드(빠른/심층)로 다시 분석 (SPEC-AI-REPORT-002 v1.0.1 UI 보완) */}
-              {status === 'done' && markdown && (
-                <div className="ai-report-rerun">
-                  <button className="ai-report-retry-btn" onClick={() => onRetry(mode)}>
-                    {mode === 'deep' ? '심층 분석으로 다시 시도' : '빠른 분석으로 다시 시도'}
-                  </button>
-                </div>
+              {/* SPEC-AI-REPORT-004 M6: goose 작업 화면 (진행 패널 + 취소 / 결과 iframe / 오류·취소 안내) */}
+              {showGoose && goose && (
+                <>
+                  {gooseBusy && (
+                    <>
+                      <ProgressPanel progress={goose.progress} />
+                      <div className="ai-report-goose-actions">
+                        <button
+                          type="button"
+                          className="ai-report-retry-btn"
+                          onClick={onCancelGoose}
+                          disabled={goose.status !== 'running'}
+                        >
+                          분석 취소
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {goose.result && (
+                    <GooseReportView
+                      reportUrl={goose.result.reportUrl}
+                      deliveryStatus={goose.result.deliveryStatus}
+                      interrupted={goose.result.interrupted}
+                    />
+                  )}
+                  {(goose.status === 'error' || goose.status === 'cancelled') && (
+                    <div className="ai-report-error">
+                      <span className="ai-report-error-text">{goose.message}</span>
+                      {goose.errorKind && GOOSE_NOTICE_HINTS[goose.errorKind] && (
+                        <span className="ai-report-state-text">{GOOSE_NOTICE_HINTS[goose.errorKind]}</span>
+                      )}
+                      {onStart && (
+                        <button className="ai-report-retry-btn" onClick={() => handleStart('deep')}>
+                          다시 시도
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* 스트리밍 중 타이핑 인디케이터 */}
-              {status === 'streaming' && (
-                <div className="ai-report-typing">
-                  <span className="ai-report-typing-dot" />
-                  <span className="ai-report-typing-dot" />
-                  <span className="ai-report-typing-dot" />
-                </div>
-              )}
-
-              {/* 저장된 리포트 로딩 중 */}
-              {status === 'loading-history' && (
-                <div className="ai-report-state-center">
-                  <span className="ai-report-state-text">리포트를 불러오는 중...</span>
-                </div>
-              )}
-
-              {/* 에러 상태 */}
-              {status === 'error' && (
-                <div className="ai-report-state-center">
-                  {markdown && (
-                    <div className="ai-report-content ai-report-content--partial">
+              {/* Fast 화면 — 기록에서 연 goose 리포트가 있으면 숨긴다 */}
+              {!selectedGoose && (
+                <>
+                  {/* 스트리밍 / 완료: 마크다운 렌더링 */}
+                  {(status === 'streaming' || status === 'done') && markdown && (
+                    <div className="ai-report-content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
                     </div>
                   )}
-                  <div className="ai-report-error">
-                    <span className="ai-report-error-text">{errorMessage}</span>
-                    <button className="ai-report-retry-btn" onClick={() => onRetry(mode)}>
-                      다시 시도
-                    </button>
-                  </div>
-                </div>
+
+                  {/* 완료 후: 선택한 모드(빠른/심층)로 다시 분석 (SPEC-AI-REPORT-002 v1.0.1 UI 보완) */}
+                  {status === 'done' && markdown && (
+                    <div className="ai-report-rerun">
+                      <button className="ai-report-retry-btn" onClick={() => handleRetry(mode)}>
+                        {mode === 'deep' ? 'Goose로 다시 시도' : '빠른 분석으로 다시 시도'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 스트리밍 중 타이핑 인디케이터 */}
+                  {status === 'streaming' && (
+                    <div className="ai-report-typing">
+                      <span className="ai-report-typing-dot" />
+                      <span className="ai-report-typing-dot" />
+                      <span className="ai-report-typing-dot" />
+                    </div>
+                  )}
+
+                  {/* 저장된 리포트 로딩 중 */}
+                  {status === 'loading-history' && (
+                    <div className="ai-report-state-center">
+                      <span className="ai-report-state-text">리포트를 불러오는 중...</span>
+                    </div>
+                  )}
+
+                  {/* 에러 상태 */}
+                  {status === 'error' && (
+                    <div className="ai-report-state-center">
+                      {markdown && (
+                        <div className="ai-report-content ai-report-content--partial">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+                        </div>
+                      )}
+                      <div className="ai-report-error">
+                        <span className="ai-report-error-text">{errorMessage}</span>
+                        <button className="ai-report-retry-btn" onClick={() => handleRetry(mode)}>
+                          다시 시도
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* 초기 / idle 상태 — SPEC-AI-REPORT-002 v1.0.3: 모드 선택 후 명시적 시작 */}
-              {status === 'idle' && (
+              {status === 'idle' && !showGoose && !selectedGoose && (
                 <div className="ai-report-idle-launcher">
                   <h3 className="ai-report-idle-title">분석 모드를 선택하세요</h3>
                   <p className="ai-report-idle-desc">
@@ -284,20 +359,20 @@ export function AiReportModal({
                       <strong>빠른 분석</strong> — Codex CLI 단일 호출, 약 2~9분 (진행 상태 실시간 표시)
                     </li>
                     <li>
-                      <strong>심층 분석</strong> — 5개 소스(Codex·Brave·Tavily·Naver·YouTube) 합성, 수분 소요
+                      <strong>Goose</strong> — Claude 기반 AI 애널리스트가 원문 근거로 HTML 리포트 작성, 수분~15분 소요
                       <br />
                       <span className="ai-report-idle-hint">
-                        💡 Codex 는 ChatGPT 구독 쿼터를 사용합니다 (API 키 불필요).
+                        💡 창을 닫아도 분석은 계속되고, 다시 열면 진행 상황을 이어서 봅니다.
                       </span>
                     </li>
                   </ul>
                   {onStart && (
                     <button
                       className="ai-report-start-btn"
-                      onClick={() => onStart(mode)}
+                      onClick={() => handleStart(mode)}
                       type="button"
                     >
-                      {mode === 'deep' ? '심층 분석 시작' : '빠른 분석 시작'}
+                      {mode === 'deep' ? 'Goose 분석 시작' : '빠른 분석 시작'}
                     </button>
                   )}
                 </div>
@@ -313,21 +388,39 @@ export function AiReportModal({
                 </div>
               ) : (
                 <ul className="ai-report-history-list">
-                  {history.map((item) => (
-                    <li key={item.filename}>
-                      <button
-                        className="ai-report-history-item"
-                        onClick={() => {
-                          onSelectHistory(item.filename)
-                          setActiveTab('result')
-                        }}
-                      >
-                        <span className="ai-report-history-date">{item.date}</span>
-                        <span className="ai-report-history-time">{item.created_at}</span>
-                        <span className="ai-report-history-file">{item.filename}</span>
-                      </button>
-                    </li>
-                  ))}
+                  {history.map((item) => {
+                    const isGoose = item.kind === 'goose'
+                    return (
+                      <li key={`${item.kind ?? 'markdown'}:${item.run ?? item.filename}`}>
+                        <button
+                          className="ai-report-history-item"
+                          onClick={() => {
+                            if (isGoose) {
+                              setSelectedGoose(item)
+                            } else {
+                              setSelectedGoose(null)
+                              onSelectHistory(item.filename)
+                            }
+                            setActiveTab('result')
+                          }}
+                        >
+                          <span className="ai-report-history-date">{item.date}</span>
+                          <span className="ai-report-history-time">{item.created_at}</span>
+                          {isGoose ? (
+                            <>
+                              <span className="ai-report-history-kind">Goose</span>
+                              <span className="ai-report-history-badge">
+                                {item.delivery_status === 'final' ? '최종' : '초안'}
+                                {item.interrupted ? ' · 중단' : ''}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="ai-report-history-file">{item.filename}</span>
+                          )}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>

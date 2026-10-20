@@ -2816,6 +2816,52 @@ html, body, #root {
 .ai-report-history-time { color: var(--text-muted); font-size: 12px; min-width: 140px; }
 .ai-report-history-file { color: var(--text-secondary); font-size: 12px; }
 
+/* SPEC-AI-REPORT-004 M6: goose 진행·리포트 화면 */
+.ai-report-progress-source { grid-template-columns: 20px 120px 1fr; }
+.ai-report-progress-source--skipped { opacity: 0.4; }
+.ai-report-progress-detail {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+.ai-report-goose-actions { display: flex; justify-content: center; padding: 8px 0; }
+.ai-report-goose-report { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.ai-report-goose-banner {
+  padding: 8px 12px;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.ai-report-goose-banner-title { font-weight: 700; color: #fbbf24; }
+.ai-report-goose-banner-desc { margin-top: 2px; color: var(--text-secondary); font-size: 12px; }
+.ai-report-goose-interrupted {
+  padding: 8px 12px;
+  border: 1px solid rgba(239, 83, 80, 0.5);
+  background: rgba(239, 83, 80, 0.08);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #ef5350;
+  font-weight: 600;
+}
+.ai-report-goose-frame {
+  width: 100%;
+  min-height: 60vh;
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: #fff;
+}
+.ai-report-history-kind {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a78bfa;
+  min-width: 44px;
+}
+.ai-report-history-badge { font-size: 11px; color: var(--text-muted); }
+
 /* ── 공용 지표 셀 (SPEC-SECTOR-UX-001 M6 / D6 / AC-SUX-052 ER-1) ──
    5상태가 화면(순위표·버블·RRG·Bump·종목탐색)과 무관하게 같은 스타일을 갖는다. */
 .metric-cell { white-space: nowrap; }

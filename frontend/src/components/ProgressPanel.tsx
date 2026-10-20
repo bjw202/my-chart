@@ -1,125 +1,106 @@
 /**
- * SPEC-AI-REPORT-003: 심층 분석 진행 상태 패널.
+ * SPEC-AI-REPORT-004 M6: goose 분석 진행 상태 패널.
  *
- * 5개 소스(Codex/Brave/Tavily/Naver/YouTube) 수집 진행 상황과
- * Claude CLI 합성 단계 상태를 시각화한다. 본문 위에 렌더링되어
- * 사용자가 "언제쯤 끝나는지 / 어디서 걸려 있는지"를 파악할 수 있다.
+ * 옛 5소스(Codex/Brave/Tavily/Naver/YouTube) + Claude 합성 패널을 goose 진행 단계로 바꿨다.
+ * 단계와 순서는 design §3.5 측정 표(stream-json → 진행 단계)를 따른다.
  */
 
 import React from 'react'
-import type { DeepProgress, SourceName, SourceProgress } from '../types/aiReport'
+import type { GooseProgress, GooseStage } from '../types/aiReport'
+import { GOOSE_STAGES } from '../utils/gooseJob'
 
 // ── 표시용 상수 ─────────────────────────────────────────────────────────────
 
-const SOURCE_LABELS: Record<SourceName, string> = {
-  codex: 'Codex 심층 리서치',
-  brave: 'Brave',
-  tavily: 'Tavily',
-  naver: 'Naver',
-  youtube: 'YouTube',
+const STAGE_LABELS: Record<GooseStage, string> = {
+  goose_start: '세션 시작',
+  plan: '분석 지침 읽기',
+  research_tick: '자료 검색',
+  fetch_start: '원문 열람 시작',
+  fetch_done: '원문 열람 완료',
+  compose: '리포트 입력 작성',
+  render_draft: '초안 만들기',
+  audit: '최종 감사',
+  render_final: '최종본 만들기',
+  session_end: '세션 종료',
 }
 
-const STATE_ICON: Record<SourceProgress['state'], string> = {
+type StageState = 'pending' | 'running' | 'done' | 'skipped'
+
+const STATE_ICON: Record<StageState, string> = {
   pending: '⏸',
   running: '⏳',
   done: '✅',
-  failed: '❌',
+  skipped: '➖',
+}
+
+const STATE_HINT: Record<StageState, string> = {
+  pending: '대기',
+  running: '진행 중…',
+  done: '',
+  skipped: '건너뜀',
 }
 
 // ── 유틸 ────────────────────────────────────────────────────────────────────
 
-function formatDuration(ms?: number): string {
-  if (ms === undefined) return ''
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
+/** 가장 늦게 도달한 단계가 진행 중, 그 앞 단계는 완료(도달하지 않았으면 건너뜀). */
+function stageStates(progress: GooseProgress): Record<GooseStage, StageState> {
+  const reached = new Set(progress.reached)
+  const maxIdx = GOOSE_STAGES.reduce((max, stage, i) => (reached.has(stage) ? i : max), -1)
+  const states = {} as Record<GooseStage, StageState>
+  GOOSE_STAGES.forEach((stage, i) => {
+    if (i < maxIdx) states[stage] = reached.has(stage) ? 'done' : 'skipped'
+    else if (i === maxIdx) states[stage] = stage === 'session_end' ? 'done' : 'running'
+    else states[stage] = 'pending'
+  })
+  return states
 }
 
-function formatCount(source: SourceName, count?: number): string {
-  if (count === undefined || count === 0) return ''
-  if (source === 'codex') {
-    // SPEC-AI-REPORT-003: Codex 는 char_count 를 바로 제공. KB로 표시하면 직관적.
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}KB`
-    return `${count}자`
-  }
-  // 나머지는 결과 건수
-  return `${count}건`
+function stageMeta(stage: GooseStage, progress: GooseProgress): string {
+  if (stage === 'research_tick' && progress.researchTicks > 0) return `${progress.researchTicks}회`
+  if (stage === 'fetch_start' && progress.fetchStarted > 0) return `${progress.fetchStarted}건`
+  if (stage === 'fetch_done' && progress.fetchDone > 0) return `${progress.fetchDone}건`
+  return ''
 }
 
 // ── 컴포넌트 ────────────────────────────────────────────────────────────────
 
 interface ProgressPanelProps {
-  progress: DeepProgress
+  progress: GooseProgress
 }
 
 export function ProgressPanel({ progress }: ProgressPanelProps): React.ReactElement {
-  const orderedSources: SourceName[] = ['codex', 'brave', 'tavily', 'naver', 'youtube']
+  const states = stageStates(progress)
 
   return (
     <div className="ai-report-progress-panel" aria-live="polite">
       <div className="ai-report-progress-header">
-        <span className="ai-report-progress-title">
-          🔄 분석 진행 상황
-        </span>
-        {progress.collectingDone && progress.successful !== undefined && progress.total && (
-          <span className="ai-report-progress-summary">
-            수집 {progress.successful}/{progress.total}
-          </span>
-        )}
+        <span className="ai-report-progress-title">🔄 Goose 분석 진행 상황</span>
       </div>
 
       <ul className="ai-report-progress-sources">
-        {orderedSources.map((name) => {
-          const src = progress.sources[name]
-          const icon = STATE_ICON[src.state]
-          const durationText = formatDuration(src.durationMs)
-          const countText = formatCount(name, src.count)
+        {GOOSE_STAGES.map((stage) => {
+          const state = states[stage]
+          const meta = stageMeta(stage, progress)
           return (
             <li
-              key={name}
-              className={`ai-report-progress-source ai-report-progress-source--${src.state}`}
+              key={stage}
+              data-stage={stage}
+              data-state={state}
+              className={`ai-report-progress-source ai-report-progress-source--${state}`}
             >
-              <span className="ai-report-progress-icon">{icon}</span>
-              <span className="ai-report-progress-name">{SOURCE_LABELS[name]}</span>
+              <span className="ai-report-progress-icon">{STATE_ICON[state]}</span>
+              <span className="ai-report-progress-name">{STAGE_LABELS[stage]}</span>
               <span className="ai-report-progress-meta">
-                {src.cached ? (
-                  <span className="ai-report-progress-cached">캐시 재사용</span>
-                ) : (
-                  <>
-                    {durationText && <span className="ai-report-progress-duration">{durationText}</span>}
-                    {countText && <span className="ai-report-progress-count">{countText}</span>}
-                  </>
+                {meta && <span className="ai-report-progress-count">{meta}</span>}
+                {stage === 'fetch_start' && progress.lastFetch && (
+                  <span className="ai-report-progress-detail">{progress.lastFetch}</span>
                 )}
-                {src.state === 'failed' && src.error && (
-                  <span className="ai-report-progress-error">{src.error}</span>
-                )}
-                {src.state === 'running' && <span className="ai-report-progress-hint">진행 중…</span>}
-                {src.state === 'pending' && <span className="ai-report-progress-hint">대기</span>}
+                {STATE_HINT[state] && <span className="ai-report-progress-hint">{STATE_HINT[state]}</span>}
               </span>
             </li>
           )
         })}
       </ul>
-
-      <div className="ai-report-progress-synthesis">
-        <span className="ai-report-progress-synth-icon">🤖</span>
-        <span className="ai-report-progress-synth-label">
-          Claude 합성
-          {progress.synthesis.model && (
-            <span className="ai-report-progress-synth-model"> ({progress.synthesis.model})</span>
-          )}
-        </span>
-        <span className="ai-report-progress-synth-state">
-          {progress.synthesis.state === 'idle' && (
-            <span className="ai-report-progress-hint">수집 대기</span>
-          )}
-          {progress.synthesis.state === 'waiting' && (
-            <span className="ai-report-progress-hint">⏳ 5개 소스 분석 중…</span>
-          )}
-          {progress.synthesis.state === 'streaming' && (
-            <span className="ai-report-progress-hint">✍️ 생성 중</span>
-          )}
-        </span>
-      </div>
     </div>
   )
 }
