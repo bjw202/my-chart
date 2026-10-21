@@ -103,6 +103,55 @@ P1~P5·P7·P8은 2026-10-21 HEAD `c8e5c20`에서, P9a·P9b·P10~P12·P15는 같�
 - 그룹 하나에 기사가 2건 이상 오는 경우, 실제 상장 종목의 기사 0건 응답, 실제 마크업 태그가 든 `body` — 모두 관측하지 못했다.
 - 호출 제한·약관(spec G3)은 여전히 미관측.
 
+### M2 — 수집 모듈 `goose_naver_prefetch.py` (2026-10-21, 카드 t19)
+
+실행 위치: 에이전트 격리 워크트리 `agent-a3f9bb90dca738a53`(기준 HEAD `1c49411`). `PY` = `/Users/byunjungwon/Dev/my_chart/.venv/bin/python`. 증거 폴더 `$S` = `.moai/state/verify/t19-run/`. 외부 네트워크 요청 0건(모든 요청은 `httpx.MockTransport`).
+
+- 기준선(AC-013, M2 착수 전, 새 파일 제외): `PY -m pytest backend/tests/test_goose_dart_prefetch.py backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py backend/tests/test_goose_storage.py backend/tests/test_goose_runner.py backend/tests/test_goose_harness.py backend/tests/test_main_goose_lifespan.py -q -p no:cacheprovider` → `267 passed, 1 warning in 17.17s` (`$S/baseline_goose.txt`)
+- 합성 픽스처 5종 추가(`build_synthetic.py`): `top_level_object.json`, `mixed_malformed_groups.json`, `two_items_group.json`, `entity_body.json`, `all_empty_items.json`(감사 부채 D-B). 결정성: 생성 → `shasum -a 256 synthetic/*` → 재생성 → `shasum` → `cmp` → `deterministic-ok`. 기존 합성 10종은 바이트 변화 없음(`git status --short`에 수정 표시 없음)
+- RED(모듈 작성 전): `PY -m pytest backend/tests/test_goose_naver_prefetch.py -q` → `E   ImportError: cannot import name 'goose_naver_prefetch' from 'backend.services'` / `1 warning, 1 error in 0.68s`
+- GREEN: 같은 명령 → `41 passed, 1 warning in 0.51s` (`$S/m2_naver_tests.txt`)
+- 커버리지(§E): `PY -m coverage run --source=backend -m pytest backend/tests/test_goose_naver_prefetch.py` → `coverage report --include='backend/services/goose_naver_prefetch.py' -m` → `goose_naver_prefetch.py  201  7  97%  82, 99-100, 165, 173, 175, 221`
+- ruff: 설치되어 있지 않음(`No module named ruff`, `which ruff` → `ruff not found`) — §E 린트 게이트는 미관측(Gap)
+
+#### 되돌림 관측 (lessons #9 — 변형 적용 → 실행 → RED 원문 → 복원)
+
+변형은 Edit로 소스에 넣고 같은 Edit로 되돌렸다. 복원 확인: 모든 되돌림 뒤 `shasum -a 256 backend/services/goose_naver_prefetch.py` → `36ed1628f0aac7a60ef4f4a36b97892ab75cb3eb34d74a1b8404fb854cccaada`(변형 전 백업과 같음), 이어서 전체 41 passed. 명령은 모두 `PY -m pytest backend/tests/test_goose_naver_prefetch.py -q -k <선택>`.
+
+| # | AC | 변형 | `-k` | RED 원문 (발췌) | 복원 뒤 |
+|---|---|---|---|---|---|
+| R1 | 005 입력 검증 | 종목코드 검사를 `if False:` | `air7_005_invalid` | `E       AssertionError: assert [<Request('GE...=10&page=1')>] == []` · `Left contains one more item: <Request('GET', 'https://m.stock.naver.com/api/news/stock/02015a?pageSize=10&page=1')>` · `3 failed, 38 deselected` | 41 passed |
+| R2 | 005 리디렉트 | `client.send(..., follow_redirects=True)` | `air7_005_redirect` | `E       AssertionError: assert 2 == 1` · `where 2 = len([<Request('GET', 'https://m.stock.naver.com/...')>, <Request('GET', 'https://evil.example.com/x')>])` (두 번째 요청은 MockTransport가 기록 — 실제 연결 없음) | 41 passed |
+| R3 | 005 선언 길이 | 선언 길이 검사만 끔 | `air7_005_declared or air7_005_streamed` | `E       assert 3 == 0` · `where 3 = <..._CountingStream ...>.read` (outcome은 스트리밍 검사로 여전히 failed — 조각 수 단언만 RED) · `1 failed, 1 passed` | 41 passed |
+| R4 | 005 스트리밍 누적 | 누적 검사만 끔 | 같음 | `E       AssertionError: assert 'too large' in 'JSONDecodeError: Expecting value: line 1 column 1 (char 0)'` · `1 failed, 1 passed` — 주의: acceptance가 적은 `outcome != "failed"`가 아니다. 본문 `xxx…`가 JSON 해석에서 실패해 outcome은 `failed`로 남고, `too large` 문구 단언이 RED를 낸다 | 41 passed |
+| R5 | 005 둘 다 | 두 검사 모두 끔 | 같음 | 두 테스트 모두 `E       AssertionError: assert 'too large' in 'JSONDecodeError: Expecting value: line 1 column 1 (char 0)'` · `2 failed` | 41 passed |
+| R6 | 005 시간 | `asyncio.wait_for` 제거, `await _send(...)`만 | `air7_005_hanging` | `E                   TimeoutError` (바깥 2초 상한, `asyncio/timeouts.py:116`) · `1 failed ... in 2.45s` | 41 passed |
+| R7 | 006 경로(V1) | `enumerate(data[:1], 1)`(첫 그룹만) | `air7_006_recorded_flattened` | `E       assert 1 == 10` · `where 1 = len([{'article_id': '0005344879', ...}])` (020150), `where 1 = len([{'article_id': '0003691095', ...}])` (000040) | 41 passed |
+| R8 | 007 `item_count`(V1) | `item_count`를 그룹 `total` 합으로 | `air7_007` | `E       assert 22 == 10` (020150) · `1 failed, 1 passed` (000040은 `total` 합 = 10이라 GREEN — P19와 같음) | 41 passed |
+| R9 | 006 모양 오류(V1) | 그룹 검사 없이 `group["items"]` 바로 순회 | `air7_006_malformed or e_mixed_malformed` | `E       AssertionError: assert [] == ['015/0005344...1/0003690339']` · `Right contains 2 more items` (예외가 최상위 처리로 가서 articles 비고 failed), AC-014 (e) `E       AssertionError: assert 'failed' == 'partial'` | 41 passed |
+| R10 | 006 엔티티 해제(V3) | `html.unescape` 제거 | `air7_006_recorded_entities or air7_006_tags_removed` | 런타임 선택 기사 `E               AssertionError: (1, 'body', '&quot;')` · `assert '&quot;' not in '제목: 오늘의 프리미...` (020150), `(3, 'body', '&quot;')` (000040); 순서 테스트 `E       assert "a'b'c & <b>리터럴</b> 태그" in "...a&#39;b&#x27;c &amp; &lt;b&gt;리터럴&lt;/b&gt; 태그\n"` | 41 passed |
+| R11 | 006 순서(V3) | 해제 먼저, 태그 제거 나중 | `air7_006_tags_removed` | `E       assert "a'b'c & <b>리터럴</b> 태그" in "...본문(...):\na'b'c & 리터럴 태그\n"` | 41 passed |
+| R12 | 006 태그 제거 | 태그 제거 단계 삭제 | `air7_006_parse_cases or air7_006_tags_removed` | `E       AssertionError: assert ('강조' in '...' and '<b>' not in '...')` · `'<b>' is contained here: <b>강조</b> 19일 오후 3시 30분 기준` | 41 passed |
+| R13 | 006 `metadata_only` | 빈 본문도 `ok` | `air7_006_parse_cases or air7_014` | `E       AssertionError: assert ('ok' == 'metadata_only'` · AC-014 (b) `E       AssertionError: assert 'complete' == 'failed'` | 41 passed |
+| R14 | 006 `+09:00` | `datetime`에 시간대 없음 | `air7_006_parse_cases or air7_007` | `E       AssertionError: assert '2026-10-21T13:52:00' == '2026-10-21T13:52:00+09:00'` | 41 passed |
+| R15 | 007 V5 교차 확인 | `article_url`에 `int(officeId)` | `air7_007` | `E           AssertionError: assert 'https://n.ne...15/0005344879' == 'https://n.ne...15/0005344879'` · `- .../article/015/0005344879` / `+ .../article/15/0005344879` (두 녹화 파일 모두 RED) | 41 passed |
+| R16 | 007 키 집합 | 항목에서 `article_url` 키 제거 | `air7_007` | `E        +  where False = all(<generator object test_air7_007_index_keys_raw_response_and_urls.<locals>.<genexpr> ...>)` (두 파일) | 41 passed |
+| R17 | 008 최상위 배열(V1, 감사 부채 D-A) | 최상위 배열 검사를 끔 | `air7_008` | `E       AssertionError: assert 'top-level JSON value is not an array' in '_ParseError: no group has an items array'` · `FAILED ...::test_air7_008_top_level_object_reports_top_level_error` · `1 failed, 11 passed` — D-A 확인: 일반 실패 테스트 `[top_level_object]`는 형제 검사 때문에 GREEN이고, 최상위 전용 오류 문구 단언만 RED | 41 passed |
+| R18 | 008 `items` 배열 전무 | 그 판정을 끔 | `air7_008` | `E       TypeError: argument of type 'NoneType' is not iterable` (`search.error`가 None) · `FAILED ...[missing_items_path]` · `FAILED ...::test_air7_008_no_group_with_items_array_is_failed_with_error` · `2 failed, 10 passed` | 41 passed |
+| R19 | 008 최상위 예외 처리 | `except Exception` → `except ZeroDivisionError` | `air7_008` | `E       RuntimeError: parser exploded` · `FAILED ...::test_air7_008_unexpected_exception_is_recorded_as_failed` (수집기 직접 실행 경로) | 41 passed |
+| R20 | 008 0건 | 0건을 `failed`로 | `air7_008_zero` | `E       AssertionError: assert 'failed' == 'no_results'` (3개 변형 모두) | 41 passed |
+| R21 | 014 | `all ok` 대신 `not any error`로 complete | `air7_014` | (b) `E       AssertionError: assert 'complete' == 'failed'` | 41 passed |
+| R22 | 014 | `ok`가 하나라도 있으면 complete | `air7_014` | `FAILED ...test_air7_014_outcome[a_mixed_status]` · `[d_parse_cases]` · `[e_mixed_malformed]` | 41 passed |
+| R23 | 014 | 모양 오류 항목을 판정에서 뺌 | `air7_014` | `E       AssertionError: assert 'complete' == 'partial'` · `FAILED ...[e_mixed_malformed]` | 41 passed |
+| R24 | 013 가드 | 테스트 도우미 `run()`의 `transport`를 `None`으로 | `air7_005_valid_code` | 선행: `PY -m pytest backend/tests/test_goose_dart_prefetch.py -k air5_014_guard -q` → `1 passed`. RED: `ERROR at teardown of test_air7_005_valid_code_sends_exactly_one_get` · `E       AssertionError: network attempt in goose test: [(b'm.stock.naver.com', 443)]` (가드는 원래 함수를 부르지 않음 — 실제 연결 없음) | 41 passed |
+
+#### M2 Gap
+
+- AC-005 R4의 RED는 acceptance가 예상한 단언(`outcome != "failed"`)이 아니라 `too large` 문구 단언에서 나왔다. 테스트 본문이 `x` 바이트라 JSON 해석이 따로 실패하기 때문이다. 결과적으로 변형은 잡히지만, outcome만 보는 검사였다면 잡지 못했다.
+- AC-002 수집기 부분(취소 전파)은 테스트가 통과하지만 "수집기가 CancelledError를 잡아 failed로 기록" 되돌림은 M3에서 작업 서비스 경로로 관측한다(AC-002 (2)).
+- ruff 미설치로 린트 게이트 미관측.
+- 실제 태그가 든 `body`, 그룹당 기사 2건, 실제 상장 종목 0건은 여전히 합성으로만 검사(spec G4).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

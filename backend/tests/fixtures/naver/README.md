@@ -1,4 +1,4 @@
-# 네이버 뉴스 픽스처 (SPEC-AI-REPORT-007 M1)
+# 네이버 뉴스 픽스처 (SPEC-AI-REPORT-007 M1·M2)
 
 goose 네이버 사전 수집 모듈(M2 `backend/services/goose_naver_prefetch.py`) 테스트용 녹화·합성 JSON이다. 테스트는 이 파일을 `httpx.MockTransport`로 돌려줄 뿐 네이버에 접속하지 않는다.
 
@@ -49,6 +49,16 @@ goose 네이버 사전 수집 모듈(M2 `backend/services/goose_naver_prefetch.p
 | `all_metadata_only.json` | 전체 10 | 모든 `body` → `""` | AC-AIR7-014 (`failed`) |
 | `missing_items_path.json` | 전체 10 | 그룹에서 `items` 키 삭제 | AC-AIR7-008 (경로 없음) |
 | `not_json.txt` | — | 녹화본 바이트 앞 50바이트(ASCII 구간에서 잘린 JSON → `JSONDecodeError`) | AC-AIR7-008 (JSON 아님) |
+
+M2에서 더한 합성 픽스처(plan.md §3 M2, 감사 부채 D-B). 만드는 방법은 위와 같고, 두 번 실행해 `shasum` 목록이 같은지 확인했다(`progress.md §E.2` M2).
+
+| 파일 | 원본 그룹 | 바꾼 것 | 쓰는 AC |
+|---|---|---|---|
+| `top_level_object.json` | 0 | 그룹 객체 하나를 최상위에 둠(배열 아님) | AC-AIR7-008 (최상위 객체 → `failed`, 오류 문구 `top-level JSON value is not an array`) |
+| `mixed_malformed_groups.json` | 0·1·2·3 | 응답 순서: 그룹 1 정상 / 그룹 2 `items` 없음 / 그룹 3 `items`가 문자열 / 그룹 4 객체가 아님(문자열) / 그룹 5 정상 기사 1건 + 객체가 아닌 기사(정수 `42`) 1건 | AC-AIR7-006 (4), AC-014 (e) |
+| `two_items_group.json` | 0·1·2 | 그룹 0에 그룹 1의 기사를 붙여 기사 2건, 그 뒤 그룹 2(그룹 2개·기사 3건) | AC-AIR7-006 (3) |
+| `entity_body.json` | 0 | `body` → `a&#39;b&#x27;c &amp; &lt;b&gt;리터럴&lt;/b&gt; <i>태그</i>` | AC-AIR7-006 7 (태그 제거 → 엔티티 해제 순서) |
+| `all_empty_items.json` | 전체 10 | 모든 그룹의 `items` → `[]` | AC-AIR7-008 (REQ-AIR7-009 두 번째 절 → `no_results`) |
 
 ## 테스트가 픽스처에서 읽어야 할 값 (lessons #10 — 손으로 옮겨 적지 않기)
 
