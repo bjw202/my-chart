@@ -186,7 +186,7 @@ async def test_ac008_decision_order(env, monkeypatch, row, running, code, which,
     if row == 6:
         assert "하나기술" in r.json()["detail"]["detail"]
     assert len(runner.calls) == calls_before  # 실행기 추가 호출 0
-    # Fast 쿼터 카운터는 건드리지 않는다
+    # Fast rate limit(분당 버스트)은 건드리지 않는다
     env.fast.check_rate_limit.assert_not_called()
     runner.release.set()
     if running_job is not None:

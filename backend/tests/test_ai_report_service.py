@@ -5,7 +5,7 @@
 - get_report_content(): path traversal 차단
 - save_report(): 동일 날짜 시퀀스 처리
 - load_prompt(): 프롬프트 로드 + 종목명 치환
-- check_rate_limit(): 일일 쿼터 + 분당 버스트
+- check_rate_limit(): 분당 버스트 (하루 횟수 제한 없음 — 2026-10-21)
 """
 
 from __future__ import annotations
@@ -54,11 +54,8 @@ def service_module(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_REPORTS_BASE", tmp_path)
     # 모듈 레벨 상태 초기화
     mod._active_analyses.clear()
-    mod._daily_call_count = 0
-    mod._daily_reset_date = ""
     mod._recent_call_timestamps.clear()
     # 테스트용 완화된 제한 설정
-    monkeypatch.setattr(mod, "AI_REPORT_DAILY_QUOTA", 5)
     monkeypatch.setattr(mod, "AI_REPORT_BURST_LIMIT", 2)
     monkeypatch.setattr(mod, "AI_REPORT_BURST_WINDOW_SEC", 2)
 
@@ -227,16 +224,13 @@ class TestRateLimit:
         # 재호출 가능해야 함
         service_module.check_rate_limit()
 
-    def test_blocks_daily_quota(self, service_module):
-        """일일 쿼터(5회) 초과 시 RateLimitError."""
-        # 윈도우 충분히 기다리며 5회 호출
-        for _ in range(5):
+    def test_many_sequential_calls_same_day_are_never_refused(self, service_module, monkeypatch):
+        """하루 호출 횟수 제한은 없다(사용자 결정 2026-10-21). 분당 한도만 지키면 같은 날 60번도 통과."""
+        clock = [1_000_000.0]
+        monkeypatch.setattr(time, "time", lambda: clock[0])
+        for _ in range(60):
             service_module.check_rate_limit()
-            time.sleep(2.1)  # 버스트 윈도우 회피
-
-        with pytest.raises(service_module.RateLimitError) as exc_info:
-            service_module.check_rate_limit()
-        assert "일일" in str(exc_info.value) or "쿼터" in str(exc_info.value)
+            clock[0] += 61  # 버스트 윈도우 밖으로 (같은 날 안)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -19,14 +19,12 @@ logger = logging.getLogger(__name__)
 # @MX:REASON: 로컬 단일 프로세스 uvicorn 전제. 프로덕션 멀티워커 전환 시 Redis로 교체 필요.
 _active_analyses: set[str] = set()
 
-# @MX:NOTE: [AUTO] v1.1.4 - Rate limiting: 일일 쿼터 + 분당 버스트 방지 (CRITICAL 보안)
-# Perplexity API 비용 폭주 방지. 단일 프로세스 로컬 앱 전제 (멀티워커면 Redis 권장).
-_daily_call_count: int = 0
-_daily_reset_date: str = ""
+# @MX:NOTE: [AUTO] v1.1.4 - Rate limiting: 분당 버스트 방지만 남긴다.
+# 하루 호출 횟수 제한(AI_REPORT_DAILY_QUOTA)은 사용자 결정(2026-10-21)으로 없앴다 — 단일 사용자 앱.
+# 단일 프로세스 로컬 앱 전제 (멀티워커면 Redis 권장).
 _recent_call_timestamps: list[float] = []
 
 # 환경변수 기반 제한 (기본값은 개인 사용 기준)
-AI_REPORT_DAILY_QUOTA = int(os.environ.get("AI_REPORT_DAILY_QUOTA", "50"))
 AI_REPORT_BURST_LIMIT = int(os.environ.get("AI_REPORT_BURST_LIMIT", "3"))  # 분당 최대
 AI_REPORT_BURST_WINDOW_SEC = 60
 
@@ -35,34 +33,20 @@ class RateLimitError(Exception):
     """Rate limit 초과 예외. HTTP 429로 변환됨."""
 
 
-# @MX:ANCHOR: [AUTO] v1.1.4 - 비용 폭주 방지 게이트. fan_in >= 2 (router + tests).
-# @MX:REASON: Perplexity API 호출 전 모든 경로가 이 함수를 통과해야 하는 invariant.
-# 일일 쿼터/분당 버스트 제한을 강제하며, 제거/우회 시 비용 통제 불가.
+# @MX:ANCHOR: [AUTO] v1.1.4 - 연속 요청 폭주 방지 게이트. fan_in >= 2 (router + tests).
+# @MX:REASON: Codex 호출 전 Fast 경로가 이 함수를 통과해야 하는 invariant.
+# 분당 버스트 제한만 강제한다(하루 횟수 제한 없음).
 def check_rate_limit() -> None:
-    """AI 리포트 요청의 rate limit 검사. 위반 시 RateLimitError 발생.
+    """AI 리포트 요청의 분당 버스트 제한 검사. 위반 시 RateLimitError 발생.
 
-    일일 쿼터와 분당 버스트 제한을 동시에 검사. 검사 통과 시 카운터 증가.
+    하루 호출 횟수는 세지 않는다. 검사 통과 시 최근 호출 시각을 기록한다.
 
     Raises:
-        RateLimitError: 쿼터 초과 또는 분당 버스트 초과.
+        RateLimitError: 분당 버스트 초과.
     """
     import time
 
-    global _daily_call_count, _daily_reset_date, _recent_call_timestamps
-
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    # 일일 카운터 자정 리셋
-    if _daily_reset_date != today:
-        _daily_call_count = 0
-        _daily_reset_date = today
-        logger.info("일일 AI 리포트 쿼터 리셋: %s", today)
-
-    # 일일 쿼터 초과 검사
-    if _daily_call_count >= AI_REPORT_DAILY_QUOTA:
-        raise RateLimitError(
-            f"일일 쿼터 초과 ({AI_REPORT_DAILY_QUOTA}회). 내일 다시 시도해 주세요."
-        )
+    global _recent_call_timestamps
 
     # 분당 버스트 검사: 윈도우 밖 타임스탬프 제거
     now = time.time()
@@ -77,12 +61,10 @@ def check_rate_limit() -> None:
             f"{wait_sec}초 후 다시 시도해 주세요."
         )
 
-    # 통과: 카운터 증가
-    _daily_call_count += 1
+    # 통과: 최근 호출 시각 기록
     _recent_call_timestamps.append(now)
     logger.info(
-        "rate limit 통과: daily=%d/%d, burst=%d/%d",
-        _daily_call_count, AI_REPORT_DAILY_QUOTA,
+        "rate limit 통과: burst=%d/%d",
         len(_recent_call_timestamps), AI_REPORT_BURST_LIMIT,
     )
 

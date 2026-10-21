@@ -108,7 +108,7 @@ async def _handle_fast_mode(code: str, stock_name: str) -> EventSourceResponse:
             detail={"error": "already_running", "detail": f"{stock_name}({code}) 분석이 이미 진행 중입니다."},
         )
 
-    # @MX:NOTE: ChatGPT 구독 쿼터 보호 rate limit (SPEC-AI-REPORT-003 NFR-002).
+    # @MX:NOTE: 분당 버스트 rate limit (SPEC-AI-REPORT-003 NFR-002). 하루 횟수 제한은 없다(2026-10-21).
     try:
         check_rate_limit()
     except RateLimitError as exc:
