@@ -1,0 +1,22 @@
+# AC-AIR7-012 live check - lead - job 11808900a8834252814d1872da5e0ca5 - run 2026-10-21 19:26:22~19:33:15 KST
+main=c16e1de server_pid=87910
+installed CLAUDE.md sha == source: 77e260e4c5a27e9f / 77e260e4c5a27e9f
+## check1 index
+outcome complete request_count 1 articles ok 10 of 10
+## check2 audit (defect codes)
+['AUDIT_INPUT_VERSION', 'AUDIT_MODE', 'AUDIT_PREVIEW_VERSION', 'AUDIT_TIME', 'LATEST_SEARCH_COMPANY_IR', 'REVIEW_CALCULATIONS', 'REVIEW_COVERAGE', 'REVIEW_OPINION', 'REVIEW_SOURCE_ACCURACY', 'REVIEW_VISUAL']
+LATEST_SEARCH_NAVER present: False
+## check3 air7_check3.py (extracted verbatim from acceptance.md; diff vs lane-2 copy: 0 lines)
+violations 0
+mode 3F+3S
+## check3 on other same-day run a5becbb9 (pre-integration, index missing)
+violations 0
+mode 3F only (outcome=missing)
+## goose naver record
+dart read currentPage=1&maxResults=100&maxLinks=10&sort=date&series=de 
+naver read 네이버 증권 모바일 뉴스 API 종목코드 020150 (pageSize=10, page=1) | note: 서버 사전 수집 10건 중 4건(01·03·05·09)만 열람했고 모두 약 150자 API 요약본입니다.
+original_news read 롯데에너지머티리얼즈 2분기 실적 2026 영업손실 말레이시아 증설 
+original_news read 롯데에너지머티리얼즈 2026년 10월 일렉포일 ESS 수주 
+industry read 동박 업황 2026 ESS 수요 SK넥실리스 솔루스 일렉포일 
+## goose self-reported company_ir gap (assumptions.md line 9)
+- 회사 IR 페이지는 직접 열람하지 못해 `company_ir` 채널 기록은 만들지 않았다. 회사 발표 내용은 언론(SBS Biz 등)에 인용된 범위에서만 사용했다.

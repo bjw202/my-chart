@@ -18,6 +18,11 @@
   세션이 끝난 뒤 같은 백그라운드 태스크에서 재검사 → 캡처 → 감수 세션 → 영수증 → 전달 상태 재계산을 이어서
   실행한다(잠금 밖, active 유지). 생성자 기본값은 둘 다 없음(기존 흐름 그대로)이고 운영용 모듈 인스턴스에만
   실제 구현을 붙인다. 끄기 스위치 `AI_REPORT_GOOSE_REVIEW=0`의 소유자는 이 서비스다(REQ-AIR6-004).
+- SPEC-AI-REPORT-007: ``naver_prefetcher``(네이버 최신 뉴스 사전 수집기)를 주입하면 DART 수집 뒤·무결성 재검사
+  앞에 ``runs/<job_id>/naver/``로 수집한다. 진행 이벤트는 새로 만들지 않는다(REQ-AIR7-004). ``code_check``(서버
+  종목 목록 조회)의 결과를 색인 ``code_validated``로 넘기며, 결과와 무관하게 수집은 실행한다(REQ-AIR7-015).
+  생성자 기본값은 둘 다 없음이고 운영용 모듈 인스턴스에만 붙인다. 끄기 스위치
+  `AI_REPORT_GOOSE_NAVER_PREFETCH=0`의 소유자는 이 서비스다(REQ-AIR7-003).
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ from typing import Any
 from backend.services import (
     goose_dart_prefetch,
     goose_harness,
+    goose_naver_prefetch,
     goose_review,
     goose_runner,
     goose_screenshot,
@@ -47,6 +53,7 @@ logger = logging.getLogger(__name__)
 
 ENV_DART_PREFETCH = "AI_REPORT_GOOSE_DART_PREFETCH"  # "0"이면 DART 사전 수집을 끈다(REQ-AIR5-004)
 ENV_REVIEW = "AI_REPORT_GOOSE_REVIEW"  # "0"이면 화면 캡처·감수 후처리를 끈다(REQ-AIR6-004)
+ENV_NAVER_PREFETCH = "AI_REPORT_GOOSE_NAVER_PREFETCH"  # "0"이면 네이버 사전 수집을 끈다(REQ-AIR7-003)
 MAX_FINISHED_JOBS = 50
 TERMINAL_STATES = ("done", "error", "cancelled")
 
@@ -123,6 +130,10 @@ class _PostResult:
 
     launched: bool = False
     receipt_blocked: bool = False
+# 호출 계약: ``await naver_prefetcher(code, out_dir, code_validated=<bool>) -> index``. 실패는 색인에 적고
+# 정상 반환, 취소만 전파한다(REQ-AIR7-002·008).
+NaverPrefetcher = Callable[..., Awaitable[Any]]
+CodeCheck = Callable[[str], bool]
 
 
 def _default_runs_root() -> Path:
@@ -191,6 +202,8 @@ class GooseJobService:
         prefetcher: Prefetcher | None = None,
         screenshotter: Screenshotter | None = None,
         reviewer: Reviewer | None = None,
+        naver_prefetcher: NaverPrefetcher | None = None,
+        code_check: CodeCheck | None = None,
         max_finished: int = MAX_FINISHED_JOBS,
     ) -> None:
         self._runner: Runner = runner or goose_runner.run_goose
@@ -200,6 +213,8 @@ class GooseJobService:
         self._prefetcher = prefetcher
         self._screenshotter = screenshotter
         self._reviewer = reviewer
+        self._naver_prefetcher = naver_prefetcher
+        self._code_check = code_check
         self._max_finished = max_finished
         self._jobs: dict[str, Job] = {}
         self._active_job_id: str | None = None
@@ -270,7 +285,10 @@ class GooseJobService:
         try:
             if self._prefetcher is not None:
                 await self._prefetch(job)
-                # 수집 때문에 시작 판정 검사와 claude 실행 사이가 벌어진다 — 실행 직전에 다시 검사한다(T13)
+            if self._naver_prefetcher is not None:
+                await self._prefetch_naver(job)  # DART 뒤·무결성 재검사 앞(REQ-AIR7-001)
+            if self._prefetcher is not None or self._naver_prefetcher is not None:
+                # 수집 때문에 시작 판정 검사와 claude 실행 사이가 벌어진다 — 실행 직전에 다시 검사한다(T13, 007 T7)
                 integrity = await asyncio.to_thread(self._integrity)
                 if not integrity.ok:
                     logger.error("goose 작업 %s 실행 직전 무결성 재검사 실패 — 실행하지 않음: %s",
@@ -444,6 +462,35 @@ class GooseJobService:
         selected = await asyncio.to_thread(goose_runner.select_report, self._runs_root() / job.job_id)
         return selected[0] if selected else None
 
+    async def _code_validated(self, job: Job) -> bool:
+        """서버 종목 목록 조회 결과(REQ-AIR7-015). 확인 함수가 없거나 예외를 던지면 False."""
+        if self._code_check is None:
+            return False
+        try:
+            # 첫 호출은 종목 목록(엑셀)을 읽을 수 있어 이벤트 루프를 막지 않게 스레드로 넘긴다
+            return bool(await asyncio.to_thread(self._code_check, job.code))
+        except Exception:  # noqa: BLE001 - 확인 실패는 기록만 하고 수집은 계속한다(D9)
+            logger.exception("goose 작업 %s 종목코드 확인 실패 — code_validated=false", job.job_id)
+            return False
+
+    # @MX:ANCHOR: [AUTO] _prefetch_naver — 네이버 사전 수집 단계의 단일 정의(REQ-AIR7-001~004·008·015).
+    # @MX:REASON: 끄기 스위치 판단·code_validated 전달·fail-open의 소유자가 여기다. 진행 이벤트를 보내지 않는다
+    #             (AC-004). except를 BaseException으로 넓히면 취소가 삼켜져 goose가 실행된다(AC-002).
+    # @MX:SPEC: SPEC-AI-REPORT-007
+    async def _prefetch_naver(self, job: Job) -> None:
+        out_dir = self._runs_root() / job.job_id / "naver"
+        validated = await self._code_validated(job)
+        if os.environ.get(ENV_NAVER_PREFETCH, "").strip() == "0":
+            try:
+                goose_naver_prefetch.write_disabled_index(out_dir, job.code, code_validated=validated)
+            except Exception:  # noqa: BLE001 - 색인 쓰기 실패도 goose 실행을 막지 않는다
+                logger.exception("goose 작업 %s 네이버 사전 수집 끄기 색인 쓰기 실패", job.job_id)
+            return
+        try:
+            await self._naver_prefetcher(job.code, out_dir, code_validated=validated)
+        except Exception:  # noqa: BLE001 - fail-open(REQ-AIR7-008). CancelledError는 Exception이 아니라 전파된다
+            logger.exception("goose 작업 %s 네이버 사전 수집 실패 — goose 실행은 계속", job.job_id)
+
     async def _call_finish_hook(
         self, job: Job, result: goose_runner.RunResult | None, ending: tuple[str, str | None]
     ) -> dict[str, Any]:
@@ -533,13 +580,24 @@ class GooseJobService:
 # @MX:WARN: [AUTO] 프로세스 전역 작업 서비스 — 라우터·lifespan이 같은 인스턴스를 쓴다.
 # @MX:REASON: 서버 전체 동시 1개(D10)와 이벤트 재생은 단일 uvicorn 워커의 메모리 상태에 의존한다.
 #             워커를 늘리면 작업이 워커별로 갈라진다. 테스트는 set_service()로 교체한다.
-# 보관 훅(M5)과 DART 사전 수집기(SPEC-AI-REPORT-005)는 이 운영용 인스턴스에만 붙인다. 생성자 기본값은
-# 훅·수집기 없음 — 테스트가 만든 서비스가 실제 backend/reports에 쓰거나 DART에 요청하지 않게 한다.
+# 보관 훅(M5)·DART 사전 수집기(SPEC-AI-REPORT-005)·네이버 사전 수집기와 종목코드 확인(SPEC-AI-REPORT-007)은
+# 이 운영용 인스턴스에만 붙인다. 생성자 기본값은 모두 없음 — 테스트가 만든 서비스가 실제 backend/reports에
+# 쓰거나 DART·네이버에 요청하지 않게 한다.
+def _server_code_check(code: str) -> bool:
+    """라우터와 같은 서버 종목 목록 조회(네트워크 없음, spec §2.7). 목록에 있으면 True."""
+    # 지연 가져오기: my_chart.registry(종목 목록 엑셀) 로드를 첫 확인 때까지 미룬다
+    from backend.services import ai_report_service
+
+    return ai_report_service.get_stock_name(code) is not None
+
+
 _service = GooseJobService(
     on_finish=goose_storage.make_finish_hook(runs_root=_default_runs_root),
     prefetcher=goose_dart_prefetch.DartPrefetcher(),
     screenshotter=goose_screenshot.capture,
     reviewer=goose_runner.run_review,
+    naver_prefetcher=goose_naver_prefetch.NaverPrefetcher(),
+    code_check=_server_code_check,
 )
 
 

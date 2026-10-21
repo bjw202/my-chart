@@ -66,6 +66,7 @@ Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
 | SPEC-AI-REPORT-003 | Perplexity → Codex 전면 대체 — 빠른 분석이 Codex CLI를 쓰도록 전환 (Implemented) |
 | SPEC-AI-REPORT-004 | 심층 분석을 Goose 스킬 하네스로 교체 — 헤드리스 `claude -p` 작업 큐 + SSE 진행 표시 + sandbox iframe HTML 리포트 (2026-10-20) |
 | SPEC-AI-REPORT-005 | Goose DART 원문 사전 수집 — 서버가 goose 실행 직전에 정기보고서 재무제표·주석·감사/검토보고서를 받아 `runs/<job_id>/dart/`에 둔다 (2026-10-21) |
+| SPEC-AI-REPORT-007 | Goose 네이버 최신 뉴스 사전 수집 — 서버가 goose 실행 직전에 네이버 모바일 뉴스 JSON을 받아 `runs/<job_id>/naver/`에 둔다 (2026-10-21) |
 
 ### 🛠️ 데이터 인프라
 
@@ -180,9 +181,9 @@ KRX_PW=your_krx_password
 
 **재무 분석 (FS 버튼)** — SPEC-FNGUIDE-ENGINE-001: FnGuide S-RIM 8섹션 대시보드 (사업실적·건전성·대차대조표·수익률분해·이익워터폴·활동성·추세신호·5개질문)
 
-**AI 기업 분석 (AI 버튼)** — SPEC-AI-REPORT-003/004/005: 2모드 AI 분석
+**AI 기업 분석 (AI 버튼)** — SPEC-AI-REPORT-003/004/005/007: 2모드 AI 분석
 - **빠른 분석** (약 2~9분): Codex CLI(`codex exec`) 단일 호출로 markdown 리포트를 스트리밍
-- **Goose** (약 3~6분): 서버가 DART 정기보고서 원문을 먼저 받아 둔 뒤, 헤드리스 `claude -p`가 goose 스킬 하네스로 종목 리포트를 작성해 단일 HTML로 보여줌 (모달을 닫아도 서버에서 계속 진행)
+- **Goose** (약 3~6분): 서버가 DART 정기보고서 원문과 네이버 최신 뉴스를 먼저 받아 둔 뒤, 헤드리스 `claude -p`가 goose 스킬 하네스로 종목 리포트를 작성해 단일 HTML로 보여줌 (모달을 닫아도 서버에서 계속 진행)
 
 ### 5️⃣ Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001/002/003, SPEC-STOCK-TOOLTIP-PRODUCT-001
 
@@ -211,6 +212,10 @@ KRX_PW=your_krx_password
    - **실패해도 진행**: 검색 결과가 한 회사로 좁혀지지 않거나 요청이 실패·시간 초과되면 그 사실을 색인(`outcome`: `complete`·`partial`·`failed`·`company_unresolved`)에 적고 goose 실행은 그대로 이어간다. 수집 중 취소하면 goose를 실행하지 않는다.
    - **재검사와 표시**: 수집이 끝나면 하네스 무결성을 다시 검사한 뒤 goose를 실행한다. 진행 패널에는 첫 단계 `공시 원문 수집`으로 보인다.
    - **끄기**: `AI_REPORT_GOOSE_DART_PREFETCH=0`이면 수집하지 않고 `outcome: disabled` 색인만 남긴다(진행 단계 표시도 없음).
+   - **네이버 최신 뉴스 사전 수집** (SPEC-AI-REPORT-007) — DART 수집이 끝나면 이어서 네이버 증권 모바일 뉴스 API(`m.stock.naver.com/api/news/stock/<code>?pageSize=10&page=1`, 인증키 불필요)를 한 번 불러 최신 기사 최대 10건을 받는다. 기사마다 제목·언론사·게시 시각·본문을 평문 텍스트 파일로, 원본 응답을 `response.json`으로, 색인을 `index.json`으로 `runs/<job_id>/naver/`에 쓰고, 하네스 지침 규칙 9가 goose에게 이 색인을 먼저 읽고 실제로 연 파일만 출처로 적게 한다. 받은 본문은 기사 전문이 아니라 API가 주는 약 150자 요약이라, 출처 기록에 `API 요약본(약 150자), 원문 미확인`을 적고 요약에 없는 사실은 단정하지 않게 한다.
+     - **요청 상한**: 작업당 요청 1회, 요청 전체 10초, 응답 2MB. 호스트는 `m.stock.naver.com`만 허용하고 리디렉트는 따라가지 않는다. 숫자는 코드 상수다.
+     - **실패해도 진행**: 요청·해석이 실패하면 색인(`outcome`: `complete`·`partial`·`failed`·`no_results`)에 적고 goose 실행은 그대로 이어간다. 실패한 회차에 goose는 기존 방법으로 시도하고 실제 결과를 적는다. 없는 종목코드도 API가 빈 목록을 돌려주므로, 서버 종목 목록에 있는 코드인지를 색인의 `code_validated`로 남긴다.
+     - **표시와 끄기**: 별도 진행 단계는 없고 `공시 원문 수집` 단계 동안 이어서 실행된다. `AI_REPORT_GOOSE_NAVER_PREFETCH=0`이면 수집하지 않고 `outcome: disabled` 색인만 남긴다. 무결성 재검사는 두 수집이 끝난 뒤 한 번 한다.
 3. **실행** — 작업마다 하네스 폴더에서 `claude -p --permission-mode dontAsk --settings <하네스>/.claude/settings.json --setting-sources project --strict-mcp-config`로 실행한다. 하네스 밖 읽기·쓰기와 `.claude/` 수정은 권한 규칙으로 거부되고, 하위 프로세스에는 허용 목록의 환경 변수만 넘어간다(API 키 등 `.env` 비밀 값은 전달하지 않음).
 4. **진행 표시** — `GET /api/ai-report/jobs/{job_id}/events`(SSE)가 단계 이벤트를 재생과 함께 보내므로, 모달을 다시 열면 진행 상황이 이어진다. `POST /api/ai-report/jobs/{job_id}/cancel`로 취소한다.
 5. **초안과 최종본** — goose가 `final/report.html`과 `delivery_allowed: true` 검증 결과를 함께 남기면 최종본(`final`), 그렇지 않고 `draft/report.html`만 있으면 초안(`draft`)으로 전달한다. 초안은 리포트 위에 배너가 붙는다.
@@ -218,8 +223,10 @@ KRX_PW=your_krx_password
 
 **알려진 한계**
 - 실행 중 작업 기록은 서버 메모리에 있어 재시작하면 사라진다.
-- goose 결과는 아직 초안(`draft`)으로 끝난다. 2026-10-21 라이브 실행(롯데에너지머티리얼즈 020150)에서 DART 원문 15건을 모두 받았고 DART 미확보로 생기던 감사 결함 6종은 사라졌지만, 감수(`AUDIT_*`·`REVIEW_*`)와 브라우저 화면 확인(`REVIEW_VISUAL`) 단계가 없고 네이버 검색이 막혀 `LATEST_SEARCH_NAVER` 결함이 남는다. 백로그 카드 t18(감수·화면 확인)·t19(네이버 검색)에서 다룬다.
-- 사전 수집 범위는 DART 정기보고서(사업·반기·분기)뿐이다. 잠정실적·주요사항보고서·지분 공시, KIND 공시, PDF 원본은 받지 않는다. 우선주·스팩·외국 기업 전용 처리는 없으며, 검색 결과로 회사가 하나로 확인되지 않으면 수집 없이 goose가 실행된다.
+- goose 결과는 아직 초안(`draft`)으로 끝난다. 2026-10-21 라이브 실행(롯데에너지머티리얼즈 020150)에서 DART 원문 15건을 모두 받았고 DART 미확보로 생기던 감사 결함 6종은 사라졌지만, 감수(`AUDIT_*`·`REVIEW_*`)와 브라우저 화면 확인(`REVIEW_VISUAL`) 단계가 없다. 이 단계는 백로그 카드 t18(SPEC-AI-REPORT-006)에서 다룬다.
+- 네이버 사전 수집(SPEC-AI-REPORT-007) 뒤 2026-10-21 라이브 실행(020150)에서 `LATEST_SEARCH_NAVER` 결함은 사라졌지만, 같은 회차에 `company_ir` 채널 기록이 없어 `LATEST_SEARCH_COMPANY_IR` 결함이 새로 나왔다. 규칙 9의 부작용인지 실행마다 달라지는 변동인지는 아직 확인하지 못했다.
+- DART 사전 수집 범위는 정기보고서(사업·반기·분기)뿐이다. 잠정실적·주요사항보고서·지분 공시, KIND 공시, PDF 원본은 받지 않는다. 우선주·스팩·외국 기업 전용 처리는 없으며, 검색 결과로 회사가 하나로 확인되지 않으면 수집 없이 goose가 실행된다.
+- 네이버 사전 수집은 최신 기사 1페이지(최대 10건)의 API 요약 본문만 받는다. 기사 원문 페이지는 받지 않는다. 비공식 모바일 API라 예고 없이 바뀔 수 있으며, 바뀌면 수집이 `failed`로 기록되고 `LATEST_SEARCH_NAVER`가 다시 남는다.
 
 ### 환경변수 설정
 
@@ -235,9 +242,10 @@ AI_REPORT_GOOSE_TIMEOUT=900       # 작업 1건 시간 상한(초)
 AI_REPORT_GOOSE_RUNS_KEEP=10      # 하네스에 남길 작업 폴더 수 (오래된 것부터 정리)
 # AI_REPORT_GOOSE_HARNESS_DIR=~/.goose-harness   # 하네스 설치 위치. 리포 아래 경로는 거부됨
 # AI_REPORT_GOOSE_DART_PREFETCH=0                # 0이면 DART 원문 사전 수집을 끈다 (기본: 켜짐)
+# AI_REPORT_GOOSE_NAVER_PREFETCH=0               # 0이면 네이버 최신 뉴스 사전 수집을 끈다 (기본: 켜짐)
 ```
 
-상세 설명은 `.moai/specs/SPEC-AI-REPORT-003/spec.md`(빠른 분석), `.moai/specs/SPEC-AI-REPORT-004/spec.md`(Goose), `.moai/specs/SPEC-AI-REPORT-005/spec.md`(DART 사전 수집)를 참조하세요.
+상세 설명은 `.moai/specs/SPEC-AI-REPORT-003/spec.md`(빠른 분석), `.moai/specs/SPEC-AI-REPORT-004/spec.md`(Goose), `.moai/specs/SPEC-AI-REPORT-005/spec.md`(DART 사전 수집), `.moai/specs/SPEC-AI-REPORT-007/spec.md`(네이버 사전 수집)를 참조하세요.
 
 ---
 
@@ -404,6 +412,7 @@ DB 파일은 `Output/` 디렉토리에 저장됩니다:
 - [SPEC-AI-REPORT-003](/.moai/specs/SPEC-AI-REPORT-003/spec.md) — Perplexity → Codex 전면 대체 (Implemented)
 - [SPEC-AI-REPORT-004](/.moai/specs/SPEC-AI-REPORT-004/spec.md) — 심층 분석을 Goose 스킬 하네스로 교체 (2026-10-20)
 - [SPEC-AI-REPORT-005](/.moai/specs/SPEC-AI-REPORT-005/spec.md) — Goose DART 원문 사전 수집 (2026-10-21)
+- [SPEC-AI-REPORT-007](/.moai/specs/SPEC-AI-REPORT-007/spec.md) — Goose 네이버 최신 뉴스 사전 수집 (2026-10-21)
 
 ### 인프라 / 기초
 - [SPEC-001](/.moai/specs/SPEC-001/spec.md) — Data Pipeline Validation & Optimization

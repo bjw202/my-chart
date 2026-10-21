@@ -199,6 +199,35 @@
 - 커버리지는 이 마일스톤에서 재측정하지 않았다(`goose_job_service` 후처리 신규 줄은 위 시험들이 지나가나 수치 미측정).
 - `ruff format --check`는 기존 파일 재포맷 대상이라 적용하지 않았다.
 
+### Merge main (SPEC-AI-REPORT-007, 카드 t19) — 2026-10-21
+
+main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 했고 harness-instructions.md·매니페스트·pyproject·README·`.env.example`은 건드리지 않았다(다음 단계 M5).
+
+충돌은 2개 파일, 10개 구간이었다.
+
+| 파일 | 구간 | 해결 | 이유 |
+|---|---|---|---|
+| goose_job_service.py | 모듈 문서 문자열 | 양쪽 유지(006, 007 순) | 서로 다른 SPEC 설명 |
+| 〃 | import | `goose_naver_prefetch`를 더한 한 목록 | 둘 다 필요 |
+| 〃 | `ENV_REVIEW` / `ENV_NAVER_PREFETCH` | 둘 다 | 서로 다른 끄기 스위치 |
+| 〃 | 타입 별칭 | 둘 다 | Screenshotter·Reviewer·`_PostResult` + NaverPrefetcher·CodeCheck |
+| 〃 | 생성자 인자 | 둘 다(screenshotter, reviewer, naver_prefetcher, code_check) | 모두 기본값 None |
+| 〃 | 생성자 대입 | 둘 다 | 위와 동일 |
+| 〃 | 메서드 블록(HEAD 116줄 / main 29줄) | 둘 다(006 후처리 메서드들 뒤에 007 `_code_validated`·`_prefetch_naver`) | 서로 독립된 메서드 |
+| 〃 | 운영 인스턴스 `_service(...)` | 인자 4개 모두 | 둘 다 운영에 연결 |
+| test_goose_job_service.py | 양쪽 모두 파일 끝에 추가한 구간 | 합집합: 기준 + 006 추가분(718줄) + 007 추가분(338줄) | 두 구간이 줄 단위로 얽혀 있어 조각 병합 대신 ours 전체 + main 추가분을 그대로 붙임. 최상위 이름 충돌 없음(AST로 확인) |
+
+`_run` 본문은 git이 충돌 없이 합쳤고 순서가 맞다: DART 수집 → 네이버 수집 → (수집기 하나라도 있으면) 무결성 재검사 → 1차 세션 → `_post_process`(재검사 → 캡처 → 감수 → 영수증) → 전달 상태 → 종료. 진행 이벤트에는 네이버 단계가 없다.
+
+병합 통합 시험 1개를 추가했다(`test_merge_007_006_run_order_and_identical_event_lists`): 두 SPEC 주입을 모두 켠 구성에서 호출 순서와, 네이버 주입 유무에 따른 진행 이벤트 목록 동일을 확인한다.
+
+시험(격리: `AI_REPORT_GOOSE_HARNESS_DIR=.moai/state/verify/t18-merge/home/.goose-harness`, `-B -p no:cacheprovider`):
+- `pytest backend/tests -k goose -q` → `534 passed, 214 deselected` (통합 시험 추가 전 533). 출력 `.moai/state/verify/t18-merge/goose_all_final.txt`.
+- 작업 서비스 시험 파일: 기준 49, 006쪽 84(+35), main쪽 71(+22), 병합 106 = 49+35+22 (+ 통합 1 = 107).
+- AC-AIR7-001·004, AC-AIR6-001·003·004·005·020 선택 실행 28개 통과.
+
+하네스 전후: `~/.goose-harness/CLAUDE.md`의 해시와 수정 시각이 전후 동일(`.moai/state/verify/t18-merge/harness-{before,after}.txt`).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

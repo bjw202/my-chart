@@ -1,0 +1,14 @@
+2	runs/<job_id>/naver/index.json
+1	article_url
+1	channel: "naver"
+1	metadata_only
+1	"no_results"
+1	모바일 뉴스 API 응답의 제목·요약 본문 필드
+1	서버 사전 수집본으로 열람, 기사 원문 페이지와 대조하지 않음
+1	API 요약본(약 150자), 원문 미확인
+1	요약에 없는 사실은 단정하지 않는다
+1	이번 세션에서 그 파일을 연 시각
+1	original_news
+1	code_validated
+1	서버가 종목코드 유효성을 확인하지 못함
+2	runs/<job_id>/dart/index.json
