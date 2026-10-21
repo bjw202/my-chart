@@ -64,7 +64,7 @@ describe('AC-SUX-028 — weeks 컨트롤 + span_days 표기', () => {
   it('최초 조회가 weeks=12 로 발행된다', async () => {
     render(<BumpChart />)
     await waitFor(() => expect(mockFetchSectorHistory).toHaveBeenCalled())
-    expect(mockFetchSectorHistory).toHaveBeenLastCalledWith(12)
+    expect(mockFetchSectorHistory).toHaveBeenLastCalledWith(12, expect.any(Object))
   })
 
   it('26주 선택 시 weeks=26 을 포함한 요청이 발행된다', async () => {
@@ -72,7 +72,7 @@ describe('AC-SUX-028 — weeks 컨트롤 + span_days 표기', () => {
     await waitFor(() => expect(mockFetchSectorHistory).toHaveBeenCalled())
     mockFetchSectorHistory.mockClear()
     fireEvent.click(screen.getByText('26주'))
-    await waitFor(() => expect(mockFetchSectorHistory).toHaveBeenCalledWith(26))
+    await waitFor(() => expect(mockFetchSectorHistory).toHaveBeenCalledWith(26, expect.any(Object)))
   })
 
   it('축 하단에 응답의 weeks 와 span_days 가 병기된다 (12주 (84일)) — 프론트 계산 금지', async () => {
@@ -108,5 +108,42 @@ describe('AC-SUX-019 — Bump 반대 방향 단언 (AG-5 미적용 계약)', () 
     expect(screen.getByText('스마트폰')).toBeInTheDocument()
     expect(screen.getByText('반도체')).toBeInTheDocument()
     expect(screen.getByText('은행')).toBeInTheDocument()
+  })
+})
+
+// 표와 같은 기준(2026-10-21 사용자 결정): Bump 는 헤더의 기간·시장 토글을 그대로 조회에 싣고,
+// 툴팁은 순위 기준인 그 기간의 초과수익률을 보여준다(종합점수 아님).
+describe('표와 같은 기준 — 기간·시장 전달', () => {
+  it('period·market 을 조회 요청에 싣는다', async () => {
+    render(<BumpChart period="3m" market="kospi" />)
+    await waitFor(() => expect(mockFetchSectorHistory).toHaveBeenCalled())
+    expect(mockFetchSectorHistory).toHaveBeenLastCalledWith(12, { period: '3m', market: 'kospi' })
+  })
+
+  it('기간이 바뀌면 다시 조회한다', async () => {
+    const { rerender } = render(<BumpChart period="1m" market="all" />)
+    await waitFor(() => expect(mockFetchSectorHistory).toHaveBeenCalled())
+    mockFetchSectorHistory.mockClear()
+    rerender(<BumpChart period="1w" market="all" />)
+    await waitFor(() =>
+      expect(mockFetchSectorHistory).toHaveBeenCalledWith(12, { period: '1w', market: 'all' }))
+  })
+
+  it('툴팁은 순위 기준 기간의 초과수익률을 보여준다', async () => {
+    const fx = makeHistoryFixture()
+    fx.sectors[0].history[0].rank_basis_excess_return = 12.34
+    mockFetchSectorHistory.mockResolvedValue({ ...fx, period: '3m' })
+    render(<BumpChart period="3m" market="all" />)
+    await waitFor(() => expect(screen.getByTestId('bump-echarts')).toBeInTheDocument())
+    const opt = capturedOption as unknown as { tooltip: { formatter: (p: unknown) => string } }
+    const html = opt.tooltip.formatter({ seriesName: '반도체', name: '2026-08-04', value: 1 })
+    expect(html).toContain('3M 초과수익률: +12.3%')
+    expect(html).not.toContain('종합점수')
+  })
+
+  it('순위 기준 캡션을 표시한다', async () => {
+    render(<BumpChart period="1w" market="kosdaq" />)
+    await waitFor(() => expect(screen.getByTestId('bump-basis-caption')).toBeInTheDocument())
+    expect(screen.getByTestId('bump-basis-caption').textContent).toBe('순위 기준: 1W 초과수익률 · KOSDAQ (표와 동일)')
   })
 })

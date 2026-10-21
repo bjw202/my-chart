@@ -246,3 +246,63 @@ def test_get_sector_history_includes_excluded_sectors_and_envelope_excluded_empt
     assert resp.excluded == []
     last = resp.dates[-1]
     assert resp.rankings[last]["SMALL"] == 1
+
+
+# --- 기간 순위(표의 1W/1M/3M 탭과 같은 기준) ----------------------------------------
+# 사용자 결정(2026-10-21): Bump 는 표와 같은 기준으로 순위를 매긴다 — 기간 탭을 주면 그 기간의
+# 초과수익률 단독 순위(AC-SAG-021)를 쓴다. period 를 주지 않으면 종전 composite 순위를 유지한다.
+
+def _table_period_ranks(weekly_db: str, daily_db: str, d: str, period: str) -> dict[str, int]:
+    result = compute_sector_aggregates(
+        weekly_db, d, daily_db, as_of=d, compute_rank_change=False, period=period)
+    return {a.name: a.rank for a in result.aggregates if a.rank is not None}
+
+
+@pytest.mark.parametrize("period", ["1w", "1m", "3m"])
+def test_history_period_ranks_equal_table_period_ranks(alignment_dbs, period: str) -> None:
+    """모든 히스토리 날짜에서 Bump(period) 순위 == 표의 같은 period 순위."""
+    weekly_db, daily_db = alignment_dbs
+    dates, rankings = compute_sector_history(
+        weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db, period=period)
+    assert len(dates) == len(rankings) > 0
+    for d, week in zip(dates, rankings):
+        got = {r.name: r.rank for r in week}
+        assert got == _table_period_ranks(weekly_db, daily_db, d, period), (
+            f"{period} {d}: Bump {got}")
+
+
+def test_history_3m_period_puts_outlier_first(alignment_dbs) -> None:
+    """3M 기준이면 3M 60% 섹터(OUT)가 1위 — composite 기준(LEAD 1위)과 갈리는 대조."""
+    weekly_db, daily_db = alignment_dbs
+    _dates, rankings = compute_sector_history(
+        weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db, period="3m")
+    assert {r.name: r.rank for r in rankings[-1]} == {"OUT": 1, "LEAD": 2, "MID": 3, "LAG": 4}
+
+
+def test_service_history_period_passthrough(alignment_dbs) -> None:
+    """서비스 응답이 period 를 되돌려 주고, 순위 기준 초과수익률을 주별로 싣는다."""
+    from backend.services.sector_advanced_service import get_sector_history
+
+    weekly_db, daily_db = alignment_dbs
+    resp = get_sector_history(weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db, period="3m")
+    assert resp.period == "3m"
+    last = resp.dates[-1]
+    assert {n: r for n, r in resp.rankings[last].items() if r is not None} == {
+        "OUT": 1, "LEAD": 2, "MID": 3, "LAG": 4}
+    table = compute_sector_aggregates(
+        weekly_db, last, daily_db, as_of=last, compute_rank_change=False, period="3m")
+    expected = {a.name: a.excess_returns["3m"].value for a in table.aggregates if a.rank is not None}
+    got = {s.name: s.history[-1].rank_basis_excess_return for s in resp.sectors}
+    assert got == pytest.approx(expected)
+
+
+def test_service_history_default_is_composite(alignment_dbs) -> None:
+    """period 미지정이면 종전대로 composite 순위이고 기간 초과수익률 필드는 비어 있다."""
+    from backend.services.sector_advanced_service import get_sector_history
+
+    weekly_db, daily_db = alignment_dbs
+    resp = get_sector_history(weekly_db, weeks=_N_WEEKS, daily_db_path=daily_db)
+    assert resp.period is None
+    last = resp.dates[-1]
+    assert resp.rankings[last]["LEAD"] == 1
+    assert all(w.rank_basis_excess_return is None for s in resp.sectors for w in s.history)

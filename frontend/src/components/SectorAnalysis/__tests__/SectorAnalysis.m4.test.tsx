@@ -1,6 +1,6 @@
 // AC-SUX-022 / 023 / 027 / 019(컨테이너) / 025(컨테이너) — SectorAnalysis M4 (SPEC-SECTOR-UX-001 M4).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // ② 봉투 필드(excluded / baseline_date) 포함 픽스처
 const mockMarketState = {
@@ -28,6 +28,12 @@ vi.mock('../../../contexts/MarketContext', () => ({
 }))
 
 const mockNavigate = vi.fn()
+// Bump 조회 인자 관찰용 — 표와 같은 기준(기간·시장)이 BumpChart 까지 전달되는지 단언한다.
+const mockFetchSectorHistory = vi.fn()
+vi.mock('../../../api/history', () => ({
+  fetchSectorHistory: (...args: unknown[]) => mockFetchSectorHistory(...args),
+}))
+
 vi.mock('../../../contexts/TabContext', () => ({
   useNavIntent: () => ({ navigate: mockNavigate, intent: null }),
 }))
@@ -49,6 +55,7 @@ function renderSectorAnalysis() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockFetchSectorHistory.mockResolvedValue({ weeks: 12, sectors: [] })
 })
 
 // AC-SUX-022 (REQ-SUX-020): 비-rank 정렬 고지 띠
@@ -100,8 +107,9 @@ describe('AC-SUX-023 — period/market 변경 시 정렬 rank/asc 리셋', () =>
   })
 })
 
-// AC-SUX-027 (REQ-SUX-025): RRG/Bump 서브탭에서 기간 토글 비활성 + 툴팁
-describe('AC-SUX-027 — RRG/Bump 서브탭 기간 토글 비활성', () => {
+// AC-SUX-027 (REQ-SUX-025): RRG 서브탭에서 기간 토글 비활성 + 툴팁.
+// Bump 는 2026-10-21 사용자 결정으로 대상에서 빠졌다 — 표와 같은 기간 기준으로 순위를 그린다.
+describe('AC-SUX-027 — RRG 서브탭 기간 토글 비활성 (Bump 는 표와 같은 기준으로 활성)', () => {
   it('Table 서브탭에서는 기간 토글이 활성이다', () => {
     renderSectorAnalysis()
     const periodToggle = screen.getByTestId('period-toggle')
@@ -119,12 +127,24 @@ describe('AC-SUX-027 — RRG/Bump 서브탭 기간 토글 비활성', () => {
     buttons.forEach(b => expect((b as HTMLButtonElement).disabled).toBe(true))
   })
 
-  it('Bump 서브탭에서도 기간 토글이 disabled 다', () => {
+  it('Bump 서브탭에서는 기간 토글이 활성이다 (표와 같은 기준)', () => {
     renderSectorAnalysis()
     fireEvent.click(screen.getByText('Bump'))
     const periodToggle = screen.getByTestId('period-toggle')
     const buttons = periodToggle.querySelectorAll('button')
-    buttons.forEach(b => expect((b as HTMLButtonElement).disabled).toBe(true))
+    buttons.forEach(b => expect((b as HTMLButtonElement).disabled).toBe(false))
+    expect(periodToggle.getAttribute('title')).toBeNull()
+  })
+
+  it('Bump 서브탭에서 기간·시장을 바꾸면 Bump 가 같은 기준으로 다시 조회한다', async () => {
+    renderSectorAnalysis()
+    fireEvent.click(screen.getByText('Bump'))
+    await waitFor(() =>
+      expect(mockFetchSectorHistory).toHaveBeenLastCalledWith(12, { period: '1m', market: 'all' }))
+    fireEvent.click(screen.getByTestId('period-toggle').querySelectorAll('button')[2]) // '3m'
+    fireEvent.click(screen.getByText('KOSPI'))
+    await waitFor(() =>
+      expect(mockFetchSectorHistory).toHaveBeenLastCalledWith(12, { period: '3m', market: 'kospi' }))
   })
 
   it('비활성 시 툴팁(자체 시간 파라미터 설명)이 title 에 포함된다', () => {

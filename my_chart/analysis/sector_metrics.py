@@ -944,6 +944,7 @@ def compute_sector_history(
     weeks: int = 12,
     daily_db_path: str | None = None,
     market: str = "all",
+    period: str | None = None,
 ) -> tuple[list[str], list[list[SectorAggregate]]]:
     """최근 N주 섹터 랭킹 히스토리를 계산한다.
 
@@ -958,6 +959,8 @@ def compute_sector_history(
         daily_db_path: 일봉 DB 경로 — M6 신설. ``compute_sector_aggregates`` 에 그대로
             넘긴다(시총가중 원천).
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
+        period: ``None`` 이면 composite 순위(종전 동작). ``"1w"``/``"1m"``/``"3m"`` 면 표의
+            같은 기간 탭과 같은 기준(그 기간 초과수익률 단독, AC-SAG-021)으로 순위를 매긴다.
 
     Returns:
         (dates, rankings) 튜플. dates는 정규 격자 history 의 최근 weeks 개(오름차순),
@@ -973,7 +976,9 @@ def compute_sector_history(
     if not history_dates:
         return [], []
 
-    # @MX:NOTE: [AUTO] Bump 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=None)`.
+    # @MX:NOTE: [AUTO] Bump 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=...)`.
+    #   화면은 표의 기간 탭(1W/1M/3M)을 그대로 넘겨 표와 같은 기간 단독 순위를 그린다(2026-10-21
+    #   사용자 결정 — 355주 실측에서 종합점수 대비 예측력 차이 없이 순위 흔들림만 커서). period=None 은 composite.
     #   종전에는 레거시 순위 함수(min-max 정규화, 제거됨)를 탔고, 3M 초과수익률
     #   극단값 섹터가 Bump 에서만 1위로 뛰는 불일치가 있었다(라이브 2026-10-16 비철금속: Bump 1위,
     #   표 5위). 이제 각 날짜 d 의 순위·composite 는 표의 순위 백분위(AG-8) 값과 같다.
@@ -996,7 +1001,7 @@ def compute_sector_history(
     for date in history_dates:
         result = compute_sector_aggregates(
             db_path, date, daily_db_path, market=market, as_of=date,
-            compute_rank_change=False, period=None, shared=shared,
+            compute_rank_change=False, period=period, shared=shared,
             apply_min_members=False, equal_weight_fallback=True)
         ranked = [a for a in result.aggregates if a.rank is not None]
         ranked.sort(key=lambda a: a.rank)

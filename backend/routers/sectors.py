@@ -122,16 +122,19 @@ async def sector_rrg(
 async def sector_history(
     weeks: int = Query(default=12, ge=1, le=52),
     market: str = Query(default="all", pattern="^(all|kospi|kosdaq)$"),
+    period: str | None = Query(default=None, pattern="^(1w|1m|3m)$"),
 ) -> SectorHistoryResponse:
     """섹터 랭킹 N주 히스토리를 반환한다.
 
+    ``period`` 를 주면 표(/sectors/ranking)의 같은 기간 탭과 같은 기준(그 기간 초과수익률
+    단독 순위)으로, 생략하면 종전대로 composite 순위로 그린다.
     Returns 503 if weekly DB is not available.
     """
     from backend.services.sector_advanced_service import get_sector_history
 
     try:
         return get_sector_history(WEEKLY_DB_PATH, weeks=weeks, daily_db_path=DAILY_DB_PATH,
-                                   market=market)
+                                   market=market, period=period)
     except Exception as exc:
         raise HTTPException(
             status_code=503,

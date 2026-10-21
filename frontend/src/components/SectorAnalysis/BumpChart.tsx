@@ -27,13 +27,20 @@ const TOP_FILTER_LABELS: Record<string, string> = {
 interface Props {
   // 섹터 클릭 시 Table 탭으로 이동하며 해당 섹터 선택
   onSectorClick?: (sectorName: string) => void
+  // 순위 기준 — 표의 기간·시장 토글 값. 넘기면 Bump 순위가 표 순위와 같은 기준이 된다.
+  period?: string
+  market?: string
 }
+
+// 순위 기준 캡션·툴팁 라벨 (표 헤더 토글 라벨과 동일)
+const PERIOD_LABELS: Record<string, string> = { '1w': '1W', '1m': '1M', '3m': '3M' }
+const MARKET_LABELS: Record<string, string> = { all: 'All', kospi: 'KOSPI', kosdaq: 'KOSDAQ' }
 
 // AC-SUX-028 (REQ-SUX-026): Bump 구간 컨트롤 옵션. 기본 12주.
 const WEEKS_OPTIONS = [8, 12, 26] as const
 const DEFAULT_WEEKS = 12
 
-export function BumpChart({ onSectorClick }: Props): ReactElement {
+export function BumpChart({ onSectorClick, period, market }: Props): ReactElement {
   const [sectors, setSectors] = useState<SectorHistoryItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,12 +50,12 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
   const [respWeeks, setRespWeeks] = useState<number | null>(null)
   const [spanDays, setSpanDays] = useState<number | null>(null)
 
-  // 히스토리 데이터 로드 (weeks 구간)
+  // 히스토리 데이터 로드 (weeks 구간 + 표와 같은 기간·시장 기준)
   const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetchSectorHistory(weeks)
+      const res = await fetchSectorHistory(weeks, { period, market })
       setSectors(res.sectors)
       setRespWeeks(res.weeks)
       setSpanDays(res.span_days ?? null)
@@ -57,7 +64,7 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
     } finally {
       setLoading(false)
     }
-  }, [weeks])
+  }, [weeks, period, market])
 
   useEffect(() => {
     void loadData()
@@ -200,23 +207,27 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
         const weekDate: string = params.name
         const rank: number = params.value
 
-        // 해당 섹터·날짜의 composite_score를 sectors에서 찾아 표시
+        // 해당 섹터·날짜의 순위 기준 값을 sectors에서 찾아 표시
         const sector = sectors.find(s => s.name === sectorName)
         const weekData = sector?.history.find(w => w.date === weekDate)
         // D2: 결측 표기는 표 셀(MetricCell)과 같은 metricText 로 생성한다.
         // 종전의 ASCII '-' 는 표의 '–'(MISSING_TEXT)와 달라 같은 결측이 화면마다 다르게 보였다.
-        const score = metricText(weekData?.composite_score, n => n.toFixed(2))
+        // 기간 기준이면 순위를 정한 그 기간의 초과수익률을(표 셀과 같은 소수 1자리 %), 아니면 종합점수를 보인다.
+        const basisLine = period
+          ? `${PERIOD_LABELS[period] ?? period} 초과수익률: ${metricText(
+            weekData?.rank_basis_excess_return, n => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`)}`
+          : `종합점수: ${metricText(weekData?.composite_score, n => n.toFixed(2))}`
 
         return [
           `<b>${sectorName}</b>`,
           `날짜: ${weekDate}`,
           `순위: ${rank}위`,
-          `종합점수: ${score}`,
+          basisLine,
         ].join('<br/>')
       },
     },
     series: seriesData,
-  }), [dates, seriesData, sectors, totalSectors])
+  }), [dates, seriesData, sectors, totalSectors, period])
 
   // 섹터 클릭 이벤트 핸들러 (라인 클릭 → Table 탭 이동)
   const handleChartClick = useCallback(
@@ -264,6 +275,12 @@ export function BumpChart({ onSectorClick }: Props): ReactElement {
           })}
         </div>
       </div>
+
+      {period && (
+        <div className="bump-span-caption" data-testid="bump-basis-caption">
+          {`순위 기준: ${PERIOD_LABELS[period] ?? period} 초과수익률 · ${MARKET_LABELS[market ?? 'all'] ?? market} (표와 동일)`}
+        </div>
+      )}
 
       {/* 차트 본문 */}
       <div className="bump-chart-body">

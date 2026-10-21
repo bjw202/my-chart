@@ -294,3 +294,12 @@ def test_ac_sag_043_by_sector_unclassified_count_present(client: Any) -> None:
         assert "total" in entry
         assert (entry["stage1"] + entry["stage2"] + entry["stage3"] + entry["stage4"]
                 + entry["unclassified_count"]) == entry["total"]
+
+
+def test_history_period_param_validated_and_echoed(client: Any) -> None:
+    """Bump 가 표와 같은 기간 기준을 쓰도록 /sectors/history 가 period 를 받는다(2026-10-21)."""
+    ok = client.get("/api/sectors/history?weeks=4&market=all&period=1m")
+    assert ok.status_code == 200
+    assert ok.json()["period"] == "1m"
+    assert client.get("/api/sectors/history?weeks=4&period=6m").status_code == 422
+    assert client.get("/api/sectors/history?weeks=4").json()["period"] is None

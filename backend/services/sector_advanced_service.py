@@ -288,6 +288,7 @@ def get_rrg_data(weekly_db_path: str, market: str = "all") -> RRGResponse:
 def get_sector_history(
     weekly_db_path: str, weeks: int = 12,
     daily_db_path: str | None = None, market: str = "all",
+    period: str | None = None,
 ) -> SectorHistoryResponse:
     """N주 섹터 랭킹 히스토리 API 응답을 반환한다.
 
@@ -301,6 +302,8 @@ def get_sector_history(
         weeks: 조회 주수 (기본 12주)
         daily_db_path: 일봉 DB 경로(시총가중 원천) — M6 신설.
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
+        period: ``"1w"``/``"1m"``/``"3m"`` 면 표의 같은 기간 탭과 같은 순위 기준.
+            ``None`` 이면 composite 순위(종전 동작).
 
     Returns:
         SectorHistoryResponse — ``dates[]`` / ``span_days`` / ``rankings[date][sector]``
@@ -315,13 +318,14 @@ def get_sector_history(
 
     # SSOT: 부분 데이터 날짜가 제외된 (dates, rankings) 튜플
     dates, history_by_week = compute_sector_history(
-        weekly_db_path, weeks=weeks, daily_db_path=daily_db_path, market=market)
+        weekly_db_path, weeks=weeks, daily_db_path=daily_db_path, market=market,
+        period=period)
 
     if not history_by_week:
         return SectorHistoryResponse(
             weeks=weeks, sectors=[], dates=[], span_days=None,
             rankings={}, market_filter=(market or "all").lower(),
-            as_of_date=as_of_date)
+            as_of_date=as_of_date, period=period)
 
     # 섹터별 히스토리 데이터 수집 (하위 호환 — ``sectors[]``)
     sector_history: dict[str, list[SectorHistoryWeek]] = {}
@@ -352,6 +356,8 @@ def get_sector_history(
                 sector_return_1w=rank_item.returns["1w"].value,
                 sector_excess_return_1w=rank_item.excess_returns["1w"].value,
                 rs_avg=rank_item.rs_avg.value or 0.0,
+                rank_basis_excess_return=(
+                    rank_item.excess_returns[period].value if period else None),
             ))
 
     sector_items = [
@@ -370,7 +376,7 @@ def get_sector_history(
     return SectorHistoryResponse(
         weeks=weeks, sectors=sector_items, dates=dates, span_days=span_days,
         rankings=rankings, market_filter=(market or "all").lower(),
-        as_of_date=as_of_date)
+        as_of_date=as_of_date, period=period)
 
 
 # ---------------------------------------------------------------------------

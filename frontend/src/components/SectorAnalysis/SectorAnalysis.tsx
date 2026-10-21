@@ -30,8 +30,9 @@ const SUB_TAB_LABELS: Record<SubTab, string> = {
 const PERIOD_LABELS: Record<Period, string> = { '1w': '1W', '1m': '1M', '3m': '3M' }
 const PERIOD_VALUES: Period[] = ['1w', '1m', '3m']
 
-// RRG/Bump 서브탭 이름 — 기간 토글 비활성 대상 (AC-SUX-027). 자체 시간 파라미터(lookback/weeks)를 가진다.
-const PERIOD_DISABLED_SUBTABS: SubTab[] = ['rrg', 'bump']
+// RRG 서브탭 — 기간 토글 비활성 대상 (AC-SUX-027). 자체 시간 파라미터(lookback)를 가진다.
+// Bump 는 2026-10-21 사용자 결정으로 제외 — 표와 같은 기간·시장 기준으로 순위를 그린다.
+const PERIOD_DISABLED_SUBTABS: SubTab[] = ['rrg']
 
 // 시장 값 (all/kospi/kosdaq) — 백엔드 전송 필터 소문자 (01 §8). 표시 라벨은 All/KOSPI/KOSDAQ.
 const MARKET_VALUES: Market[] = ['all', 'kospi', 'kosdaq']
@@ -58,8 +59,7 @@ function getSortValue(sector: SectorRankItem, field: string): number | null {
 
 // AC-SUX-027: 비활성 서브탭에서 기간 토글에 붙이는 툴팁 문구.
 function periodDisabledTooltip(subTab: SubTab): string {
-  if (subTab === 'rrg') return 'RRG는 자체 lookback(주) 시간 파라미터를 사용합니다 — 기간 토글은 Table/Bubble에서만 동작합니다'
-  if (subTab === 'bump') return 'Bump는 자체 weeks(구간) 시간 파라미터를 사용합니다 — 기간 토글은 Table/Bubble에서만 동작합니다'
+  if (subTab === 'rrg') return 'RRG는 자체 lookback(주) 시간 파라미터를 사용합니다 — 기간 토글은 Table/Bubble/Bump에서만 동작합니다'
   return ''
 }
 
@@ -200,7 +200,7 @@ export function SectorAnalysis(): ReactElement {
             <button
               key={p}
               className={period === p ? 'active' : undefined}
-              // AC-SUX-027 (REQ-SUX-025): RRG/Bump 서브탭에서는 자체 시간 파라미터를 쓰므로 기간 토글을 비활성(숨김 아님) + 툴팁.
+              // AC-SUX-027 (REQ-SUX-025): RRG 서브탭에서는 자체 시간 파라미터를 쓰므로 기간 토글을 비활성(숨김 아님) + 툴팁.
               disabled={PERIOD_DISABLED_SUBTABS.includes(subTab)}
               onClick={() => handlePeriodChange(p)}
             >
@@ -332,6 +332,8 @@ export function SectorAnalysis(): ReactElement {
         <div style={{ display: subTab === 'bump' ? 'block' : 'none' }}>
           <DataStatusBar screen="sector-bump" />
           <BumpChart
+            period={period}
+            market={market}
             onSectorClick={(name) => {
               // TR-8: Bump line click → selectSector + table. keep-mounted 로 topFilter 보존.
               selectSector(name)

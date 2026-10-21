@@ -129,6 +129,8 @@ class SectorHistoryWeek(BaseModel):
     sector_return_1w: float
     sector_excess_return_1w: float
     rs_avg: float
+    # 순위 기준 기간(요청 period)의 초과수익률(%). period 미지정(composite 순위)이면 None.
+    rank_basis_excess_return: float | None = None
 
 
 class SectorHistoryItem(BaseModel):
@@ -149,6 +151,8 @@ class SectorHistoryResponse(EnvelopeMixin):
     dates: list[str] = []
     span_days: int | None = None
     rankings: dict[str, dict[str, int | None]] = {}
+    # 순위 기준 echo — "1w"/"1m"/"3m"(표의 기간 탭과 같은 기준) 또는 None(composite).
+    period: str | None = None
 
 
 # ---------------------------------------------------------------------------
