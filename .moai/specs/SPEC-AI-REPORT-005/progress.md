@@ -350,3 +350,10 @@ changelog_entry_position: "[Unreleased] 첫 항목 — ### Added (SPEC-AI-REPORT
 - SPEC-AI-REPORT-004 문서(design·progress의 하루 한도 서술)는 완료된 SPEC의 역사 기록이라 고치지 않았다. §E.3이 "004 design/progress는 sync 단계가 고친다"고 적었지만, 이번 위임 범위가 완료 SPEC 본문 수정을 금지해 그대로 두었다.
 - `.moai/project/product.md:48`·`.moai/project/tech.md:101`의 옛 Deep 하루 한도(`AI_REPORT_DEEP_DAILY_QUOTA`) 서술은 SPEC-AI-REPORT-004 이전부터 낡은 내용이라 이번 범위 밖으로 남겼다.
 - 4be2906·cb6b1ff 반영 서버 재시작과 라이브 확인(G-M5-5)은 하지 않았다.
+
+### 동기화 감사 부채 F1~F3 해소 (2026-10-21, `.moai/reports/sync-audit-SPEC-AI-REPORT-005-20261021.md`)
+
+- F1 — `c43c971`: `test_air5_002_cancellation_inside_report_stage_propagates[section_viewer|report_toc|attachment_toc]`. 검색은 정상으로 답하고 처음 일치한 구간 본문(`viewer.do` eleId=24)·본문 목차·첨부 목차 요청 한 번에서 멈춘 채 취소한다. `goose_dart_prefetch.py:523`·`:552`·`:611`을 하나씩 `except BaseException`으로 넓힌 변이마다 해당 단계 케이스만 RED, 기존 검색 단계 취소 테스트는 그대로 통과(감사가 지적한 사각지대 재확인). 원복 후 sha256 `42130130…d77d12` 동일. 증거: `aiR5/debt_mutant_m523_fetch_section.log`·`debt_mutant_m552_report_toc.log`·`debt_mutant_m611_attachment_toc.log`.
+- F2 — `c43c971`: `test_air5_011_streamed_oversized_response_without_length_is_error`. content-length 없이 1 MiB×9 조각을 흘려보내 스트리밍 상한(`:397`)을 검사한다. `if False:` 변이에서 RED(`assert 'ok' == 'error'`), 원복 후 sha256 동일. 증거: `aiR5/debt_mutant_m397_streamed_cap.log`.
+- F3 — `e4bccb4`: `.moai/project/product.md:48`·`tech.md:101`의 옛 Deep 하루 쿼터 서술을 현재 상태(하루 제한 없음, goose 단일 실행 `goose_busy`, 빠른 분석 `AI_REPORT_BURST_LIMIT` 기본 3회/60초)로 고쳤다. 위 "하지 않은 것"의 해당 줄은 이 항목으로 해소됐다.
+- 회귀: `pytest backend/tests -k goose -q` → `267 passed, 214 deselected` (exit 0, `aiR5/debt_pytest_goose.log`). 운영 코드 변경 없음.
