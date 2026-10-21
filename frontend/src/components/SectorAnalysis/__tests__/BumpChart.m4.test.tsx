@@ -144,6 +144,29 @@ describe('표와 같은 기준 — 기간·시장 전달', () => {
   it('순위 기준 캡션을 표시한다', async () => {
     render(<BumpChart period="1w" market="kosdaq" />)
     await waitFor(() => expect(screen.getByTestId('bump-basis-caption')).toBeInTheDocument())
-    expect(screen.getByTestId('bump-basis-caption').textContent).toBe('순위 기준: 1W 초과수익률 · KOSDAQ (표와 동일)')
+    // 감사 F2: 표는 진행 중인 주까지, Bump 마지막 점은 끝난 주까지라 '동일'이 아니라 '같은 기준'이다.
+    expect(screen.getByTestId('bump-basis-caption').textContent).toBe(
+      '순위 기준: 1W 초과수익률 · KOSDAQ (표와 같은 기준 · 마지막 점 2026-08-04, 끝난 주)')
+  })
+
+  // 감사 F1: 기간을 빠르게 바꾸면 늦게 도착한 이전 요청의 응답이 새 응답을 덮어쓰면 안 된다.
+  it('늦게 도착한 이전 요청의 응답은 버린다', async () => {
+    const resolvers: Array<(v: SectorHistoryResponse) => void> = []
+    mockFetchSectorHistory.mockImplementation(
+      () => new Promise<SectorHistoryResponse>(res => { resolvers.push(res) }))
+    const one = (name: string): SectorHistoryResponse => ({
+      weeks: 12,
+      sectors: [{ name, history: [{ date: '2026-08-04', rank: 1, composite_score: 50, sector_return_1w: 0, sector_excess_return_1w: 0, rs_avg: 50 }] }],
+    })
+    const { rerender } = render(<BumpChart period="1w" market="all" />)
+    await waitFor(() => expect(resolvers.length).toBe(1))
+    rerender(<BumpChart period="3m" market="all" />)
+    await waitFor(() => expect(resolvers.length).toBe(2))
+    resolvers[1](one('새응답3M'))
+    await waitFor(() => expect(screen.getByText('새응답3M')).toBeInTheDocument())
+    resolvers[0](one('옛응답1W'))
+    await new Promise(r => setTimeout(r, 20))
+    expect(screen.queryByText('옛응답1W')).not.toBeInTheDocument()
+    expect(screen.getByText('새응답3M')).toBeInTheDocument()
   })
 })

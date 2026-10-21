@@ -1,7 +1,7 @@
 // @MX:ANCHOR: [AUTO] BumpChart는 섹터 순위 변동을 가변 구간(8/12/26주, 기본 12주) bump chart(ranked line chart)로 시각화
 // @MX:REASON: SectorAnalysis에서 bump 서브탭 활성화 시 마운트; onSectorClick 통해 Table 탭 연동
 // @MX:SPEC: SPEC-TOPDOWN-002D
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { fetchSectorHistory } from '../../api/history'
@@ -50,19 +50,26 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
   const [respWeeks, setRespWeeks] = useState<number | null>(null)
   const [spanDays, setSpanDays] = useState<number | null>(null)
 
+  // 요청 순번 — 응답이 수 초 걸려 토글을 빠르게 바꾸면 이전 요청이 늦게 도착할 수 있다.
+  // 가장 최근 요청의 응답만 반영해 캡션(현재 기간)과 선(이전 기간 응답)이 어긋나지 않게 한다.
+  const requestSeq = useRef(0)
+
   // 히스토리 데이터 로드 (weeks 구간 + 표와 같은 기간·시장 기준)
   const loadData = useCallback(async () => {
+    const seq = ++requestSeq.current
     setLoading(true)
     setError(null)
     try {
       const res = await fetchSectorHistory(weeks, { period, market })
+      if (seq !== requestSeq.current) return
       setSectors(res.sectors)
       setRespWeeks(res.weeks)
       setSpanDays(res.span_days ?? null)
     } catch (e) {
+      if (seq !== requestSeq.current) return
       setError(e instanceof Error ? e.message : '데이터 로드 실패')
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [weeks, period, market])
 
@@ -278,7 +285,9 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
 
       {period && (
         <div className="bump-span-caption" data-testid="bump-basis-caption">
-          {`순위 기준: ${PERIOD_LABELS[period] ?? period} 초과수익률 · ${MARKET_LABELS[market ?? 'all'] ?? market} (표와 동일)`}
+          {/* 표는 진행 중인 주까지, Bump 마지막 점은 끝난 주까지라 '동일'이 아니라 '같은 기준'이다 */}
+          {`순위 기준: ${PERIOD_LABELS[period] ?? period} 초과수익률 · ${MARKET_LABELS[market ?? 'all'] ?? market}`
+            + (latestDate ? ` (표와 같은 기준 · 마지막 점 ${latestDate}, 끝난 주)` : ' (표와 같은 기준)')}
         </div>
       )}
 

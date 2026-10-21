@@ -981,7 +981,8 @@ def compute_sector_history(
     #   사용자 결정 — 355주 실측에서 종합점수 대비 예측력 차이 없이 순위 흔들림만 커서). period=None 은 composite.
     #   종전에는 레거시 순위 함수(min-max 정규화, 제거됨)를 탔고, 3M 초과수익률
     #   극단값 섹터가 Bump 에서만 1위로 뛰는 불일치가 있었다(라이브 2026-10-16 비철금속: Bump 1위,
-    #   표 5위). 이제 각 날짜 d 의 순위·composite 는 표의 순위 백분위(AG-8) 값과 같다.
+    #   표 5위). 이제 각 날짜 d 의 순위는 같은 period 로 매긴 표 순위와, composite 는 표의 순위
+    #   백분위(AG-8) 값과 같다.
     #   `as_of=d` 로 고정해 오늘 날짜에 기대지 않는다(acceptance.md §8.4 규약 8).
     #   격자·유효 유니버스·registry 매핑은 날짜와 무관하므로 한 번만 계산해 넘긴다
     #   (_SharedInputs 근거 참조) — 유니버스 산출이 registry xlsx 를 매번 다시 읽어
@@ -990,9 +991,9 @@ def compute_sector_history(
     #   섹터도 선이 있어야 한다. `apply_min_members=False` + `equal_weight_fallback=True` 로,
     #   AG-4/AG-7 로 시총가중 수익률이 null 인 섹터(구성종목 < 5 섹터뿐 아니라 유효 시총 < 5 거나
     #   커버리지 < 0.50 인 ≥ 5 종목 섹터도)는 등가중 수익률 − 벤치마크를 초과수익률로 써서
-    #   전 섹터를 같은 순위 백분위 composite 로 순위 매긴다. 대체 섹터가 없는 날짜(라이브
-    #   market=all)의 순위는 표 composite 순위와 정확히 같고, 대체 섹터가 있으면 Bump 의 순위
-    #   분모가 표보다 크다(사용자 결정). 3기간 수익률이 하나라도 없는 섹터(3M 앵커 없음 등)는 여전히 빠진다.
+    #   전 섹터를 같은 기준(period 단독 또는 composite)으로 순위 매긴다. 대체 섹터가 없는 날짜(라이브
+    #   market=all)의 순위는 같은 period 의 표 순위와 정확히 같고, 대체 섹터가 있으면 Bump 의 순위
+    #   분모가 표보다 크다(사용자 결정 — 공통 섹터의 상대 순서는 같다). 3기간 수익률이 하나라도 없는 섹터(3M 앵커 없음 등)는 여전히 빠진다.
     shared = _SharedInputs(
         grid=grid,
         universe=_valid_universe(db_path, daily_db_path, None, history_dates[-1]),
