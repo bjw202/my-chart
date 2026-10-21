@@ -1,7 +1,7 @@
 ---
 id: SPEC-AI-REPORT-007
 title: "goose 네이버 최신 뉴스 사전 수집 (서버가 goose 실행 전에 네이버 모바일 뉴스 JSON을 받아 둔다)"
-version: "0.2.0"
+version: "0.3.0"
 status: draft
 created: 2026-10-21
 updated: 2026-10-21
@@ -23,6 +23,7 @@ related_specs: [SPEC-AI-REPORT-005, SPEC-AI-REPORT-004, SPEC-AI-REPORT-006, SPEC
 |---|---|---|---|
 | 0.1.0 | 2026-10-21 | manager-spec | 초안. 칸반 카드 t19. 리드 승인 방향(서버가 네이버 모바일 뉴스 JSON을 사전 수집 → 색인 → 하네스 규칙으로 goose가 `naver` 검색 기록을 남김) 반영. 근거는 `.moai/reports/t19/` |
 | 0.2.0 | 2026-10-21 | manager-spec | plan-audit 1회차(FAIL 0.81, `.moai/reports/t19/plan-audit.md`) 반영: 라이브 게이트에서 goose가 지어낸 `no_results`를 막음(D1a), REQ-013·AC-012의 출처 규칙을 "색인 `ok` 항목만"으로 통일하고 세 검사를 같은 회차에 요구(D1b), SPEC-AI-REPORT-006(카드 t18)과의 규칙 번호·매니페스트·`_run` 충돌을 필수 병합 단계로 명시(D3), 요청 시간 상한을 전송 계층과 무관한 `asyncio.wait_for`로 규정(D4), `outcome` 판정 규칙을 REQ-AIR7-014로 신설(D5), 실패할 수 없던 "blocked 없음" 조항 삭제(D7), 규칙의 `accessed_at` 값 지정(D8), `phase` 값을 미확정 가정으로 표기(D9). REQ 14·AC 14 |
+| 0.3.0 | 2026-10-21 | manager-spec | plan-audit 2회차(FAIL 0.85, `.moai/reports/t19/plan-audit-iter2.md`) 반영, REQ 14·AC 14 유지: REQ-013의 "다른 회차" 검사를 색인 `outcome`에 따라 성공 형태(`complete`·`partial`)와 지어냄 형태(그 밖)로 나눠 REQ-010이 허용하는 대체 기록을 위반으로 보지 않게 함(N1), 성공 형태에 "`naver` 항목은 정확히 한 건, `source_ids` 비어 있지 않음"을 더함(N2), REQ-005의 선언 길이 검사를 "본문을 읽기 전에 거부"로 규정(N4 근거), REQ-014를 번호 순서 자리(§5.7)로 옮김(N7) |
 
 관계: SPEC-AI-REPORT-005(DART 원문 사전 수집, completed)와 같은 구조를 네이버 채널에 적용한다. 005의 수집기·색인·하네스 규칙 8은 수정하지 않고, 작업 서비스에 두 번째 수집기 하나를 끼운다. 004·005 문서는 수정하지 않는다. 같은 시기에 카드 t18이 SPEC-AI-REPORT-006(goose 최종본 경로, 커밋 `4663bb3`, draft)을 진행하며, 그 SPEC도 `harness-instructions.md`에 규칙 9를 더하고 매니페스트를 재생성하며 `goose_job_service.py`의 `_run`을 바꾼다(006 spec.md 65~67행). 두 SPEC의 병합 절차는 `plan.md §5`에 필수 단계로 둔다.
 
@@ -137,15 +138,13 @@ related_specs: [SPEC-AI-REPORT-005, SPEC-AI-REPORT-004, SPEC-AI-REPORT-006, SPEC
 
 ### 5.2 요청
 
-**REQ-AIR7-005** — The Naver prefetcher shall send at most one HTTP request per job: a `GET` to `https://m.stock.naver.com/api/news/stock/<code>?pageSize=10&page=1`, bounded as a whole (send plus body read) by a 10-second timeout enforced with `asyncio.wait_for` around the send coroutine independently of the HTTP transport — the same form as `goose_dart_prefetch.py` line 376 — and by a maximum accepted response size of 2 MB checked both on the declared `content-length` and while streaming the body; it shall send requests only to `https` URLs whose parsed hostname is exactly `m.stock.naver.com`, shall not follow redirects, and shall reject a stock code that is not six ASCII digits without sending any request.
+**REQ-AIR7-005** — The Naver prefetcher shall send at most one HTTP request per job: a `GET` to `https://m.stock.naver.com/api/news/stock/<code>?pageSize=10&page=1`, bounded as a whole (send plus body read) by a 10-second timeout enforced with `asyncio.wait_for` around the send coroutine independently of the HTTP transport — the same form as `goose_dart_prefetch.py` line 376 — and by a maximum accepted response size of 2 MB, rejecting a declared `content-length` above the limit before reading any of the body and otherwise checking the accumulated size while streaming the body; it shall send requests only to `https` URLs whose parsed hostname is exactly `m.stock.naver.com`, shall not follow redirects, and shall reject a stock code that is not six ASCII digits without sending any request.
 
 ### 5.3 응답 해석과 저장
 
 **REQ-AIR7-006** — When the response is HTTP 200 and parses as JSON, the Naver prefetcher shall take the article items at the response path fixed in run-phase M1 (at most 10), and for each item shall: accept `officeId` and `articleId` only when each matches `^[0-9]{1,12}$` (otherwise mark the entry `error` and write no file); convert `datetime` of the form `YYYYMMDDHHMM` to timezone-aware ISO-8601 `published_at` with the `+09:00` offset (otherwise mark the entry `error`); convert `title` and `body` to plain text with markup removed; and write a text file under a server-generated name matching `^[0-9]{2}_article\.txt$` containing the title, office name, `published_at`, and body. An item whose plain-text body is empty shall be recorded with status `metadata_only` and no text file.
 
 **REQ-AIR7-007** — The Naver prefetcher shall store the raw response bytes as `response.json` and write `runs/<job_id>/naver/index.json` containing exactly the key set of `acceptance.md §B`: the search (URL, query, `searched_at`, status, item count, error), the overall outcome derived per REQ-AIR7-014, the SHA-256 and byte length of `response.json`, and one entry per item with article reference `<officeId>/<articleId>`, office name, title, `published_at`, article URL, text file name, body length in characters, status (`ok`, `metadata_only`, or `error`) and error reason; every timestamp in the index shall carry the `+09:00` offset, and no file name shall contain text taken from the response.
-
-**REQ-AIR7-014** — The Naver prefetcher shall derive the index `outcome` as follows, in this order: `disabled` only when written by the job service for the off switch; `failed` when the request or response handling failed (REQ-AIR7-008); `no_results` when the response was valid and held zero article items; `complete` when every item entry has status `ok`; `partial` when at least one entry is `ok` and at least one is `metadata_only` or `error`; and `failed` when items were present but no entry is `ok`.
 
 ### 5.4 실패 처리
 
@@ -163,7 +162,11 @@ related_specs: [SPEC-AI-REPORT-005, SPEC-AI-REPORT-004, SPEC-AI-REPORT-006, SPEC
 
 **REQ-AIR7-012** — Every Naver prefetcher test shall run in a test module whose file name starts with `test_goose_`, so that the existing shared network guard records and fails any connection or name-resolution attempt; tests shall answer requests through an injected `httpx.MockTransport` serving recorded or synthetic JSON fixtures, any test that waits on a request shall carry an outer `asyncio.wait_for` bound, and existing job-service tests that construct the service without a Naver prefetcher shall issue zero Naver requests.
 
-**REQ-AIR7-013** — When a goose job runs on stock code 020150 on the deployed server after integration and the restart that installs the new harness (up to two runs on the same KST day), one and the same run shall satisfy all of: (1) the Naver index outcome is `complete` or `partial`; (2) the delivery audit on goose's draft input does not emit `LATEST_SEARCH_NAVER`; (3) the draft input has at least one `naver` entry with `result: "read"`, has zero `naver` entries with `result: "no_results"`, and every source cited by every `naver` entry with `result: "read"` has a `url` equal to the `article_url` of an index entry with status `ok`, a `read_scope` containing that entry's text file name, and `limitations` containing `서버 사전 수집본으로 열람`; and check (3) shall also hold in every other run executed that day. This is a gating observed-verification requirement owned by the lead after integration; the SPEC does not close while it is unmet, and it is not part of the run-phase lane.
+**REQ-AIR7-013** — When a goose job runs on stock code 020150 on the deployed server after integration and the restart that installs the new harness (up to two runs on the same KST day), one and the same run shall satisfy all of: (1) the Naver index outcome is `complete` or `partial`; (2) the delivery audit on goose's draft input does not emit `LATEST_SEARCH_NAVER`; (3) the success form of the record check holds — the draft input has exactly one `naver` entry, that entry has `result: "read"` and a non-empty `source_ids` list, and every source it cites has a `url` equal to the `article_url` of an index entry with status `ok`, a `read_scope` containing that entry's text file name, and `limitations` containing `서버 사전 수집본으로 열람`. In every other run executed that day, the record check shall hold in the form that run's index outcome selects: the success form above when the outcome is `complete` or `partial`; otherwise only the fabrication form — no `naver` entry with `result: "no_results"` unless the index outcome is `no_results`, and no `naver` `read` source whose `url` equals an index `article_url` unless that index entry has status `ok` and matches `read_scope` and `limitations` as above — so that the fallback records REQ-AIR7-010 allows for a `failed`, `disabled`, missing, or `no_results` index (an honest `blocked`, a `read` of sources outside the index, or `no_results` for a `no_results` index) are not violations. This is a gating observed-verification requirement owned by the lead after integration; the SPEC does not close while it is unmet, and it is not part of the run-phase lane.
+
+### 5.7 색인 결과 판정 (REQ-AIR7-007이 참조)
+
+**REQ-AIR7-014** — The Naver prefetcher shall derive the index `outcome` as follows, in this order: `disabled` only when written by the job service for the off switch; `failed` when the request or response handling failed (REQ-AIR7-008); `no_results` when the response was valid and held zero article items; `complete` when every item entry has status `ok`; `partial` when at least one entry is `ok` and at least one is `metadata_only` or `error`; and `failed` when items were present but no entry is `ok`.
 
 ## 6. 하네스 규칙이 할 수 있는 것과 없는 것
 
@@ -173,6 +176,7 @@ related_specs: [SPEC-AI-REPORT-005, SPEC-AI-REPORT-004, SPEC-AI-REPORT-006, SPEC
 | `metadata_only` 항목(제목·시각만 있음)으로 통과시킬 수 있나 | 없다. 읽을 본문이 없으므로 출처로 쓰지 않는다 |
 | 검색은 됐는데 기사가 0건이면 | 색인 `outcome == "no_results"`일 때만 `result: "no_results"`를 쓰고, `note`에 종목코드·`pageSize`·`page`·`searched_at`을 적는다 |
 | 색인에 `ok` 기사가 있는데 `no_results`를 쓸 수 있나 | 없다. 감사는 이를 막지 못하지만(§2.4) 라이브 게이트 검사 3이 위반으로 잡는다 |
+| 수집이 실패한 회차에 goose가 `blocked`를 적거나 기존 경로로 읽으면 라이브 게이트 위반인가 | 아니다. 그런 회차는 통과 회차가 될 수 없을 뿐이고, 검사 3은 지어낸 기록(색인이 `no_results`가 아닌데 `no_results`, 색인의 `ok`가 아닌 기사를 읽었다는 주장)만 잡는다(REQ-AIR7-013) |
 | 수집이 실패했으면 | 기존 방법(WebFetch 등)으로 시도하고 실제 결과를 적는다. 그래도 못 읽으면 `blocked` 그대로 두며 감사 결함은 남는다 — 조용한 통과는 없다 |
 | 열람 범위를 기사 원문 페이지라고 적을 수 있나 | 없다. 받은 것은 API 응답의 제목·본문 필드다(D3) |
 | `accessed_at`에는 무엇을 적나 | goose가 이번 세션에서 그 파일을 연 시각. 서버 수집 시각은 goose의 열람이 아니다 |

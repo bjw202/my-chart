@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-007 — 인수 기준
 
-버전 0.2.0 · 요구사항은 `spec.md §5`(REQ-AIR7-001~014). 각 AC는 Given-When-Then, 실행 명령, 기대 관측 출력, **되돌림 검사**(이 한 가지 변경을 되돌리면 검사가 RED가 된다)와 **잡지 못하는 것**을 적는다. 되돌림 검사는 run 단계에서 실제로 적용해 RED 출력을 원문으로 남겨야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 되돌림은 `progress.md §E.2`에 Gap으로 남긴다.
+버전 0.3.0 · 요구사항은 `spec.md §5`(REQ-AIR7-001~014). 각 AC는 Given-When-Then, 실행 명령, 기대 관측 출력, **되돌림 검사**(이 한 가지 변경을 되돌리면 검사가 RED가 된다)와 **잡지 못하는 것**을 적는다. 되돌림 검사는 run 단계에서 실제로 적용해 RED 출력을 원문으로 남겨야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 되돌림은 `progress.md §E.2`에 Gap으로 남긴다.
 
 ## §A 공통 실행 조건
 
@@ -82,19 +82,21 @@
 
 ### AC-AIR7-005 — 요청 모양, 입력 검증, 크기·시간 상한 (REQ-AIR7-005)
 
-- Given: 요청을 기록하는 `MockTransport`, 녹화 픽스처 응답. 합성 처리기: (i) 다른 호스트로 가는 `302` 응답, (ii) 본문이 2MB + 1바이트인 응답 두 가지 — `content-length`를 선언한 것과 선언하지 않고 조각으로 흘려보내는 것, (iii) 응답하지 않고 `asyncio.Event`를 영원히 기다리는 비동기 처리기(요청 시간 상한 모듈 상수를 테스트에서 0.05초로 낮춤)
+- Given: 요청을 기록하는 `MockTransport`, 녹화 픽스처 응답. 합성 처리기: (i) 다른 호스트로 가는 `302` 응답, (ii) 2MB를 넘는 응답 두 가지 — (ii-a) `content-length: 2097153`을 선언하고 본문은 읽힌 조각 수를 세는 `httpx.AsyncByteStream`으로 주는 것, (ii-b) `content-length` 없이 2MB + 1바이트를 조각으로 흘려보내는 것, (iii) 응답하지 않고 `asyncio.Event`를 영원히 기다리는 비동기 처리기(요청 시간 상한 모듈 상수를 테스트에서 0.05초로 낮춤)
 - When: 수집 실행 — 정상 코드 `020150`, 잘못된 코드 `02015a`·`０２０１５０`(전각)·`0201500`, 그리고 (i)~(iii). (iii)은 테스트 안에서 `asyncio.wait_for(prefetcher(...), 2)`로 감싼다
 - Then:
   1. 정상: 요청 수 정확히 1, 메서드 `GET`, URL이 정확히 `https://m.stock.naver.com/api/news/stock/020150?pageSize=10&page=1`
   2. 잘못된 코드 3종: 요청 수 0, `search.status == "error"`, `outcome == "failed"`
   3. (i): 요청 수 1(리디렉트 대상으로 두 번째 요청 없음), `search.error`에 `HTTP 302`
-  4. (ii) 두 가지 모두: `outcome == "failed"`, `search.error`에 `too large`
+  4. (ii-a): `outcome == "failed"`, `search.error`에 `too large`, **본문 조각 읽힘 수 == 0**(선언 길이만 보고 본문을 읽기 전에 거부). (ii-b): `outcome == "failed"`, `search.error`에 `too large`
   5. (iii): 바깥 2초 상한에 걸리지 않고 반환, `outcome == "failed"`, `search.error`에 `Timeout`
 - 명령: `PY -m pytest backend/tests/test_goose_naver_prefetch.py -k air7_005 -q`
 - 기대 관측: 실패 0
 - 되돌림 검사(입력 검증): 종목코드 검사를 지운다 → 잘못된 코드 경우 요청 수 1로 RED
 - 되돌림 검사(리디렉트): 클라이언트를 `follow_redirects=True`로 바꾼다 → (i)에서 요청 수 2로 RED(두 번째 요청은 `MockTransport`가 기록하므로 실제 연결 없음)
-- 되돌림 검사(크기): 선언 길이 검사와 스트리밍 누적 검사를 함께 지운다 → (ii)에서 `outcome != "failed"`로 RED. 하나만 지우면 그 하나에 해당하는 경우만 RED가 된다(두 경우를 따로 둔 이유)
+- 되돌림 검사(선언 길이): 선언 길이 검사만 지운다 → 스트리밍 누적 검사가 대신 거부하므로 `outcome`은 여전히 `failed`지만, 본문을 읽은 뒤라 (ii-a)의 "조각 읽힘 수 == 0" 단언이 RED(plan 단계 모의 관측: `body_chunks_read=2` — `progress.md` 사실표 P16)
+- 되돌림 검사(스트리밍 누적): 스트리밍 누적 검사만 지운다 → (ii-b)는 선언 길이가 없어 통과해 버려 `outcome != "failed"`로 RED. (ii-a)는 선언 길이 검사가 그대로 잡으므로 GREEN — 두 경우를 따로 둔 이유다
+- 되돌림 검사(둘 다): 두 검사를 모두 지운다 → (ii-a)·(ii-b) 모두 RED(모의 관측: `ok 3145731 bytes`, `body_chunks_read=3`)
 - 되돌림 검사(시간): 전송 코루틴을 감싼 `asyncio.wait_for`를 지우고 httpx 시간 상한만 남긴다 → (iii)이 바깥 2초 상한에 걸려 `TimeoutError`로 RED(`MockTransport`가 httpx 시간 상한을 적용하지 않으므로)
 - 범위 메모: 호스트 검사 함수에 손으로 만든 주소를 넣는 단위 검사는 두지 않는다. 요청 주소는 모듈 상수로 만들어지므로 그런 검사는 상수를 상수와 비교하는 자기 비교에 가깝다(lessons #9 형태 2). 다른 호스트로 실제 요청이 나가지 않는다는 성질은 (i)의 리디렉트 경우가 요청 경로를 통해 확인한다
 - 잡지 못하는 것: 네이버 쪽 호출 제한(spec G3), 운영 전송 계층에서의 httpx 시간 상한 거동(바깥 `wait_for`가 상한을 보장하므로 판정에 쓰지 않음)
@@ -184,10 +186,16 @@ cur = None; tops = []; errs = []
 for n, line in enumerate(open(sys.argv[1], encoding="utf-8"), 1):
     m = re.match(r"^(\d+)\. ", line)
     if m:
-        cur = int(m.group(1)); tops.append(cur); continue
-    s = re.match(r"^\s+- (\d+)-\d+[a-z]?\. ", line)
-    if s and int(s.group(1)) != cur:
-        errs.append("line %d: sub-item %s-* under rule %s" % (n, s.group(1), cur))
+        cur = int(m.group(1)); tops.append(cur); body = line[m.end():]
+    else:
+        s = re.match(r"^\s+- (\d+)-\d+[a-z]?\. ", line)
+        if s and int(s.group(1)) != cur:
+            errs.append("line %d: sub-item %s-* under rule %s" % (n, s.group(1), cur))
+        body = line[s.end():] if s else line
+    # 본문 안 `N-M` 참조는 자기 규칙 번호만 가리켜야 한다(다시 매긴 뒤 남은 옛 참조를 잡는다)
+    for r in re.finditer(r"(?<![\d.\-])(\d{1,2})-\d{1,2}[a-z]?(?![\d\-])", body):
+        if cur is not None and int(r.group(1)) != cur:
+            errs.append("line %d: in-text reference %s inside rule %s" % (n, r.group(0), cur))
 if tops != list(range(1, len(tops) + 1)):
     errs.append("top-level numbers not 1..K unique: %s" % tops)
 print("rules", tops)
@@ -196,12 +204,26 @@ print("rule numbering ok" if not errs else "\n".join(errs))
 
 - 기대 관측(#4): plan 단계 현재 트리에서 `rules [1, 2, 3, 4, 5, 6, 7, 8]` / `rule numbering ok`(사실표 P13). M4 뒤 `rules [1, …, 9]`, 006 병합 뒤 `rules [1, …, 10]`, 마지막 줄은 항상 `rule numbering ok`
 - 되돌림 검사(#1·#3): 지침만 고치고 매니페스트 재생성을 빠뜨린다 → #1에서 `CLAUDE.md` 해시 줄 차이 출력, #3에서 원본 해시 비교 테스트 RED
-- 되돌림 검사(#4): 006 병합 트리에서 나중 쪽 규칙 번호를 9로 둔다 → `top-level numbers not 1..K unique: [1, …, 9, 9]`로 RED. 상위 번호만 10으로 바꾸고 하위 라벨을 `9-6`으로 남긴다 → `line <n>: sub-item 9-* under rule 10`으로 RED(두 경우 모두 plan 단계에서 같은 판정 로직으로 관측 — 사실표 P13)
+- 되돌림 검사(#4): 006 병합 트리에서 나중 쪽 규칙 번호를 9로 둔다 → `top-level numbers not 1..K unique: [1, …, 9, 9]`로 RED. 상위 번호만 10으로 바꾸고 하위 라벨을 `9-6`으로 남긴다 → `line <n>: sub-item 9-* under rule 10`으로 RED. 라벨은 10으로 바꾸고 본문 참조 "9-2에서"를 남긴다 → `line <n>: in-text reference 9-2 inside rule 10`으로 RED(세 경우 모두 plan 단계에서 이 블록과 같은 판정 로직으로 관측 — 사실표 P13)
+- 정직한 한계(#4): 본문 참조 검사는 `N-M` 형태만 본다. "5번 규칙"처럼 다른 규칙을 이름으로 가리키는 산문은 검사하지 않는다(규칙 번호가 바뀌는 것은 나중 쪽 규칙 하나뿐이고, 기존 규칙 1~8은 번호가 그대로다). 또한 한 규칙 본문이 다른 규칙의 하위 항목을 `N-M`으로 가리키는 것도 위반으로 잡으므로, 네이버 규칙 초안은 다른 규칙의 하위 항목을 `N-M`으로 가리키지 않는다(plan.md §4)
 - 잡지 못하는 것: 서버 재시작 누락(설치는 서버 시작 때만 일어난다 — 리드가 AC-012 전에 확인)
 
 ### AC-AIR7-012 — 라이브 관측 검사 (REQ-AIR7-013, 리드 몫·이 레인 밖)
 
-통합과 서버 재시작 뒤 리드가 실행하는 라이브 게이트다. 이 레인은 실행하지 않는다. 통과해야 SPEC을 닫는다(§F). 같은 KST 날짜에 020150으로 최대 2회 실행할 수 있다. **검사 1·2·3은 같은 한 회차에서 모두 만족해야 하고**, 검사 3은 그날 실행한 다른 회차에서도 만족해야 한다(회차 A의 수집 성공과 회차 B의 감사 통과를 합쳐 통과로 보지 않는다).
+통합과 서버 재시작 뒤 리드가 실행하는 라이브 게이트다. 이 레인은 실행하지 않는다. 통과해야 SPEC을 닫는다(§F). 같은 KST 날짜에 020150으로 최대 2회 실행할 수 있다. **검사 1·2·3은 같은 한 회차에서 모두 만족해야 하고**(회차 A의 수집 성공과 회차 B의 감사 통과를 합쳐 통과로 보지 않는다), 그날 실행한 다른 회차에도 검사 3 스크립트를 돌려 `violations 0`이어야 한다. 검사 3은 두 부분으로 나뉘며, 스크립트가 색인 `outcome`을 보고 적용할 부분을 고른다:
+
+- **3F 지어냄 검사 — 모든 회차**: (F1) `naver`의 `no_results` 항목은 색인 `outcome == "no_results"`일 때만 허용(REQ-AIR7-010 "only when the index outcome is `no_results`"), (F2) `read` 항목의 출처 `url`이 색인의 어떤 `article_url`과 같으면 그 항목은 `ok`이고 `read_scope`에 그 `text_file`, `limitations`에 `서버 사전 수집본으로 열람`이 있어야 함(색인 파일을 읽었다는 주장은 사실이어야 함)
+- **3S 성공 검사 — 색인 `outcome`이 `complete`·`partial`인 회차에만**: (S1) `naver`의 `read` 항목 1건 이상, (S2) 그 `read` 항목의 `source_ids`가 비어 있지 않은 목록, (S3) 그 출처가 **모두** 색인 `ok` 항목(아래 출처 규칙), (S4) `read` 항목이 유일한 `naver` 항목(REQ-AIR7-010 "the only `naver` entry" — 같은 회차에 `blocked`·`no_results` 등 다른 `naver` 항목이 있으면 위반)
+
+색인 `outcome`별로 REQ-AIR7-010이 허용하는 goose 기록과 적용 검사:
+
+| 색인 `outcome` | REQ-AIR7-010이 허용하는 `naver` 기록 | 적용 검사 |
+|---|---|---|
+| `complete`·`partial` | 연 `ok` 파일을 인용한 `read` 한 건만 | 3F + 3S |
+| `no_results` | 조건을 `note`에 적은 `no_results`. 기존 경로로 다시 찾아 실제로 읽었다면 그 결과의 `read` | 3F만 |
+| `failed`·`disabled`·색인 없음(`missing`) | 기존 경로 대체 시도의 실제 결과 — 읽었으면 `read`(색인 밖 출처 허용), 막혔으면 `blocked`. `no_results`는 허용하지 않음 | 3F만 |
+
+`no_results`·`failed`·`disabled` 회차는 검사 1에서 이미 통과 회차가 될 수 없으므로, 그런 회차에서 goose가 규칙대로 `blocked`를 적거나 대체 경로로 읽은 것은 위반이 아니다. 그런 회차에서 잡는 것은 지어낸 기록(색인이 `failed`인데 `no_results`, 색인 `metadata_only` 기사를 읽었다는 주장)뿐이다.
 
 출처 규칙(REQ-AIR7-013과 같은 규칙, spec D7): `naver` 채널의 `result == "read"` 항목이 인용한 출처는 **모두** 색인 `ok` 항목이어야 한다. goose가 다른 경로로 연 출처는 `naver` 채널에 허용하지 않는다(그런 기사는 `original_news` 채널에 적는다 — 규칙 N-3). 이유: 게이트의 목적은 사전 수집이 통과를 만들었음을 보이는 것이고, 다른 출처를 허용하면 수집이 실패하고 대체 경로로 통과한 경우와 구분할 수 없다.
 
@@ -210,36 +232,59 @@ print("rule numbering ok" if not errs else "\n".join(errs))
 - Then (작업과 같은 KST 날짜에, 같은 `<job_id>`로 확인):
   1. `$IDX`의 `outcome`이 `complete` 또는 `partial`, `request_count <= 1`
   2. `python3 -I ~/.goose-harness/.claude/skills/goose/workflows/fact-check/scripts/audit_report.py --input "$INP" --output "$S/audit.json"`의 결함 코드에 `LATEST_SEARCH_NAVER`가 없다
-  3. 아래 블록을 `$S/air7_check3.py`로 추출해 `python3 -I "$S/air7_check3.py" "$IDX" "$INP"` → 첫 줄이 정확히 `violations 0`. 이 검사는 (a) `naver`의 `read` 항목이 1건 이상, (b) 색인 `outcome`이 `complete`·`partial`인데 `naver`의 `no_results` 항목이 있으면 위반(검사 1이 그 두 값을 요구하므로 통과 회차에서는 `no_results` 0건), (c) `read` 항목의 출처마다 `url`이 색인 `ok` 항목의 `article_url`이고 `read_scope`에 그 항목의 `text_file`, `limitations`에 `서버 사전 수집본으로 열람`이 있어야 함을 본다
+  3. 아래 블록을 `$S/air7_check3.py`로 추출해 `python3 -I "$S/air7_check3.py" "$IDX" "$INP"` → 첫 줄이 정확히 `violations 0`, 둘째 줄이 `mode 3F+3S`(통과 회차는 검사 1 때문에 반드시 이 모드다). 그날의 다른 회차도 같은 명령으로 첫 줄 `violations 0`(모드는 그 회차의 색인 `outcome`이 정한다)
 
 ```python
 # AC-AIR7-012 검사 3 — naver 기록과 서버 색인 대조
-import json, sys
-idx = json.load(open(sys.argv[1], encoding="utf-8"))
+# 3F(지어냄 검사)는 모든 회차, 3S(성공 검사)는 색인 outcome이 complete·partial인 회차에만 적용한다
+import json, os, sys
+MARK = "서버 사전 수집본으로 열람"
+idx = json.load(open(sys.argv[1], encoding="utf-8")) if os.path.exists(sys.argv[1]) else {"outcome": "missing", "articles": []}
 d = json.load(open(sys.argv[2], encoding="utf-8"))
-ok = {a["article_url"]: a for a in idx["articles"] if a["status"] == "ok"}
-src = {s.get("id"): s for s in d.get("sources", [])}
-nav = [s for s in d["research_window"]["searches"] if s.get("channel") == "naver"]
-v = []
-if idx["outcome"] in ("complete", "partial"):
-    v += ["naver no_results while index outcome=" + idx["outcome"] for s in nav if s.get("result") == "no_results"]
+outcome = str(idx.get("outcome"))
+arts = [a for a in (idx.get("articles") or []) if isinstance(a, dict)]
+ok = {a.get("article_url"): a for a in arts if a.get("status") == "ok"}
+indexed = {a.get("article_url") for a in arts}
+src = {str(s.get("id")): s for s in d.get("sources", []) if isinstance(s, dict)}
+nav = [s for s in d.get("research_window", {}).get("searches", []) if isinstance(s, dict) and s.get("channel") == "naver"]
 reads = [s for s in nav if s.get("result") == "read"]
-if not reads:
-    v.append("no naver read entry")
-for s in reads:
-    for i in s.get("source_ids", []):
-        x = src.get(i, {})
-        a = ok.get(x.get("url"))
-        if a is None:
-            v.append(i + ": url is not an ok index article_url")
-        elif a["text_file"] not in str(x.get("read_scope", "")) or "서버 사전 수집본으로 열람" not in str(x.get("limitations", "")):
-            v.append(i + ": read_scope/limitations mismatch")
+success = outcome in ("complete", "partial")
+v = []
+
+def source_findings(sid, strict):
+    x = src.get(str(sid))
+    if x is None:
+        return [str(sid) + ": source id not in sources"] if strict else []
+    a = ok.get(x.get("url"))
+    if a is None:
+        return [str(sid) + ": url is not an ok index article_url"] if strict or x.get("url") in indexed else []
+    if str(a.get("text_file") or "\0") not in str(x.get("read_scope", "")) or MARK not in str(x.get("limitations", "")):
+        return [str(sid) + ": read_scope/limitations mismatch"]
+    return []
+
+for s in nav:  # 3F-F1
+    if s.get("result") == "no_results" and outcome != "no_results":
+        v.append("naver no_results while index outcome=" + outcome)
+if success:  # 3S-S1, S4
+    if not reads:
+        v.append("no naver read entry")
+    if len(nav) > 1:
+        v.append("naver entries=%d (the read entry must be the only naver entry)" % len(nav))
+for s in reads:  # 3F-F2 (모든 회차) / 3S-S2, S3 (성공 회차)
+    ids = s.get("source_ids")
+    if not isinstance(ids, list) or not ids:
+        if success:
+            v.append("naver read entry has no source_ids")
+        continue
+    for i in ids:
+        v += source_findings(i, success)
 print("violations", len(v))
+print("mode", "3F+3S" if success else "3F only (outcome=" + outcome + ")")
 for line in v:
     print(" ", line)
 ```
 
-- 되돌림 검사(검사 3, 리드가 게이트 실행 때 함께 관측): `$INP`의 사본에서 `naver` 항목의 `result`를 `no_results`로 바꿔 검사 3을 돌린다 → `violations 2`(`naver no_results while index outcome=…`, `no naver read entry`)로 RED. 사본에서 출처 `url`을 `metadata_only` 항목의 `article_url`이나 색인 밖 주소로 바꾼다 → `<id>: url is not an ok index article_url`로 RED. 같은 판정 로직은 plan 단계에서 합성 입력으로 관측했다(사실표 P14) — 통과 입력 `violations 0`, 위 세 변형 각각 RED
+- 되돌림 검사(검사 3, 리드가 게이트 실행 때 통과 회차의 `$INP` 사본으로 함께 관측): `naver` 항목의 `result`를 `no_results`로 바꾼다 → RED(`naver no_results while index outcome=…`, `no naver read entry`). 출처 `url`을 `metadata_only` 항목의 `article_url`이나 색인 밖 주소로 바꾼다 → `<id>: url is not an ok index article_url`로 RED. `source_ids`를 `[]`로 바꾼다 → `naver read entry has no source_ids`로 RED. `blocked` `naver` 항목을 하나 더 넣는다 → `naver entries=2 …`로 RED. 이 블록은 plan 단계에서 문서에서 그대로 추출해 합성 입력 18종으로 실행했다(사실표 P14 — 성공 회차 11종 중 통과 입력 1종 `violations 0`·변형 10종 RED(정수 출처 id는 역추적 없이 위반 한 줄), 다른 회차의 규칙 준수 기록 5종 `violations 0`, 다른 회차의 지어낸 기록 2종 RED)
 - 실패 시 기록: 1 실패 → 수집 결함(API 변경 의심, spec §9), 1 통과·3 위반 → 지침 미준수(지어낸 `no_results`나 사실과 다른 열람 기록), 1·3 통과·2 실패 → 남은 조건(`searched_at` 범위, `note` 공백 등)을 입력 필드와 함께 기록. 어느 경우든 SPEC은 닫지 않고 원인에 맞게 재위임한다
 - 잡지 못하는 것: goose가 파일을 열었다고 적고 실제로는 일부만 읽은 경우(스트림 기록 미보존 — Gap)
 
