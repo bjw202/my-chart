@@ -731,6 +731,112 @@ async def test_air5_002_cancellation_propagates_from_request(tmp_path):
     assert task.cancelled()
 
 
+# 감사 부채 F1 — 검색·목록은 정상으로 답하고, 보고서 안쪽 단계에서 멈춘 채 취소한다.
+# 첫 요청(검색)에서 멈추는 위 테스트로는 구간·목차·첨부 단계의 `except Exception`이
+# `except BaseException`으로 넓어져 취소를 삼켜도 잡히지 않는다(AC-002 대조 (b)).
+# 멈춤은 처음 일치한 요청 한 번뿐이다 — 취소를 삼키는 변이라면 이후 요청은 정상 응답으로
+# 끝까지 진행해 정상 반환하므로 `CancelledError` 단언이 즉시 실패한다.
+CANCEL_STAGES = {
+    # fetch_section(:523) — 최신 반기보고서 주석 구간 본문
+    "section_viewer": lambda r: r.url.path == "/report/viewer.do" and r.url.params.get("eleId") == "24"
+    and r.url.params.get("rcpNo") == LATEST,
+    # report() 목차(:552) — 본문 목차
+    "report_toc": lambda r: r.url.path == "/dsaf001/main.do" and "dcmNo" not in r.url.params,
+    # attachment() 목차(:611) — 감사·검토보고서 첨부 목차
+    "attachment_toc": lambda r: r.url.path == "/dsaf001/main.do" and "dcmNo" in r.url.params,
+}
+
+
+@pytest.mark.parametrize("stage", sorted(CANCEL_STAGES))
+async def test_air5_002_cancellation_inside_report_stage_propagates(tmp_path, stage):
+    clock = FakeClock()
+    entered = asyncio.Event()
+    never = asyncio.Event()
+    target = CANCEL_STAGES[stage]
+
+    async def hang(request):
+        entered.set()
+        await never.wait()
+        return httpx.Response(200, content=b"")
+
+    fake = FakeDart(clock, overrides=[(lambda r: not entered.is_set() and target(r), hang)])
+    out = tmp_path / "dart"
+    task = asyncio.create_task(make(clock, fake)("020150", out))
+
+    async def scenario():
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    await asyncio.wait_for(scenario(), 5)
+    assert task.cancelled()
+    # 멈춘 단계 앞의 검색 요청은 정상으로 처리됐다 — 취소가 보고서 안쪽에서 일어났다
+    paths = [urlparse(r["url"]).path for r in fake.requests]
+    assert paths[0] == "/dsab007/detailSearch.ax"
+    assert len(paths) >= 2
+    assert target(httpx.Request("GET", fake.requests[-1]["url"]))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 감사 부채 F2 — 길이 머리글 없이 흘려보내는 응답의 8 MB 상한(:394-398)
+
+
+class _ChunkedBody(httpx.AsyncByteStream):
+    """content-length 없이 1 MiB 조각을 흘려보내는 본문."""
+
+    def __init__(self, chunks: int) -> None:
+        self.chunks = chunks
+        self.sent = 0
+
+    async def __aiter__(self):
+        for _ in range(self.chunks):
+            self.sent += 1
+            yield b"x" * (1024 * 1024)
+
+    async def aclose(self) -> None:
+        pass
+
+
+async def test_air5_011_streamed_oversized_response_without_length_is_error(tmp_path):
+    clock = FakeClock()
+    fake = FakeDart(clock)
+    body = _ChunkedBody(chunks=9)  # 9 MiB > 8 MiB
+    seen_headers: list[httpx.Headers] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if (
+            request.url.path == "/report/viewer.do" and request.url.params.get("eleId") == "24"
+            and request.url.params.get("rcpNo") == LATEST
+        ):
+            resp = httpx.Response(200, stream=body)
+            seen_headers.append(resp.headers)
+            return resp
+        return await fake.handle(request)
+
+    out = tmp_path / "runs" / "job1" / "dart"
+    prefetcher = gdp.DartPrefetcher(
+        transport=httpx.MockTransport(handler), clock=clock.monotonic, sleep=clock.sleep, now=clock.now
+    )
+    index = await prefetcher("020150", out)
+    assert json.loads((out / "index.json").read_text(encoding="utf-8")) == index
+
+    # 전제: 길이 머리글이 없어 선언 길이 검사(:391-393)는 걸리지 않는다
+    assert len(seen_headers) == 1
+    assert "content-length" not in seen_headers[0]
+    notes = entries(index, section="notes")[0]
+    assert notes["status"] == "error"
+    assert "too large" in notes["error"]
+    assert notes["html_file"] is None and notes["text_file"] is None
+    # 8 MiB까지는 경계 이하라 계속 읽고, 9번째 조각에서 초과하자마자 멈춘다
+    assert body.sent == 9
+    ok = [f for f in index["files"] if f["status"] == "ok"]
+    assert sorted(p.name for p in out.iterdir()) == sorted(
+        ["index.json"] + [f["html_file"] for f in ok] + [f["text_file"] for f in ok]
+    )
+    assert index["outcome"] == "partial"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # REQ-AIR5-004 — 끄기 스위치 색인 모양 (작업 서비스가 이 함수로 쓴다, M3에서 연결)
 
