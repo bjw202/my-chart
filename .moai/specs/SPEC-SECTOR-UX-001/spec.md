@@ -1,7 +1,7 @@
 ---
 id: SPEC-SECTOR-UX-001
 title: "섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약"
-version: "0.4.1"
+version: "0.4.2"
 status: completed
 created: 2026-08-12
 updated: 2026-10-21
@@ -27,6 +27,7 @@ tier: L
 | 0.3.0 | 2026-08-12 | manager-spec | plan-audit iteration 2 **PASS 0.87**(L, thresh 0.85; MUST-PASS 전항 통과, 단조 개선) 이후 잔여 결함 정리. **(D7) `AC-SUX-061` 고아 해소** — AC는 정의(`acceptance.md`)·E7·DoD·`plan.md` M4·§7 O-U7 해결 행에 모두 존재했으나 **어떤 REQ도 매핑되지 않아** §5 traceability 표에 행이 없었다(정의 60 / 추적 60이지만 **집합이 달랐다**). 열 접기 계약을 소유하는 **`REQ-SUX-058` 신설**(§3.3 컨트롤, `REQ-SUX-029` 기간 3열 상설의 폭 조건 확장) + traceability 행 추가. REQ 부재 상태에서는 구현 중 이 AC가 잘려도 §3의 어떤 항목도 반대하지 않았고, 그것은 Lesson #3(신규 열이 default 진입에서 안 보여 그림자 결함이 된 선례) 게이트를 재현하는 경로였다. **(D8) HISTORY 항목 (4)의 미검증 주장 정정** — "§3 번호 순서 정상화"는 실제로 일어나지 않았다(`REQ-SUX-055`는 `030`↔`031` 사이, `056/057`은 `048`↔`049` 사이에 그대로 있다). 주제별 배치가 **의도된 설계**임을 명시하는 문장으로 재작성하고 §3.7 서문에도 같은 취지를 못 박았다 — 재배열은 하지 않는다. **(D9) `progress.md` 갱신** — `open_questions`에 남아 있던 O-U1/O-U4/O-U6/O-U7(전부 v0.2.0에서 해결)과 `blocking_before_run`의 동일 4건을 정리하고 `resolved_open_questions`로 이력 보존. **`SPEC-SECTOR-AGGREGATION-001 completed`와 O-U9는 실제 차단 항목이므로 유지한다.** `ac_count` 57 → **60** 정정(v0.1.0 값 잔류분). |
 | 0.4.0 | 2026-08-14 | manager-spec | **O-U9 해결 — 착수 차단 항목 전부 해소.** 사용자 결정(2026-08-14): **AG-5(최소 구성수 5)를 Bump에 적용하지 않는다.** ② `SPEC-SECTOR-AGGREGATION-001`은 v0.5.0 `completed`(main `65dfe2d`)로 종료됐고, 그 출하 구현이 이미 미적용이라는 것을 실물 대조로 확인했다 — `/sectors/history` → `compute_sector_history` → `compute_sector_ranking` → `_compute_sector_metrics`(`sector_metrics.py:947-948`이 *"AG-5 제외는 여기에 적용하지 않는다 — 규칙 AG-5는 `data[]`가 소유한다"* 를 명시), `get_sector_history`(`sector_advanced_service.py:218`)는 `SectorHistoryResponse` 생성 3곳 전부에서 `excluded=`를 전달하지 않아 봉투가 항상 빈 배열이다. 따라서 **②의 백엔드 변경은 없으며 amendment도 불필요하다**(② `completed` 유지). ③ 조치 3건: **(1)** `AC-SUX-019` · `AC-SUX-056 R5`의 검증 범위를 **Table · 섹터 Bubble · RRG로 한정**(Bump 제외)하고 §7 O-U9 · plan.md §0 차단 표 · DoD를 해결로 갱신. **(2)** 범위에서 빼기만 하지 않고 **Bump 반대 방향 단언을 신설** — 제외 섹터의 선이 Bump에 남아 있어야 하며, 되돌림 변형 `mut_bump_applies_ag5`(Bump 시계열을 `data[]` 섹터 집합과 교집합)에서 **RED 관측이 필수**다(Lesson #9). 단언 없는 범위 제외는 이후 누군가 Bump에 AG-5를 넣어도 어떤 AC도 반대하지 않는 상태를 만들며, 그것이 Lesson #3의 재현 경로다. **(3)** `REQ-SUX-017`(제외 섹터 가시성)에 적용 범위를 명문화 — Bump에 제외 영역을 렌더하는 구현은 충족이 아니라 **위반**이다. **도입하지 않은 것**: `connectNulls:false` 선 끊김 단언은 "Bump에도 적용" 분기 전용이었으므로 신설하지 않는다(해당 옵션 자체는 §1.2 보존 항목으로 불변). **의도된 귀결(회귀 아님)**: Bump는 전 섹터, Table `data[]`는 AG-5 통과 섹터라는 서로 다른 모집단 위에서 순위를 매기므로 같은 섹터의 rank가 두 화면에서 다를 수 있다. `CT-4`(AC-SUX-021)의 rank 일치는 순위표 내부(rank 열 ↔ 행 순서) 한정이며 Table↔Bump 교차 일치로 확대하지 않는다. `ac_count` 60 불변(신규 AC 없음 — 기존 AC 2건의 범위 한정 + 단언 추가). **plan-audit 캐시 무효화**: 본 개정으로 plan-artifact hash가 바뀌므로 v0.3.0의 PASS 0.87은 skip 근거로 쓸 수 없다 — `/moai run` Phase 1에서 plan-audit **재실행 필수**. |
 | 0.4.1 | 2026-10-21 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** SPEC-RS-REBALANCE-001 라이브 점검 후속 커밋 `6ae45d7`·`2ef3644`·`d99abbc`로 Bump 히스토리 순위의 원천이 레거시 `compute_sector_ranking`(삭제됨)에서 `compute_sector_aggregates(period=None)`(순위 백분위 composite)로 바뀌었다. Bump만 AG-5를 적용하지 않고(`apply_min_members=False`), AG-4/AG-7로 시총가중 수익률이 null인 섹터는 등가중 수익률 − 벤치마크로 대체한다(`equal_weight_fallback=True`). AC-SUX-019 계약(제외 섹터의 선이 Bump에 남고 히스토리 `excluded[]`는 빈 배열)은 그대로 성립한다. 주석 위치: acceptance.md AC-SUX-019 배경 실측, AC-SUX-056 R5 결정 근거·잔여 위험, §8 DoD O-A7 항목, spec.md §7 O-U9 행. 출처: `CHANGELOG.md` [Unreleased] "Fixed (섹터 순위 계산 경로 통일 …, 2026-10-21)". |
+| 0.4.2 | 2026-10-21 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 사용자 결정(2026-10-21)으로 Bump가 표와 같은 순위 기준을 쓴다 — 헤더의 기간(1W/1M/3M)·시장 토글 값을 `/api/sectors/history?period=&market=`로 넘겨 그 기간 초과수익률 단독 순위(AC-SAG-021)로 그린다(커밋 `ddbdf23`). 그 결과 REQ-SUX-025·AC-SUX-027의 기간 토글 비활성 대상에서 **Bump가 빠지고 RRG만 남는다**. 근거: 355주 실측(프로덕션 집계 경로, `.moai/state/verify/e6bbafd3-bump-score-eval/`)에서 1M 단독은 composite와 향후 4주 상위5 초과수익이 표준오차 안에서 같고(1.69%p vs 1.53%p) 주간 10칸 이상 순위 이동은 적었다(12% vs 18%). 주석 위치: spec.md REQ-SUX-025, acceptance.md AC-SUX-027. 출처: `CHANGELOG.md` [Unreleased] "Changed (Bump 순위 기준을 표와 통일 …, 2026-10-21)". |
 
 ---
 
@@ -353,6 +354,8 @@ Where the active sub-tab is RRG or Bump, the period toggle **shall** render disa
 
 - 검증: AC-SUX-027
 - **주의**: 비활성 vs 숨김은 02 §13 O-3 미결 — §7 O-U1.
+
+> **후속 변경 (2026-10-21, 커밋 `ddbdf23`)**: Bump는 이 요구사항의 대상에서 빠졌다. Bump가 표와 같은 기간·시장 기준으로 순위를 그리게 되면서(사용자 결정) 기간 토글이 Bump 서브탭에서 활성이다. RRG는 그대로 비활성 + 툴팁이다. 본문은 바꾸지 않는다.
 
 #### REQ-SUX-026 (Ubiquitous) — Bump 구간 컨트롤
 
