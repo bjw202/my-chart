@@ -305,6 +305,7 @@ changelog_entry_position: "[Unreleased] 첫 항목 — ### Added (SPEC-AI-REPORT
 - 006이 먼저 병합되면 CHANGELOG `[Unreleased]` 첫 항목 자리와 README 알려진 한계 문단(감수 단계 서술)이 겹쳐 손 병합이 필요할 수 있다.
 - README 알려진 한계에서 "감수·화면 확인 단계가 없다"는 006 완료 전 상태를 적은 것이라 006 sync에서 다시 고쳐야 한다.
 - 비공식 API 변경·호출 제한은 문서에 적었을 뿐 감시 장치는 없다.
+- conftest에 하네스 경로 격리가 없어 lifespan을 도는 테스트가 실제 `~/.goose-harness`를 덮어쓸 수 있음(후속 카드 후보). 리드가 이 사고를 보고했다(원인: `AI_REPORT_GOOSE_HARNESS_DIR` 미격리 + `TestClient(app)` lifespan의 `install_at_startup()`). 이 카드의 테스트는 `HOME`·`AI_REPORT_GOOSE_HARNESS_DIR`을 임시 폴더로 돌린다는 REQ-AIR7-012 규칙을 따르지만, 기존 스위트 전체를 격리 없이 돌린 실행(이 레인의 run·검증 단계 `pytest` 다수)은 같은 위험에 노출됐다. 이 레인 쪽 소스는 main과 내용이 같아 덮어써도 내용은 같다는 것이 리드의 판단이다.
 
 ### sync 단계에서 하지 않은 것
 
