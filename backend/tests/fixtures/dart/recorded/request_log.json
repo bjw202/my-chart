@@ -1,0 +1,140 @@
+[
+ {
+  "n": 1,
+  "started_at": "2026-10-21T11:46:27.901+09:00",
+  "method": "POST",
+  "url": "https://dart.fss.or.kr/dsab007/detailSearch.ax",
+  "form": {
+   "currentPage": "1",
+   "maxResults": "100",
+   "maxLinks": "10",
+   "sort": "date",
+   "series": "desc",
+   "textCrpNm": "020150",
+   "startDate": "20231021",
+   "endDate": "20261021",
+   "publicType": [
+    "A001",
+    "A002",
+    "A003"
+   ],
+   "finalReport": "recent"
+  },
+  "status": 200,
+  "bytes": 17715,
+  "content_type": "text/html; charset=UTF-8",
+  "elapsed_s": 0.134,
+  "file": "list_020150_recent.html"
+ },
+ {
+  "n": 2,
+  "started_at": "2026-10-21T11:46:29.007+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260814000373",
+  "form": null,
+  "status": 200,
+  "bytes": 107709,
+  "content_type": "text/html; charset=UTF-8",
+  "elapsed_s": 0.155,
+  "file": "main_20260814000373.html"
+ },
+ {
+  "n": 3,
+  "started_at": "2026-10-21T11:46:30.113+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260814000373&dcmNo=11527105",
+  "form": null,
+  "status": 200,
+  "bytes": 40574,
+  "content_type": "text/html; charset=UTF-8",
+  "elapsed_s": 0.08,
+  "file": "main_20260814000373_11527105.html"
+ },
+ {
+  "n": 4,
+  "started_at": "2026-10-21T11:46:31.223+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/report/viewer.do?rcpNo=20260814000373&dcmNo=11527102&eleId=19&offset=259834&length=178344&dtd=dart4.xsd",
+  "form": null,
+  "status": 200,
+  "bytes": 53931,
+  "content_type": "text/html; charset=utf-8",
+  "elapsed_s": 0.08,
+  "file": "viewer_20260814000373_fs_consolidated.html"
+ },
+ {
+  "n": 5,
+  "started_at": "2026-10-21T11:46:32.332+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/report/viewer.do?rcpNo=20260814000373&dcmNo=11527102&eleId=24&offset=438182&length=1703030&dtd=dart4.xsd",
+  "form": null,
+  "status": 200,
+  "bytes": 492989,
+  "content_type": "text/html; charset=utf-8",
+  "elapsed_s": 0.111,
+  "file": "viewer_20260814000373_notes_consolidated.html"
+ },
+ {
+  "n": 6,
+  "started_at": "2026-10-21T11:46:33.433+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260310002974",
+  "form": null,
+  "status": 200,
+  "bytes": 116351,
+  "content_type": "text/html; charset=UTF-8",
+  "elapsed_s": 0.141,
+  "file": "main_20260310002974.html"
+ },
+ {
+  "n": 7,
+  "started_at": "2026-10-21T11:46:34.540+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/report/viewer.do?rcpNo=20260310002974&dcmNo=11105315&eleId=18&offset=250218&length=25415&dtd=dart4.xsd",
+  "form": null,
+  "status": 200,
+  "bytes": 21068,
+  "content_type": "text/html; charset=utf-8",
+  "elapsed_s": 0.06,
+  "file": "viewer_20260310002974_summary.html"
+ },
+ {
+  "n": 8,
+  "started_at": "2026-10-21T11:46:35.649+09:00",
+  "method": "GET",
+  "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260310002974&dcmNo=11105314",
+  "form": null,
+  "status": 200,
+  "bytes": 42309,
+  "content_type": "text/html; charset=UTF-8",
+  "elapsed_s": 0.105,
+  "file": "main_20260310002974_11105314.html"
+ },
+ {
+  "n": 9,
+  "started_at": "2026-10-21T11:46:36.758+09:00",
+  "method": "POST",
+  "url": "https://dart.fss.or.kr/dsab007/detailSearch.ax",
+  "form": {
+   "currentPage": "1",
+   "maxResults": "100",
+   "maxLinks": "10",
+   "sort": "date",
+   "series": "desc",
+   "textCrpNm": "299030",
+   "startDate": "20231021",
+   "endDate": "20261021",
+   "publicType": [
+    "A001",
+    "A002",
+    "A003"
+   ],
+   "finalReport": "recent"
+  },
+  "status": 200,
+  "bytes": 17271,
+  "content_type": "text/html; charset=UTF-8",
+  "elapsed_s": 0.057,
+  "file": "list_299030_recent.html"
+ }
+]

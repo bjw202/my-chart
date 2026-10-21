@@ -1,0 +1,17 @@
+{
+ "_source": "SPEC-AI-REPORT-005 acceptance.md §B (M1 확정, 2026-10-21). AC-AIR5-009가 집합 동등으로 검사한다.",
+ "top": ["schema_version", "code", "company", "search", "outcome", "started_at", "finished_at", "request_count", "files"],
+ "company": ["name", "corp_code"],
+ "search": ["url", "query", "searched_at", "status", "row_count", "error"],
+ "files_item": ["rcp_no", "report_type", "report_name", "period", "document", "attachment_name", "section", "section_title", "basis", "viewer_url", "fetched_at", "html_file", "text_file", "sha256", "bytes", "status", "error"],
+ "enums": {
+  "outcome": ["complete", "partial", "company_unresolved", "failed", "disabled"],
+  "files.status": ["ok", "error", "skipped"],
+  "files.section": ["financial_statements", "notes", "summary", "auditor_report"],
+  "files.document": ["main", "attachment"],
+  "files.basis": ["consolidated", "separate"]
+ },
+ "timestamp_fields": ["search.searched_at", "started_at", "finished_at", "files[].fetched_at"],
+ "timestamp_offset": "+09:00",
+ "viewer_url_params": ["rcpNo", "dcmNo", "eleId", "offset", "length", "dtd"]
+}
