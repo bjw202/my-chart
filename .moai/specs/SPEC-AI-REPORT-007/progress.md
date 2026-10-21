@@ -300,6 +300,16 @@ changelog_entry_position: "[Unreleased] 첫 항목 — ### Added (SPEC-AI-REPORT
 - MX 태그의 호출자 수(fan_in) 계산, 문서 링크 검사기, 마크다운 린터는 실행하지 않았다.
 - SPEC-AI-REPORT-006(카드 t18)과의 병합 뒤 README·CHANGELOG 충돌 여부는 확인하지 않았다(이 브랜치에는 006 sync 항목이 없다).
 
+### sync-auditor 독립 감사 (2026-10-21, `--security` 렌즈)
+
+보고서: `.moai/reports/t19/sync-audit.md`. 판정 **PASS-WITH-DEBT, 조화평균 0.887**(Tier M 합격선 0.80): Functionality 0.92 · Security 0.85 · Craft 0.88 · Consistency 0.90. 필수 항목 실패 없음, 차단 결함 없음. 감사자가 직접 재실행: goose 테스트 330 passed(0 network), 되돌림 7건 모두 RED 관측 후 복원, `claude-settings.json` sha256 불변, 매니페스트는 재생성과 동일, 새 모듈 커버리지 97%.
+
+지적 사항(전체는 보고서): S1 SHOULD-FIX(goose가 서버가 쓴 색인을 고칠 수 있어 검사 3이 속을 수 있음 — spec §9에 기록) · S2 SHOULD-FIX(conftest 하네스 경로 격리 부재, 이 카드 이전부터 있던 문제 — 아래 잔여 위험과 CHANGELOG (g)) · M1~M3 MINOR(제목 줄바꿈, 필드 길이 상한 없음, 프롬프트 주입 서술 불명확 — spec §9에 기록) · I1~I4 INFO. 감사자가 못 본 것: AC-012 라이브 실행 자체(lead의 기록에 의존), 기준 커밋 `7abdcac`에서의 전체 스위트(전체 스위트 4 failed·58 errors가 이전부터 있었다는 것은 격리 실행의 동일 수와 오류 원인으로 추론한 것), ruff.
+
+되돌림 건수 표기: 코드 되돌림 36건(M2 24 + M3 12, CHANGELOG 표기)과, 규칙 문서 되돌림 6건을 더한 §E.3의 42건은 세는 방식이 다르다. "41"은 M2 테스트 수이며 되돌림 건수가 아니다.
+
+감사자는 지시 전달 전에 격리 없이 명령 2개(AC-013 goose 테스트 330건, 새 모듈 커버리지 41건)를 돌렸다고 밝혔다. 코드를 읽은 판단으로는 실제 홈에 쓰지 않지만 파일 시스템을 감시하지는 않았다.
+
 ### 잔여 위험
 
 - 006이 먼저 병합되면 CHANGELOG `[Unreleased]` 첫 항목 자리와 README 알려진 한계 문단(감수 단계 서술)이 겹쳐 손 병합이 필요할 수 있다.
