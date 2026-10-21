@@ -1,0 +1,38 @@
+[
+ {
+  "file": "020150_p1.json",
+  "method": "GET",
+  "url": "https://m.stock.naver.com/api/news/stock/020150?pageSize=10&page=1",
+  "request_headers": {
+   "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+  },
+  "status": 200,
+  "content_type": "application/json;charset=UTF-8",
+  "retrieved_at": "2026-10-21T17:59:55.533+09:00",
+  "bytes": 8094
+ },
+ {
+  "file": "000040_p1.json",
+  "method": "GET",
+  "url": "https://m.stock.naver.com/api/news/stock/000040?pageSize=10&page=1",
+  "request_headers": {
+   "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+  },
+  "status": 200,
+  "content_type": "application/json;charset=UTF-8",
+  "retrieved_at": "2026-10-21T17:59:56.725+09:00",
+  "bytes": 8192
+ },
+ {
+  "file": "999999_p1.json",
+  "method": "GET",
+  "url": "https://m.stock.naver.com/api/news/stock/999999?pageSize=10&page=1",
+  "request_headers": {
+   "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+  },
+  "status": 200,
+  "content_type": "application/json;charset=UTF-8",
+  "retrieved_at": "2026-10-21T18:00:44.936+09:00",
+  "bytes": 2
+ }
+]

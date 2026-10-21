@@ -46,7 +46,55 @@ P1~P5·P7·P8은 2026-10-21 HEAD `c8e5c20`에서, P6·P9a·P9b·P10~P12·P15는 
 
 ## §E.2 Run-phase Evidence
 
-_<pending run-phase>_
+### M1 — 픽스처와 데이터 모양 관측 (2026-10-21, 카드 t19)
+
+실행 위치: 에이전트 격리 워크트리 `agent-a8a4aa39c4b1cb9d1`(기준 HEAD `794b9f7`). `PY` = `/Users/byunjungwon/Dev/my_chart/.venv/bin/python`. 외부 요청은 상한(`m.stock.naver.com` 3건 + `n.news.naver.com` 1건) 안에서 모두 4건: `m.stock.naver.com` 3건(020150, 000040, 999999), `n.news.naver.com` 1건. 요청 헤더는 User-Agent만 보냈다.
+
+#### 요청 기록
+
+| # | 명령 | 관측 원문 | 결론 |
+|---|---|---|---|
+| R1·R2 | `PY -I backend/tests/fixtures/naver/capture_naver.py backend/tests/fixtures/naver/recorded 020150 000040` | `200 application/json;charset=UTF-8 8094 https://m.stock.naver.com/api/news/stock/020150?pageSize=10&page=1` / `200 application/json;charset=UTF-8 8192 https://m.stock.naver.com/api/news/stock/000040?pageSize=10&page=1` | 두 종목 모두 200 JSON. 받은 시각 `2026-10-21T17:59:55.533+09:00`, `17:59:56.725+09:00` (`recorded/request_log.json`). 000040은 기사가 적을 것으로 보고 골랐으나 기사 10건이 왔다 — "기사가 적은 종목" 관측은 얻지 못했다 |
+| R3 | `PY -I backend/tests/fixtures/naver/capture_naver.py backend/tests/fixtures/naver/recorded 999999` 뒤 `od -c recorded/999999_p1.json` | `200 application/json;charset=UTF-8 2 https://m.stock.naver.com/api/news/stock/999999?pageSize=10&page=1` / `0000000    [   ]` | 존재하지 않는 종목코드도 HTTP 200 + 본문 `[]`(2바이트). 받은 시각 `18:00:44.936+09:00` |
+| R4 | `curl -sS -L -o /dev/null -A "<Chrome UA>" -w 'status=%{http_code} redirects=%{num_redirects} final_url=%{url_effective} content_type=%{content_type} size_download=%{size_download}\n' https://n.news.naver.com/mnews/article/015/0005344879` | `status=200 redirects=0 final_url=https://n.news.naver.com/mnews/article/015/0005344879 content_type=text/html; charset=utf-8 size_download=300749` (요청 직후 `date` → `2026-10-21T18:00:30+0900`) | 020150 첫 기사(`officeId 015`, `articleId 0005344879`)로 만든 주소가 리디렉트 없이 200 HTML. 페이지 본문은 저장하지 않았고 내용도 검사하지 않았다(아래 Gap) |
+
+녹화 파일 해시(`shasum -a 256`): `020150_p1.json` `e6f86f39ef11f9fc4db40a04e629939203ec04f0c4866bfee77b9f7207bad7cf`, `000040_p1.json` `907cbc191d271523eb74b96783ab5b4f2cd5f82cb53732e2a13431d30c0ac72a`, `999999_p1.json` `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945`.
+
+#### 관측 (G4·G5)
+
+| # | 명령 | 관측 원문 (발췌) | 결론 |
+|---|---|---|---|
+| O1 (G4 경로) | `PY -I -c` — `json.load` 후 최상위 타입·길이, 그룹별 키·`total`·`len(items)` 출력 | 020150: `top type list len 10`, 그룹마다 `keys ['total', 'items']`, `items/group [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]`, `totals [4, 1, 10, 1, 1, 1, 1, 1, 1, 1]`. 000040: `groups 10`, `items/group` 전부 1, `totals` 전부 1 | 최상위는 **그룹 배열**(pageSize=10 → 그룹 10개). 그룹 = `{total, items}`, 관측한 20개 그룹 모두 `items` 1건. 기사 목록 경로는 `[*].items[*]`(그룹을 펼친 목록)이다. `[0].items`만 읽으면 기사 1건만 나온다. 그룹의 `total`은 관련 기사 묶음 크기로 보이며(020150 합계 22 ≠ 기사 10) 기사 수가 아니다 |
+| O2 (키) | 같은 스크립트로 기사 키 정렬 출력, 첫 기사 3건의 `{키: (타입, 값)}` | 키: `articleId, body, datetime, id, imageOriginLink, mobileNewsUrl, officeId, officeName, photoType, title, titleFull, type` (`imageOriginLink`는 일부 기사에 없음). 타입: `id`·`officeId`·`articleId`·`officeName`·`datetime`·`title`·`titleFull`·`mobileNewsUrl` 문자열, `type`·`photoType` 정수. 예: `'officeId': ('str', '015')`, `'articleId': ('str', '0005344879')`, `'mobileNewsUrl': ('str', 'https://n.news.naver.com/mnews/article/015/0005344879')` | spec이 적은 키 7개는 모두 있다. 추가 키 5개(`titleFull`, `mobileNewsUrl`, `imageOriginLink`, `photoType`, `type`). `officeId`는 앞자리 0이 있는 문자열이라 정수로 바꾸면 주소가 깨진다. `title != titleFull` 0건(두 파일) |
+| O3 (body) | 기사별 `len(body)`, 태그 정규식 `<[a-zA-Z/][^>]*>`, 엔티티 정규식 `&[a-zA-Z#0-9]+;`, 개행 여부, `body.endswith('... ')`, 첫 기사 3건 `repr(body)` | 020150 `n 10 min 129 median 147.5 max 154`, 000040 `n 10 min 131 median 137.5 max 154`. 태그 `False` 20/20, 개행 `False` 20/20, 엔티티 `True` 2/20 — 종류는 두 파일 모두 `['&quot;']`. `body endswith "... ": 10 / 10`(두 파일). 예: `"삼성자산운용은 … 삼성운용 측은 개인투자자의... "` | `body`는 기사 전문이 아니라 **129~154자에서 잘린 요약 조각**(20건 모두 `... `로 끝남). HTML 태그는 없고 HTML 엔티티(`&quot;`)가 들어 있다 |
+| O4 (datetime) | `re.fullmatch(r'[0-9]{12}', datetime)` 개수 | `datetime 12 digits: 10`(두 파일 각각) | 20/20이 `YYYYMMDDHHMM` 12자리. 값에 시간대 표시는 없다 |
+| O5 (식별자) | `re.fullmatch(r'[0-9]{1,12}', …)` 개수, `id == officeId+articleId` 개수 | `officeId/articleId match ^[0-9]{1,12}$: 10`, `id == officeId+articleId: 10`(두 파일 각각) | REQ-AIR7-006 정규식에 녹화 기사 20건이 모두 맞는다 |
+| O6 (G5 주소) | `mobileNewsUrl == 'https://n.news.naver.com/mnews/article/%s/%s' % (officeId, articleId)` 개수 + R4 | `10 / 10`(두 파일 각각), R4 `status=200 redirects=0` | 응답의 `mobileNewsUrl`이 spec의 `article_url` 형태와 20/20 일치하고, 그 형태의 주소 1건이 200으로 열린다 |
+| O7 (0건) | R3 | 본문 `[]` | 0건 응답의 실제 모양은 빈 최상위 배열. 존재하지 않는 종목코드와 "기사 0건 종목"을 응답만으로는 구별할 수 없다(실제 상장 종목의 0건 응답은 관측하지 못함) |
+
+#### SPEC 가정과의 차이 (manager-spec 재위임 대상 — 이 레인은 spec·plan·acceptance를 고치지 않음)
+
+| # | 위치 | SPEC 가정 | 관측 | 영향 |
+|---|---|---|---|---|
+| V1 | spec.md:78, spec.md:145, spec.md:153, acceptance.md:109·122·307 | 응답에 `items[]` 목록 하나(78행 "`items[]`에 …"), 145행 "the response path fixed in run-phase M1", AC가 "픽스처 기사 목록 길이"를 쓴다 | 최상위 그룹 배열, 그룹마다 `items` 1건(O1). 기사 목록 = 그룹들의 `items`를 펼친 것 | REQ-006의 경로를 `[*].items[*]`(펼침, 최대 10건)로 확정해야 한다. `item_count`·"기사 목록 길이"가 펼친 길이인지, 그룹의 `total`이 아님을 명시할 필요. 그룹당 기사 2건 이상은 관측되지 않았다 |
+| V2 | spec.md:103(D3), spec.md:157(REQ-010 `read_scope` 문구), acceptance.md:116 | `body`가 전문인지 요약인지 미정(G4). 116행은 "잡지 못하는 것"으로 둠 | 20/20이 129~154자 요약 조각, `... `로 끝남(O3) | `read_scope` 문구 "모바일 뉴스 API 응답의 제목·본문 필드"는 사실과 어긋나지 않지만, 읽은 것이 기사 요약 조각(약 150자)이라는 점을 드러내지 않는다. `direct_read`로 감사를 통과시키는 근거가 150자 조각이라는 점을 리드·manager-spec이 받아들일지 결정해야 한다(D3의 `limitations` 문구 보강 후보: "요약 조각") |
+| V3 | spec.md:145 (REQ-006 "plain text with markup removed"), acceptance.md:106·111 | 마크업(태그)이 있을 수 있음 — 합성 `<b>강조</b>`로 검사 | 실제 응답에 태그 0건, HTML 엔티티 `&quot;` 2건(O3) | 평문 변환에 HTML 엔티티 해제가 필요하다는 점이 REQ에 명시돼 있지 않다. 태그 제거만 구현하면 `&quot;`가 텍스트 파일에 남는다. AC-006에 엔티티 해제 단언을 더할지 결정 필요 |
+| V4 | spec.md:153 (REQ-009), plan.md:67(N-3 초안) | 정상 응답 + 기사 0건 → `no_results`, goose는 그때만 `no_results` | 없는 종목코드 `999999`도 200 `[]`(O7) | 6자리 숫자 형식만 맞으면 존재하지 않는 종목도 `no_results`가 되고, 하네스 규칙이 goose에게 `no_results` 기록을 허용한다. 실제 운영 호출은 상장 종목이라 위험은 낮지만, 응답만으로 구별할 수 없다는 점을 문서에 적을지 결정 필요 |
+| V5 | spec.md:78 | 키 7개 나열 | 추가 키 5개, 특히 `mobileNewsUrl`(O2·O6) | 모순은 아니다. `article_url`을 검증된 숫자 식별자로 서버가 만드는 현재 방식은 그대로 유효(응답 문자열을 주소에 쓰지 않음). `mobileNewsUrl`을 쓰지 않는다는 점, 또는 일치 검사에 쓸지를 정할 수 있다 |
+
+차이 없음으로 확인한 것: `article_url` 형태(O6, R4), `officeId`·`articleId` 정규식(O5), `datetime` 12자리 형식(O4), 키 이름 `officeId`·`articleId`·`officeName`·`datetime`·`title`·`body`(O2), 응답 크기(8 KB대, 2 MB 상한과 무관), content-type `application/json;charset=UTF-8`.
+
+#### 픽스처
+
+- 녹화 `backend/tests/fixtures/naver/recorded/`: `020150_p1.json`(8,094 B), `000040_p1.json`(8,192 B), `999999_p1.json`(2 B), `request_log.json`(1,302 B). 생성 스크립트 `capture_naver.py`.
+- 합성 `backend/tests/fixtures/naver/synthetic/`(생성 `build_synthetic.py`, 2회 실행 후 `shasum` 비교로 같은 바이트 확인: `deterministic-ok`): `zero_articles.json`, `empty_body.json`, `bad_article_id.json`, `bad_datetime.json`, `markup_body.json`, `parse_cases.json`(AC-006 (2) 4건 묶음), `mixed_status.json`(AC-014), `all_metadata_only.json`(AC-014), `missing_items_path.json`(AC-008 경로 없음 — 처음 이름 `no_items_key.json`이 `.gitignore` 139행 `*_key.*`에 걸려 바꿈), `not_json.txt`(AC-008, `json.loads` → `JSONDecodeError Unterminated string starting at: line 1 column 44 (char 43)`). 모양 점검: 모든 합성 기사의 키 집합이 녹화본 키의 부분집합(`keys_same_as_recorded True`). 설명은 `fixtures/naver/README.md`.
+
+#### Gap (M1에서 관측하지 않은 것)
+
+- R4의 페이지가 그 기사인지(제목 일치)는 검사하지 않았다 — 본문을 저장하지 않는 지시에 따라 상태·최종 주소·크기만 봤다.
+- `datetime`이 KST라는 점: 값에 시간대가 없다. 가장 최근 기사 `202610211352`가 받은 시각 `17:59 +09:00`보다 앞선다는 것은 KST 해석과 모순되지 않을 뿐 증명은 아니다.
+- 그룹 하나에 기사가 2건 이상 오는 경우, 실제 상장 종목의 기사 0건 응답, 실제 마크업 태그가 든 `body` — 모두 관측하지 못했다.
+- 호출 제한·약관(spec G3)은 여전히 미관측.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
