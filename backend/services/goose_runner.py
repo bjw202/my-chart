@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from backend.services import goose_review
 from backend.services.goose_harness import resolve_harness_dir
 
 logger = logging.getLogger(__name__)
@@ -187,8 +188,13 @@ def _regular_file(path: Path) -> bool:
 
 # @MX:ANCHOR: [AUTO] select_report — final/draft 판정의 단일 규칙(REQ-AIR4-014, design §5.2, 결정 T7).
 # @MX:REASON: 실행기의 empty_output 분류, goose_storage.archive_job의 복사 원본·delivery_status,
-#             AC-014 (a)~(g)가 모두 이 함수에 의존한다(fan_in 3). final은 report.html과
-#             delivery_allowed: true가 함께 있을 때만이다 — 폴더 존재만으로 final을 붙이면 AC-014 (c)가 깨진다.
+#             작업 서비스의 전달 상태 재계산, AC-014 (a)~(g)가 모두 이 함수에 의존한다(fan_in 4+). final은
+#             report.html과 delivery_allowed: true(조건 0)에 더해 영수증 판정(조건 1~17)이 함께 인정할 때만이다 —
+#             폴더 존재만으로 final을 붙이면 AC-014 (c)가, 영수증 확인을 빼면 AC-AIR6-016이 깨진다.
+# @MX:WARN: [AUTO] 규칙 7 불변식(화면 확인 통과는 일어난 일일 때만)의 마지막 관문이다.
+# @MX:REASON: 여기서 goose_review.evaluate_admissibility 호출을 빼거나 저장된 값을 믿으면 감수 세션이 쓴 final/이
+#             그대로 최종본이 된다(REQ-AIR6-016, AC-AIR6-016 전 조건).
+# @MX:SPEC: SPEC-AI-REPORT-006
 def select_report(job_dir: Path) -> tuple[str, Path] | None:
     """design §5.2 선택 규칙. 모델이 출력한 경로는 쓰지 않고 작업 디렉터리만 본다.
 
@@ -204,7 +210,11 @@ def select_report(job_dir: Path) -> tuple[str, Path] | None:
         except (OSError, ValueError, AttributeError):
             allowed = False
         if allowed:
-            return "final", final_dir
+            # 조건 0(위)은 이 함수의 기존 조건, 조건 1~17은 단일 판정 함수가 디스크 현재 상태로 다시 계산한다
+            admissible, reasons = goose_review.evaluate_admissibility(job_dir)
+            if admissible:
+                return "final", final_dir
+            logger.info("goose 최종본 미인정 — draft로 전달 (%s, 첫 사유 %s)", job_dir.name, reasons[0])
     draft_dir = job_dir / "draft"
     if _regular_file(draft_dir / "report.html"):
         return "draft", draft_dir

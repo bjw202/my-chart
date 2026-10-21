@@ -21,8 +21,10 @@ const STAGE_LABELS: Record<GooseStage, string> = {
   compose: '리포트 입력 작성',
   render_draft: '초안 만들기',
   audit: '최종 감사',
-  render_final: '최종본 만들기',
   session_end: '세션 종료',
+  screenshot: '화면 캡처',
+  review: '감수',
+  render_final: '최종본 만들기',
 }
 
 type StageState = 'pending' | 'running' | 'done' | 'skipped'

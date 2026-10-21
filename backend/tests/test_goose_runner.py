@@ -402,7 +402,7 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text)
 
 
-def test_select_report_rules(gr, tmp_path):
+def test_select_report_rules(gr, tmp_path, monkeypatch):
     job = tmp_path / "job"
     assert gr.select_report(job) is None
     _write(job / "draft" / "report.html", "<d>")
@@ -416,6 +416,9 @@ def test_select_report_rules(gr, tmp_path):
     _write(job / "final" / "render-validation.json", '{"delivery_allowed": "true"}')
     assert gr.select_report(job) == ("draft", job / "draft")
     _write(job / "final" / "render-validation.json", '{"delivery_allowed": true}')
+    # SPEC-AI-REPORT-006: 영수증 없는 final/은 draft다(조건 1 no_receipt). 인정 판정은 goose_review 시험이 다룬다
+    assert gr.select_report(job) == ("draft", job / "draft")
+    monkeypatch.setattr(gr.goose_review, "evaluate_admissibility", lambda _jd: (True, []))
     assert gr.select_report(job) == ("final", job / "final")
 
 

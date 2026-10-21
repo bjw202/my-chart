@@ -217,7 +217,12 @@ _AC014 = [
     ("e", _draft() + _WAIT, 1.0, False, "error", "timeout", "draft", "draft", True),
     ("f", _draft() + _WAIT, 30.0, True, "cancelled", None, "draft", "draft", True),
     ("g", _final(True) + _draft() + _WAIT, 1.0, False, "error", "timeout", "final", "final", True),
+    # SPEC-AI-REPORT-006: 영수증이 없으면 delivery_allowed: true인 final/도 draft로 보관된다(조건 1)
+    ("a-no-receipt", _final(True) + _draft() + _EXIT0, 30.0, False, "done", None, "draft", "draft", False),
+    ("g-no-receipt", _final(True) + _draft() + _WAIT, 1.0, False, "error", "timeout", "draft", "draft", True),
 ]
+# 보관 복사 경로(final/ 원본)를 계속 시험하려고 (a)(g)는 영수증 판정만 인정으로 고정한다
+_ADMISSIBLE_FIXED = {"a", "g"}
 
 
 @pytest.mark.parametrize(
@@ -225,8 +230,10 @@ _AC014 = [
     _AC014, ids=[row[0] for row in _AC014],
 )
 async def test_ac014_final_judgement_fixtures(
-    env, name, body, timeout, cancel, status, kind, source, delivery, interrupted
+    env, monkeypatch, name, body, timeout, cancel, status, kind, source, delivery, interrupted
 ):
+    if name in _ADMISSIBLE_FIXED:
+        monkeypatch.setattr(env.real.gr.goose_review, "evaluate_admissibility", lambda _jd: (True, []))
     svc = env.service(_runner(env, body, timeout=timeout))
     job = (await svc.start("299030", "하나기술")).job
     job_dir = env.runs / job.job_id

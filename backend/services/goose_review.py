@@ -501,3 +501,18 @@ def finish_review(
     receipt["visual_admissible"] = not reasons
     receipt["reasons"] = reasons
     return _write_receipt_file(job_dir / REVIEW_DIR / RECEIPT_NAME, receipt)
+
+
+def write_outcome_receipt(job_dir: Path, outcome: str, *, harness_dir: Path) -> ReceiptResult:
+    """세션 없이 끝난 경우(`integrity_failed`·`disabled`·`cancelled`)의 영수증을 서버가 쓴다.
+
+    감수 세션을 시작하지 않았으므로 열람·쓰기 기록은 비어 있고 시작·종료 측정값은 같다.
+    어떤 outcome이든 `reviewed`가 아니므로 최종본은 인정되지 않는다(조건 3).
+    """
+    if outcome not in OUTCOMES or outcome == "reviewed":
+        raise ValueError(f"세션 없는 영수증 outcome이 아님: {outcome!r}")
+    index = _load_json_object(job_dir / "screens" / "index.json")
+    start = ReviewStart(
+        job_dir.name, _now(), False, _measure_draft(job_dir), measure_screens(job_dir), _index_tiles(index)
+    )
+    return finish_review(job_dir, start, harness_dir=harness_dir, outcome=outcome)

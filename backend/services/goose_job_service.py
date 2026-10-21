@@ -14,6 +14,10 @@
   ``runs/<job_id>/dart/``로 수집하고 무결성을 다시 검사한다. 생성자 기본값은 수집기 없음(기존 동작 그대로)이고
   운영용 모듈 인스턴스에만 실제 DART 수집기를 붙인다. 끄기 스위치 `AI_REPORT_GOOSE_DART_PREFETCH=0`의
   소유자는 이 서비스다(REQ-AIR5-004).
+- SPEC-AI-REPORT-006: ``screenshotter``(화면 캡처기)와 ``reviewer``(감수 세션 실행기)를 둘 다 주입하면 goose 1차
+  세션이 끝난 뒤 같은 백그라운드 태스크에서 재검사 → 캡처 → 감수 세션 → 영수증 → 전달 상태 재계산을 이어서
+  실행한다(잠금 밖, active 유지). 생성자 기본값은 둘 다 없음(기존 흐름 그대로)이고 운영용 모듈 인스턴스에만
+  실제 구현을 붙인다. 끄기 스위치 `AI_REPORT_GOOSE_REVIEW=0`의 소유자는 이 서비스다(REQ-AIR6-004).
 """
 
 from __future__ import annotations
@@ -30,11 +34,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.services import goose_dart_prefetch, goose_harness, goose_runner, goose_storage
+from backend.services import (
+    goose_dart_prefetch,
+    goose_harness,
+    goose_review,
+    goose_runner,
+    goose_screenshot,
+    goose_storage,
+)
 
 logger = logging.getLogger(__name__)
 
 ENV_DART_PREFETCH = "AI_REPORT_GOOSE_DART_PREFETCH"  # "0"이면 DART 사전 수집을 끈다(REQ-AIR5-004)
+ENV_REVIEW = "AI_REPORT_GOOSE_REVIEW"  # "0"이면 화면 캡처·감수 후처리를 끈다(REQ-AIR6-004)
 MAX_FINISHED_JOBS = 50
 TERMINAL_STATES = ("done", "error", "cancelled")
 
@@ -99,6 +111,18 @@ Runner = Callable[..., Awaitable[goose_runner.RunResult]]
 FinishHook = Callable[[Job, "goose_runner.RunResult | None"], Any]
 # 호출 계약: ``await prefetcher(code, out_dir) -> index``. 실패는 색인에 적고 정상 반환, 취소만 전파한다.
 Prefetcher = Callable[[str, Path], Awaitable[Any]]
+# 호출 계약: ``await screenshotter(job_dir)``. 실패는 색인에 적고 정상 반환, 취소만 전파한다(goose_screenshot.capture).
+Screenshotter = Callable[[Path], Awaitable[Any]]
+# 호출 계약: ``await reviewer(job_id=, code=, on_event=) -> ReviewRunResult``(goose_runner.run_review). 취소만 전파한다.
+Reviewer = Callable[..., Awaitable["goose_runner.ReviewRunResult"]]
+
+
+@dataclass
+class _PostResult:
+    """후처리 결과. ``launched``: 캡처 또는 감수 세션이 시작됨, ``receipt_blocked``: 영수증 쓰기가 실패했는데 같은 이름 파일이 남음."""
+
+    launched: bool = False
+    receipt_blocked: bool = False
 
 
 def _default_runs_root() -> Path:
@@ -165,6 +189,8 @@ class GooseJobService:
         runs_root: Callable[[], Path] | None = None,
         on_finish: FinishHook | None = None,
         prefetcher: Prefetcher | None = None,
+        screenshotter: Screenshotter | None = None,
+        reviewer: Reviewer | None = None,
         max_finished: int = MAX_FINISHED_JOBS,
     ) -> None:
         self._runner: Runner = runner or goose_runner.run_goose
@@ -172,6 +198,8 @@ class GooseJobService:
         self._runs_root = runs_root or _default_runs_root
         self._on_finish = on_finish
         self._prefetcher = prefetcher
+        self._screenshotter = screenshotter
+        self._reviewer = reviewer
         self._max_finished = max_finished
         self._jobs: dict[str, Job] = {}
         self._active_job_id: str | None = None
@@ -253,6 +281,8 @@ class GooseJobService:
             result = await self._runner(
                 job_id=job.job_id, stock_name=job.stock_name, code=job.code, on_event=on_event
             )
+            # 후처리(SPEC-AI-REPORT-006): 취소는 아래 CancelledError 처리로 흘러가고, 그 밖의 실패는 안에서 삼킨다
+            post = await self._post_process(job) if result.status == "done" else _PostResult()
         except asyncio.CancelledError:
             # 실행기는 그룹을 정리한 뒤 CancelledError를 다시 던진다(M3). 취소는 오류 종류가 아니다.
             reason = job.cancel_reason or "cancel"
@@ -267,7 +297,12 @@ class GooseJobService:
             return
         if result.status == "done":
             extra = await self._call_finish_hook(job, result, ("done", None))
-            data = {"delivery_status": result.delivery_status, **extra}
+            if post.launched:
+                # 영수증을 쓴 뒤의 값이 전달 상태다 — 실행기가 1차 세션 직후(영수증 없이) 계산한 값이 아니다(REQ-AIR6-019)
+                status = await self._post_delivery_status(job, extra, post)
+                data = {**extra, "delivery_status": status}
+            else:
+                data = {"delivery_status": result.delivery_status, **extra}
             await self._finish(job, "done", None, data)
         else:
             kind = result.error_kind or "exit_error"
@@ -292,6 +327,122 @@ class GooseJobService:
             await self._prefetcher(job.code, out_dir)
         except Exception:  # noqa: BLE001 - fail-open(REQ-AIR5-010). CancelledError는 Exception이 아니라 전파된다
             logger.exception("goose 작업 %s DART 사전 수집 실패 — goose 실행은 계속", job.job_id)
+
+    # ── 후처리 (SPEC-AI-REPORT-006) ──────────────────────────────────────────
+
+    # @MX:ANCHOR: [AUTO] _post_process — 1차 세션 뒤 후처리 순서·진행 이벤트·스위치·fail-open의 단일 정의
+    #             (REQ-AIR6-001~005, design §2).
+    # @MX:REASON: 순서(재검사 → 캡처 → 스냅샷/컨텍스트 → 감수 → 영수증)와 이벤트 시점이 AC-AIR6-001·003·005에,
+    #             영수증 사실이 최종본 인정(AC-AIR6-016)에 그대로 들어간다. 이 안에서 `except BaseException`으로
+    #             넓히면 취소가 삼켜져 취소된 작업의 다음 단계가 실행된다(AC-AIR6-002 대조 (a)).
+    # @MX:SPEC: SPEC-AI-REPORT-006
+    async def _post_process(self, job: Job) -> _PostResult:
+        post = _PostResult()
+        if self._screenshotter is None or self._reviewer is None:
+            return post  # 주입이 없으면 기존 흐름 그대로(영수증도 쓰지 않는다)
+        job_dir = self._runs_root() / job.job_id
+        harness_dir = self._runs_root().parent
+        draft = job_dir / "draft" / "report.html"
+        if not draft.is_file() or draft.is_symlink():
+            return post
+        start: goose_review.ReviewStart | None = None
+        receipt_done = False
+        try:
+            if os.environ.get(ENV_REVIEW, "").strip() == "0":
+                await self._write_outcome_receipt(job_dir, harness_dir, "disabled")
+                return post
+            try:
+                integrity = await asyncio.to_thread(self._integrity)
+            except Exception:  # noqa: BLE001 - 검사를 못 하면 닫힌 실패로 본다
+                logger.exception("goose 작업 %s 후처리 전 무결성 재검사 예외", job.job_id)
+                integrity = None
+            if integrity is None or not integrity.ok:
+                logger.error("goose 작업 %s 후처리 전 무결성 재검사 실패 — 캡처·감수 없음", job.job_id)
+                await self._write_outcome_receipt(job_dir, harness_dir, "integrity_failed")
+                return post
+            post.launched = True
+            await self._emit(job, "progress", {"stage": "screenshot", "detail": None})
+            try:
+                await self._screenshotter(job_dir)
+            except Exception:  # noqa: BLE001 - 캡처 실패는 색인/컨텍스트에 남고 감수는 계속한다(REQ-AIR6-005)
+                logger.exception("goose 작업 %s 화면 캡처 실패 — 감수는 계속", job.job_id)
+            start = await asyncio.to_thread(goose_review.prepare_review, job_dir, code=job.code)
+            run = None
+            if start.launch:
+                await self._emit(job, "progress", {"stage": "review", "detail": None})
+                run = await self._run_reviewer(job)
+            receipt_done = True  # 아래 쓰기 중 취소·예외는 영수증 쓰기 자체의 문제다
+            written = await asyncio.to_thread(
+                goose_review.finish_review, job_dir, start, harness_dir=harness_dir,
+                exit_code=run.exit_code if run else None, timed_out=run.timed_out if run else False,
+                read_paths=run.reads if run else (), write_paths=run.writes if run else (),
+            )
+            post.receipt_blocked = written.file_remains
+        except asyncio.CancelledError:
+            self._write_cancel_receipt(job_dir, harness_dir, start)
+            raise
+        except Exception:  # noqa: BLE001 - fail-open: 후처리의 어떤 실패도 작업을 error로 만들지 않는다
+            logger.exception("goose 작업 %s 후처리 실패 — 초안으로 끝냄", job.job_id)
+            if not receipt_done:
+                await self._write_failure_receipt(job_dir, harness_dir, start)
+        return post
+
+    async def _run_reviewer(self, job: Job):
+        """감수 세션 실행. 예외(취소 제외)는 None으로 돌려 영수증이 `review_failed`로 쓰이게 한다."""
+        render_final_sent = False
+
+        async def on_review_event(ev: goose_runner.ProgressEvent) -> None:
+            nonlocal render_final_sent
+            # 감수 세션의 다른 도구 호출은 중계하지 않는다(1차 세션의 audit·render_draft와 섞이지 않게). 한 번만 낸다
+            if ev.stage == "render_final" and not render_final_sent:
+                render_final_sent = True
+                await self._emit(job, "progress", {"stage": "render_final", "detail": None})
+
+        try:
+            return await self._reviewer(job_id=job.job_id, code=job.code, on_event=on_review_event)
+        except Exception:  # noqa: BLE001 - 감수 실패는 영수증(review_failed)으로 남기고 초안으로 끝낸다
+            logger.exception("goose 작업 %s 감수 세션 실패", job.job_id)
+            return None
+
+    async def _write_outcome_receipt(self, job_dir: Path, harness_dir: Path, outcome: str) -> None:
+        try:
+            await asyncio.to_thread(goose_review.write_outcome_receipt, job_dir, outcome, harness_dir=harness_dir)
+        except Exception:  # noqa: BLE001 - 영수증이 없으면 최종본이 인정되지 않을 뿐이다
+            logger.exception("goose 작업 %s %s 영수증 쓰기 실패", job_dir.name, outcome)
+
+    async def _write_failure_receipt(
+        self, job_dir: Path, harness_dir: Path, start: goose_review.ReviewStart | None
+    ) -> None:
+        try:
+            if start is not None:
+                await asyncio.to_thread(goose_review.finish_review, job_dir, start, harness_dir=harness_dir)
+            else:
+                await asyncio.to_thread(goose_review.write_outcome_receipt, job_dir, "review_failed",
+                                        harness_dir=harness_dir)
+        except Exception:  # noqa: BLE001
+            logger.exception("goose 작업 %s 실패 영수증 쓰기 실패", job_dir.name)
+
+    def _write_cancel_receipt(
+        self, job_dir: Path, harness_dir: Path, start: goose_review.ReviewStart | None
+    ) -> None:
+        """취소는 best-effort로 `cancelled` 영수증을 남긴다(동기 — 취소 처리 중이라 짧게 끝낸다)."""
+        try:
+            if start is not None:
+                goose_review.finish_review(job_dir, start, harness_dir=harness_dir, outcome="cancelled")
+            else:
+                goose_review.write_outcome_receipt(job_dir, "cancelled", harness_dir=harness_dir)
+        except Exception:  # noqa: BLE001
+            logger.exception("goose 작업 %s 취소 영수증 쓰기 실패", job_dir.name)
+
+    async def _post_delivery_status(self, job: Job, extra: dict[str, Any], post: _PostResult) -> str | None:
+        """후처리가 돈 작업의 전달 상태: 영수증 쓰기 실패 잔존이면 draft, 훅 값, 없으면 select_report 재계산."""
+        if post.receipt_blocked:
+            return "draft"
+        hooked = extra.get("delivery_status")
+        if hooked in goose_storage.DELIVERY_STATUSES:
+            return hooked
+        selected = await asyncio.to_thread(goose_runner.select_report, self._runs_root() / job.job_id)
+        return selected[0] if selected else None
 
     async def _call_finish_hook(
         self, job: Job, result: goose_runner.RunResult | None, ending: tuple[str, str | None]
@@ -387,6 +538,8 @@ class GooseJobService:
 _service = GooseJobService(
     on_finish=goose_storage.make_finish_hook(runs_root=_default_runs_root),
     prefetcher=goose_dart_prefetch.DartPrefetcher(),
+    screenshotter=goose_screenshot.capture,
+    reviewer=goose_runner.run_review,
 )
 
 

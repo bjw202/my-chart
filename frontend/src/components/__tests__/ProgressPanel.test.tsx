@@ -22,7 +22,7 @@ function stateOf(container: HTMLElement, stage: string): string | null {
 }
 
 describe('ProgressPanel — goose 진행 단계', () => {
-  it('단계 11개(공시 원문 수집 + 측정 표 10개)를 순서대로 렌더하고 옛 5소스 이름은 없다', () => {
+  it('단계 13개(공시 원문 수집 + 측정 표 10개 + 화면 캡처·감수)를 순서대로 렌더하고 옛 5소스 이름은 없다', () => {
     const { container } = render(<ProgressPanel progress={makeInitialGooseProgress()} />)
     const stages = Array.from(container.querySelectorAll('[data-stage]')).map((el) =>
       el.getAttribute('data-stage'),
@@ -37,8 +37,10 @@ describe('ProgressPanel — goose 진행 단계', () => {
       'compose',
       'render_draft',
       'audit',
-      'render_final',
       'session_end',
+      'screenshot',
+      'review',
+      'render_final',
     ])
     for (const old of ['Brave', 'Tavily', 'YouTube', 'Claude 합성']) {
       expect(screen.queryByText(old)).not.toBeInTheDocument()
@@ -84,6 +86,26 @@ describe('ProgressPanel — goose 진행 단계', () => {
   it('session_end에 도달하면 마지막 단계도 완료다', () => {
     const { container } = render(<ProgressPanel progress={progressOf('goose_start', 'session_end')} />)
     expect(stateOf(container, 'session_end')).toBe('done')
+  })
+
+  it('화면 캡처·감수 단계를 한국어 라벨로 렌더하고 진행 순서대로 상태를 표시한다(AC-AIR6-003)', () => {
+    const { container } = render(
+      <ProgressPanel progress={progressOf('goose_start', 'session_end', 'screenshot', 'review')} />,
+    )
+    expect(container.querySelector('[data-stage="screenshot"]')).toHaveTextContent('화면 캡처')
+    expect(container.querySelector('[data-stage="review"]')).toHaveTextContent('감수')
+    expect(stateOf(container, 'session_end')).toBe('done')
+    expect(stateOf(container, 'screenshot')).toBe('done')
+    expect(stateOf(container, 'review')).toBe('running')
+    expect(stateOf(container, 'render_final')).toBe('pending')
+  })
+
+  it('감수 세션이 --final을 실행하면 최종본 만들기가 진행 중이다', () => {
+    const { container } = render(
+      <ProgressPanel progress={progressOf('goose_start', 'session_end', 'screenshot', 'review', 'render_final')} />,
+    )
+    expect(stateOf(container, 'review')).toBe('done')
+    expect(stateOf(container, 'render_final')).toBe('running')
   })
 
   it('aria-live 속성으로 스크린 리더에게 동적 변경을 전파한다', () => {

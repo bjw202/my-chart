@@ -70,8 +70,10 @@ export type GooseStage =
   | 'compose'
   | 'render_draft'
   | 'audit'
-  | 'render_final'
   | 'session_end'
+  | 'screenshot' // SPEC-AI-REPORT-006: 서버가 초안 화면을 찍는 단계
+  | 'review' // SPEC-AI-REPORT-006: 별도 감수 세션
+  | 'render_final' // 감수 세션이 --final을 실행할 때만 발생한다
 
 /** SSE `event: progress`의 데이터. 알 수 없는 stage는 무시한다. */
 export interface GooseProgressEvent {

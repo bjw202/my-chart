@@ -972,3 +972,105 @@ def test_air6_011_review_timeout_env_resolution(gr):
 def test_air6_011_review_prompt_rejects_unsafe_values(gr, code, job):
     with pytest.raises(ValueError):
         gr.build_review_prompt(job, code)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-006 M4 — select_report가 판정 함수를 부른다 (AC-AIR6-016 select_report 몫)
+# 조건 0(final_not_allowed)은 select_report 자신의 기존 조건이고, 1~17은 evaluate_admissibility의 몫이다.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _draft_of(job) -> tuple[str, Path]:
+    return ("draft", job.job_dir / "draft")
+
+
+def test_air6_016_select_report_baseline_p_is_final(gr, tmp_path):
+    job = _make_job(tmp_path)
+    assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+
+
+@pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+    job = _make_job(tmp_path, **kwargs)
+    assert gr.select_report(job.job_dir) == _draft_of(job)
+
+
+@pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+    job = _make_job(tmp_path)
+    assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+    mutate(job.job_dir)
+    assert gr.select_report(job.job_dir) == _draft_of(job)
+
+
+def test_air6_016_select_report_condition0_final_not_allowed(gr, tmp_path):
+    """(n) 조건 0: delivery_allowed가 거짓이면 판정 함수가 인정이어도 draft."""
+    job = _make_job(tmp_path)
+    (job.job_dir / "final" / "render-validation.json").write_text('{"delivery_allowed": false}')
+    assert gv.evaluate_admissibility(job.job_dir) == (True, [])
+    assert gr.select_report(job.job_dir) == _draft_of(job)
+
+
+def test_air6_016_select_report_final_without_receipt_and_without_draft(gr, tmp_path):
+    """영수증 없는 final/만 있고 draft/가 없는 폴더는 None(기존 규칙)."""
+    jd = tmp_path / "harness" / "runs" / "jx"
+    jd.mkdir(parents=True)
+    _plant_final(jd)
+    assert gr.select_report(jd) is None
+
+
+def test_air6_016_select_report_is_the_single_caller_of_the_disk_wrapper(gr, tmp_path, monkeypatch):
+    """select_report는 디스크 래퍼를 부른다(작성기는 코어). 래퍼 결과가 곧 판정이다."""
+    job = _make_job(tmp_path)
+    calls: list[Path] = []
+    mod = sys.modules["backend.services.goose_review"]
+    real = mod.evaluate_admissibility
+
+    def spy(job_dir):
+        calls.append(job_dir)
+        return real(job_dir)
+
+    monkeypatch.setattr(mod, "evaluate_admissibility", spy)
+    assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+    assert calls == [job.job_dir]
+
+
+def test_air6_014_select_report_planted_cases(gr, tmp_path, monkeypatch):
+    """(11)(12)(13)의 select_report 절반: 심은 파일은 인정 근거가 되지 못한다."""
+    job11 = _make_job(tmp_path / "a", pre=_plant_record, write_audit=False, session=_make_final)
+    assert gr.select_report(job11.job_dir) == _draft_of(job11)
+    job12 = _make_job(tmp_path / "b", pre=_plant_final, make_final=False)
+    assert gr.select_report(job12.job_dir) == _draft_of(job12)  # final/ 자체가 없음(조건 0)
+
+    def plant_both(jd):
+        _plant_record(jd)
+        _plant_final(jd)
+
+    monkeypatch.setattr(gv, "_delete_planted", lambda _jd: False)
+    job13 = _make_job(tmp_path / "c", pre=plant_both)
+    assert gr.select_report(job13.job_dir) == _draft_of(job13)
+
+
+# ── 종료 영수증 작성기(integrity_failed·disabled·cancelled) ───────────────────
+
+
+@pytest.mark.parametrize("outcome", ["integrity_failed", "disabled", "cancelled"])
+def test_air6_001_004_outcome_receipt_writer(tmp_path, outcome):
+    harness = tmp_path / "harness"
+    job_dir = _build_job_files(harness)
+    _plant_final(job_dir)  # 감수 없이 final/이 있어도 영수증은 인정하지 않는다
+    result = gv.write_outcome_receipt(job_dir, outcome, harness_dir=harness)
+    assert result.written is True
+    receipt = json.loads(_receipt_path(job_dir).read_text())
+    assert set(receipt) == _RECEIPT_KEYS
+    assert receipt["outcome"] == outcome and receipt["visual_admissible"] is False
+    assert receipt["screens"]["tiles_read"] == [] and receipt["judged_writes"] == []
+    assert receipt["reasons"][0] == "review_not_completed"
+    assert gv.evaluate_admissibility(job_dir)[0] is False
+
+
+def test_air6_001_outcome_receipt_writer_rejects_unknown_outcome(tmp_path):
+    harness = tmp_path / "harness"
+    job_dir = _build_job_files(harness)
+    with pytest.raises(ValueError):
+        gv.write_outcome_receipt(job_dir, "reviewed", harness_dir=harness)

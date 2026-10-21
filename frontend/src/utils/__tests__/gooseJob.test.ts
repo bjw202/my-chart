@@ -46,7 +46,7 @@ describe('goose 작업 저장 키 (sessionStorage goose_job:{code})', () => {
 })
 
 describe('goose 진행 단계 누적 (design §3.5 측정 표)', () => {
-  it('단계 11개를 순서대로 가진다 — 공시 원문 수집(dart_prefetch)이 맨 앞(SPEC-AI-REPORT-005)', () => {
+  it('단계 13개를 순서대로 가진다 — dart_prefetch가 맨 앞, 화면 캡처·감수가 session_end 뒤(SPEC-AI-REPORT-006 AC-AIR6-003)', () => {
     expect(GOOSE_STAGES[0]).toBe('dart_prefetch')
     expect(GOOSE_STAGES).toEqual([
       'dart_prefetch',
@@ -58,9 +58,19 @@ describe('goose 진행 단계 누적 (design §3.5 측정 표)', () => {
       'compose',
       'render_draft',
       'audit',
-      'render_final',
       'session_end',
+      'screenshot',
+      'review',
+      'render_final',
     ])
+  })
+
+  it('screenshot·review를 reached에 넣는다(알 수 없는 단계로 버리지 않는다)', () => {
+    let p = makeInitialGooseProgress()
+    for (const stage of ['session_end', 'screenshot', 'review', 'render_final']) {
+      p = applyGooseStage(p, { stage, detail: null })
+    }
+    expect(p.reached).toEqual(['session_end', 'screenshot', 'review', 'render_final'])
   })
 
   it('도달한 단계를 한 번씩 기록하고 검색·열람 횟수를 센다', () => {

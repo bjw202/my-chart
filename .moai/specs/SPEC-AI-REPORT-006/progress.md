@@ -148,6 +148,57 @@
 - **일시적 불일치 관측**: 19:40경 같은 확인이 `['installed sha256 mismatch: CLAUDE.md']`를 냈다. 당시 설치본 `CLAUDE.md` 앞 16자리는 `a7a9a06e43d2a2be`(= t18 작업공간 매니페스트의 항목), 주 체크아웃 매니페스트는 `77e260e4c5a27e9f`였다. 19:42:16에 `CLAUDE.md`와 `settings.json`의 수정 시각이 갱신됐고 19:42:19에 다시 `77e260e4…`로 바뀐 뒤 불일치는 사라졌다. 그 시각대에 t19 작업공간 파이썬(pid 69801, 19:41:46 시작)이 돌고 있었다.
 - **원인은 미확정이다.** 19:39:36의 `a7a9a06e…`(t18 소스 해시)가 이 작업공간의 테스트 실행(제 `pytest` 또는 M3 에이전트의 테스트)이 실제 홈에 설치한 결과인지, 다른 세션의 실행인지 구분하지 못했다. 이 SPEC의 테스트는 하네스 경로를 `AI_REPORT_GOOSE_HARNESS_DIR`로 임시 경로에 돌리지만, 앱 전체를 띄우는 다른 테스트의 격리는 확인하지 않았다(`test_main_goose_lifespan.py`는 `install_at_startup`을 가짜로 바꾼다). 재현 시험은 라이브 하네스를 다시 건드릴 수 있어 하지 않았다.
 
+### M4 작업 서비스 연결·최종본 인정·프론트 — 2026-10-21
+
+**산출**: `backend/services/goose_job_service.py`(후처리 `_post_process`·스위치·취소·fail-open·전달 상태 재계산, 생성자 `screenshotter`/`reviewer`, 운영 인스턴스에 `goose_screenshot.capture`·`goose_runner.run_review` 주입), `backend/services/goose_review.py`(`write_outcome_receipt`: integrity_failed·disabled·cancelled 영수증 작성기), `backend/services/goose_runner.py`(`select_report`가 조건 0 통과 뒤 `goose_review.evaluate_admissibility` 호출), 프론트 3파일(`types/aiReport.ts`, `utils/gooseJob.ts`, `components/ProgressPanel.tsx`), 시험(`test_goose_job_service.py`·`test_goose_review.py` 추가, `test_goose_runner.py`·`test_goose_storage.py` 갱신 + 프론트 시험 2파일), 합성 입력 픽스처 `backend/tests/fixtures/goose_review/live-draft-input.json`(라이브 020150 초안 입력 원본 68430바이트, 시험에서 네이버 채널 패치). 증거 폴더 `.moai/state/verify/t18-m4/`(git 무시): `baseline.out`, `red_select.out`, `red_service.out`, `vitest_red.out`, `mutations.out`, `mutations2.out`, `mutate.py`, `py.sh`·`node.sh`(격리 실행 래퍼), `final_goose.out`, `vitest_final.out`, `tsc.out`, `eslint.out`, `harness-before.txt`, `harness-after.txt`.
+
+**격리**: 모든 pytest·python 실행은 `py.sh`(임시 `HOME=.moai/state/verify/t18-m4/home`, `AI_REPORT_GOOSE_HARNESS_DIR=…/home/.goose-harness`, `python -B`, `PYTHONDONTWRITEBYTECODE=1`)로, 프론트 도구는 `node.sh`(같은 HOME/하네스 환경)로 실행했다. **예외 1건(프론트, 하네스와 무관)**: 20:17경 `vitest run`(RED 관측용) 1회가 `node.sh` 도입 전에 격리 환경 변수 없이 `frontend/node_modules/.bin/vitest`로 실행됐다(출력 `vitest_red.out`). 그 시점 실제 홈의 `~/.goose-harness`에 쓰는 코드 경로는 프론트 시험에 없지만 환경 변수로 막지 않았다는 사실을 그대로 기록한다. 격리 이전에 돌린 pytest·python은 없다(첫 pytest는 `py.sh` 경유 `baseline.out`).
+
+**하네스 전후** (`harness-before.txt` 19:47 / `harness-after.txt` 20:26, 읽기 전용 `shasum -a 256`·`stat`):
+- 전: `CLAUDE.md` `a7a9a06e43d2a2be…554e9`(mtime 19:44:59), `settings.json` `e8b527cc…15df3`(19:44:59)
+- 후: `CLAUDE.md` `77e260e4c5a27e9f6166be2be19faec6332d421cdf0d82ba5fe3c1b6c6fb2fed`(mtime **20:01:07**), `settings.json` 해시 동일 `e8b527cc…15df3`, mtime 20:01:07
+- 해석: 바뀌었다. 내 첫 pytest/python 실행은 20:06경(`baseline.out` 20:06:48)이라 변경(20:01:07)은 내 실행보다 앞선다. 19:47~20:06 사이 내가 한 일은 읽기(cat·sed·grep·ls)뿐이었다. 새 해시 `77e260e4…`는 M3 기록의 주 체크아웃 매니페스트 값(= t19 지침 설치본)과 같다. 변경 주체는 확인하지 못했다(설치 행위를 직접 보지 못함).
+
+**기준선·결과 (직접 실행)**
+- 전: `py.sh -m pytest backend/tests -k goose -q -p no:cacheprovider` → `398 passed, 214 deselected, 1 warning in 36.26s`
+- 후: 같은 명령 → `470 passed, 214 deselected, 1 warning in 28.26s` (398 + 신규 72, 실패 0). 신규 72 = `test_goose_review.py` 35(select_report 몫 + 종료 영수증 작성기) + `test_goose_storage.py` 매개변수 2(`a-no-receipt`, `g-no-receipt`) + `test_goose_job_service.py` 35(AC-001~005·014 서비스 몫·015 S9·020·022)
+- **갱신한 기존 테스트 3개**(398 기준선 대비): `test_goose_runner.py::test_select_report_rules`(영수증 없는 `final/`은 draft라는 새 기대 + `evaluate_admissibility`를 인정으로 고정한 `final` 기대), `test_goose_storage.py::test_ac014_final_judgement_fixtures[a]`·`[g]`(`final/` 보관 복사 경로를 계속 시험하려고 판정 함수만 인정으로 고정; 영수증 없음 기대는 `a-no-receipt`·`g-no-receipt`로 추가). 다른 기존 테스트 수정 0.
+- 프론트: `node.sh vitest run --root …/frontend src/utils src/components` → `Test Files 77 passed (77) / Tests 702 passed (702)`, exit 0(`vitest_final.out`). 전체 `vitest run` 1회(`vitest_green.out`): `Tests 845 passed (845)`, `Test Files 1 failed | 96 passed (97)` — 실패 1건은 `e2e/preset-flow.spec.ts`(`Playwright Test did not expect test.describe() to be called here`), 이 변경과 무관한 Playwright 스펙이 vitest에 수집된 것(기준선에서 별도 재측정하지 않음 — 미검증). `tsc -p tsconfig.app.json --noEmit` exit 0, `eslint`(변경 5파일) exit 0. 워크트리에 `frontend/node_modules`가 없어 주 체크아웃 것을 `cp -cR`(복제)로 워크트리 안에 두고 썼다(주 체크아웃 쓰기 없음, gitignore 대상).
+- 린트: `python3 -m ruff check`(변경 7파일) → `All checks passed!`
+
+**RED 관측**: 이번 마일스톤은 시험을 먼저 썼다. (1) select_report·종료 영수증 시험: 구현 전 `33 failed, 2 passed`(`red_select.out`, `-k "select_report or planted_cases or outcome_receipt"`; 통과 2건은 구현 전에도 맞던 기준 상태 확인) → 구현 후 `35 passed`. (2) 서비스 시험: 구현 전 `31 failed, 1 passed`(`red_service.out`) → 구현 후 전부 통과. (3) 프론트: `5 failed | 12 passed`(`vitest_red.out`) → 구현 후 통과. 그 뒤 모든 AC의 되돌림 변이는 `mutate.py`(`mutations.out` 64개 + 재구성 3개 `mutations2.out`)로 보호 동작을 하나씩 되돌려 RED를 관측하고 복원했다. 마지막 줄 `restored-sha-match: True` 두 번.
+
+| AC | 상태 | 되돌림 변이 → 관측 |
+|---|---|---|
+| 001 (a)~(f) | PASS | (a) 후처리를 잠금 안에서 실행 · (b) 감수를 캡처 자리에서 실행 · (c) 재검사 생략 · (d) 재검사 실패 때 진행 · (e) 생성자 기본값에 실제 구현 · (f) draft 확인 제거 → 모두 RED |
+| 002 | PASS | (a) 캡처 단계가 취소를 삼킴(`BaseException`) · 취소 영수증 쓰기 제거 · (c) 감수 프로세스 그룹 정리 제거(실제 `run_review` + 잠자는 가짜 claude) → RED. 브라우저 프로세스 그룹 몫 (b)(3)은 M2 `test_air6_002_cancel_kills_browser_group_and_profile`가 담당(이 마일스톤에서 서비스 수준으로 중복하지 않음) |
+| 003 | PASS | (a) 프론트 단계 목록 누락 · (b) 단계를 시작 후 발행 · (c) 두 번 발행 · (d) 꺼진 경우에도 발행 · (e) 프론트 `render_final`을 `session_end` 앞에 · (f) 감수 세션 모든 호출 중계 · `render_final` 중복 제거 해제 · 라벨 누락 → 모두 RED |
+| 004 | PASS | (a) 스위치 무시 · (c) disabled 영수증 미작성 · (d) 스위치 0이면 실행기도 건너뜀 → RED. (b) "스위치를 감수기 안에서만 확인"은 구조상 별도 변이를 만들지 않았다(스위치는 후처리 진입에서 한 번 읽는다) — 미관측 |
+| 005 | PASS | (a) 캡처 예외가 작업 실패로 전파 · (b) 캡처 실패 시 감수 건너뜀 · (c) 감수 예외 전파(안쪽·바깥쪽 fail-open 두 겹을 함께 제거해야 RED, 첫 시도에서 안쪽만 제거한 변이는 STILL-GREEN이었음 — 바깥 보호가 받아내서) · (d) 시간 초과를 기록하지 않음 · (e) 종료 0·기록 없음을 `reviewed`로 기록 → RED |
+| 014 서비스 몫 | PASS | (i) 사전 심은 `audit-review.json` 삭제 제거 · (j) `final/` 삭제 제거 · (k) 삭제 실패를 무시하고 세션 시작(`launch=True`; 첫 변이 `if False: return start`는 STILL-GREEN이라 의도대로 `launch`를 바꾼 변이로 재구성) · (m) 삭제 실패 때 시작 값 비워 둠 · select_report 인정 건너뜀 → RED. (11)(12)(13)의 select_report 절반은 `test_air6_014_select_report_planted_cases` |
+| 015 S9 | PASS | S9(a)(b)는 세션이 서버와 똑같은 **인정 영수증**을 위조해 두는 시험(처음엔 키가 부족한 위조 파일이라 우연히 draft가 되어 변이가 STILL-GREEN일 뻔했고, 완전한 위조로 고침). (f) 제거 없이 교체만(제거 두 곳을 함께 빼야 RED) · (g) 영수증 잔존 시 이벤트를 draft로 확정하는 분기 제거 → RED |
+| 016 select_report 몫 | PASS | 조건 0 제거 · 판정 함수 호출 제거 · 조건 1~17 각각의 사유 추가를 제거(`reasons.append("…")`→`pass`) → 17개 모두 RED. 수준 A/B 구분 없이 select 시험(`air6_016_select_report_*`)이 모든 조건에서 RED. 조건별 격리 사유 목록 단언은 M3 시험이 담당 |
+| 020 (1)~(6) | PASS (c 제외) | (a) 실행기 값 그대로 사용 · (b) 재계산 대신 고정값 · (d) 스위치 0에서도 재계산 · (e) 재검사 실패에서도 재계산 → RED. (c) "이벤트와 `job.json`이 다른 시점 값"은 훅과 재계산이 같은 `select_report`를 읽어 서로 갈라지는 상태를 만들 수 없어 독립 변이를 만들지 못했다 — 미관측(대신 (1)이 이벤트·`job.json`·`archive_job` 반환의 동치를 단언) |
+| 022 | PASS | 실제 `audit_report.py`·`render_report.py --final`을 가짜 claude 스크립트가 실행. 합성 입력은 라이브 초안 입력에서 네이버 `blocked`→`no_results` 패치 + `research_window.mode: historical`·`user_requested_as_of: true`(날짜 신선도 검사를 시험 시점과 분리 — G10을 날짜 재작성 대신 이 방식으로 해소; 분기·연도 상대 검사도 고정). 감사 `decision == pass`·`findings == []`, `final/render-validation.json` `delivery_allowed: true`, 영수증 `reviewed`·`visual_admissible: true`·`reasons: []`, `select_report == final`, 완료 이벤트와 `job.json` `final`, `render_final` 이벤트 1개. 대조(타일 하나 미열람)는 감사기·렌더러는 통과시키나 사유 `[tile_not_read]`, `draft`. 되돌림: 컨텍스트의 `preview_sha256`·`input_sha256`·`reviewed_at`·`mode` 오염, 조건 11 제거, `render_final` 중계 제거 → 모두 RED |
+| 017 (M4 종료 시 회귀) | PASS | 위 `470 passed`, 실패 0, 네트워크 가드 teardown 단언 통과(가드 기록 0) |
+
+**SPEC 대비 차이·결정**
+- 주입 계약: `screenshotter(job_dir)`는 `goose_screenshot.capture`(위치 인자 1개), `reviewer(job_id=, code=, on_event=)`는 `goose_runner.run_review`와 같은 키워드 시그니처. 둘 중 하나라도 없으면 후처리를 하지 않고 영수증도 쓰지 않는다. 하네스 경로는 `runs_root().parent`로 얻는다.
+- `disabled`·`integrity_failed` 영수증은 "주입됨 + 1차 `done` + `draft/report.html` 정규 파일"일 때만 쓴다(REQ-AIR6-004는 주입 조건을 적지 않지만 REQ-001의 "생성자 기본값은 기존 흐름 그대로"와 맞추려고 주입이 없으면 쓰지 않는다).
+- 후처리 중 취소는 best-effort `cancelled` 영수증을 쓴다. 감수 세션 시작 전이면 `write_outcome_receipt`, 시작 뒤면 `finish_review(outcome="cancelled")`.
+- `render_final` 진행 이벤트는 감수 세션 단위로 한 번만 낸다(같은 세션이 `--final`을 여러 번 실행해도).
+- 1차 세션 `StageMapper`의 `render_final`(1차 세션이 규칙을 어기고 `--final`을 실행한 경우)은 건드리지 않았다(T11). 이 경우 `render_final`이 `session_end` 앞에 도착할 수 있고 프론트는 그대로 `reached`에 넣는다.
+- 영수증 쓰기 실패 + 파일 잔존 시 완료 이벤트는 `draft`(REQ-019), 보관 훅의 `job.json`은 G14 그대로(디스크 재판정).
+- 전달 상태 재계산에서 `select_report`가 `None`(draft도 사라짐)이면 이벤트 값은 `None`이다.
+
+**Gap·미관측**
+- 004 (b), 020 (c): 위 표 사유로 독립 변이 미관측.
+- 002 (3)의 실제 브라우저 프로세스 그룹은 서비스 수준에서 다시 시험하지 않았다(M2 시험이 모듈 수준에서 RED 관측 완료).
+- 합성 입력 시험은 `historical` 모드를 쓰므로 실제 현재 모드(`current`)의 `FRESHNESS_CUTOFF`·`AS_OF_MISMATCH` 경로는 AC-022가 확인하지 않는다.
+- 프론트 전체 `vitest run`의 `e2e/preset-flow.spec.ts` 실패는 기준선에서 재측정하지 않았다.
+- 커버리지는 이 마일스톤에서 재측정하지 않았다(`goose_job_service` 후처리 신규 줄은 위 시험들이 지나가나 수치 미측정).
+- `ruff format --check`는 기존 파일 재포맷 대상이라 적용하지 않았다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

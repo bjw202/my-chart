@@ -62,8 +62,10 @@ export const GOOSE_STAGES: readonly GooseStage[] = [
   'compose',
   'render_draft',
   'audit',
-  'render_final',
   'session_end',
+  'screenshot', // SPEC-AI-REPORT-006: 1차 세션 뒤 서버 후처리(화면 캡처 → 감수 → 최종본)
+  'review',
+  'render_final',
 ]
 
 export function makeInitialGooseProgress(): GooseProgress {
