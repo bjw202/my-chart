@@ -1,0 +1,58 @@
+## 014-n review/ not emptied
+   ose_job_service.py::test_air6_014_14_service_review_dir_emptied_before_reviewer
+FAILED backend/tests/test_goose_job_service.py::test_air6_014_15_service_review_delete_failure_does_not_launch_reviewer
+  ->  RED: 7
+   - test_air6_014_14_review_dir_is_emptied_without_following_links
+   - test_air6_014_14_review_that_is_itself_a_symlink_is_unlinked_not_followed
+   - test_air6_014_14_review_that_is_a_regular_file_is_replaced
+   - test_air6_014_15_review_delete_failure_blocks_session_and_records_start_values
+   - test_air6_014_15_without_planted_record_the_absent_record_adds_no_audit_review
+   - test_air6_014_14_service_review_dir_emptied_before_reviewer
+   - test_air6_014_15_service_review_delete_failure_does_not_launch_reviewer
+## 014-o symlinks followed
+   /tests/test_goose_review.py::test_air6_014_14_review_dir_is_emptied_without_following_links
+FAILED backend/tests/test_goose_job_service.py::test_air6_014_14_service_review_dir_emptied_before_reviewer
+  ->  RED: 2
+   - test_air6_014_14_review_dir_is_emptied_without_following_links
+   - test_air6_014_14_service_review_dir_emptied_before_reviewer
+## 014-p review delete failure ignored
+   :test_air6_014_15_without_planted_record_the_absent_record_adds_no_audit_review
+FAILED backend/tests/test_goose_job_service.py::test_air6_014_15_service_review_delete_failure_does_not_launch_reviewer
+  ->  RED: 3
+   - test_air6_014_15_review_delete_failure_blocks_session_and_records_start_values
+   - test_air6_014_15_without_planted_record_the_absent_record_adds_no_audit_review
+   - test_air6_014_15_service_review_delete_failure_does_not_launch_reviewer
+## 014-q context.json not written
+   kend/tests/test_goose_review.py::test_air6_014_14_review_that_is_a_regular_file_is_replaced
+FAILED backend/tests/test_goose_job_service.py::test_air6_014_14_service_review_dir_emptied_before_reviewer
+  ->  RED: 8
+   - test_air6_014_restored_tile_has_equal_snapshots_but_recorded_write
+   - test_air6_014_normal_review_directory_writes_are_not_false_positives
+   - test_air6_014_11_planted_audit_review_is_removed_before_session
+   - test_air6_014_12_planted_final_is_removed_before_session
+   - test_air6_014_14_review_dir_is_emptied_without_following_links
+   - test_air6_014_14_review_that_is_itself_a_symlink_is_unlinked_not_followed
+   - test_air6_014_14_review_that_is_a_regular_file_is_replaced
+   - test_air6_014_14_service_review_dir_emptied_before_reviewer
+## 014-x review/ itself a symlink is followed
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_review.py::test_air6_014_14_review_that_is_itself_a_symlink_is_unlinked_not_followed
+  ->  RED: 1
+   - test_air6_014_14_review_that_is_itself_a_symlink_is_unlinked_not_followed
+## 013-e delete rule 10-11
+   goose_harness.py::test_air6_013_rule10_11_treats_web_text_as_data_and_forbids_external_tools
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_rule10_11_sentence_is_detected
+  ->  RED: 5
+   - test_committed_source_matches_committed_manifest
+   - test_committed_manifest_covers_instructions_settings_and_whole_skill
+   - test_air6_013_manifest_equals_regeneration
+   - test_air6_013_rule10_11_treats_web_text_as_data_and_forbids_external_tools
+   - test_air6_013_mutation_dropping_rule10_11_sentence_is_detected
+## 013-b instruction edited without regenerating the manifest
+   FAILED backend/tests/test_goose_harness.py::test_committed_manifest_covers_instructions_settings_and_whole_skill
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+  ->  RED: 3
+   - test_committed_source_matches_committed_manifest
+   - test_committed_manifest_covers_instructions_settings_and_whole_skill
+   - test_air6_013_manifest_equals_regeneration

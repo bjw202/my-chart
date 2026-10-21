@@ -1,0 +1,12 @@
+## 009-n served body differs from disk bytes
+   ml
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot_live.py::test_air6_009_live_r3_normal_report_matches_unisolated_baseline
+  ->  RED: 1
+   - test_air6_009_live_r3_normal_report_matches_unisolated_baseline
+## 009-o data: also failed
+   ml
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot_live.py::test_air6_009_live_r3_normal_report_matches_unisolated_baseline
+  ->  RED: 1
+   - test_air6_009_live_r3_normal_report_matches_unisolated_baseline

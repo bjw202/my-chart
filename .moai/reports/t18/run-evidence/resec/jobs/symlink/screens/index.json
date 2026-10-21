@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "source": "draft/report.html",
+  "preview_sha256": null,
+  "started_at": "2026-10-21T23:15:43+09:00",
+  "finished_at": "2026-10-21T23:15:43+09:00",
+  "outcome": "failed",
+  "browser": {
+    "name": null,
+    "version": null,
+    "path_kind": "none"
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "status": "error",
+      "error": "draft_not_regular_file",
+      "metrics": {
+        "scroll_width": null,
+        "client_width": null,
+        "scroll_height": null,
+        "horizontal_overflow": null
+      },
+      "tiles": []
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "status": "error",
+      "error": "draft_not_regular_file",
+      "metrics": {
+        "scroll_width": null,
+        "client_width": null,
+        "scroll_height": null,
+        "horizontal_overflow": null
+      },
+      "tiles": []
+    }
+  ]
+}

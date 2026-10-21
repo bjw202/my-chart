@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "source": "draft/report.html",
+  "preview_sha256": "0371da85a5e19376f2f7c6ff85a74398ae16649067bbcf582d80088254507352",
+  "started_at": "2026-10-21T22:43:04+09:00",
+  "finished_at": "2026-10-21T22:43:04+09:00",
+  "outcome": "complete",
+  "browser": {
+    "name": "HeadlessChrome",
+    "version": "153.0.8010.12",
+    "path_kind": "playwright_cache"
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "status": "ok",
+      "error": null,
+      "metrics": {
+        "scroll_width": 1280,
+        "client_width": 1280,
+        "scroll_height": 3694,
+        "horizontal_overflow": false
+      },
+      "tiles": [
+        {
+          "file": "desktop-01.png",
+          "y": 0,
+          "width": 1280,
+          "height": 1568,
+          "bytes": 13884,
+          "sha256": "4c15069079e0f4c9ddd8f6272e976d50cf3d9685fec210f4815fc1cf0da519a5"
+        },
+        {
+          "file": "desktop-02.png",
+          "y": 1568,
+          "width": 1280,
+          "height": 1568,
+          "bytes": 9178,
+          "sha256": "3f54e1deca45c693787614b0bfe119af2ab9fc1fe54b2ce8897c8499f5162cea"
+        },
+        {
+          "file": "desktop-03.png",
+          "y": 3136,
+          "width": 1280,
+          "height": 558,
+          "bytes": 4534,
+          "sha256": "f5ad9803b7954c0cc4f17fb42b17e8ba8c6bde99fdcf34c869ca7cce8d792e90"
+        }
+      ]
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "status": "ok",
+      "error": null,
+      "metrics": {
+        "scroll_width": 390,
+        "client_width": 390,
+        "scroll_height": 3694,
+        "horizontal_overflow": false
+      },
+      "tiles": [
+        {
+          "file": "mobile-01.png",
+          "y": 0,
+          "width": 390,
+          "height": 1568,
+          "bytes": 9559,
+          "sha256": "1b019b0087297cdc30198f303451ae99ce39be50766d5a8da2f489af8e317b3b"
+        },
+        {
+          "file": "mobile-02.png",
+          "y": 1568,
+          "width": 390,
+          "height": 1568,
+          "bytes": 5018,
+          "sha256": "3fc01407f4cd5d1a1290a8615defb2f1b20fd1fe8c893bccefff0decbfde75ea"
+        },
+        {
+          "file": "mobile-03.png",
+          "y": 3136,
+          "width": 390,
+          "height": 558,
+          "bytes": 3026,
+          "sha256": "b3e76fd8f2667aab424c658d5899e917f1cd78507867872be98390a71b1c5618"
+        }
+      ]
+    }
+  ]
+}

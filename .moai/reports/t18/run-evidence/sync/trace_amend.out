@@ -1,0 +1,32 @@
+REQ count 20 sequential: True
+AC count 22 sequential: True
+uncovered REQ: []
+AC with missing/invalid REQ: []
+  REQ 001 -> 001
+  REQ 002 -> 002
+  REQ 003 -> 003
+  REQ 004 -> 004
+  REQ 005 -> 005
+  REQ 006 -> 006
+  REQ 007 -> 007
+  REQ 008 -> 008
+  REQ 009 -> 009
+  REQ 010 -> 010
+  REQ 011 -> 011
+  REQ 012 -> 012
+  REQ 013 -> 013,021
+  REQ 014 -> 014
+  REQ 015 -> 015
+  REQ 016 -> 016,021,022
+  REQ 017 -> 017
+  REQ 018 -> 018
+  REQ 019 -> 020,022
+  REQ 020 -> 019
+AC missing catches/cannot-catch: []
+version 0.3.4 present: {'spec': True, 'plan': True, 'acceptance': True, 'design': True, 'research': True, 'progress': True}
+stale 0.3.3 header strings: {'spec': False, 'plan': False, 'acceptance': False, 'design': False, 'research': False, 'progress': False}
+NEEDS CLARIFICATION markers: {'spec': 0, 'plan': 0, 'acceptance': 0, 'design': 0, 'research': 0, 'progress': 0}
+OutOfScope H3 count in spec: 4
+rule 10 sub-label mentions 10-11: {'spec': 3, 'plan': 4, 'acceptance': 6, 'design': 4, 'research': 2, 'progress': 1}
+research Gaps: ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G17', 'G18', 'G19', 'G20']
+research probes: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13', 'P14', 'P15', 'P16', 'P17', 'P18', 'P19', 'P20', 'P21', 'P22', 'P23', 'P24', 'P25', 'P26', 'P27', 'P28', 'P29', 'P30', 'P31', 'P32', 'P33', 'P34', 'P35', 'P36', 'P37', 'P38', 'P39', 'P40', 'P41', 'P42']

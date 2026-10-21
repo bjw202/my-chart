@@ -1,0 +1,102 @@
+## 009-f1 drop --proxy-server
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-f2 drop --proxy-bypass-list
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-f3 drop --host-resolver-rules
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-h Fetch.enable only on page session
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-i runIfWaitingForDebugger before Fetch.enable
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-j continueRequest for everything
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-k only http(s) failed, file:// passes
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-l1 draft compare by prefix
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-l2 draft compare case-insensitive
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-l3 draft compare by substring
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-m1 no CSP header
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-m2 CSP without frame-src
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-m3 CSP without object-src
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-n served body differs from disk bytes
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-o data: also failed
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-p handler error swallowed
+   s slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  ->  RED: 0
+## 009-r isolate() not called
+   pture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot_live.py::test_air6_009_live_r1_file_frames_never_render
+  ->  RED: 1
+   - test_air6_009_live_r1_file_frames_never_render

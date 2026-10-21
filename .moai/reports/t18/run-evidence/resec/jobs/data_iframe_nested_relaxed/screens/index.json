@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "source": "draft/report.html",
+  "preview_sha256": "5d0bf96a9f5596aa37f11afec97b036078475b0bcbd778aa0e2ac15fa2ccdea5",
+  "started_at": "2026-10-21T23:15:39+09:00",
+  "finished_at": "2026-10-21T23:15:40+09:00",
+  "outcome": "complete",
+  "browser": {
+    "name": "HeadlessChrome",
+    "version": "153.0.8010.12",
+    "path_kind": "playwright_cache"
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "status": "ok",
+      "error": null,
+      "metrics": {
+        "scroll_width": 1280,
+        "client_width": 1280,
+        "scroll_height": 800,
+        "horizontal_overflow": false
+      },
+      "tiles": [
+        {
+          "file": "desktop-01.png",
+          "y": 0,
+          "width": 1280,
+          "height": 800,
+          "bytes": 9725,
+          "sha256": "98888a214b9c0f6dbed6d0ba75635e397a675e9e7edd6782d48643945d53b6f3"
+        }
+      ]
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "status": "ok",
+      "error": null,
+      "metrics": {
+        "scroll_width": 980,
+        "client_width": 980,
+        "scroll_height": 2120,
+        "horizontal_overflow": false
+      },
+      "tiles": [
+        {
+          "file": "mobile-01.png",
+          "y": 0,
+          "width": 390,
+          "height": 1568,
+          "bytes": 8632,
+          "sha256": "1bcb67d06340b0ad1e6be2e9839e6fa36fc996e29d5a5e1c259a0fbe885630cc"
+        },
+        {
+          "file": "mobile-02.png",
+          "y": 1568,
+          "width": 390,
+          "height": 552,
+          "bytes": 1827,
+          "sha256": "60b149f552f70dbb2330c99c29451ce8c82ed96b67f541142e15a5d5a6a72372"
+        }
+      ]
+    }
+  ]
+}

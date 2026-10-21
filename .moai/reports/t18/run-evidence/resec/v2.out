@@ -1,0 +1,13 @@
+/Users/byunjungwon/Dev/my-project-01/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+[data_iframe_nested] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[data_css_import] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[svg_data_image] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[data_iframe_nested RELAXED] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[data_css_import RELAXED] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[svg_data_image RELAXED] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[hardlink_etc_hosts] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+[symlink] failed [('desktop', 'error', 'draft_not_regular_file', 0), ('mobile', 'error', 'draft_not_regular_file', 0)] NEWHITS: []
+[dirlink] failed [('desktop', 'error', 'draft_not_regular_file', 0), ('mobile', 'error', 'draft_not_regular_file', 0)] NEWHITS: []
+[hardlink_secret] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+ALLHITS []

@@ -1,0 +1,56 @@
+/Users/byunjungwon/Dev/my-project-01/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+{
+ "baseline": [
+  {
+   "name": "desktop",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  },
+  {
+   "name": "mobile",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  }
+ ],
+ "new": [
+  {
+   "name": "desktop",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  },
+  {
+   "name": "mobile",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  }
+ ]
+}

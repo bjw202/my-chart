@@ -1,0 +1,35 @@
+## 009-f1 drop --proxy-server
+  ->  RED: 0
+## 009-f2 drop --proxy-bypass-list
+  ->  RED: 0
+## 009-f3 drop --host-resolver-rules
+  ->  RED: 0
+## 009-h Fetch.enable only on page session
+  ->  RED: 0
+## 009-i runIfWaitingForDebugger before Fetch.enable
+  ->  RED: 0
+## 009-j continueRequest for everything
+  ->  RED: 0
+## 009-k only http(s) failed, file:// passes
+  ->  RED: 0
+## 009-l1 draft compare by prefix
+  ->  RED: 0
+## 009-l2 draft compare case-insensitive
+  ->  RED: 0
+## 009-l3 draft compare by substring
+  ->  RED: 0
+## 009-m1 no CSP header
+  ->  RED: 0
+## 009-m2 CSP without frame-src
+  ->  RED: 0
+## 009-m3 CSP without object-src
+  ->  RED: 0
+## 009-n served body differs from disk bytes
+  ->  RED: 0
+## 009-o data: also failed
+  ->  RED: 0
+## 009-p handler error swallowed
+  ->  RED: 0
+## 009-r isolate() not called
+  ->  RED: 1
+   - test_air6_009_live_r1_file_frames_never_render

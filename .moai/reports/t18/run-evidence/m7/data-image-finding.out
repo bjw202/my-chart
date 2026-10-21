@@ -1,0 +1,2 @@
+new (setBlockedURLs *) complete green px: 0 heights: [[1568, 1568, 377], [1568, 1568, 377]]
+new, setBlockedURLs disabled complete green px: 60000 heights: [[1568, 1568, 558], [1568, 1568, 558]]

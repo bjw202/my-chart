@@ -1,0 +1,5 @@
+SKIPPED [1] backend/tests/test_goose_screenshot_live.py:244: AI_REPORT_GOOSE_REAL_BROWSER_TESTS=1일 때만 실행(실제 브라우저)
+SKIPPED [1] backend/tests/test_goose_screenshot_live.py:253: AI_REPORT_GOOSE_REAL_BROWSER_TESTS=1일 때만 실행(실제 브라우저)
+SKIPPED [1] backend/tests/test_goose_screenshot_live.py:266: AI_REPORT_GOOSE_REAL_BROWSER_TESTS=1일 때만 실행(실제 브라우저)
+SKIPPED [1] backend/tests/test_goose_screenshot_live.py:272: AI_REPORT_GOOSE_R3_DRAFT(라이브 초안 사본 경로)가 없다
+565 passed, 4 skipped, 214 deselected, 1 warning in 33.61s

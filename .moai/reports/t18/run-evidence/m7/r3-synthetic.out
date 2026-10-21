@@ -1,0 +1,54 @@
+{
+ "baseline": [
+  {
+   "name": "desktop",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  },
+  {
+   "name": "mobile",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  }
+ ],
+ "new": [
+  {
+   "name": "desktop",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  },
+  {
+   "name": "mobile",
+   "status": "ok",
+   "tiles": 3,
+   "heights": [
+    1568,
+    1568,
+    377
+   ],
+   "scroll_height": 3513,
+   "overflow": false
+  }
+ ]
+}

@@ -1,0 +1,121 @@
+## 009-f1 drop --proxy-server
+   e-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_argv_only_fixed_strings_and_server_values
+  ->  RED: 1
+   - test_air6_009_argv_only_fixed_strings_and_server_values
+## 009-f2 drop --proxy-bypass-list
+   e-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_argv_only_fixed_strings_and_server_values
+  ->  RED: 1
+   - test_air6_009_argv_only_fixed_strings_and_server_values
+## 009-f3 drop --host-resolver-rules
+   e-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_argv_only_fixed_strings_and_server_values
+  ->  RED: 1
+   - test_air6_009_argv_only_fixed_strings_and_server_values
+## 009-g Popen without env
+   ngs.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_child_env_is_an_allowlist_without_server_secrets
+  ->  RED: 1
+   - test_air6_009_child_env_is_an_allowlist_without_server_secrets
+## 009-h Fetch.enable only on page session
+   shot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+  ->  RED: 2
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+   - test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+## 009-i runIfWaitingForDebugger before Fetch.enable
+   shot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+  ->  RED: 2
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+   - test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+## 009-j continueRequest for everything
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-k only http(s) failed, file:// passes
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-l1 draft compare by prefix
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-l2 draft compare case-insensitive
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-l3 draft compare by substring
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-m1 no CSP header
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-m2 CSP without frame-src
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-m3 CSP without object-src
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-n served body differs from disk bytes
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-o data: also failed
+   l
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+  ->  RED: 1
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+## 009-p handler error swallowed
+   air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_4_malformed_paused_event_closes_the_viewport_without_passing_anything
+  ->  RED: 2
+   - test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+   - test_air6_009_4_malformed_paused_event_closes_the_viewport_without_passing_anything
+## 009-q1 Fetch.enable error ignored (page session)
+   ====================== short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_4_fetch_enable_error_on_page_session_closes_without_navigating
+  ->  RED: 1
+   - test_air6_009_4_fetch_enable_error_on_page_session_closes_without_navigating
+## 009-q2 Fetch.enable error ignored (attached target)
+   ========================= short test summary info ============================
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+  ->  RED: 1
+   - test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport
+## 009-r isolate() not called
+   eenshot.py::test_air6_009_3_isolation_commands_precede_the_first_navigation
+FAILED backend/tests/test_goose_screenshot.py::test_air6_009_4_fetch_enable_error_on_page_session_closes_without_navigating
+  ->  RED: 5
+   - test_air6_009_isolation_is_applied_before_first_open_with_the_hashed_draft_bytes
+   - test_air6_009_isolation_failure_closes_both_viewports_without_open
+   - test_air6_009_3_handler_contract_attach_order_and_per_request_answers
+   - test_air6_009_3_isolation_commands_precede_the_first_navigation
+   - test_air6_009_4_fetch_enable_error_on_page_session_closes_without_navigating

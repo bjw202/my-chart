@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "source": "draft/report.html",
+  "preview_sha256": "d3d2f8149b72381e45ce82e1af23c2d05f14e310b28dbfaa13a9ae7c7d37667d",
+  "started_at": "2026-10-21T23:17:54+09:00",
+  "finished_at": "2026-10-21T23:17:55+09:00",
+  "outcome": "failed",
+  "browser": {
+    "name": "HeadlessChrome",
+    "version": "153.0.8010.12",
+    "path_kind": "playwright_cache"
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "status": "too_tall",
+      "error": null,
+      "metrics": {
+        "scroll_width": 2059,
+        "client_width": 1280,
+        "scroll_height": 800059,
+        "horizontal_overflow": true
+      },
+      "tiles": []
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "status": "too_tall",
+      "error": null,
+      "metrics": {
+        "scroll_width": 2059,
+        "client_width": 980,
+        "scroll_height": 800059,
+        "horizontal_overflow": true
+      },
+      "tiles": []
+    }
+  ]
+}

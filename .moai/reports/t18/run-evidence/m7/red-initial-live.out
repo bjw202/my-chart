@@ -1,0 +1,11 @@
+E           AssertionError: ('file_iframes', {'desktop-01.png': 239688, 'mobile-01.png': 151688, 'mobile-02.png': 0})
+E           assert ({'desktop-01.png': 239688, 'mobile-01.png': 151688, 'mobile-02.png': 0} and False)
+E            +  where False = all(<generator object test_air6_009_live_r1_file_frames_never_render.<locals>.<genexpr> at 0x10e4631d0>)
+E       AssertionError: [b'GET /iframe HTTP/1.1', b'GET /embed HTTP/1.1', b'GET /object HTTP/1.1', b'GET /iframe HTTP/1.1', b'GET /embed HTTP/1.1', b'GET /object HTTP/1.1']
+E       assert [b'GET /ifram...ect HTTP/1.1'] == []
+E         
+E         Left contains 6 more items, first extra item: b'GET /iframe HTTP/1.1'
+E         Use -v to get more diff
+FAILED backend/tests/test_goose_screenshot_live.py::test_air6_009_live_r1_file_frames_never_render
+FAILED backend/tests/test_goose_screenshot_live.py::test_air6_009_live_r2_no_request_reaches_a_loopback_listener
+2 failed, 2 passed, 1 warning in 7.84s

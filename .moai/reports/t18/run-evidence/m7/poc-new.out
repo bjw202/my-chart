@@ -1,0 +1,3 @@
+new PoC1 complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)]
+new PoC2 complete [('desktop', 'ok', None), ('mobile', 'ok', None)]
+new PoC2 HITS: []

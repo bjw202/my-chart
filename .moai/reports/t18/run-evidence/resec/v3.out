@@ -1,0 +1,18 @@
+/Users/byunjungwon/Dev/my-project-01/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+goose screenshot viewport desktop failed: TimeoutError
+[big_40mb] failed [('desktop', 'error', 'TimeoutError', 0), ('mobile', 'error', 'budget_exceeded', 0)] NEWHITS: []
+   elapsed 60.5s, leftover browser procs: 0
+goose screenshot viewport desktop failed: TimeoutError
+goose screenshot viewport mobile failed: TimeoutError
+[deep_nest] failed [('desktop', 'error', 'TimeoutError', 0), ('mobile', 'error', 'TimeoutError', 0)] NEWHITS: []
+   elapsed 41.1s, leftover browser procs: 0
+[heavy_css] failed [('desktop', 'too_tall', None, 0), ('mobile', 'too_tall', None, 0)] NEWHITS: []
+   elapsed 0.7s, leftover browser procs: 0
+[huge_height] failed [('desktop', 'too_tall', None, 0), ('mobile', 'too_tall', None, 0)] NEWHITS: []
+   elapsed 0.6s, leftover browser procs: 0
+[zero_height] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+   elapsed 0.8s, leftover browser procs: 0
+[offscreen_hide] complete [('desktop', 'ok', None, 1), ('mobile', 'ok', None, 2)] NEWHITS: []
+   elapsed 0.8s, leftover browser procs: 0
+ALLHITS []
