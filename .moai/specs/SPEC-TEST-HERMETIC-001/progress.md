@@ -130,7 +130,7 @@ m1_to_mN_commit_strategy: combined-code-commit(M1-M3) + evidence-docs-commit —
 
 ```yaml
 sync_complete_at: 2026-10-21
-sync_commit_sha: pending-backfill-sync-commit
+sync_commit_sha: 390e082   # docs(SPEC-TEST-HERMETIC-001): sync-phase 문서 동기화 및 3-phase close — D3 backfill (커밋은 자기 SHA를 알 수 없어 후속 커밋에서 채움)
 sync_status: complete
 b12_self_test_a: 0 (CHANGELOG grep 'SPEC-TEST-HERMETIC-001' 사전 점검 — 중복 항목 없음 확인 후 기입)
 b12_self_test_b: 10/10 (acceptance.md 고유 AC-ID 수와 CHANGELOG 인용 AC 수 일치 — AC-001~AC-010)
