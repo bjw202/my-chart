@@ -267,7 +267,16 @@ main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 
 
 **하네스 전후** (`harness-before.txt`/`harness-after.txt`): 시작 시 `~/.goose-harness/CLAUDE.md` sha256 `77e260e4c5a27e9f6166be2be19faec6332d421cdf0d82ba5fe3c1b6c6fb2fed`, 수정 시각 `20:32:20`. 커밋 뒤 값은 아래 보고에 이어 적는다.
 
-**SPEC 본문에 남은 "규칙 9" 표기 (manager-spec 후속, 이 레인에서는 고치지 않음)**: plan.md:48(M5 행), plan.md:68(병합 순서 위험 행의 설명), design.md:158(제목 줄)·160(규칙 본문 안 `규칙 7·9`), acceptance.md:139(AC-013 #1)·145(잡는 구현 (a))·333(AC-021 Then), spec.md:72(§3 변경 범위 표), research.md:78(G13 `규칙 9 (h)`), progress.md:128(AC-021 행). progress.md:149는 t19 규칙 9를 가리키는 정당한 표기다.
+**SPEC 본문에 남은 "규칙 9" 표기 (manager-spec 후속, 이 레인에서는 고치지 않음)**: plan.md:48(M5 행), plan.md:68(병합 순서 위험 행의 설명), design.md:158(제목 줄)·160(규칙 본문 안 `규칙 7·9`), acceptance.md:139(AC-013 #1)·145(잡는 구현 (a))·333(AC-021 Then), spec.md:72(§3 변경 범위 표), research.md:78(G13 `규칙 9 (h)`), progress.md:128(AC-021 행). progress.md:149는 t19 규칙 9를 가리키는 정당한 표기다. (위 목록은 커밋 `c5632a6`(v0.3.3)에서 규칙 10으로 정정됐다. 남은 "규칙 9"는 의도된 설명이거나 t19의 실제 규칙 9다.)
+
+**오케스트레이터 독립 확인 (2026-10-21 20:50~21:05, 병합 `33e3c18`·`c5632a6` 뒤, 증거 `.moai/reports/t18/run-evidence/orch-m5/`)**
+- 규칙 번호 검사(007 acceptance.md의 AC-AIR7-011 #4 블록을 그대로 추출해 `python3 -B -I`): `rules [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]` / `rule numbering ok`. 감수 표지 문구 `[렌더 차이]`는 `harness-instructions.md`에 1건, 한자 표기 0건.
+- 매니페스트: `python -B -m backend.services.goose_harness`로 새로 재생성한 출력과 커밋된 `goose-manifest.json`의 `diff`가 비었다(종료 0). `claude-settings.json` sha256 앞 16자리 `e8b527ccaf017853` 그대로, `backend/goose_harness_src`의 `.pyc`·`__pycache__` 0개.
+- `pytest backend/tests -k goose -q -p no:cacheprovider`(`AI_REPORT_GOOSE_HARNESS_DIR`를 저장소 안 임시 경로로 지정): `548 passed, 214 deselected, 1 warning in 28.24s`, 종료 0. 실행 전후 실제 `~/.goose-harness/CLAUDE.md`는 `77e260e4c5a27e9f`, 수정 시각 `20:32:20`으로 같다.
+- 프런트 `e2e/preset-flow.spec.ts`를 vitest로 돌리면 기준 상태(주 체크아웃)에서도 `Playwright Test did not expect test.describe() to be called here.`, `Test Files 1 failed (1)`, `Tests no tests`로 실패한다(`vitest_e2e_baseline.out`). 이 SPEC의 변경과 무관한 이미 있던 실패다(Playwright 명세가 vitest에 수집됨). 에이전트가 본 전체 vitest 1파일 실패와 같은 파일이다.
+- **커밋 게이트 격리 확인**: 환경 변수 `AI_REPORT_GOOSE_HARNESS_DIR`를 붙인 커밋 5건(`0ee4593`, `9c763cb`, `33e3c18`, `c5632a6`, `28e896e`)에서 실제 하네스 `CLAUDE.md` 수정 시각은 `20:32:20`에서 변하지 않았다. 각 커밋 뒤 75~150초를 두고 읽었다(이전 3건은 커밋 +35~45초에 덮어쓰기). 훅 안에서 테스트가 격리 경로로 도는 것을 직접 보지는 못했다.
+- 사본 증거에서 1MB를 넘는 3개는 제외했고(`EXCLUDED-over-1MB.txt`) 비밀 문자열 검색은 필드 이름 `apiKeySource` 3건 외에 일치가 없었다(`run-evidence/README.md`).
+- **미검증**: AC-013 #5(서버 재시작 뒤 설치본 무결성 통과)와 M6 라이브 전부. 현재 설치된 하네스(`77e260e4…`)는 새 매니페스트(`CLAUDE.md` 항목 `64ceebda…`)와 달라 main 병합 뒤 서버 재시작 때 맞춰진다.
 
 ## §E.3 Run-phase Audit-Ready Signal
 
