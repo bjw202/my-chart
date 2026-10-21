@@ -399,8 +399,93 @@ main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 
 
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+```yaml
+run_complete_at: 2026-10-21   # 날짜만 기록, 시각은 기록하지 않음
+run_commit_sha: "M7 bc56cc7 (보안 강화). 이전 마일스톤: M4 86e4301, M5 33e3c18, M6 증거 9a7b9af"
+run_status: run-complete-security-hardened   # 1차 보안 검토 FAIL(S1·S2 높음) → M7 수정 → 독립 재검토 PASS
+ac_total: 22   # AC-AIR6-001~022 (acceptance.md 고유 AC-AIR6-* 재계산: 22)
+ac_live_gate: "AC-AIR6-018 통과(M6, 1회차, 리드 판정)"
+test_goose_isolated: "565 passed, 4 skipped, 214 deselected"   # 오케스트레이터 직접 실행. skipped 4개 = 실제 브라우저 시험(AI_REPORT_GOOSE_REAL_BROWSER_TESTS 환경 변수로만 켜짐)
+coverage_four_modules_pre_m7: "96% (job_service 96, review 94, runner 98, screenshot 95) — M7 이전 측정"
+lint_and_types: "ruff 통과, tsc 0 오류, eslint 0 오류"   # 오케스트레이터 직접 실행
+frontend_tests: "vitest 702 passed (M4 시점 측정, M7 이후 재실행하지 않음)"
+security_poc_after_m7: "PoC1(file:// iframe + 심은 비밀) 타일 빈 칸 · PoC2(루프백 수신) HITS []"
+manifest: "재생성 결과가 커밋 파일과 동일(diff 없음)"
+claude_settings_sha256: "e8b527cc… 불변"
+live_harness: "~/.goose-harness 손대지 않음"
+security_review: "1차 FAIL(S1·S2 높음, 검증됨) → M7(bc56cc7) → 독립 재검토 PASS (.moai/reports/t18/security-rereview.md)"
+reversal_checks: "M7 되돌림 RED 관측 §E.2 M7 4절 (변형마다 RED 관측 후 바이트 단위 복원)"
+```
+
+Gaps(이 단계가 관측하지 않은 것): §E.2 M7 10절과 아래 §E.4 "알려진 한계"에 모았다.
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+```yaml
+sync_complete_at: 2026-10-21
+sync_commit_sha: pending-backfill   # 이 파일을 담는 커밋이라 자기 SHA를 적을 수 없음
+sync_status: audit-ready
+sync_route: 카드 워크트리 `.claude/worktrees/t18`(브랜치 WT-goose-review-pass) 커밋, push·PR 없음
+sync_base_sha: bc56cc7
+sync_auditor_score: "pending (sync-auditor runs after this commit)"
+frontmatter_status_transitions:
+  spec.md: "draft → completed (updated: 2026-10-21 유지). 3단계 닫기(draft → in-progress → implemented → completed)를 이 sync 커밋 하나에 합침"
+  plan.md / acceptance.md / design.md / research.md / progress.md: "YAML frontmatter가 없다. plan.md 3행 본문 '상태: draft'는 본문이라 이 단계가 고치지 않았다(Gap)"
+b12_self_test_a: "grep -c 'SPEC-AI-REPORT-006' CHANGELOG.md → 1 (추가 전). 그 1건은 007 항목 안의 '알려진 한계 (c)'가 006을 가리키는 교차 참조이고 006 자체 항목 제목은 없었다 → 중복 아님, 진행"
+b12_self_test_b: "acceptance.md 고유 AC-AIR6-* 22개 = CHANGELOG 'AC-AIR6-001~022 22개'. 앵커 grep 원시 고유 수 41은 본문의 축약 별칭 포함"
+b12_self_test_c: "CHANGELOG 새 항목에 적은 경로·커밋은 ls 및 git log로 존재 확인 (아래 증거 절)"
+changelog_entry_position: "[Unreleased] 첫 항목 — ### Added (SPEC-AI-REPORT-006 v0.3.4 …), 기존 첫 항목 SPEC-AI-REPORT-007 앞"
+moai_spec_lint: "WARNING StatusGitConsistency — 이 커밋 전 측정: frontmatter 'draft' vs git 추정 'in-progress'. 0 error(s), 1 warning(s), exit 0. 커밋 후 재측정값은 반환 보고에 적는다"
+```
+
+### sync 단계 산출물
+
+- `.moai/specs/SPEC-AI-REPORT-006/spec.md`: frontmatter `status`만 `completed`로 바꿨다(`updated`는 이미 2026-10-21). 본문은 손대지 않았다.
+- `.moai/specs/SPEC-AI-REPORT-006/progress.md`: §E.3·§E.4를 채웠다.
+- `CHANGELOG.md`: `[Unreleased]` 첫 항목으로 SPEC-AI-REPORT-006을 더했다. 형식은 007 항목(`### Added (SPEC-… vX — 제목, 카드, 날짜)` + 굵은 글씨 하위 항목 + 검증 + 알려진 한계 + 근거)을 따랐다.
+- `README.md`: SPEC 표·하단 SPEC 목록에 006 행을 더하고, 알려진 한계에서 "감수 단계가 없다"는 낡은 문장을 현재 상태로 고쳤다.
+
+### 증거 (이 sync 실행에서 직접 실행, 격리: `AI_REPORT_GOOSE_HARNESS_DIR=.moai/state/verify/t18-docs/h`, `-B -p no:cacheprovider`, `HOME` 불변)
+
+- 시험: `coverage run … -m pytest -p no:cacheprovider backend/tests -k goose -q` → `565 passed, 4 skipped, 214 deselected, 1 warning in 35.46s`
+- 커버리지 재측정(M7 이후, `--include`로 네 모듈만, `--cov=` 미사용): `goose_job_service.py` 372문 16누락 **96%** · `goose_review.py` 294문 15누락 **95%** · `goose_runner.py` 361문 10누락 **97%** · `goose_screenshot.py` 305문 13누락 **96%** · 합계 1332문 54누락 **96%**
+- 라이브 하네스: `stat -f %Sm ~/.goose-harness/CLAUDE.md` → `Oct 21 21:36:04 2026` (시험 실행 뒤, 커밋 뒤 값은 반환 보고)
+
+### 독립 보안 재검토 결과 (`.moai/reports/t18/security-rereview.md`, 기준 HEAD bc56cc7, 판정 **PASS**)
+
+검토자는 새 PoC를 `.moai/state/verify/t18-resec/`에서 실행했고 모든 벡터를 실제 문서 CSP(층 B)와 CSP를 `default-src *`로 푼 상태(층 A1·A2만) 두 번씩 돌렸다. 바깥으로 나가는 요청도 `file://` 내용도 타일에서 확인되지 않았다. 층 A1(모든 대상의 Fetch 가로채기)은 CSP 없이도 혼자 막았다. 이전 높음 2건(S1 file:// iframe, S2 루프백·네트워크 요청)은 닫혔다. 해결되지 않은 높음·치명 없음.
+
+| ID | 심각도 | 근거 등급 | 내용 |
+|---|---|---|---|
+| F1 | 중간 | 가설(HYPOTHESIS: 코드·설정 읽기, 실제 `claude`에 돌리지 않음) | 감수 세션이 1차 세션과 같은 `claude-settings.json` 권한을 쓴다(`WebSearch`·`WebFetch`·`Agent`·`Skill`·`Read(./**)`·`Write(./runs/**)` 허용). 규칙 10-11은 문구일 뿐이다 |
+| F2 | 낮음 | 검증됨(VERIFIED) | 외부 파일에 대한 하드링크 초안이 `_check_draft`를 통과해 HTML로 렌더됨. 지금은 `ln`이 Bash 허용 밖이라 악용이 어렵다 |
+| F3 | 낮음 | 가설(재현 안 함) | `_check_draft`와 `read_bytes()` 사이의 TOCTOU. 수정은 F2와 같다(파일 기술자 하나) |
+| F4 | 낮음 | 검증됨 | DevTools 포트(127.0.0.1)가 인증 없이 열려 있음. 같은 호스트의 다른 사용자가 `PUT /json/new`로 `file://` 대상을 열 수 있음 |
+| F5 | 낮음 | 검증됨(가용성, 안전한 쪽으로 실패) | 심은 `screens` 일반 파일이나 매우 큰 초안은 최종본 불인정으로 끝난다. 예산(60초)과 프로세스 정리는 매번 지켜졌다 |
+| F6 | 정보 | 검증됨 + 코드 읽기 | 브라우저 자식 환경은 HOME·LANG·PATH·SHELL·TMPDIR·USER만(S5 검증). 화면 밖에 둔 내용은 타일에 없다(감수 범위 공백). `review/` 비우기(S9)는 코드 읽기만 |
+
+검토자가 시험하지 않은 것: 실제 `claude -p` 감수 세션(프롬프트 주입, F1 악용, WebFetch 유출), `_empty_review`·`_delete_planted`의 실제 심은 파일 실행, F3 경합, 다른 Chrome 빌드·Linux, 적대적 초안으로 작업 서비스 끝에서 끝까지.
+
+### 알려진 한계 (근거 등급 표기)
+
+- (a) **conftest에 하네스 경로 격리가 없다** — lifespan을 도는 테스트가 실제 `~/.goose-harness`를 덮어쓸 수 있음(후속 카드 후보). 리드가 이 사고를 보고했다(원인: `AI_REPORT_GOOSE_HARNESS_DIR` 미격리 + `TestClient(app)` lifespan의 `install_at_startup()`). 007 sync와 같은 문제이며 이 카드 이전부터 있었다. [리드 보고 — 007 sync 기록에서 가져옴]
+- (b) **렌더러의 390px 모바일 차트 잘림** — M6 라이브 감수가 찾았다. 제품 후속 후보(이 SPEC 범위 밖). 잘림이 진짜 결함인지는 이 기록 작성자가 렌더 결과를 보고 확인하지 않았다. [리드 보고, 라이브 관측]
+- (c) **라이브 `final` 경로 미관측** — AC-AIR6-018은 `draft`/`visual_not_pass`로 끝나는 경로만 봤다. `final` 인정은 AC-AIR6-022 격리 시험이 담당한다. [미관측]
+- (d) **AC-AIR6-004(b)·AC-AIR6-020(c)·AC-AIR6-022의 현재 모드 신선도 미관측** [미관측]
+- (e) **AC-AIR6-013 #5(서버 재시작 뒤 설치본 무결성)** — M6에서 리드가 재시작 뒤 33개 파일 일치와 규칙 10 설치를 관측했다. 그러나 M7이 지침을 다시 바꿔(규칙 10-11, `CLAUDE.md` 해시 `64ceebda… → e5c3fd9b…`) 설치본(`64ceebda…`)은 다음 서버 재시작 때 맞춰진다. M7 지침본에 대한 재시작 뒤 무결성은 미관측. [리드 관측(M6 시점) + 미관측(M7 시점)]
+- (f) **S3 잔여 / F1 중간** — 감수 세션이 1차 세션과 같은 권한을 갖는다. 규칙 10-11은 지침 수준일 뿐이다. 후속: `--disallowedTools` 좁히기. [가설]
+- (g) **F2·F3 낮음** — 하드링크나 교체된 `draft/report.html`이 `_check_draft`를 통과한다. 악용에는 `ln`이 필요하고 Bash 허용 목록에 없다. 수정: `O_NOFOLLOW`와 `st_nlink` 검사를 파일 기술자 하나로. [F2 검증됨 / F3 가설]
+- (h) **F4 낮음** — CDP 디버그 포트가 127.0.0.1에서 인증 없이 열림. 후속: `--remote-debugging-pipe`. [검증됨]
+- (i) **F5 낮음(가용성)** — 심은 `screens` 일반 파일이나 매우 큰 초안은 최종본 불인정(안전한 쪽으로 실패)으로 끝난다. [검증됨]
+- (j) **S7·S8 이월** — 스트림 줄 한도 4 MiB 대 타일 8 MiB 불일치(S7), 완료·취소 경로의 영수증 임시 파일 이름 충돌(S8). [가설, 시험하지 않음]
+- (k) **`data:` 이미지가 이미 렌더되지 않는다** — `Network.setBlockedURLs ["*"]`가 막는다. 감수자는 `data:` 이미지(로고 등)를 화면에서 못 본다. 제품 후속 후보. [검증됨(§E.2 M7 9절 2번)]
+- (l) **관측 범위**: macOS의 `chrome-headless-shell` 153.0.8010.12 하나만 관측했다. Linux는 미관측. 규칙 10-11이 모델 행동을 바꾸는지도 미관측. [미관측]
+- (m) **AC-AIR6-009 (6)(o)의 "이미지가 사라진다"는 R3로 관측할 수 없다** — (k) 때문이다. 핸들러 계약 시험의 `data:` 행만 잡는다. [검증됨]
+- (n) **AC-AIR6-014 (15)의 기대 목록**은 심은 `audit-review.json`이 있는지에 따라 달라진다. SPEC 문구 후속 — manager-spec 재위임 대상. [검증됨(§E.2 M7 9절 1번)]
+- (o) **격리는 브라우저 세션당 한 번 적용한다** — SPEC 오류 문구의 "뷰포트마다"보다 엄격하다. 격리 실패는 두 뷰포트 모두 `error`다. [검증됨(§E.2 M7 9절 4번)]
+
+### sync 단계에서 하지 않은 것
+
+- spec.md의 `status` 외 필드, plan.md·acceptance.md·design.md·research.md 본문, `.moai/reports/t18/security-rereview.md`, 코드·테스트·하네스 파일은 고치지 않았다.
+- push·PR은 하지 않았다. sync-auditor는 이 커밋 뒤에 돈다(점수 칸은 비움).
+- MX 태그 호출자 수 계산, 문서 링크 검사기, 마크다운 린터는 실행하지 않았다.

@@ -2,7 +2,7 @@
 id: SPEC-AI-REPORT-006
 title: "goose 후처리 감수 (서버가 초안 화면을 찍고, 별도 감수 세션이 audit-review.json을 쓴다)"
 version: "0.3.4"
-status: draft
+status: completed
 created: 2026-10-21
 updated: 2026-10-21
 author: manager-spec

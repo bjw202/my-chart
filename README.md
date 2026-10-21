@@ -66,6 +66,7 @@ Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
 | SPEC-AI-REPORT-003 | Perplexity → Codex 전면 대체 — 빠른 분석이 Codex CLI를 쓰도록 전환 (Implemented) |
 | SPEC-AI-REPORT-004 | 심층 분석을 Goose 스킬 하네스로 교체 — 헤드리스 `claude -p` 작업 큐 + SSE 진행 표시 + sandbox iframe HTML 리포트 (2026-10-20) |
 | SPEC-AI-REPORT-005 | Goose DART 원문 사전 수집 — 서버가 goose 실행 직전에 정기보고서 재무제표·주석·감사/검토보고서를 받아 `runs/<job_id>/dart/`에 둔다 (2026-10-21) |
+| SPEC-AI-REPORT-006 | Goose 후처리 감수 — 서버가 초안 화면을 찍고 별도 감수 세션이 `audit-review.json`을 쓰며, 영수증이 인정할 때만 최종본으로 전달 (2026-10-21) |
 | SPEC-AI-REPORT-007 | Goose 네이버 최신 뉴스 사전 수집 — 서버가 goose 실행 직전에 네이버 모바일 뉴스 JSON을 받아 `runs/<job_id>/naver/`에 둔다 (2026-10-21) |
 
 ### 🛠️ 데이터 인프라
@@ -226,7 +227,9 @@ KRX_PW=your_krx_password
 
 **알려진 한계**
 - 실행 중 작업 기록은 서버 메모리에 있어 재시작하면 사라진다.
-- goose 결과는 아직 초안(`draft`)으로 끝난다. 2026-10-21 라이브 실행(롯데에너지머티리얼즈 020150)에서 DART 원문 15건을 모두 받았고 DART 미확보로 생기던 감사 결함 6종은 사라졌지만, 감수(`AUDIT_*`·`REVIEW_*`)와 브라우저 화면 확인(`REVIEW_VISUAL`) 단계가 없다. 이 단계는 백로그 카드 t18(SPEC-AI-REPORT-006)에서 다룬다.
+- 감수·화면 확인 단계(SPEC-AI-REPORT-006)는 구현됐지만 라이브에서는 초안(`draft`)으로 끝나는 경로만 관측했다. 2026-10-21 라이브 실행(020150)에서 감수 세션이 모바일 390px 차트 잘림과 수치 불일치를 찾아 `draft`로 끝났고, 최종본(`final`) 인정 경로는 라이브에서 보지 못했다. 렌더러의 390px 차트 잘림은 제품 후속 과제다.
+- 감수 세션은 1차 세션과 같은 도구 권한(웹 검색·가져오기 포함)을 갖고 규칙 10~11은 지침 수준 제한이다(보안 재검토 중간, 미관측 가설). 감수자는 `data:` 이미지를 화면에서 볼 수 없다. 지원 브라우저는 macOS의 `chrome-headless-shell` 하나만 관측했다. 자세한 목록은 CHANGELOG의 SPEC-AI-REPORT-006 항목에 있다.
+- 테스트 스위트에는 하네스 경로 격리가 없어 `AI_REPORT_GOOSE_HARNESS_DIR`를 따로 지정하지 않고 lifespan을 도는 테스트를 돌리면 실제 `~/.goose-harness`를 덮어쓸 수 있다.
 - 네이버 사전 수집(SPEC-AI-REPORT-007) 뒤 2026-10-21 라이브 실행(020150)에서 `LATEST_SEARCH_NAVER` 결함은 사라졌지만, 같은 회차에 `company_ir` 채널 기록이 없어 `LATEST_SEARCH_COMPANY_IR` 결함이 새로 나왔다. 규칙 9의 부작용인지 실행마다 달라지는 변동인지는 아직 확인하지 못했다.
 - DART 사전 수집 범위는 정기보고서(사업·반기·분기)뿐이다. 잠정실적·주요사항보고서·지분 공시, KIND 공시, PDF 원본은 받지 않는다. 우선주·스팩·외국 기업 전용 처리는 없으며, 검색 결과로 회사가 하나로 확인되지 않으면 수집 없이 goose가 실행된다.
 - 네이버 사전 수집은 최신 기사 1페이지(최대 10건)의 API 요약 본문만 받는다. 기사 원문 페이지는 받지 않는다. 비공식 모바일 API라 예고 없이 바뀔 수 있으며, 바뀌면 수집이 `failed`로 기록되고 `LATEST_SEARCH_NAVER`가 다시 남는다.
@@ -415,6 +418,7 @@ DB 파일은 `Output/` 디렉토리에 저장됩니다:
 - [SPEC-AI-REPORT-003](/.moai/specs/SPEC-AI-REPORT-003/spec.md) — Perplexity → Codex 전면 대체 (Implemented)
 - [SPEC-AI-REPORT-004](/.moai/specs/SPEC-AI-REPORT-004/spec.md) — 심층 분석을 Goose 스킬 하네스로 교체 (2026-10-20)
 - [SPEC-AI-REPORT-005](/.moai/specs/SPEC-AI-REPORT-005/spec.md) — Goose DART 원문 사전 수집 (2026-10-21)
+- [SPEC-AI-REPORT-006](/.moai/specs/SPEC-AI-REPORT-006/spec.md) — Goose 후처리 감수 (2026-10-21)
 - [SPEC-AI-REPORT-007](/.moai/specs/SPEC-AI-REPORT-007/spec.md) — Goose 네이버 최신 뉴스 사전 수집 (2026-10-21)
 
 ### 인프라 / 기초
