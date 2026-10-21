@@ -228,6 +228,47 @@ main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 
 
 하네스 전후: `~/.goose-harness/CLAUDE.md`의 해시와 수정 시각이 전후 동일(`.moai/state/verify/t18-merge/harness-{before,after}.txt`).
 
+### M5 하네스 지침·매니페스트·문서 — 2026-10-21 (카드 t18)
+
+기준: 브랜치 `WT-goose-review-pass` 9c763cb(M1~M4 + main 병합). 작업은 자동 격리 워크트리(`worktree-agent-a9205c52de2a1df0e`)에서 했고 시작 시 `git rev-parse --short HEAD` → `9c763cb`. 격리: 모든 pytest/python은 `AI_REPORT_GOOSE_HARNESS_DIR=.moai/state/verify/t18-m5/home/.goose-harness`, `python -B`, `pytest -p no:cacheprovider`. 증거 파일은 `.moai/state/verify/t18-m5/`(git 미추적).
+
+**번호 결정(SPEC 문서와 다른 점).** SPEC 문서는 감수 규칙을 "규칙 9"라 적었지만 t19가 규칙 9(네이버)를 먼저 들여왔으므로 감수 규칙은 **규칙 10**이다. 하위 항목은 설계의 (a)~(i)를 `10-1`~`10-10`으로 바꿨고(규칙 4·8·9와 같은 형식, 마지막 `10-10`은 설계의 (i)), 본문 자기 참조는 `10-3`(10-5 안)이다. 규칙 7은 번호 그대로 개정했고 규칙 4의 "최종본:" 줄에 "(감수 세션만 실행한다 — 규칙 7·10)"을 덧붙였다. 코드·테스트에서 규칙 번호를 이름으로 부르는 곳은 없었다(`grep -rnE "규칙 ?9|rule 9|규칙 ?7|\b9-[0-9]" backend --include='*.py'` → `goose_runner.py:194`·`goose_review.py:4`의 "규칙 7 불변식" 주석 2건뿐, 번호 9 없음). `build_review_prompt`는 "하네스 지침의 감수 세션 규칙"으로만 가리켜 수정하지 않았다.
+
+**병합 필수 4단계 (007 `plan.md §5`)**
+
+1. 규칙 번호: `python3 -I .moai/state/verify/t18-m5/rulenum.py backend/goose_harness_src/harness-instructions.md`(007 AC-AIR7-011 #4 블록을 그대로 추출) →
+   ```
+   rules [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+   rule numbering ok
+   ```
+   감사 부채 N9(정상 교차 참조 오탐)는 발생하지 않았다. `grep -n '9번 규칙' backend/goose_harness_src/harness-instructions.md` → 출력 없음(종료 1).
+2. 지침 문자열 AC 재실행: 006 `pytest backend/tests/test_goose_harness.py backend/tests/test_goose_review.py -k "air6_013 or air6_021" -q` → `20 passed, 158 deselected`. 007 AC-AIR7-009의 grep 루프(`air7_009.txt`): `naver/index.json` 2, `article_url` 1, `channel: "naver"` 1, `metadata_only` 1, `"no_results"` 1, `모바일 뉴스 API 응답의 제목·요약 본문 필드` 1, `서버 사전 수집본으로 열람, 기사 원문 페이지와 대조하지 않음` 1, `API 요약본(약 150자), 원문 미확인` 1, `요약에 없는 사실은 단정하지 않는다` 1, `이번 세션에서 그 파일을 연 시각` 1, `original_news` 1, `code_validated` 1, `서버가 종목코드 유효성을 확인하지 못함` 1, `runs/<job_id>/dart/index.json` 2 — 14개 모두 기대(≥1, 마지막 2) 충족. (`runs/<job_id>/naver/index.json`이 2인 것은 규칙 9 도입부와 9-6, ≥1 기대.)
+3. 매니페스트 재생성: `../../../.venv/bin/python -B -m backend.services.goose_harness > backend/goose_harness_src/goose-manifest.json`(종료 0; stderr의 `pkg_resources` 경고만 있었고 stdout은 JSON뿐). 변경은 `CLAUDE.md` 해시 한 줄(`77e260e4…` → `64ceebda7075b70a65abfd5402bb1dfd13ba72856dc567a8c7be2702b2c1b35e`)뿐이다. AC-AIR7-011 #1: 다시 생성해 `diff m.json goose-manifest.json` → 출력 없음, 종료 0. #2: `claude-settings.json` sha256 `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3`. #3: `pytest backend/tests/test_goose_harness.py -q` → `46 passed`(실패 0).
+4. `_run` 순서·이벤트: `pytest backend/tests/test_goose_job_service.py -k "air7_001 or air7_004" -v` → `5 passed, 102 deselected`(`test_air7_001_order_with_dart_and_naver`·`…naver_only`·`…without_prefetchers`·`…second_integrity_failure_with_naver_only`·`test_air7_004_naver_prefetch_adds_no_progress_event` 모두 PASSED).
+
+**AC-AIR6-013 / 021 (TDD)**
+
+- RED(지침 수정 전, 시험 추가 직후): `10 failed, 538 passed, 214 deselected`(`pytest-before.out`, `red-initial.out`): 실패는 새 시험 10개(`KeyError: 10` 등). 기준선 534 + 새 시험 중 처음부터 통과하는 4개(매니페스트=재생성은 아직 일치, 설정 해시, 스킬 불변, 전체 변형 시험 1개) = 538.
+- GREEN: `pytest backend/tests -k goose -q` → `548 passed, 214 deselected`(534 + 새 시험 14개, 실패 0).
+- 새 시험 14개(`test_goose_harness.py`): `air6_013` 규칙 7 문구·규칙 10(번호·하위 라벨·고정 문구 13개)·적용 범위·매니페스트=재생성·설정 해시·스킬 불변(기준 9c763cb 대비 `git diff --stat` 비어 있음), 텍스트 변형 시험 6개, `air6_021` 표지 요건·D7 결과 문구.
+- 되돌림 RED(`mutations.out`, 실제 `harness-instructions.md`에 변형을 적용하고 시험 후 복원 — 복원 뒤 `git diff --stat`이 변형 전과 같음):
+  - (a) 표지 `[렌더 차이]` 문장 삭제 → `test_air6_021_instructions_carry_render_difference_marker_requirement`·`test_air6_021_d7_…` RED
+  - (b) 규칙 7의 "audit-review.json을 쓰지 않고" 삭제 → `test_air6_013_rule7_forbids_first_session_review_record_and_final` RED
+  - (c) 번호 충돌(`10.` → `9.`) → `test_air6_013_review_rule_is_rule_10_after_naver_rule_9`·`…rule10_applies_only…` 등 RED
+  - (d) 옛 하위 라벨 `9-2` → 규칙 번호 시험 RED
+  - (e) 본문 자기 참조 `10-3` → `9-3` → 규칙 번호 시험 RED
+  - (f) 모든 타일 Read 조건 문구 삭제 → 규칙 10 고정 문구 시험 RED
+  - (g) `--final`을 결정 `pass` 조건 없이 실행하도록 변경 → 규칙 10 고정 문구 시험 RED
+  - (h) 지침만 고치고 매니페스트 미재생성 → `test_committed_source_matches_committed_manifest`·`…covers_instructions…`·`test_air6_013_manifest_equals_regeneration` RED(`mut-b-manifest-stale.out`, 재생성 전에 실제로 관측)
+  - 모든 변형에서 매니페스트 시험도 같이 RED가 된다(지침 해시가 달라지므로). 변형별 판별 RED는 위 지정 시험이다.
+- 잡지 못하는 것: 문구가 모델 행동을 바꾸는지(약한 증거 — AC-018 라이브). AC-013 #5(서버 재시작 후 설치본 무결성)는 라이브 단계라 이 레인에서 관측하지 않았다(Gap).
+
+**기타 변경.** `pyproject.toml`에 `websockets>=16.0`(서버 venv 설치 16.0)을 더했고 `uv.lock`의 프로젝트 `dependencies`·`requires-dist`에 같은 항목을 더했다(`uv lock --check --offline` → `Resolved 78 packages`, 종료 0). `.env.example`에 `AI_REPORT_GOOSE_REVIEW`·`AI_REPORT_GOOSE_REVIEW_TIMEOUT`·`AI_REPORT_GOOSE_BROWSER`를, README의 Goose 동작 방식 5항 아래에 캡처·감수·브라우저 지원 범위(chrome-headless-shell 153.0.8010.12, macOS 구동 확인)·끄기를 적었다. 캡처 60초·타일 30장은 코드 상수라 환경 변수가 없다(`AI_REPORT_GOOSE_REVIEW_TIMEOUT`만 설정 가능). README 알려진 한계의 "감수·화면 확인 단계가 없다" 문장은 M6 라이브 확인과 병합 뒤에 고칠 대상이라 남겨 두었다.
+
+**하네스 전후** (`harness-before.txt`/`harness-after.txt`): 시작 시 `~/.goose-harness/CLAUDE.md` sha256 `77e260e4c5a27e9f6166be2be19faec6332d421cdf0d82ba5fe3c1b6c6fb2fed`, 수정 시각 `20:32:20`. 커밋 뒤 값은 아래 보고에 이어 적는다.
+
+**SPEC 본문에 남은 "규칙 9" 표기 (manager-spec 후속, 이 레인에서는 고치지 않음)**: plan.md:48(M5 행), plan.md:68(병합 순서 위험 행의 설명), design.md:158(제목 줄)·160(규칙 본문 안 `규칙 7·9`), acceptance.md:139(AC-013 #1)·145(잡는 구현 (a))·333(AC-021 Then), spec.md:72(§3 변경 범위 표), research.md:78(G13 `규칙 9 (h)`), progress.md:128(AC-021 행). progress.md:149는 t19 규칙 9를 가리키는 정당한 표기다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

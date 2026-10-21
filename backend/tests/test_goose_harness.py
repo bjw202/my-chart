@@ -489,3 +489,192 @@ def test_vendored_report_input_example_uses_harness_command_form():
         "python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py"
         " --input runs/<job_id>/company-input.json --validate-only"
     ) in text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-006 M5 — AC-AIR6-013/021: 감수 규칙(규칙 10)·규칙 7 개정·매니페스트·권한 불변
+# ─────────────────────────────────────────────────────────────────────────────
+
+_INSTRUCTIONS = _REAL_SOURCE / "harness-instructions.md"
+# research P6 기준선(권한 파일은 이 SPEC이 바꾸지 않는다)
+_SETTINGS_SHA256 = "e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3"
+# 1차 세션 대상 규칙 7(개정)의 고정 문구
+_RULE7_PHRASES = (
+    "`audit-review.json`을 쓰지 않고",
+    "`render_report.py --final`도 실행하지 않는다",
+    "감수 기록 없이 한 번 실행한 뒤 끝낸다",
+    "서버가 초안 뒤에 화면 캡처와 별도 감수 세션을 돌린다",
+)
+# 감수 세션 규칙(규칙 10)의 고정 문구 — AC-AIR6-013 #1 (ii)
+_RULE10_PHRASES = (
+    "`runs/<job_id>/review/context.json`을 먼저 Read 도구로 읽는다",
+    "`screens/index.json`의 모든 타일 파일을 Read 도구로 하나씩 연",
+    "`separate_review_pass`",
+    "`copy_into_review_record`",
+    "직접 계산하지 않는다",
+    "`draft/`, `screens/`, 입력 JSON을 수정하지 않는다",
+    "결함을 찾은 검사는 `status: \"revise\"`",
+    "`status: \"open\"`",
+    "결함을 찾지 못한 검사만 `pass`",
+    "`evidence`에 연 타일 파일 이름들과 모바일 지표(`scroll_width`·`client_width`)를 적는다",
+    "`status: \"revise\"`와 사유를 적는다",
+    "결정이 `pass`일 때만",
+    "일어나지 않은 열람·대조·화면 확인을 통과로 적지 않는다",
+)
+# AC-AIR6-021 — 글꼴 차단 증거 표지(결정 D8)
+_MARKER = "리터럴 표지 `[렌더 차이]`로 시작"
+_MARKER_FACT = "외부 네트워크와 웹 글꼴을 막고 그렸으므로 실제 화면과 조금 다르다"
+
+
+def _real_text() -> str:
+    return _INSTRUCTIONS.read_text(encoding="utf-8")
+
+
+def _missing_phrases(text: str, phrases) -> list[str]:
+    return [p for p in phrases if p not in text]
+
+
+def _split_rules(text: str) -> dict[int, str]:
+    """최상위 규칙 번호 → 그 규칙 본문(하위 항목 포함)."""
+    import re
+
+    rules: dict[int, list[str]] = {}
+    cur = None
+    for line in text.splitlines():
+        m = re.match(r"^(\d+)\. ", line)
+        if m:
+            cur = int(m.group(1))
+            rules[cur] = []
+        if cur is not None:
+            rules[cur].append(line)
+    return {k: "\n".join(v) for k, v in rules.items()}
+
+
+def _rule_number_errors(text: str) -> list[str]:
+    """SPEC-AI-REPORT-007 AC-AIR7-011 #4와 같은 판정(번호 중복·하위 라벨 불일치·본문 `N-M` 교차 참조)."""
+    import re
+
+    cur = None
+    tops: list[int] = []
+    errs: list[str] = []
+    for n, line in enumerate(text.splitlines(), 1):
+        m = re.match(r"^(\d+)\. ", line)
+        if m:
+            cur = int(m.group(1))
+            tops.append(cur)
+            body = line[m.end():]
+        else:
+            s = re.match(r"^\s+- (\d+)-\d+[a-z]?\. ", line)
+            if s and int(s.group(1)) != cur:
+                errs.append(f"line {n}: sub-item {s.group(1)}-* under rule {cur}")
+            body = line[s.end():] if s else line
+        for r in re.finditer(r"(?<![\d.\-])(\d{1,2})-\d{1,2}[a-z]?(?![\d\-])", body):
+            if cur is not None and int(r.group(1)) != cur:
+                errs.append(f"line {n}: in-text reference {r.group(0)} inside rule {cur}")
+    if tops != list(range(1, len(tops) + 1)):
+        errs.append(f"top-level numbers not 1..K unique: {tops}")
+    return errs
+
+
+def test_air6_013_rule7_forbids_first_session_review_record_and_final():
+    rules = _split_rules(_real_text())
+
+    assert _missing_phrases(rules[7], _RULE7_PHRASES) == []
+
+
+def test_air6_013_review_rule_is_rule_10_after_naver_rule_9():
+    text = _real_text()
+    rules = _split_rules(text)
+
+    assert sorted(rules) == list(range(1, 11))
+    assert "`runs/<job_id>/naver/index.json`" in rules[9]  # t19 네이버 규칙은 9번 그대로
+    assert "감수 세션" in rules[10].splitlines()[0]
+    assert _missing_phrases(rules[10], _RULE10_PHRASES) == []
+    # 규칙 10 하위 라벨은 10-N이고 낡은 `9-`가 없다. 규칙 9의 하위 라벨은 그대로 9-N
+    assert "- 10-1." in rules[10] and "- 9-1." not in rules[10]
+    assert "- 9-1." in rules[9] and "- 10-1." not in rules[9]
+    assert _rule_number_errors(text) == []
+
+
+def test_air6_013_rule10_applies_only_to_sessions_declared_as_review_session():
+    rule10 = _split_rules(_real_text())[10]
+
+    assert '프롬프트가 "감수 세션"이라고 밝힌 세션에만' in rule10
+
+
+def test_air6_013_manifest_equals_regeneration(gh):
+    committed = json.loads((_REAL_SOURCE / "goose-manifest.json").read_text(encoding="utf-8"))
+
+    assert gh.build_manifest(_REAL_SOURCE) == committed
+    assert gh.verify_source(_REAL_SOURCE, committed["files"]) == []
+
+
+def test_air6_013_settings_file_is_byte_identical_to_baseline():
+    assert _sha((_REAL_SOURCE / "claude-settings.json").read_bytes()) == _SETTINGS_SHA256
+
+
+def test_air6_013_vendored_skills_are_unchanged_since_m4_base():
+    import subprocess
+
+    base = "9c763cb"
+    root = _REAL_SOURCE.parent.parent
+    probe = subprocess.run(["git", "cat-file", "-e", f"{base}^{{commit}}"], cwd=root, capture_output=True)
+    if probe.returncode != 0:
+        pytest.skip(f"기준 커밋 {base}를 이 체크아웃에서 찾을 수 없다")
+    diff = subprocess.run(
+        ["git", "diff", "--stat", base, "--", "backend/goose_harness_src/skills"],
+        cwd=root, capture_output=True, text=True, check=True,
+    ).stdout
+    assert diff == ""
+
+
+# 되돌림 변형이 같은 판정 함수에 실제로 걸리는지 — AC-013 "잡는 구현"의 텍스트 변형판
+def test_air6_013_mutation_dropping_marker_sentence_is_detected():
+    mutated = _real_text().replace(_MARKER, "")
+
+    assert _MARKER in _split_rules(_real_text())[10]
+    assert _MARKER not in _split_rules(mutated)[10]
+
+
+def test_air6_013_mutation_dropping_never_write_review_record_sentence_is_detected():
+    mutated = _real_text().replace("`audit-review.json`을 쓰지 않고", "")
+
+    assert _missing_phrases(_split_rules(mutated)[7], _RULE7_PHRASES) == ["`audit-review.json`을 쓰지 않고"]
+
+
+def test_air6_013_mutation_number_collision_is_detected():
+    mutated = _real_text().replace("\n10. ", "\n9. ", 1)
+
+    assert any("not 1..K unique" in e for e in _rule_number_errors(mutated))
+
+
+def test_air6_013_mutation_stale_nine_label_is_detected():
+    mutated = _real_text().replace("- 10-2.", "- 9-2.", 1)
+
+    assert any("sub-item 9-* under rule 10" in e for e in _rule_number_errors(mutated))
+
+
+def test_air6_013_mutation_stale_in_text_reference_is_detected():
+    text = _real_text()
+    assert "10-3" in text.split("\n10. ", 1)[1]  # 규칙 10 안에 자기 참조가 있어야 이 변형이 의미 있다
+    mutated = text.replace("10-3", "9-3")
+
+    assert any("in-text reference 9-3 inside rule 10" in e for e in _rule_number_errors(mutated))
+
+
+def test_air6_013_mutation_dropping_all_rule10_phrases_is_detected():
+    assert _missing_phrases("", _RULE10_PHRASES) == list(_RULE10_PHRASES)
+
+
+def test_air6_021_instructions_carry_render_difference_marker_requirement():
+    rule10 = _split_rules(_real_text())[10]
+
+    assert _MARKER in rule10  # 서버(조건 17)는 *포함*만 확인하지만 지침은 *시작*을 요구한다
+    assert _MARKER_FACT in rule10
+    assert "`screens.render_note`" in rule10  # context.json의 고정 문장을 근거로 삼는다
+    assert _real_text().count("[렌더 차이]") == rule10.count("[렌더 차이]") >= 1
+
+
+def test_air6_021_d7_missing_marker_consequence_is_stated():
+    """D7: 표지 누락의 결과는 한 가지 — 서버가 최종본으로 인정하지 않는다."""
+    assert "표지가 없으면 최종본이 되지 않는다" in _split_rules(_real_text())[10]

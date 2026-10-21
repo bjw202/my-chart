@@ -218,7 +218,10 @@ KRX_PW=your_krx_password
      - **표시와 끄기**: 별도 진행 단계는 없고 `공시 원문 수집` 단계 동안 이어서 실행된다. `AI_REPORT_GOOSE_NAVER_PREFETCH=0`이면 수집하지 않고 `outcome: disabled` 색인만 남긴다. 무결성 재검사는 두 수집이 끝난 뒤 한 번 한다.
 3. **실행** — 작업마다 하네스 폴더에서 `claude -p --permission-mode dontAsk --settings <하네스>/.claude/settings.json --setting-sources project --strict-mcp-config`로 실행한다. 하네스 밖 읽기·쓰기와 `.claude/` 수정은 권한 규칙으로 거부되고, 하위 프로세스에는 허용 목록의 환경 변수만 넘어간다(API 키 등 `.env` 비밀 값은 전달하지 않음).
 4. **진행 표시** — `GET /api/ai-report/jobs/{job_id}/events`(SSE)가 단계 이벤트를 재생과 함께 보내므로, 모달을 다시 열면 진행 상황이 이어진다. `POST /api/ai-report/jobs/{job_id}/cancel`로 취소한다.
-5. **초안과 최종본** — goose가 `final/report.html`과 `delivery_allowed: true` 검증 결과를 함께 남기면 최종본(`final`), 그렇지 않고 `draft/report.html`만 있으면 초안(`draft`)으로 전달한다. 초안은 리포트 위에 배너가 붙는다.
+5. **초안과 최종본** — goose가 `final/report.html`과 `delivery_allowed: true` 검증 결과를 함께 남기면 최종본(`final`), 그렇지 않고 `draft/report.html`만 있으면 초안(`draft`)으로 전달한다. 초안은 리포트 위에 배너가 붙는다. SPEC-AI-REPORT-006부터 1차 세션은 최종본을 만들지 않고(하네스 지침 규칙 7), 아래 화면 캡처·감수 후처리가 최종본 인정을 맡는다.
+   - **화면 캡처와 감수** (SPEC-AI-REPORT-006) — 1차 세션이 초안을 만든 뒤 서버가 초안 `report.html`을 헤드리스 브라우저로 데스크톱·모바일 두 크기로 찍어 타일 이미지(`runs/<job_id>/screens/`)로 자르고(캡처 60초, 타일 30장 상한), 별도 `claude -p` 감수 세션(900초 상한)이 모든 타일을 열어 확인한 뒤 `audit-review.json`을 쓴다(하네스 지침 규칙 10). 서버가 세션 종료 후 영수증(`review/receipt.json`)을 직접 쓰며, 영수증이 화면 확인을 인정할 때만 최종본(`final`)으로 전달한다. 캡처는 스크립트와 외부 네트워크를 모두 막고 찍으므로 실제 화면과 조금 다르다(감수 기록의 `visual` 증거가 `[렌더 차이]` 표지로 이를 밝혀야 한다). 후처리가 실패해도 초안은 그대로 전달된다.
+   - **브라우저**: Playwright 캐시의 `chrome-headless-shell`만 지원한다(macOS에서 `153.0.8010.12`로 구동 확인). `AI_REPORT_GOOSE_BROWSER`로 실행 파일을 지정할 수 있고, 지정 파일을 실행하지 못하면 다른 브라우저로 바꾸지 않고 캡처가 `unavailable`로 기록된다. `Google Chrome.app`과 `PATH` 탐색은 지원하지 않는다.
+   - **끄기·시간**: `AI_REPORT_GOOSE_REVIEW=0`이면 캡처·감수를 하지 않는다. 감수 세션 시간 상한은 `AI_REPORT_GOOSE_REVIEW_TIMEOUT`(초, 기본 900)이다. 캡처 시간 상한(60초)과 타일 상한(30장)은 코드 상수다.
 6. **보관** — 결과는 `backend/reports/<종목명>/goose/<날짜>/`에 보관된다(같은 날 두 번째 실행은 `<날짜>_2`). 허용 목록 파일(`report.html`, `report-input.json`, `source-ledger.json`, `render-validation.json`, `delivery-audit.json`)과 goose가 세운 가정을 적은 `assumptions.md`, 작업 메타데이터 `job.json`만 복사한다. 기록 탭에서 빠른 분석 markdown 항목과 함께 볼 수 있다.
 
 **알려진 한계**
