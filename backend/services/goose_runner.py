@@ -37,6 +37,8 @@ DEFAULT_MODEL = "sonnet"
 ENV_TIMEOUT = "AI_REPORT_GOOSE_TIMEOUT"
 # design §3.4: M1 P4 352.8초 × 2를 5분 단위로 올린 값(표본 1회)
 DEFAULT_TIMEOUT_SEC = 900.0
+ENV_REVIEW_TIMEOUT = "AI_REPORT_GOOSE_REVIEW_TIMEOUT"
+DEFAULT_REVIEW_TIMEOUT_SEC = 900.0
 DEFAULT_GRACE_SEC = 15.0
 # design §3.3: 부모 환경에 있는 것만 넘긴다. 인증용 추가 변수는 없다.
 ENV_ALLOWLIST = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "TMPDIR", "SHELL")
@@ -92,17 +94,27 @@ def resolve_model(environ: Mapping[str, str]) -> str:
     return environ.get(ENV_MODEL) or DEFAULT_MODEL
 
 
-def resolve_timeout(environ: Mapping[str, str]) -> float:
-    """`AI_REPORT_GOOSE_TIMEOUT`(초). 숫자가 아니거나 0 이하면 기본 900초."""
-    raw = environ.get(ENV_TIMEOUT)
+def _seconds_from(environ: Mapping[str, str], key: str, default: float) -> float:
+    """환경 변수(초). 숫자가 아니거나 0 이하면 기본값."""
+    raw = environ.get(key)
     if not raw:
-        return DEFAULT_TIMEOUT_SEC
+        return default
     try:
         value = float(raw)
     except ValueError:
-        logger.warning("%s 값이 숫자가 아님(%r) — 기본값 사용", ENV_TIMEOUT, raw)
-        return DEFAULT_TIMEOUT_SEC
-    return value if value > 0 else DEFAULT_TIMEOUT_SEC
+        logger.warning("%s 값이 숫자가 아님(%r) — 기본값 사용", key, raw)
+        return default
+    return value if value > 0 else default
+
+
+def resolve_timeout(environ: Mapping[str, str]) -> float:
+    """`AI_REPORT_GOOSE_TIMEOUT`(초). 숫자가 아니거나 0 이하면 기본 900초."""
+    return _seconds_from(environ, ENV_TIMEOUT, DEFAULT_TIMEOUT_SEC)
+
+
+def resolve_review_timeout(environ: Mapping[str, str]) -> float:
+    """`AI_REPORT_GOOSE_REVIEW_TIMEOUT`(초). 숫자가 아니거나 0 이하면 기본 900초(REQ-AIR6-011)."""
+    return _seconds_from(environ, ENV_REVIEW_TIMEOUT, DEFAULT_REVIEW_TIMEOUT_SEC)
 
 
 def build_prompt(stock_name: str, code: str, job_id: str, as_of: datetime | None = None) -> str:
@@ -116,6 +128,19 @@ def build_prompt(stock_name: str, code: str, job_id: str, as_of: datetime | None
         f"/goose {stock_name}({code}) 종목을 분석해줘.\n"
         f"기준일: {stamp}. 범위: 전체 기업 보고서(company_report).\n"
         f"작업 디렉터리: runs/{job_id}. 질문 없이 진행하고 가정은 runs/{job_id}/assumptions.md에 기록하세요."
+    )
+
+
+def build_review_prompt(job_id: str, code: str) -> str:
+    """감수 세션 프롬프트(REQ-AIR6-011, T10): 작업 디렉터리·6자리 코드·역할만 담고 종목명은 넣지 않는다."""
+    if not _CODE_PATTERN.fullmatch(code or ""):
+        raise ValueError(f"종목 코드 형식 오류: {code!r}")
+    if not _JOB_ID_PATTERN.fullmatch(job_id or ""):
+        raise ValueError(f"작업 ID 형식 오류: {job_id!r}")
+    return (
+        f"감수 세션입니다. 종목 코드: {code}. 작업 디렉터리: runs/{job_id}.\n"
+        f"초안을 쓴 세션이 아니므로 조사·작성을 다시 하지 않습니다. runs/{job_id}/review/context.json을 "
+        "먼저 읽고 하네스 지침의 감수 세션 규칙에 따라 진행하세요. 질문 없이 진행합니다."
     )
 
 
@@ -382,30 +407,29 @@ async def _read_stderr(stream: asyncio.StreamReader, tail: deque[str]) -> None:
         tail.append(raw.decode("utf-8", errors="replace").rstrip("\n"))
 
 
-# @MX:ANCHOR: [AUTO] run_goose — M4 작업 서비스의 실행 진입점(시작·취소·서버 종료 경로가 모두 거친다).
-# @MX:REASON: 어떤 경로로 끝나도(정상·시간 초과·취소) 프로세스 그룹을 남기지 않는 것이 불변 조건이다.
-async def run_goose(
-    *,
-    job_id: str,
-    stock_name: str,
-    code: str,
-    on_event: EventCallback,
-    environ: Mapping[str, str] | None = None,
-    claude_bin: str = "claude",
-    timeout_sec: float | None = None,
-    grace_sec: float = DEFAULT_GRACE_SEC,
-    as_of: datetime | None = None,
-) -> RunResult:
-    """goose 세션 1회를 실행하고 종료 사유를 분류한다.
+@dataclass
+class _Session:
+    """`claude -p` 하위 프로세스 1회의 관측 결과."""
 
-    ``environ``은 부모 환경(기본 os.environ) — 하네스 경로·모델·시간 상한을 읽고,
-    허용 목록 변수만 하위 프로세스에 넘긴다. 취소되면 그룹 종료 후 CancelledError를 다시 던진다.
-    """
-    env = dict(os.environ if environ is None else environ)
-    prompt = build_prompt(stock_name, code, job_id, as_of)
-    inv = build_invocation(prompt, environ=env, claude_bin=claude_bin)
-    limit = resolve_timeout(env) if timeout_sec is None else timeout_sec
-    job_dir = inv.cwd / "runs" / job_id
+    returncode: int | None
+    timed_out: bool
+    tail: list[str]
+
+
+# @MX:WARN: [AUTO] 하위 프로세스를 새 그룹으로 띄우고 어떤 경로로 끝나도 그룹 전체를 정리한다.
+# @MX:REASON: 1차 세션(run_goose)과 감수 세션(run_review)이 공유한다. 그룹 정리를 빼면 손자 프로세스가
+#             남고(AC-005), 취소 중 정리를 shield하지 않으면 CancelledError가 정리를 끊는다.
+async def _run_session(
+    inv: Invocation,
+    env: Mapping[str, str],
+    mapper,
+    on_event: EventCallback,
+    *,
+    limit: float,
+    grace_sec: float,
+    label: str,
+) -> _Session | None:
+    """세션을 띄워 stdout을 ``mapper``로, stderr를 꼬리 버퍼로 읽는다. 실행 파일이 없으면 None."""
     tail: deque[str] = deque(maxlen=STDERR_TAIL_LINES)
 
     try:
@@ -420,11 +444,10 @@ async def run_goose(
             limit=LINE_LIMIT_BYTES,
         )
     except FileNotFoundError:
-        logger.error("goose 실행 파일 없음: %s", claude_bin)
-        return RunResult(status="error", error_kind="binary_missing", exit_code=None)
+        logger.error("goose 실행 파일 없음: %s", inv.argv[0])
+        return None
 
     pgid = proc.pid  # start_new_session → 새 세션·새 그룹의 리더
-    mapper = StageMapper(job_id)
     timed_out = False
 
     async def _drive() -> None:
@@ -456,23 +479,58 @@ async def run_goose(
         await asyncio.wait_for(_drive(), timeout=limit)
     except asyncio.TimeoutError:
         timed_out = True
-        logger.warning("goose 작업 %s 시간 초과(%.1f초) — 프로세스 그룹 종료", job_id, limit)
+        logger.warning("goose %s 시간 초과(%.1f초) — 프로세스 그룹 종료", label, limit)
     finally:
         # 정상 종료여도 손자 프로세스가 남을 수 있으므로 그룹을 항상 정리한다.
         # 취소(CancelledError) 중에도 정리가 끝날 때까지 기다린다.
         await asyncio.shield(_cleanup(proc, pgid, grace_sec))
 
+    return _Session(proc.returncode, timed_out, list(tail))
+
+
+# @MX:ANCHOR: [AUTO] run_goose — M4 작업 서비스의 실행 진입점(시작·취소·서버 종료 경로가 모두 거친다).
+# @MX:REASON: 어떤 경로로 끝나도(정상·시간 초과·취소) 프로세스 그룹을 남기지 않는 것이 불변 조건이다.
+async def run_goose(
+    *,
+    job_id: str,
+    stock_name: str,
+    code: str,
+    on_event: EventCallback,
+    environ: Mapping[str, str] | None = None,
+    claude_bin: str = "claude",
+    timeout_sec: float | None = None,
+    grace_sec: float = DEFAULT_GRACE_SEC,
+    as_of: datetime | None = None,
+) -> RunResult:
+    """goose 세션 1회를 실행하고 종료 사유를 분류한다.
+
+    ``environ``은 부모 환경(기본 os.environ) — 하네스 경로·모델·시간 상한을 읽고,
+    허용 목록 변수만 하위 프로세스에 넘긴다. 취소되면 그룹 종료 후 CancelledError를 다시 던진다.
+    """
+    env = dict(os.environ if environ is None else environ)
+    prompt = build_prompt(stock_name, code, job_id, as_of)
+    inv = build_invocation(prompt, environ=env, claude_bin=claude_bin)
+    limit = resolve_timeout(env) if timeout_sec is None else timeout_sec
+    job_dir = inv.cwd / "runs" / job_id
+    mapper = StageMapper(job_id)
+    session = await _run_session(
+        inv, env, mapper, on_event, limit=limit, grace_sec=grace_sec, label=f"작업 {job_id}"
+    )
+    if session is None:
+        return RunResult(status="error", error_kind="binary_missing", exit_code=None)
+    timed_out, tail = session.timed_out, session.tail
+
     selected = select_report(job_dir)
     status, kind = classify_exit(
         timed_out=timed_out,
-        exit_code=proc.returncode,
+        exit_code=session.returncode,
         stderr_tail=list(tail),
         report_selected=selected is not None,
     )
     return RunResult(
         status=status,
         error_kind=kind,
-        exit_code=None if timed_out else proc.returncode,
+        exit_code=None if timed_out else session.returncode,
         delivery_status=selected[0] if selected else None,
         report_dir=selected[1] if selected else None,
         stderr_tail=list(tail),
@@ -487,3 +545,104 @@ async def _cleanup(proc: asyncio.subprocess.Process, pgid: int, grace_sec: float
             await asyncio.wait_for(proc.wait(), timeout=max(grace_sec, 0.0) + 5.0)
         except asyncio.TimeoutError:
             logger.error("goose 프로세스 %d 회수 실패", proc.pid)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 감수 세션 (SPEC-AI-REPORT-006 M3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class ReviewTracker:
+    """감수 세션 stream-json에서 열람·쓰기 시도 기록을 모으고 `render_final`만 진행 이벤트로 낸다.
+
+    - ``reads``: 성공한 `Read`의 경로(`tool_result.is_error`가 True가 아닌 것만 — 키 없음·False는 성공).
+    - ``writes``: `Write`/`Edit`의 `file_path` 전부(결과와 무관하게 시도만으로 기록).
+    서브에이전트(``parent_tool_use_id`` 있음)의 호출도 똑같이 센다. 판정은 goose_review의 몫이다.
+    """
+
+    def __init__(self) -> None:
+        self.reads: list[str] = []
+        self.writes: list[str] = []
+        self._pending: dict[str, str] = {}
+
+    def feed(self, line: str) -> list[ProgressEvent]:
+        try:
+            data = json.loads(line)
+        except (ValueError, TypeError):
+            return []
+        message = data.get("message") if isinstance(data, dict) else None
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            return []
+        events: list[ProgressEvent] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if data.get("type") == "assistant" and item.get("type") == "tool_use":
+                events.extend(self._tool_use(item))
+            elif data.get("type") == "user" and item.get("type") == "tool_result":
+                path = self._pending.pop(str(item.get("tool_use_id")), None)
+                if path is not None and item.get("is_error") is not True:
+                    self.reads.append(path)
+        return events
+
+    def _tool_use(self, item: dict) -> list[ProgressEvent]:
+        name = item.get("name")
+        inp = item.get("input") if isinstance(item.get("input"), dict) else {}
+        if name == "Read" and isinstance(item.get("id"), str) and isinstance(inp.get("file_path"), str):
+            if len(self._pending) >= _TOOL_MEMORY_LIMIT:
+                self._pending.pop(next(iter(self._pending)))
+            self._pending[item["id"]] = inp["file_path"]
+        elif name in ("Write", "Edit") and isinstance(inp.get("file_path"), str):
+            self.writes.append(inp["file_path"])
+        elif name == "Bash":
+            stage = _bash_stage(str(inp.get("command", "")))
+            if stage is not None and stage.stage == "render_final":
+                return [stage]
+        return []
+
+
+@dataclass
+class ReviewRunResult:
+    """감수 세션 1회의 관측. ``started``가 False면 실행 파일이 없어 프로세스가 뜨지 않았다."""
+
+    started: bool
+    exit_code: int | None
+    timed_out: bool
+    reads: list[str] = field(default_factory=list)
+    writes: list[str] = field(default_factory=list)
+    stderr_tail: list[str] = field(default_factory=list)
+
+
+async def run_review(
+    *,
+    job_id: str,
+    code: str,
+    on_event: EventCallback | None = None,
+    environ: Mapping[str, str] | None = None,
+    claude_bin: str = "claude",
+    timeout_sec: float | None = None,
+    grace_sec: float = DEFAULT_GRACE_SEC,
+) -> ReviewRunResult:
+    """감수 세션 `claude -p`를 1차 세션과 같은 보안 인자·환경 허용 목록·프로세스 그룹 처리로 실행한다.
+
+    영수증·판정은 하지 않는다(goose_review). 취소되면 그룹 종료 후 CancelledError를 다시 던진다.
+    """
+    env = dict(os.environ if environ is None else environ)
+    inv = build_invocation(build_review_prompt(job_id, code), environ=env, claude_bin=claude_bin)
+    limit = resolve_review_timeout(env) if timeout_sec is None else timeout_sec
+    tracker = ReviewTracker()
+    session = await _run_session(
+        inv, env, tracker, on_event or (lambda _event: None),
+        limit=limit, grace_sec=grace_sec, label=f"감수 {job_id}",
+    )
+    if session is None:
+        return ReviewRunResult(started=False, exit_code=None, timed_out=False)
+    return ReviewRunResult(
+        started=True,
+        exit_code=None if session.timed_out else session.returncode,
+        timed_out=session.timed_out,
+        reads=tracker.reads,
+        writes=tracker.writes,
+        stderr_tail=session.tail,
+    )

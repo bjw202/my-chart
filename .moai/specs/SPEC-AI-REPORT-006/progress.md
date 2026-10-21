@@ -93,6 +93,54 @@
 
 **미관측/한계**: 실제 `file://` 로드의 로드 이벤트 대기 시간 분포(1회 관측, 즉시 완료), Linux 캐시 구조(G12), 외부 요청 0건을 로컬 소켓으로 확인하는 일은 M1에서 수행했고 이 모듈 경로로는 재측정하지 않았다(`Network.setBlockedURLs ["*"]` 호출 형태만 시험). 예산 60초 안에서 33장 캡처가 실제로 몇 초 걸리는지는 M6 라이브에서 측정.
 
+### M3 감수 세션·영수증 — 2026-10-21
+
+**산출**: `backend/services/goose_review.py`(신규), `backend/tests/test_goose_review.py`(신규, 97개), `backend/services/goose_runner.py`(추가: `build_review_prompt`, `resolve_review_timeout`, `ReviewTracker`, `ReviewRunResult`, `run_review`, 공용 `_run_session` 추출·`_seconds_from`). 증거 폴더 `.moai/state/verify/t18-m3/`(git 무시): `step0_write_probe.py`, `step0-attempt1.out`·`-stream.jsonl`·`-stderr.txt`·`-argv.json`, `step0-harness-{before,after-probe,after-cleanup}.txt`, `step0-find6-after.txt`, `mutate.py`, `mutations.out`, `pytest-after.out`.
+
+**Step 0 — 쓰기 허용·거부 관측 (운영 argv, 시도 1회, 종료 코드 0)** `build_invocation`/`build_env`로 만든 argv(`--setting-sources project --settings ~/.goose-harness/.claude/settings.json --strict-mcp-config --permission-mode dontAsk --no-session-persistence`), cwd=`~/.goose-harness`. stderr 원문: `Ignoring 9 permissions.allow entries from .claude/settings.json: this workspace has not been trusted. Run Claude Code interactively here once and accept the trust dialog, or set projects["/Users/byunjungwon/.goose-harness"].hasTrustDialogAccepted: true in /Users/byunjungwon/.claude.json.`
+
+| # | 호출 | 기대 | 관측 | is_error | tool_result 원문 |
+|---|---|---|---|---|---|
+| 1 | Write `runs/t18-m3-probe/ok.txt` | 허용 | 허용 | 키 없음 | `File created successfully at: /Users/byunjungwon/.goose-harness/runs/t18-m3-probe/ok.txt (file state is current in your context — no need to Read it back)` |
+| 2 | Edit 같은 파일 | 허용 | 허용 | 키 없음 | `The file …/runs/t18-m3-probe/ok.txt has been updated successfully. (file state is current in your context — no need to Read it back)` (디스크 내용 `world` 확인) |
+| 3 | Write `./t18-m3-outside.txt` | 거부 | 거부 | True | `Permission to use Write has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt …` (+ 스트림에 `system/permission_denied`, `decision_reason_type: "mode"`) |
+| 4 | Write `./.claude/t18-m3-deny.txt` | 거부 | 거부 | True | `<tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>` |
+| 5 | Edit 존재하지 않는 `./.claude/t18-m3-nonexistent.txt` | 거부 | 거부 | True | `<tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>` |
+
+해석: 허용 목록 경고에도 `runs/` 쓰기는 되고 `runs/` 밖·`.claude/` 쓰기는 거부된다(후자는 `deny` 규칙이 신뢰 경고와 무관하게 적용됨을 시사). 3의 거부는 허용 목록 부재 + dontAsk 모드 때문이므로 허용 목록이 무시되는 환경에서는 `runs/` 쓰기 허용이 허용 목록 때문인지 다른 규칙 때문인지는 이 관측만으로 구분하지 못한다(미관측). 기대와 어긋난 결과 없음.
+
+정리·검증 (프로브 직후, 리드 보류 지시 도착 전에 완료): `rm -r ~/.goose-harness/runs/t18-m3-probe` 후 `find ~/.goose-harness -maxdepth 3 -not -path '*/skills/*' | sort`를 시작 전 스냅샷과 `diff` → `IDENTICAL_TO_BEFORE`. `settings.json` sha256 `e8b527cc…15df3`, `CLAUDE.md` `a7a9a06e…554e9` 전후 동일(그때 설치본). 보류 해제 뒤 읽기 전용 재검증(쓰기 없음, `python -B -I`): `find ~/.goose-harness \( -name '__pycache__' -o -name '*.pyc' \) | wc -l` → `0`; `-not -path '*/runs/*' -not -path '*/.claude/skills/*'` 목록 = `.claude`, `.claude/settings.json`, `.claude/skills`, `CLAUDE.md`, `runs` 뿐; `*t18*` 파일 0개; 스냅샷 diff는 리드의 t19 라이브 작업 폴더 `runs/11808900a8834252814d1872da5e0ca5`(내가 만든 것이 아님)만 추가. 매니페스트: 이 워크트리의 낡은 매니페스트로는 `verify_installed` → `['installed sha256 mismatch: CLAUDE.md']`(리드가 19:36 서버 재시작으로 t19 지침을 재설치했고 설치본 `CLAUDE.md`는 `77e260e4…2fed`), 메인 체크아웃 매니페스트(33개)로는 `verify_installed mismatches: []`. 따라서 설치본 33개 해시 일치는 메인 매니페스트 기준이며 내 프로브가 만든 변경이 아니다.
+
+**기준선·결과 (직접 실행)**
+- 전: `../../../.venv/bin/python -m pytest backend/tests -k goose -q` → `301 passed, 214 deselected` (M2 기록·시작 기준선)
+- 후: 같은 명령 → `398 passed, 214 deselected, 1 warning in 27.44s` (301 + 신규 97, 실패 0, 기존 테스트 수정 0; `test_goose_runner.py` 65개 통과로 `_run_session` 추출의 동작 보존 확인)
+- 커버리지: `coverage run --include='*/goose_review.py' -m pytest backend/tests/test_goose_review.py` → `goose_review.py 274 17 94%`
+- 린트: `python3 -m ruff check` 새·변경 3파일 → `All checks passed!`
+
+**RED 관측**: 구현을 먼저 초안으로 쓴 뒤 시험을 썼다(TDD 순서 위반, M2와 같음 — 시험이 구현을 먼저 보고 쓰였다는 한계). 대신 모든 보호 동작을 `mutate.py`로 하나씩 되돌려 RED를 관측했다(`mutations.out`, 변이 52개 전부 RED, 미적용·STILL-GREEN 0, 마지막 줄 `restored-sha-match: True`).
+
+| AC | 상태 | 되돌림 변이 → RED |
+|---|---|---|
+| 016 수준 A 15개(조건 2~12, 14~17) | PASS | 각 조건의 사유 추가를 제거한 변이마다 해당 격리 케이스 RED (예: 조건 14 → `[h]`만, 15 → `[i]`만, 16 → `[j]`만) |
+| 016 수준 B(조건 1, 13) | PASS | 1을 `receipt_invalid`로 바꿈(SPEC 모델) → `[b]`·S9(a) RED; 제거 → 같음. 13 제거 → `[o]`·`[o2]` RED (이 구현에서는 결과가 뒤집힘 — 조건 13 미충족이면 14~17을 평가하지 않기 때문) |
+| 016 조건 0 | M4 | `select_report` 연결은 M4. 여기서는 `evaluate_admissibility`가 `delivery_allowed:false`에 무관함만 시험((n) 절반) |
+| 016 기타 | PASS | 저장된 `visual_admissible` 입력 사용 → 19건 RED; 읽기 실패 허용 → 6건; 작성기가 디스크 래퍼 호출 → 30건; 영수증 이중 쓰기 → 3건; 읽기 보호에서 16 제외 → 2건 |
+| 021 | PASS (판정 부분) | 조건 17 제거·표지 완화·"시작" 한정 모두 RED. 지침 문구(규칙 9)는 M5 |
+| 014 (a)~(m) | PASS | 13개 변이 모두 RED ((e)(f)는 추적기 시험으로 RED) |
+| 015 (a)(a')(b)(c)(d)(e)(f) | PASS | 7개 모두 RED; (g)는 M4 |
+| 011 (a)~(f) + 기본 시간 상한 | PASS | 7개 모두 RED |
+| 002 (감수 프로세스 그룹 몫) | PASS | 그룹 정리 제거 → RED |
+
+**SPEC 대비 차이·결정**
+- `finish_review`는 `harness_dir`을 명시 인자로 받는다(경로 정규화용). 취소는 `outcome="cancelled"` 인자로 강제한다. `integrity_failed`·`disabled` 영수증 작성기는 M4가 추가한다(이 모듈은 아직 없음).
+- 사유 코드 밖의 안전망: `evaluate_admissibility`가 예기치 않은 예외를 만나면 `(False, ["receipt_invalid"])`로 미인정 처리한다(설계상 도달하지 않음).
+- `ReviewTracker`는 `Write`/`Edit`만 쓰기 시도로 센다(`MultiEdit`·`NotebookEdit`은 세지 않음 — 하네스 허용 목록에 그 도구가 있는지는 확인하지 않았다).
+- 세션 전 정리가 `final/`까지 지우므로 시험의 기준 픽스처 P는 `final/`을 감수 세션이 만든 것으로 모델링한다.
+- 삭제 실패 시(AC-014 (13)) `context.json`은 쓰지 않는다.
+- 실행기: `run_goose`의 세션 실행부를 `_run_session`으로 추출(동작 동일, 기존 65개 통과). 추적기는 `StageMapper`와 같은 `.feed(line)` 계약이라 `_read_stdout`을 그대로 쓴다.
+
+**미관측/한계**: 이미지 `Read` 실제 스트림 모양은 M1 기록(`tool_result.content=[{type:image}]`, `is_error` 키 없음)을 합성 픽스처로 모사했을 뿐 실제 녹화로 교체하지 않았다. 별칭 경로(`/private/var` ↔ `/var`) 대응 분기와 일부 방어 분기(커버리지 미적용 17줄)는 시험하지 않았다. `select_report`·작업 서비스·완료 이벤트(AC-014 (11)~(13)의 `select_report` 절반, AC-015 S9의 이벤트 값, AC-016의 `archive_job` 비교)는 M4.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
