@@ -185,9 +185,58 @@ P1~P5·P7·P8은 2026-10-21 HEAD `c8e5c20`에서, P9a·P9b·P10~P12·P15는 같�
 - `_server_code_check`의 실제 운영 서버 호출(라우터 경유)은 관측하지 않았다 — 테스트 프로세스 안에서 같은 함수를 직접 불렀다.
 - spec.md·plan.md·acceptance.md 프런트매터 `status`는 `draft` 그대로다. 에이전트 계약상 첫 run 커밋에서 `in-progress`로 바꾸는 전환이 있으나, 리드 지시("spec.md/plan.md/acceptance.md를 수정하지 말 것")가 우선이라 손대지 않았다 — 리드가 정할 사항.
 
+### M4 — 하네스 규칙 9와 매니페스트 (2026-10-21, 카드 t19)
+
+변경: `harness-instructions.md`에 규칙 9(하위 9-1~9-6)를 plan.md §4 초안대로 추가(N=9). 초안과 다른 점은 9-1에 "Read 도구로"와 예시 경로 `runs/<job_id>/naver/01_article.txt`를 더한 것뿐이다(규칙 8-1과 같은 형태). `goose-manifest.json`은 `PY -m backend.services.goose_harness > backend/goose_harness_src/goose-manifest.json`으로 재생성했다 — 차이는 `"CLAUDE.md"` 해시 한 줄(`a7a9a06e…` → `77e260e4c5a27e9f6166be2be19faec6332d421cdf0d82ba5fe3c1b6c6fb2fed`).
+
+- AC-009 문자열 개수(`$S/air7_009.txt`, 명령은 acceptance의 한 줄 루프): `2 runs/<job_id>/naver/index.json` · `1 article_url` · `1 channel: "naver"` · `1 metadata_only` · `1 "no_results"` · `1 모바일 뉴스 API 응답의 제목·요약 본문 필드` · `1 서버 사전 수집본으로 열람, 기사 원문 페이지와 대조하지 않음` · `1 API 요약본(약 150자), 원문 미확인` · `1 요약에 없는 사실은 단정하지 않는다` · `1 이번 세션에서 그 파일을 연 시각` · `1 original_news` · `1 code_validated` · `1 서버가 종목코드 유효성을 확인하지 못함` · `2 runs/<job_id>/dart/index.json` — 기준선 0(P6)에서 13개 모두 ≥ 1, 규칙 8 문자열은 2 그대로
+- AC-009 되돌림(소스가 아니라 `$S` 사본에 적용): 규칙 9 블록을 뺀 사본 `no_rule9.md` → 13개 모두 `0`, `2 runs/<job_id>/dart/index.json`. "요약에 없는 사실은 단정하지 않는다." 문장만 뺀 사본 `no_v2.md` → 그 줄만 `0`, 나머지 12개는 그대로
+- AC-011 #1: `PY -m backend.services.goose_harness > "$S/m.json" && diff "$S/m.json" backend/goose_harness_src/goose-manifest.json` → 출력 없음, `diff_exit=0`
+- AC-011 #1·#3 되돌림(재생성 전 상태에서 관측): `diff` → `< "CLAUDE.md": "77e260e4…"` / `> "CLAUDE.md": "a7a9a06e…"`, `diff_exit=1`; `PY -m pytest backend/tests/test_goose_harness.py -q` → `FAILED ...::test_committed_source_matches_committed_manifest` · `FAILED ...::test_committed_manifest_covers_instructions_settings_and_whole_skill` · `2 failed, 30 passed`
+- AC-011 #2: `shasum -a 256 backend/goose_harness_src/claude-settings.json` → `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3`
+- AC-011 #3: `PY -m pytest backend/tests/test_goose_harness.py -q` → `32 passed in 0.10s`
+- AC-011 #4: 블록을 acceptance.md에서 정규식으로 그대로 추출(`$S/rulenum.py`) → `python3 -I "$S/rulenum.py" backend/goose_harness_src/harness-instructions.md` → `rules [1, 2, 3, 4, 5, 6, 7, 8, 9]` / `rule numbering ok`
+- AC-011 #4 병합 상황 되돌림(`$S` 사본, 규칙 9 자리에 합성 대역 "감수 세션 규칙" 한 줄을 넣고 네이버 규칙을 뒤에 둠): 정상 재번호 `m_ok10.md` → `rules [1, …, 10]` / `rule numbering ok`; 번호 9 중복 `m_dup9.md` → `top-level numbers not 1..K unique: [1, 2, 3, 4, 5, 6, 7, 8, 9, 9]`; 상위만 10·라벨 9 `m_labels9.md` → `line 28: sub-item 9-* under rule 10` · `line 29: sub-item 9-* under rule 10` (출력을 `head -3`으로 잘라 앞 두 줄만 봤다); 라벨 10·본문 "9-2에서" 남김 `m_prose9.md` → `line 30: in-text reference 9-2 inside rule 10`. 실제 006 병합 트리에는 아직 돌리지 않았다(병합은 리드 몫)
+
+#### M4 도중 발견해 고친 것 — 하네스 원본 안 `__pycache__`
+
+재생성한 매니페스트에 `.claude/skills/goose/workflows/fact-check/scripts/__pycache__/audit_report.cpython-313.pyc`가 섞여 나왔다. 원인은 M2의 AC-010 테스트가 `importlib`으로 `audit_report.py`를 불러 그 폴더에 바이트코드를 쓴 것이다(파일은 `.gitignore` 대상이라 `git status`에 보이지 않았고 추적 파일은 0개 — `git ls-files backend/goose_harness_src | grep -c pycache` → `0`). 이대로 커밋하면 매니페스트에 git에 없는 파일이 들어가 다른 체크아웃에서 무결성 검사가 깨진다. 조치: (1) 테스트가 불러오는 동안 `sys.dont_write_bytecode = True`(monkeypatch), (2) 테스트가 만든 `__pycache__` 폴더 삭제, (3) AC-010 재실행 `2 passed` 뒤 폴더 목록 `audit_report.py` 하나뿐, (4) 매니페스트 재생성. `git status --short --ignored backend/goose_harness_src/skills` → 출력 없음.
+
+#### 최종 게이트
+
+- AC-013: 전 `ls ~/.goose-harness/runs | wc -l; stat -f %m ~/.goose-harness/runs` → `5` / `1792576328`; `PATH=/usr/bin:/bin PY -m pytest <acceptance AC-013의 8개 파일> -q` → `330 passed, 1 warning in 16.65s`(`$S/ac013_goose.txt`), `network attempt in goose test` 0건; 후 → `5` / `1792576328`(같음). 통과 수 330 = 기준선 267 + 새 41 + 새 22
+- `PY -m pytest backend/tests -q -k goose` → `330 passed, 214 deselected, 1 warning in 14.81s`(`$S/k_goose.txt`)
+- 전체 백엔드 `PY -m pytest backend/tests -q` → 처음 `5 failed, 481 passed, 1 warning, 58 errors`. 그중 `test_air7_015_production_code_check_uses_server_stock_list`(`E       assert False is True`)는 이 SPEC 테스트였다: `test_ai_report_service.py`가 `sys.modules["my_chart.registry"]`에 스텁을 monkeypatch 없이 영구히 심어, 같은 세션에서 뒤에 도는 이 테스트가 스텁을 봤다. 재현: `PY -m pytest backend/tests/test_ai_report_service.py backend/tests/test_goose_job_service.py -q` → `E       assert False is True` / `1 failed, 99 passed`. 조치: 이 테스트 동안만 `my_chart.registry`·`backend.services.ai_report_service`를 `sys.modules`에서 지움(monkeypatch가 복원) → 같은 명령 `100 passed`. 수정 뒤 전체 → `4 failed, 482 passed, 1 warning, 58 errors`(`$S/full_backend2.txt`): `test_bubble_characterization.py` 21 · `test_bubble_ranking_parity.py` 30 · `test_bubble_schema_nullable.py` 1 · `test_stocks_master.py` 6 (ERROR, 원인 59줄 모두 `ImportError: cannot import name 'get_sector_registry' from '<unknown module name>'` — 같은 스텁 오염), `test_bubble_empty_date_edge.py` 1 · `test_minervini_template.py` 3 (FAILED). 새 테스트를 모두 뺀 실행(`--ignore=backend/tests/test_goose_naver_prefetch.py -k "not air7"`) → `4 failed, 419 passed, 22 deselected, 1 warning, 58 errors`로 같은 실패 — 이 SPEC의 테스트에서 오지 않는다
+- ruff: 미설치(`No module named ruff`) — 린트 미관측
+- 보호 파일: `git diff --stat 1c49411 -- backend/goose_harness_src/claude-settings.json backend/goose_harness_src/skills backend/services/goose_dart_prefetch.py backend/services/ai_report_service.py backend/routers/ai_report.py frontend backend/tests/conftest.py backend/tests/fixtures/naver/recorded` → 출력 없음
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+```yaml
+run_complete_at: 2026-10-21T00:00:00+09:00   # 날짜만 정확, 시각은 기록하지 않음
+run_commit_sha: <M4 커밋 — 이 파일을 담는 커밋이라 자기 SHA를 적을 수 없음; M2 b28394c, M3 9b4443f>
+run_status: run-lane-complete-pending-lead   # AC-012(라이브)·006 병합 단계는 리드 몫
+ac_pass_count: 14   # AC-001~011, 013, 014, 015 (run 레인 범위)
+ac_fail_count: 0
+ac_not_in_lane: [AC-AIR7-012]
+reversal_checks_observed: 24 (M2) + 12 (M3) + AC-009 2 + AC-011 #1·#3 1 + AC-011 #4 3
+preserve_list_post_run_count: claude-settings.json sha256 e8b527cc… 동일, skills/**·audit_report.py·goose_dart_prefetch.py·ai_report_service.py·routers·frontend·conftest·recorded 픽스처 diff 없음
+l44_pre_commit_fetch: not-run   # 리드 지시로 push·통합 없음
+l44_post_push_fetch: not-applicable
+new_warnings_or_lints_introduced: unknown — ruff 미설치
+cross_platform_build: not-applicable (Python, macOS에서만 실행)
+total_run_phase_files: 14   # 서로 다른 파일 수: M2 10 + M3 2(goose_job_service.py, test_goose_job_service.py) + M4 2(harness-instructions.md, goose-manifest.json); progress.md는 M2에 포함
+m1_to_mN_commit_strategy: 마일스톤마다 커밋 1개(M2 b28394c, M3 9b4443f, M4 이 커밋), 명시적 pathspec
+coverage_new_module: 97% (201 stmts, 7 miss)
+full_backend_suite: 4 failed / 58 errors — 새 테스트를 빼도 같음(기존 my_chart.registry 스텁 오염), goose 330 passed
+```
+
+Gaps(이 레인이 관측하지 않은 것):
+- AC-012 라이브 게이트(리드 몫), 006과의 실제 병합 단계 1~4(리드/통합 카드 몫 — #4 판정은 합성 사본으로만)
+- ruff 린트 게이트
+- 전체 백엔드의 기존 실패 4·오류 58이 이 SPEC 이전 커밋(`1c49411`)에서도 같은지는 그 커밋으로 직접 돌려 보지 않았다(브랜치 전환 금지). 근거는 새 테스트를 뺀 실행에서 같은 수가 나온 것과 원인 문구뿐이다. 그 실행에도 `goose_job_service.py` 소스 변경은 들어 있다(다만 실패 파일들은 그 모듈을 가져오지 않는다 — 가져오기 검사는 하지 않았다)
+- spec·plan·acceptance `status: draft` 유지(리드 지시 우선) — `in-progress` 전환 여부는 리드 결정
+- 실제 태그가 든 `body`, 그룹당 기사 2건, 실제 상장 종목 0건, 호출 제한(spec G3·G4)
 
 ## §E.4 Sync-phase Audit-Ready Signal
 

@@ -20,6 +20,7 @@ import html
 import importlib.util
 import json
 import re
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -486,7 +487,9 @@ def test_air7_003_disabled_index_shape(tmp_path):
 # AC-AIR7-010 — 규칙(N-2·N-3)대로 만든 기록이 감사를 통과하는가 (감사 스크립트는 변경 없음)
 
 
-def _audit_module():
+def _audit_module(monkeypatch):
+    # 하네스 원본 skills/ 아래에 __pycache__를 만들지 않는다 — 생기면 매니페스트 재생성에 섞여 들어간다
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
     spec = importlib.util.spec_from_file_location("_air7_audit_report", AUDIT_SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -518,8 +521,8 @@ def _naver_codes(audit_mod, data: dict) -> set:
     return {f["code"] for f in result["findings"] if f["code"].startswith("LATEST_SEARCH_NAVER")}
 
 
-async def test_air7_010_rule_shaped_record_passes_audit_and_variants_fail(tmp_path):
-    audit_mod = _audit_module()
+async def test_air7_010_rule_shaped_record_passes_audit_and_variants_fail(tmp_path, monkeypatch):
+    audit_mod = _audit_module(monkeypatch)
     index, _, _ = await run_file(tmp_path, REC / "020150_p1.json")
     a = ok_entries(index)[0]
     source = {
@@ -551,8 +554,8 @@ async def test_air7_010_rule_shaped_record_passes_audit_and_variants_fail(tmp_pa
         assert _naver_codes(audit_mod, d) == {"LATEST_SEARCH_NAVER"}, name
 
 
-async def test_air7_010_no_results_record_passes_audit(tmp_path):
-    audit_mod = _audit_module()
+async def test_air7_010_no_results_record_passes_audit(tmp_path, monkeypatch):
+    audit_mod = _audit_module(monkeypatch)
     index, _, _ = await run_file(tmp_path, REC / "999999_p1.json", code="999999")
     assert index["outcome"] == "no_results"
     note = f"종목코드 999999, pageSize=10, page=1, searched_at {index['search']['searched_at']} 기사 0건. 서버가 종목코드 유효성을 확인하지 못함"

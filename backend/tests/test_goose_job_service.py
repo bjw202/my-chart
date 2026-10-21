@@ -1271,7 +1271,11 @@ async def test_air7_015_disabled_index_records_code_validated(mods, tmp_path, mo
     assert requests == []
 
 
-async def test_air7_015_production_code_check_uses_server_stock_list(mods):
+async def test_air7_015_production_code_check_uses_server_stock_list(mods, monkeypatch):
+    # test_ai_report_service.py가 sys.modules에 my_chart.registry 스텁을 영구히 심는다(같은 세션에서 먼저
+    # 돌면 이 검사가 스텁을 보게 된다). 이 테스트 동안만 지워 실제 서버 종목 목록을 읽게 한다(종료 때 복원)
+    monkeypatch.delitem(sys.modules, "my_chart.registry", raising=False)
+    monkeypatch.delitem(sys.modules, "backend.services.ai_report_service", raising=False)
     check = mods.gjs.get_service()._code_check
     assert await asyncio.wait_for(asyncio.to_thread(check, "020150"), 30) is True
     assert await asyncio.wait_for(asyncio.to_thread(check, "999999"), 30) is False

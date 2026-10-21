@@ -32,6 +32,6 @@
     ".claude/skills/goose/workflows/stock-report/references/workflow-map.json": "c559eaf5c4487d796f1462400b65dd087c8084d4b93e2bd8df6ab5070a2e1bf9",
     ".claude/skills/goose/workflows/stock-report/scripts/render_report.py": "bffdf0516b93d4081eb7d94e3d920b7cd242267a6732c610bbc21570912c6560",
     ".claude/skills/goose/workflows/watchlist-review/GUIDE.md": "ee6779f470b93f375ca79c711ec607ea884d492806b572085db2abb51cf05c3a",
-    "CLAUDE.md": "a7a9a06e43d2a2be64107a8c934446b8b3c2c787251523bc99a74fa6041554e9"
+    "CLAUDE.md": "77e260e4c5a27e9f6166be2be19faec6332d421cdf0d82ba5fe3c1b6c6fb2fed"
   }
 }
