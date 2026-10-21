@@ -141,6 +141,13 @@
 
 **미관측/한계**: 이미지 `Read` 실제 스트림 모양은 M1 기록(`tool_result.content=[{type:image}]`, `is_error` 키 없음)을 합성 픽스처로 모사했을 뿐 실제 녹화로 교체하지 않았다. 별칭 경로(`/private/var` ↔ `/var`) 대응 분기와 일부 방어 분기(커버리지 미적용 17줄)는 시험하지 않았다. `select_report`·작업 서비스·완료 이벤트(AC-014 (11)~(13)의 `select_report` 절반, AC-015 S9의 이벤트 값, AC-016의 `archive_job` 비교)는 M4.
 
+**오케스트레이터 독립 확인 (2026-10-21 19:39~19:44, 병합 83b327f 뒤, 증거 `.moai/state/verify/t18-m3-orch/`)**
+- `pytest backend/tests -k goose -q -p no:cacheprovider` → `398 passed, 214 deselected, 1 warning in 25.16s` (`pytest_goose.out`, exit 0).
+- 하네스 목록(`find ~/.goose-harness -maxdepth 2 -not -path "*/runs/*"`): `.claude/settings.json`, `.claude/skills`, `CLAUDE.md`, `runs`만 있고, `__pycache__`·`*.pyc`·`*t18*`는 0개. `runs/`에는 기존 5개 폴더와 t19 라이브 작업 `11808900a8834252814d1872da5e0ca5`뿐이다.
+- 무결성(`verify_harness.py`, `python -B -I`, 주 체크아웃 `backend/goose_harness_src` 매니페스트): 19:43:48 `entries 33 | verify_installed vs primary manifest: []`.
+- **일시적 불일치 관측**: 19:40경 같은 확인이 `['installed sha256 mismatch: CLAUDE.md']`를 냈다. 당시 설치본 `CLAUDE.md` 앞 16자리는 `a7a9a06e43d2a2be`(= t18 작업공간 매니페스트의 항목), 주 체크아웃 매니페스트는 `77e260e4c5a27e9f`였다. 19:42:16에 `CLAUDE.md`와 `settings.json`의 수정 시각이 갱신됐고 19:42:19에 다시 `77e260e4…`로 바뀐 뒤 불일치는 사라졌다. 그 시각대에 t19 작업공간 파이썬(pid 69801, 19:41:46 시작)이 돌고 있었다.
+- **원인은 미확정이다.** 19:39:36의 `a7a9a06e…`(t18 소스 해시)가 이 작업공간의 테스트 실행(제 `pytest` 또는 M3 에이전트의 테스트)이 실제 홈에 설치한 결과인지, 다른 세션의 실행인지 구분하지 못했다. 이 SPEC의 테스트는 하네스 경로를 `AI_REPORT_GOOSE_HARNESS_DIR`로 임시 경로에 돌리지만, 앱 전체를 띄우는 다른 테스트의 격리는 확인하지 않았다(`test_main_goose_lifespan.py`는 `install_at_startup`을 가짜로 바꾼다). 재현 시험은 라이브 하네스를 다시 건드릴 수 있어 하지 않았다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
