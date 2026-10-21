@@ -221,9 +221,96 @@ R3-3 반영: `test_air5_008_attachment_review_and_audit_reports`가 eleId 1·2 �
 - G-M4-1: AC-AIR5-013 #4(재시작 후 첫 작업이 `integrity`가 아님, `~/.goose-harness/CLAUDE.md` 해시 = `a7a9a06e…54e9`)와 #5(uvicorn 시작 시각 > 지침·작업 서비스·수집 모듈의 마지막 커밋 시각과 `stat -f %m`)는 서버 재시작 뒤 오케스트레이터가 확인한다. 지금 실행 중 서버는 옛 지침·옛 코드다.
 - G-M4-2: goose가 규칙 8을 실제로 따르는지는 라이브 AC-AIR5-016(M5)에서만 드러난다.
 
+### M5 — 라이브 실측 (2026-10-21, HEAD 91b904e 코드로 재시작한 서버, 증거 정리는 HEAD 4be2906 시점)
+
+대상 작업: `~/.goose-harness/runs/a5becbb9b1a14483a1055c118d1b0be8/`, 020150 롯데에너지머티리얼즈, 2026-10-21 13:10:00 KST 시작. 서버(pid 44028) 재시작 12:33:04 뒤 첫 작업이고 `error`/`integrity`로 끝나지 않았다. AC-016 실행 횟수 1회(상한 2회). 하네스 쪽 파일은 읽기만 했고, 감사 스크립트 출력은 실행 폴더 밖 `aiR5/m5_audit.json`에 썼다. 대조 스크립트는 세션 임시 폴더의 `m5_check.py`(실행 폴더·리포 밖)를 가상환경 python `-I`로 실행했고 출력 원문은 `aiR5/m5_check.log`.
+
+#### AC-AIR5-013 #4·#5 (`aiR5/m5_ac013.log`, 오케스트레이터 측정과 같은 값을 이 실행에서 다시 관측)
+
+```
+$ shasum -a 256 ~/.goose-harness/CLAUDE.md
+a7a9a06e43d2a2be64107a8c934446b8b3c2c787251523bc99a74fa6041554e9  /Users/byunjungwon/.goose-harness/CLAUDE.md
+$ grep '"CLAUDE.md"' backend/goose_harness_src/goose-manifest.json
+    "CLAUDE.md": "a7a9a06e43d2a2be64107a8c934446b8b3c2c787251523bc99a74fa6041554e9"
+$ ps -o pid=,lstart=,command= -p 44028
+44028 Wed Oct 21 12:33:04 2026     /Users/byunjungwon/Dev/my_chart/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 1
+$ git log -1 --format=%cd --date=format:%H:%M:%S 91b904e -- <파일>
+backend/goose_harness_src/harness-instructions.md commit=12:30:26
+backend/services/goose_job_service.py commit=12:24:49
+backend/services/goose_dart_prefetch.py commit=12:09:16
+```
+
+- #4: 설치본 `CLAUDE.md` 해시 = 매니페스트 값, 재시작 뒤 첫 작업 a5becbb9가 `integrity`가 아님(`job.json` `status: done`, `error_kind: null`) → PASS
+- #5: 서버 시작 12:33:04가 세 파일의 마지막 커밋 시각(12:30:26 / 12:24:49 / 12:09:16)보다 늦다 → PASS. 수정 시각도 `harness-instructions.md` 12:29:09, `goose_dart_prefetch.py` 12:07:10(이 실행에서 `stat -f %Sm`로 관측)으로 12:33:04 이전이고, `goose_job_service.py`의 작업 시점 수정 시각은 오케스트레이터 측정 12:24:49다. 지금 `goose_job_service.py`의 수정 시각이 13:25인 것은 이 작업 뒤의 커밋 4be2906(하루 실행 횟수 제한 제거, 이 SPEC 밖) 때문이다. 즉 실행 중인 서버에는 아직 4be2906이 반영되지 않았다.
+
+#### AC-AIR5-016 판정
+
+| # | 기준 | 관측 (원문) | 판정 |
+|---|---|---|---|
+| 1 | `status: done`, `delivery_status: draft` | `backend/reports/롯데에너지머티리얼즈/goose/2026-10-21/job.json`: `"status": "done"`, `"error_kind": null`, `"delivery_status": "draft"`, `"interrupted": false`, `finished_at 13:18:31+09:00` | PASS |
+| 2 | 색인 `complete`, 요청 40 이하, 120초 이하, 재무제표 9·주석 1·요약 1·첨부 1 이상 | `outcome=complete request_count=27 duration_s=26.133 files=15 ok=15`; `ok by (document,section): {('main','financial_statements'): 9, ('main','notes'): 1, ('attachment','auditor_report'): 4, ('main','summary'): 1}` | PASS |
+| 3 | 감사 결함 코드와 대상 6종의 교집합 = 공집합 | 직접 실행(아래) `codes= ['AUDIT_INPUT_VERSION', 'AUDIT_MODE', 'AUDIT_PREVIEW_VERSION', 'AUDIT_TIME', 'LATEST_SEARCH_NAVER', 'REVIEW_CALCULATIONS', 'REVIEW_COVERAGE', 'REVIEW_OPINION', 'REVIEW_SOURCE_ACCURACY', 'REVIEW_VISUAL']`, `intersection with target = []`. goose 자체 `delivery-audit.json`도 같은 코드 집합(`same code set (ours vs goose): True`), 교집합 `[]` | PASS |
+| 4 | DART `direct_read` 출처마다 (i) `url` ∈ 색인 `ok`의 `viewer_url`, (ii) `read_scope`에 `text_file`, (iii) `limitations`에 `서버 사전 수집본으로 열람` | `dart direct_read sources: 10 of total sources 17`, 10건 모두 `(i)=True (ii)=True (iii)=True`, 추가로 `accessed_at==fetched_at=True` 10/10, `#4 violations = 0` | PASS |
+| 5 | `filing_coverage`(§4.8): `read` 항목의 `source_ids`가 허용 구간의 `viewer_url`만 가리킴 | `body: status=read source_ids=['dart_h1_26_fs'] -> 01_financial_statements.txt (main/financial_statements)`, `notes: status=read ['dart_h1_26_notes'] -> 02_notes.txt (main/notes)`, `review_or_audit: status=read ['dart_h1_26_review'] -> 04_auditor_report.txt (attachment/auditor_report)`, `#5 violations = 0` | PASS |
+
+기준선 대비: research.md §2의 이전 실행 2건에서는 대상 6종이 모두 나왔고, 이번 실행에서는 0종이다.
+
+#3 감사 명령(AC-016 문구 그대로, 출력만 실행 폴더 밖):
+
+```
+$ cd ~/.goose-harness && /Users/byunjungwon/Dev/my_chart/.venv/bin/python -I .claude/skills/goose/workflows/fact-check/scripts/audit_report.py \
+    --input ~/.goose-harness/runs/a5becbb9b1a14483a1055c118d1b0be8/draft/report-input.json \
+    --output /Users/byunjungwon/Dev/my-project-01/my_chart/.moai/state/verify/70e95898/aiR5/m5_audit.json \
+    > …/aiR5/m5_audit_stdout.log 2>&1; echo "audit_exit=$?"
+audit_exit=2
+```
+
+종료 코드 2는 결함이 남아 `"decision": "revise"`인 경우다(`m5_audit.json`).
+
+부가 관측:
+
+- `company-input.json`과 `draft/report-input.json`은 바이트가 같다(`True`). goose가 입력을 `company-input.json`으로 쓰고 render가 `draft/`로 복사했다.
+- 검색 기록(규칙 8-3): `{"channel": "dart", "searched_at": "2026-10-21T13:10:00.391+09:00", "query": "currentPage=1&…&textCrpNm=020150&…", "result": "read", "source_ids": [10개], "note": "서버 사전 수집 검색: 정기보고서 12건, 회사 고유번호 00113997"}` — `searched_at`·`query`가 색인 `search`와 같다.
+- `filing_coverage.body.read_scope` = `정기보고서 본문 중 III. 재무에 관한 사항의 연결재무제표(반기보고서 (2026.06))`, `notes.read_scope` = `3. 연결재무제표 주석(반기보고서 (2026.06)) 중 주석 1~8 구간`, `review_or_audit.read_scope` = `반기연결검토보고서 감사인 보고서 본문(첨부 재무제표 사본 제외)` — §4.8 표의 범위 문구 형식과 맞다.
+
+#### 후속 관찰 (이 SPEC의 결함 아님 — 기록만)
+
+- O-M5-1 진행 단계: 화면에 `리포트 입력 작성 — 건너뜀`. 원인은 실행기 `StageMapper`가 `runs/{job_id}/input.json`만 compose로 인식했는데 goose가 `company-input.json`을 썼기 때문. 커밋 4be2906에서 작업 폴더 바로 아래 `*input.json`을 모두 인식하도록 고쳤다(하위 폴더 `draft/report-input.json` 제외, RED→GREEN 테스트 11건). 서버 재시작 전이라 라이브 반영은 미확인.
+- O-M5-2 권한 거부: 13:10:40 Bash `cd … && grep` 1건 `permission_denied`(오케스트레이터가 서버 로그에서 관측). 규칙 4가 예상한 거부이고 goose는 계속 진행해 `done`으로 끝났다.
+- O-M5-3 `LATEST_SEARCH_NAVER`: 네이버 검색이 막혀 결함이 남음 → 백로그 t19.
+- O-M5-4 감수(`AUDIT_*`·`REVIEW_*`)와 화면 확인(`REVIEW_VISUAL`) 미실행으로 `draft` → 백로그 t18(spec.md §5 Out of Scope, 카드 t17 연결). 이 SPEC 이후에도 goose 결과는 `draft`다.
+
+#### Gaps
+
+- G-M5-1: goose가 파일을 열었다고 적은 10건을 실제로 끝까지 읽었는지는 기계 검증 불가(스트림 기록 미보존 — acceptance AC-016 "잡지 못하는 것").
+- G-M5-2: 452190 선택 관측(비게이팅)은 하지 않았다.
+- G-M5-3: AC-AIR5-003의 진행 패널 화면 배치(`DART 원문 수집` 단계 표시)는 이 실행에서 내가 직접 보지 않았다. O-M5-1 화면 관측은 오케스트레이터 보고에 기댄다.
+- G-M5-4: `ruff check` 미실행(G-M2-1과 같은 이유).
+- G-M5-5: 4be2906 이후 서버 재시작과 그 뒤 라이브 실행은 아직 없다(오케스트레이터 몫).
+
 ## §E.3 Run-phase Audit-Ready Signal
 
-_<pending run-phase>_
+- run_status: audit-ready
+- run_complete_at: 2026-10-21 (M5 라이브 실측 기록 시점)
+- run_commits: d72a1e1 (M1 픽스처) · 06fb05f (M2 수집 모듈) · 93b5ed5 (M3 작업 서비스 연결) · 91b904e (M4 지침 규칙 8·매니페스트) · M5 증거 기록 커밋(이 progress.md 변경)
+- 범위 밖 후속 커밋: 4be2906 `fix(ai-report)` — goose 하루 실행 횟수 제한 제거(사용자 결정 2026-10-21)와 compose 단계 인식 보정(O-M5-1). SPEC-AI-REPORT-004의 쿼터 관련 문서(README·CHANGELOG·004 design/progress)는 sync 단계가 고친다.
+- AC 요약 (16개):
+
+| AC | 판정 | 근거 위치 |
+|---|---|---|
+| 001 실행 위치 | PASS | M3 GREEN·되돌림 (a)~(f) |
+| 002 수집 중 취소 | PASS | M2 (b), M3 (a)(c) |
+| 003 진행 단계 | PASS (자동 테스트) | M3 (b)(d)·프론트 (a)(c). 화면 배치 눈 확인은 G-M5-3 |
+| 004 끄기 스위치 | PASS | M3 (a)~(c) |
+| 005~009, 011, 012 | PASS | M2 되돌림 34건 표 |
+| 010 실패해도 진행 | PASS | M2 (a)~(c), M3 (e) |
+| 013 지침·매니페스트·권한 | PASS | #1~#3 M4, #4·#5 M5 |
+| 014 테스트 격리 | PASS | M3 r1~r4·격리 실행 |
+| 015 기존 goose 회귀 | PASS | M3·M4 회귀(`256 passed`) |
+| 016 라이브 관측 | PASS (1회차) | M5 판정표 #1~#5 |
+
+- gaps: G-M2-1/G-M3-1/G-M5-4(ruff 미설치), G-M3-2(끄기 색인 쓰기 실패 분기 테스트 없음), G-M5-1(실제 열람 범위 기계 검증 불가), G-M5-3(진행 패널 눈 확인), G-M5-5(4be2906 라이브 미반영)
+- 참고: M3 §E.2 기록의 테스트 이름 `test_ac007_same_code_twice_returns_existing_job_without_quota`는 4be2906에서 `test_ac007_same_code_twice_returns_existing_job`으로 바뀌었다(기록은 당시 이름 그대로 둔다).
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
