@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-TEST-HERMETIC-001 v0.1.0 — 백엔드 pytest 스위트 허메틱화, 2026-10-21)
+
+- **프로덕션 DB 없는 환경에서 백엔드 테스트 전체가 통과한다** — 새 git 워크트리에는 gitignored 프로덕션 DB(`Output/stock_data_weekly.db`·`stock_data_daily.db`)가 없어 프론트엔드만 수정한 카드의 커밋도 백엔드 테스트 약 20건 실패로 차단됐다. 원인은 게이트가 아니라 스위트 자체가 비-허메틱인 것이었고, 테스트 계층만 고쳐 워크트리 DB 복사 워크어라운드 없이 pre-commit 게이트가 통과하도록 만들었다. 백엔드 프로덕션 코드 변경은 0건이다 (`eb0b6be` 코드 · `19279f9` 증거 문서)
+  - **허메틱 DB 경로 패치 픽스처** (`tests/conftest.py`): autouse `hermetic_db_paths` 픽스처가 `backend.routers` 패키지 전체를 순회해 모든 라우터 모듈이 갖고 있는 `WEEKLY_DB_PATH`·`DAILY_DB_PATH` 모듈 상수(라우터별 복사본 — `backend.deps`만 패치해서는 무효)를 tmp_path 산하 경로로 대체한다. 경로 대체만 수행하고 DB 파일을 만들지 않으므로, DB 내용이 필요한 테스트는 기존 `daily_db`/`weekly_db` 픽스처를 그대로 명시 요청한다. 모듈이 추가돼도 순회로 자동 포함된다
+  - **기존 픽스처 패치 갭 2곳 수선** (`tests/test_market_api.py`, `tests/test_response_contract.py`): `test_client` 픽스처의 `DAILY_DB_PATH` 미패치(market/stage daily 조회 12건+1건 실패 원인)와 `client` 픽스처의 `stage.DAILY_DB_PATH` 미패치(4건 실패 원인)를 메웠다
+  - **M1 RED 실측 4건 진단·해소** (`tests/test_m6_gap_closure.py`): `stock_meta` 부재 시 `config` 파생 `DEFAULT_DB_DAILY` 폴백 경로를 패치. 정적 분석으로 미설명이던 실패는 관측된 트레이스백으로 원인을 확정한 뒤에만 수정했다(관측된 RED 없는 결함 주장 금지 원칙). `test_ac_sag_045_r1_r4_r5a.py` 1건은 DB-less 실측에서 재현되지 않았다
+  - **검증 테스트 신설** (`tests/test_hermetic_db_patch.py`): 라우터 전 모듈 순회로 패치 커버를 단언하는 테스트와 config 파생 상수 커버 테스트. 되돌림 RED 실측(autouse 비활성화 → 2 failed, 종료 코드 1 → 복원 후 2 passed)으로 각 테스트가 패치 누락을 실제로 잡는지 확인했다
+  - **게이트 실측 (AC-007/008)**: `moai gate` 실측 결과 이 저장소에서는 Python test 단계만 트리거되고 vitest는 실행되지 않음(루트 `package.json`/`tsconfig.json` 부재) — `frontend/vite.config.ts`는 변경 없음(no-op 분기)
+- **검증**: AC-001~AC-010 10개 모두 PASS. DB-less 워크트리 전체 스위트 `1089 passed, 1 skipped, 95 deselected, 1 xpassed`, 종료 코드 0(`0 failed`); 수정 전 동일 환경 RED `20 failed`(M1 실측). 정상 환경 기준선 대비 신규 실패 0·신규 skip 0. 워크트리 실행 후 `Output/`의 `.db` 생성 0건. ff-merge 후 주 체크아웃(실 DB 존재)에서 동일 스위트 재실행도 `1089 passed, 1 skipped, 95 deselected, 1 xpassed`, 종료 코드 0으로 회귀 없음 확인. 되돌림 대조(프로젝트 교훈 #9)로 핵심 AC의 되돌림 RED를 관측했다
+  - **근거**: `.moai/specs/SPEC-TEST-HERMETIC-001/progress.md` §E.2~§E.4 · `evidence/`(m0-baseline, m1-red-observations, m3-unexplained-diagnosis, m4-gate-measurement) · `.moai/state/verify/develop-hermetic/` · `.moai/state/verify/41724e22-orch/post-merge-main-suite.log`
+- **알려진 한계**: conftest autouse 순회는 테스트 중 최초 임포트 시점의 모듈만 볼 수 있어, 스위트 어디서도 임포트되지 않는 신규 라우터는 미패치로 노출될 수 있다(현 스위트는 `backend.main` 경유 전수 임포트라 영향 없음 — 최종 전체 GREEN이 실측 보장). `moai gate`는 성공 시 무출력 설계라 단계 이름 목록은 설정 선언+시간 실측으로 구성했다
+
 ### Added (SPEC-AI-REPORT-005 v0.3.1 — Goose DART 원문 사전 수집, 2026-10-21)
 
 - **goose 실행 전에 서버가 DART 정기보고서 원문을 받아 둔다** — goose의 WebFetch로는 DART 공시 원문(목록 POST 조회, 자바스크립트로 그리는 목차)을 읽지 못해 리포트가 DART 미확보 결함을 안고 초안으로 끝났다. 이제 작업 서비스의 백그라운드 태스크가 goose 실행기를 부르기 직전에 수집기를 불러 `runs/<job_id>/dart/`에 원본 HTML·텍스트판·`index.json`을 쓴다 (`d72a1e1` 픽스처 · `06fb05f` 수집 모듈 · `93b5ed5` 작업 서비스 연결 · `91b904e` 하네스 지침 · `c1076ec` 라이브 증거)

@@ -128,7 +128,22 @@ m1_to_mN_commit_strategy: combined-code-commit(M1-M3) + evidence-docs-commit —
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase — manager-docs가 작성, sync_commit_sha 필드 포함>_
+```yaml
+sync_complete_at: 2026-10-21
+sync_commit_sha: pending-backfill-sync-commit
+sync_status: complete
+b12_self_test_a: 0 (CHANGELOG grep 'SPEC-TEST-HERMETIC-001' 사전 점검 — 중복 항목 없음 확인 후 기입)
+b12_self_test_b: 10/10 (acceptance.md 고유 AC-ID 수와 CHANGELOG 인용 AC 수 일치 — AC-001~AC-010)
+b12_self_test_c: pass (CHANGELOG에 명명한 파일 5종 모두 ls 실측 존재: tests/conftest.py, tests/test_market_api.py, tests/test_response_contract.py, tests/test_m6_gap_closure.py, tests/test_hermetic_db_patch.py)
+changelog_entry_position: [Unreleased] 섹션 선두 (기존 SPEC-AI-REPORT-005 항목보다 앞)
+frontmatter_status_transitions:
+  in_progress_to_implemented: sync 커밋에서 수행 (merged close)
+  implemented_to_completed: sync 커밋에서 수행 (merged close — 별도 Mx 커밋 없음)
+canary_compliance_check:
+  mx_tag_validation: sync 서브스텝으로 수행 — 테스트 전용 변경으로 신규 export 함수 없음, run-phase에서 MX 태그 결론 없음(변경 5파일 모두 테스트 파일)
+  close_subject_full_id: docs(SPEC-TEST-HERMETIC-001): sync-phase 문서 동기화 및 3-phase close
+readme_sync: no-op (테스트 인프라 변경 — 사용자 대상 기능·설치·사용법 불변)
+```
 
 ## §F Phase 4 Mode Selection
 

@@ -2,7 +2,7 @@
 id: SPEC-TEST-HERMETIC-001
 title: "백엔드 pytest 스위트 허메틱화 — Output DB 부재 환경에서 pre-commit 게이트 통과"
 version: "0.1.0"
-status: in-progress
+status: completed
 created: 2026-10-21
 updated: 2026-10-21
 author: manager-spec
