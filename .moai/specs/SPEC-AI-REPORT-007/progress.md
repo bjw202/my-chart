@@ -152,6 +152,39 @@ P1~P5·P7·P8은 2026-10-21 HEAD `c8e5c20`에서, P9a·P9b·P10~P12·P15는 같�
 - ruff 미설치로 린트 게이트 미관측.
 - 실제 태그가 든 `body`, 그룹당 기사 2건, 실제 상장 종목 0건은 여전히 합성으로만 검사(spec G4).
 
+### M3 — 작업 서비스 연결 (2026-10-21, 카드 t19)
+
+변경: `goose_job_service.py` — 생성자 인자 `naver_prefetcher`·`code_check`(기본값 둘 다 `None`), `_run`에서 DART 수집 뒤·무결성 재검사 앞에 `_prefetch_naver`, 재검사 조건을 "수집기가 하나라도 주입"으로(T7), 끄기 스위치 `AI_REPORT_GOOSE_NAVER_PREFETCH`, 진행 이벤트 없음, `_code_validated`(확인 함수를 `asyncio.to_thread`로 호출, 없거나 예외면 `False`), 운영 인스턴스에 `NaverPrefetcher()`와 `_server_code_check`(지연 가져오기한 `ai_report_service.get_stock_name(code) is not None`).
+
+- RED(연결 전): `PY -m pytest backend/tests/test_goose_job_service.py -q -k air7` → `21 failed, 1 passed, 49 deselected in 0.45s`. 원인 분포: `AttributeError: module 'backend.services.goose_job_service' has no attribute 'goose_naver_prefetch'` 13 · `TypeError: GooseJobService.__init__() got an unexpected keyword argument 'naver_prefetcher'` 6 · `'GooseJobService' object has no attribute '_naver_prefetcher'` 1 · `... '_code_check'` 1 (통과 1건은 수집기 없는 구성 (c))
+- GREEN: `PY -m pytest backend/tests/test_goose_job_service.py backend/tests/test_goose_naver_prefetch.py -q` → `112 passed, 1 warning in 2.19s` (`$S/m3_tests.txt`; job_service 71 = 기존 49 + 새 22)
+- AC-015 (f) 운영 확인 함수: `test_air7_015_production_code_check_uses_server_stock_list`가 `"020150"` → `True`, `"999999"` → `False`로 통과(네트워크 가드 종료 단언 통과 = 연결 시도 0)
+
+#### 되돌림 관측
+
+복원 확인: `shasum -a 256 backend/services/goose_job_service.py backend/services/goose_naver_prefetch.py` → `84cfe0a437e5bf5b2c3f0803beb1016d8d0a3fbed5487c148b77d23000dc1d96` / `36ed1628f0aac7a60ef4f4a36b97892ab75cb3eb34d74a1b8404fb854cccaada`(변형 전과 같음), 이어서 112 passed. 명령은 `PY -m pytest backend/tests/test_goose_job_service.py [backend/tests/test_goose_naver_prefetch.py] -q -k <선택>`.
+
+| # | AC | 변형 | `-k` | RED 원문 (발췌) |
+|---|---|---|---|---|
+| M3-R1 | 001 | 네이버 수집 호출을 실행기 호출 뒤로 | `air7_001` | (a) `E       AssertionError: assert ['integrity',...ner', 'naver'] == ['integrity',...ty', 'runner']` · `At index 2 diff: 'integrity' != 'naver'`; (b) `At index 1 diff: 'integrity' != 'naver'` |
+| M3-R2 | 001 | 재검사 조건을 DART 주입일 때만 | `air7_001` | (b) `E       AssertionError: assert ['integrity',...er', 'runner'] == ['integrity',...ty', 'runner']` · `At index 2 diff: 'runner' != 'integrity'`; 네이버만 주입 + 2차 무결성 실패 `E       AssertionError: assert ('done', None) == ('error', 'integrity')` |
+| M3-R3 | 002 (1) | 작업 서비스 네이버 예외 처리를 `except BaseException` | `air7_002` | `E           AssertionError: cancel` · `assert ('done', None) == ('cancelled', None)` (가짜·실제 수집기 두 경우 모두 — 작업이 실행기까지 가서 done) |
+| M3-R4 | 002 (2) | 수집기 `_collect`의 `except Exception` → `except BaseException`(CancelledError를 failed로 기록하고 정상 반환) | `air7_002` (두 파일) | 작업 서비스 경로 `E           AssertionError: cancel` · `assert ('done', None) == ('cancelled', None)`; 수집기 직접 `E       Failed: DID NOT RAISE <class 'asyncio.exceptions.CancelledError'>` · `2 failed, 1 passed` (가짜 수집기 경우는 수집기 코드를 거치지 않아 GREEN) |
+| M3-R5 | 003 | 스위치 검사 줄을 `if False:` | `air7_003 or air7_015_disabled` | `E       AssertionError: assert ['https://m.s...ze=10&page=1'] == []` · `Left contains one more item: 'https://m.stock.naver.com/api/news/stock/020150?pageSize=10&page=1'`; `E       AssertionError: assert 'no_results' == 'disabled'` |
+| M3-R6 | 004 | 네이버 수집 전에 `progress`/`naver_prefetch` 이벤트 | `air7_004` | `E       AssertionError: assert ['dart_prefet...'goose_start'] == ['dart_prefet...'goose_start']` · `At index 1 diff: 'naver_prefetch' != 'goose_start'` |
+| M3-R7 | 008 | 작업 서비스 네이버 `except Exception` → `except ZeroDivisionError` | `air7_008` | `E       assert 0 == 1` · `where [] = <...FakeRunner ...>.calls` · `FAILED ...::test_air7_008_naver_prefetcher_exception_does_not_stop_goose` · `1 failed, 6 passed` (실제 수집기 6개 변형은 수집기 자체 fail-open이 막아 GREEN — acceptance AC-008 되돌림 설명과 같음) |
+| M3-R8 | 013 | 생성자 기본값을 실제 `NaverPrefetcher()`로 | `air5_001_default or test_done_result_emits_done` | `ERROR at teardown of test_done_result_emits_done_and_clears_active` · `E       AssertionError: network attempt in goose test: [(b'm.stock.naver.com', 443)]` · `ERROR at teardown of test_air5_001_default_constructor_has_no_prefetch` (가드가 원래 함수를 부르지 않음 — 실제 연결 없음) |
+| M3-R9 | 015 | 확인 결과 대신 `code_validated=True` | `air7_015` | (b)·(c)·(d) 각각 `E       assert True is False` |
+| M3-R10 | 015 | 확인이 거짓이면 수집 건너뜀 | `air7_015` | (b)·(c)·(d) `E       FileNotFoundError: [Errno 2] No such file or directory: '.../runs/<job_id>/naver/index.json'` (수집기 호출 0 → 색인 없음) |
+| M3-R11 | 015 | 확인 함수 예외를 그대로 올림 | `air7_015` | (d) `E       FileNotFoundError: ... naver/index.json` · `1 failed, 5 passed` (색인이 없다 = 수집기가 불리지 않았다. 작업 상태는 이 실패 줄보다 뒤의 단언이라 관측하지 않았다) |
+| M3-R12 | 015 (f)·013 | 운영 인스턴스에 `code_check` 없음 | `air7_015_production or air7_013` | `E        +  where False = callable(None)` · `E           TypeError: 'NoneType' object is not callable` |
+
+#### M3 Gap
+
+- AC-002의 "서버 종료(lifespan) 중 실제 프로세스" 경로는 `svc.shutdown()` 호출로만 검사했다(실제 uvicorn 종료 미관측 — 기존 `test_main_goose_lifespan.py` 회귀로 대신).
+- `_server_code_check`의 실제 운영 서버 호출(라우터 경유)은 관측하지 않았다 — 테스트 프로세스 안에서 같은 함수를 직접 불렀다.
+- spec.md·plan.md·acceptance.md 프런트매터 `status`는 `draft` 그대로다. 에이전트 계약상 첫 run 커밋에서 `in-progress`로 바꾸는 전환이 있으나, 리드 지시("spec.md/plan.md/acceptance.md를 수정하지 말 것")가 우선이라 손대지 않았다 — 리드가 정할 사항.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
