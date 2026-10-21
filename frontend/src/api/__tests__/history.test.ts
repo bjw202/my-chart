@@ -37,4 +37,22 @@ describe('fetchSectorHistory — 표와 같은 기준 전송', () => {
     await fetchSectorHistory(8)
     expect(lastRequest().params).toStrictEqual({ weeks: 8 })
   })
+
+  it('잠정점 필드(provisional_date·history[].provisional)를 가공 없이 돌려준다', async () => {
+    const body = {
+      weeks: 1,
+      provisional_date: '2026-10-21',
+      sectors: [{
+        name: '반도체',
+        history: [
+          { date: '2026-10-16', rank: 2, composite_score: 0, sector_return_1w: 0, sector_excess_return_1w: 0, rs_avg: 0, provisional: false },
+          { date: '2026-10-21', rank: 1, composite_score: 0, sector_return_1w: 0, sector_excess_return_1w: 0, rs_avg: 0, provisional: true },
+        ],
+      }],
+    }
+    mockGet.mockResolvedValue({ data: body } as never)
+    const res = await fetchSectorHistory(1, { period: '1m' })
+    expect(res.provisional_date).toBe('2026-10-21')
+    expect(res.sectors[0].history.map(w => w.provisional)).toEqual([false, true])
+  })
 })

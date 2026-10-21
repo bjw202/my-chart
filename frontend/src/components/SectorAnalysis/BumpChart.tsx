@@ -115,27 +115,27 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
   // 전체 섹터 수 (Y축 max 계산용)
   const totalSectors = sectors.length
 
+  // @MX:NOTE: [AUTO] 잠정점(2026-10-22) — 서버가 진행 중인 주의 순위를 history 끝에 `provisional: true`
+  //   점으로 한 개 덧붙인다(표의 as_of_date 와 같은 날짜). 원본 sectors 에서 도출하므로 latestDate 가
+  //   곧 잠정점 날짜가 되어 Top-N 필터·endLabel 이 잠정점 순위를 따른다(사용자 결정).
+  const provisionalDate = useMemo((): string | null => (
+    sectors.flatMap(s => s.history).find(w => w.provisional)?.date ?? null
+  ), [sectors])
+
   // ECharts 시리즈 데이터 구성
   const seriesData = useMemo(() => {
-    return filteredSectors.map((sector, idx) => {
+    return filteredSectors.flatMap((sector, idx) => {
+      const color = SECTOR_COLORS[idx % SECTOR_COLORS.length]
+      const doneWeeks = sector.history.filter(w => !w.provisional)
+      const provisionalWeek = sector.history.find(w => w.provisional)
       // 날짜 키 기반 매핑: dates 축의 각 날짜에 해당 섹터 순위를 매핑한다.
       // 해당 날짜 데이터가 없으면 null → ECharts가 선을 끊어 표시 (잘못된 인덱스
       // 매핑으로 인해 마지막 날 섹터가 누락되던 버그의 근본 방어).
-      const rankByDate = new Map(sector.history.map(w => [w.date, w.rank]))
-      return {
+      const rankByDate = new Map(doneWeeks.map(w => [w.date, w.rank]))
+      // 실선·점선 공통 — 이름이 같아야 클릭(onSectorClick)·툴팁이 섹터 단위로 동작한다.
+      const common = {
         name: sector.name,
         type: 'line' as const,
-        data: dates.map(d => {
-          const rank = rankByDate.get(d)
-          return rank === undefined ? null : rank
-        }),
-        // 마지막 순위값 endLabel로 섹터명 표시
-        endLabel: {
-          show: true,
-          formatter: '{a}',
-          color: '#e5e7eb',
-          fontSize: 11,
-        },
         // 호버 시 해당 시리즈 강조, 나머지 흐리게
         emphasis: {
           focus: 'series',
@@ -146,18 +146,40 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
           lineStyle: { opacity: 0.15 },
           itemStyle: { opacity: 0.15 },
         },
-        lineStyle: {
-          width: 2,
-          color: SECTOR_COLORS[idx % SECTOR_COLORS.length],
-        },
-        itemStyle: {
-          color: SECTOR_COLORS[idx % SECTOR_COLORS.length],
-        },
+        itemStyle: { color },
         smooth: false,
-        symbol: 'circle',
-        symbolSize: 6,
         connectNulls: false,  // 누락 날짜는 선을 끊어 정확한 시각화 보장
       }
+      // 마지막 순위값 endLabel로 섹터명 표시 — 잠정점이 있으면 점선 끝(잠정점)에 붙인다.
+      const endLabel = (show: boolean) => ({ show, formatter: '{a}', color: '#e5e7eb', fontSize: 11 })
+      const solid = {
+        ...common,
+        data: dates.map(d => {
+          const rank = rankByDate.get(d)
+          return rank === undefined ? null : rank
+        }),
+        endLabel: endLabel(!provisionalWeek),
+        lineStyle: { width: 2, color },
+        symbol: 'circle',
+        symbolSize: 6,
+      }
+      if (!provisionalWeek) return [solid]
+
+      // 잠정 구간: 마지막 끝난 점(기호 없음 — 실선이 이미 그림) → 잠정점(속 빈 기호)을 점선으로 잇는다.
+      const lastDone = doneWeeks[doneWeeks.length - 1]
+      const dashed = {
+        ...common,
+        data: dates.map(d => {
+          if (d === provisionalWeek.date) {
+            return { value: provisionalWeek.rank, symbol: 'emptyCircle', symbolSize: 8 }
+          }
+          if (lastDone && d === lastDone.date) return { value: lastDone.rank, symbol: 'none' }
+          return null
+        }),
+        endLabel: endLabel(true),
+        lineStyle: { width: 2, color, type: 'dashed' },
+      }
+      return [solid, dashed]
     })
   }, [filteredSectors, dates])
 
@@ -179,6 +201,7 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
         fontSize: 11,
         // 날짜가 많을 경우 일부만 표시
         interval: Math.max(0, Math.floor(dates.length / 6) - 1),
+        formatter: (value: string) => (value === provisionalDate ? `${value} (잠정)` : value),
       },
       axisLine: { lineStyle: { color: '#2d2d44' } },
       splitLine: {
@@ -230,11 +253,12 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
           `날짜: ${weekDate}`,
           `순위: ${rank}위`,
           basisLine,
+          ...(weekData?.provisional ? ['잠정 — 주 진행 중'] : []),
         ].join('<br/>')
       },
     },
     series: seriesData,
-  }), [dates, seriesData, sectors, totalSectors, period])
+  }), [dates, seriesData, sectors, totalSectors, period, provisionalDate])
 
   // 섹터 클릭 이벤트 핸들러 (라인 클릭 → Table 탭 이동)
   const handleChartClick = useCallback(
@@ -247,9 +271,26 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
     [onSectorClick],
   )
 
+  // 잠정점이 있는 섹터는 실선·점선 두 시리즈(같은 이름)라 한쪽을 호버하면 내장 강조가 다른 쪽을 흐린다.
+  // 이름으로 highlight/downplay 를 다시 보내 두 조각을 함께 강조한다. ECharts 는 사용자 mouseover
+  // 핸들러를 내장 강조 처리보다 먼저 부르므로(그 뒤 내장 blur 가 형제 시리즈를 다시 흐림) 마이크로태스크로 미룬다.
+  const linkSeriesHover = useCallback(
+    (type: 'highlight' | 'downplay') =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (params: any, chart: any) => {
+        if (!provisionalDate || params?.componentType !== 'series' || !params.seriesName) return
+        queueMicrotask(() => {
+          if (chart && !chart.isDisposed?.()) chart.dispatchAction({ type, seriesName: params.seriesName })
+        })
+      },
+    [provisionalDate],
+  )
+
   const onEvents = useMemo(() => ({
     click: handleChartClick,
-  }), [handleChartClick])
+    mouseover: linkSeriesHover('highlight'),
+    mouseout: linkSeriesHover('downplay'),
+  }), [handleChartClick, linkSeriesHover])
 
   return (
     <div className="bump-chart-container">
@@ -285,9 +326,11 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
 
       {period && (
         <div className="bump-span-caption" data-testid="bump-basis-caption">
-          {/* 표는 진행 중인 주까지, Bump 마지막 점은 끝난 주까지라 '동일'이 아니라 '같은 기준'이다 */}
+          {/* 마지막 점이 잠정점이면 표와 같은 날짜(진행 중인 주), 아니면 끝난 주 — 어느 쪽이든 '같은 기준'이다 */}
           {`순위 기준: ${PERIOD_LABELS[period] ?? period} 초과수익률 · ${MARKET_LABELS[market ?? 'all'] ?? market}`
-            + (latestDate ? ` (표와 같은 기준 · 마지막 점 ${latestDate}, 끝난 주)` : ' (표와 같은 기준)')}
+            + (latestDate
+              ? ` (표와 같은 기준 · 마지막 점 ${latestDate}${latestDate === provisionalDate ? ' 잠정(주 진행 중)' : ', 끝난 주'})`
+              : ' (표와 같은 기준)')}
         </div>
       )}
 

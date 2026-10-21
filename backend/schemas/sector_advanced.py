@@ -131,6 +131,8 @@ class SectorHistoryWeek(BaseModel):
     rs_avg: float
     # 순위 기준 기간(요청 period)의 초과수익률(%). period 미지정(composite 순위)이면 None.
     rank_basis_excess_return: float | None = None
+    # 진행 중인 주(부분 주)의 잠정 순위 점이면 True — 히스토리 끝에만, 최대 한 점(provisional_date).
+    provisional: bool = False
 
 
 class SectorHistoryItem(BaseModel):
@@ -153,6 +155,9 @@ class SectorHistoryResponse(EnvelopeMixin):
     rankings: dict[str, dict[str, int | None]] = {}
     # 순위 기준 echo — "1w"/"1m"/"3m"(표의 기간 탭과 같은 기준) 또는 None(composite).
     period: str | None = None
+    # 잠정점 날짜 — 최신 격자 바가 부분 주일 때 그 날짜(표의 as_of_date 와 같다), 아니면 None.
+    # 이 날짜는 sectors[].history 끝에만 실리고 dates[]/rankings/span_days 에는 없다(끝난 주 계약).
+    provisional_date: str | None = None
 
 
 # ---------------------------------------------------------------------------

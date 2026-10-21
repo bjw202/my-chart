@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Bump 마지막 점을 진행 중인 주의 잠정 순위로 — 2026-10-22)
+
+- **Bump 차트가 진행 중인 주의 순위를 잠정점으로 그려, 마지막 순위가 표와 같아진다** — 표(`/api/sectors/ranking`)는 진행 중인 주 바(예: 2026-10-21, `as_of_is_partial_week=true`)로 순위를 매기는데, Bump(`/api/sectors/history`)는 끝난 주(2026-10-16)까지만 그려 마지막 순위가 표와 한 주 어긋났다. 이제 최신 주가 진행 중이면 그 날짜의 순위를 Bump가 쓰는 것과 같은 집계 호출(`compute_sector_aggregates`, 같은 기간·시장, 등가중 대체 포함)로 한 번 더 계산해 마지막 점으로 덧붙인다. 최신 주가 끝났으면 잠정점은 없다 (SPEC 없음 — 사용자 결정)
+  - **백엔드** (`my_chart/analysis/sector_metrics.py`, `backend/services/sector_advanced_service.py`, `backend/schemas/sector_advanced.py`): `compute_sector_history_with_provisional`을 새로 두고 `compute_sector_history`는 그 앞 두 값(`(dates, rankings)`)을 돌려주는 얇은 함수로 남겼다. 응답에 `provisional_date`(없으면 `null`)와 `sectors[].history[].provisional`(기본 `false`)을 더했다. 잠정 날짜는 `sectors[].history` 끝에만 들어가고 `dates[]`·`rankings`·`span_days`에는 넣지 않는다 — `len(dates) == weeks`(AC-SAG-040)와 "최근 N개 끝난 주"라는 기존 의미를 지키려는 선택이다. 테스트에서 기준일을 고정할 수 있도록 히스토리 함수에 `as_of` 인자를 더했다(라우터는 넘기지 않아 오늘 기준)
+  - **화면** (`frontend/src/api/history.ts`, `frontend/src/components/SectorAnalysis/BumpChart.tsx`): 마지막 끝난 점 → 잠정점 구간은 점선, 잠정점은 속 빈 기호로 그린다. x축 라벨은 `2026-10-21 (잠정)`, 툴팁에 `잠정 — 주 진행 중` 줄을 더하고, 기준 캡션은 `마지막 점 2026-10-21 잠정(주 진행 중)`으로 바뀐다. Top-N 필터와 섹터명 끝 라벨은 잠정점 순위를 따른다. 점선 구간은 같은 섹터 이름의 별도 시리즈라 클릭하면 표로 이동하고, 호버 시 실선·점선 두 조각을 함께 강조하도록 이름으로 강조 동작을 다시 보낸다
+  - **테스트**: `tests/test_sector_history_provisional.py`(부분 주 픽스처 — 잠정점 순위가 같은 기준일·기간·시장의 표 `data[].rank`와 전 섹터 일치, 끝난 주 계약 유지, 주가 끝나면 잠정점 없음), `frontend/src/components/SectorAnalysis/__tests__/BumpChart.provisional.test.tsx`, `frontend/src/api/__tests__/history.test.ts` 보강
+  - **라이브 대조 (2026-10-22, `period=1m`, `weeks=12`)**: 라이브 서버 표(as_of 2026-10-21, 부분 주)와 잠정점 순위가 `market=all` 29/29, `market=kosdaq` 29/29 일치. `dates[]`는 12개(마지막 2026-10-16), `span_days` 77 그대로
+
 ### Added (SPEC-AI-REPORT-006 v0.3.4 — Goose 후처리 감수: 서버 화면 캡처와 별도 감수 세션, 카드 t18, 2026-10-21)
 
 - **goose가 만든 초안을 서버가 화면으로 찍고, 별도 `claude -p` 감수 세션이 그 화면을 보고 감수 기록을 쓴다** — 전달 감사기는 감수 기록(`review`)이 없으면 `AUDIT_*`·`REVIEW_*` 결함을 내는데, goose는 브라우저가 없어 화면을 볼 수 없고 감수 기록의 해시도 스스로 만들 수 없어 라이브 실행마다 초안(`draft`)에서 멈췄다. 이제 1차 세션이 끝나면 작업 서비스가 하네스 무결성 재검사 → 서버 화면 캡처 → 감수 세션 → 서버가 쓰는 영수증 순으로 이어서 실행하고, 영수증이 화면 확인을 인정할 때만 최종본(`final`)으로 전달한다. 후처리가 실패해도 초안은 그대로 전달된다 (`d8854c1` 캡처 모듈 · `83b327f` 감수 세션·영수증 · `86e4301` 작업 서비스·프론트 · `33e3c18` 하네스 규칙 10 · `bc56cc7` 보안 강화)

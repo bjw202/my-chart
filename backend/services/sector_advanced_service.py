@@ -289,6 +289,7 @@ def get_sector_history(
     weekly_db_path: str, weeks: int = 12,
     daily_db_path: str | None = None, market: str = "all",
     period: str | None = None,
+    as_of: str | None = None,
 ) -> SectorHistoryResponse:
     """N주 섹터 랭킹 히스토리 API 응답을 반환한다.
 
@@ -304,22 +305,23 @@ def get_sector_history(
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
         period: ``"1w"``/``"1m"``/``"3m"`` 면 표의 같은 기간 탭과 같은 순위 기준.
             ``None`` 이면 composite 순위(종전 동작).
+        as_of: 진행 중인 주 판정 기준일. ``None`` 이면 오늘(라우터 기본) — 테스트 고정용.
 
     Returns:
         SectorHistoryResponse — ``dates[]`` / ``span_days`` / ``rankings[date][sector]``
         (spec.md §12.3, AC-SAG-040)를 함께 실은 확장 스키마.
     """
-    from my_chart.analysis.sector_metrics import compute_sector_history
+    from my_chart.analysis.sector_metrics import compute_sector_history_with_provisional
 
     # AC-SAG-037(SN-3) — 공통 봉투 as_of_date 는 dates[-1](진행 중인 주 제외 가능성이
     # 있는 history SSOT)이 아니라, 다른 6개 엔드포인트와 동일한 공유 헬퍼를 직접
     # 호출해 정규 대표 바로 고정한다.
-    as_of_date = _get_latest_valid_date(weekly_db_path)
+    as_of_date = _get_latest_valid_date(weekly_db_path, as_of)
 
-    # SSOT: 부분 데이터 날짜가 제외된 (dates, rankings) 튜플
-    dates, history_by_week = compute_sector_history(
+    # SSOT: 부분 데이터 날짜가 제외된 (dates, rankings) 튜플 + 진행 중인 주 잠정 순위
+    dates, history_by_week, provisional = compute_sector_history_with_provisional(
         weekly_db_path, weeks=weeks, daily_db_path=daily_db_path, market=market,
-        period=period)
+        period=period, as_of=as_of)
 
     if not history_by_week:
         return SectorHistoryResponse(
@@ -338,11 +340,21 @@ def get_sector_history(
     rankings: dict[str, dict[str, int | None]] = {}
 
     # dates와 history_by_week는 같은 길이·같은 순서 (SSOT 보장)
-    for date, week_rankings in zip(dates, history_by_week):
-        rankings[date] = {name: None for name in all_sector_names}
+    # @MX:NOTE: [AUTO] 잠정점은 sectors[].history 끝에만 `provisional=True` 로 붙인다. dates[]·
+    #   rankings·span_days 는 끝난 주만 — AC-SAG-040(len(dates)==weeks, rankings 키 == dates)과
+    #   기존 소비자가 읽는 "최근 N 개 끝난 주" 의미를 바꾸지 않으려는 선택(2026-10-22).
+    weeks_to_emit: list[tuple[str, list, bool]] = [
+        (date, week_rankings, False) for date, week_rankings in zip(dates, history_by_week)]
+    if provisional is not None:
+        weeks_to_emit.append((provisional[0], provisional[1], True))
+
+    for date, week_rankings, is_provisional in weeks_to_emit:
+        if not is_provisional:
+            rankings[date] = {name: None for name in all_sector_names}
         for rank_item in week_rankings:
             name = rank_item.name
-            rankings[date][name] = rank_item.rank
+            if not is_provisional:
+                rankings[date][name] = rank_item.rank
             if name not in sector_history:
                 sector_history[name] = []
             # rank_item 은 표와 같은 경로의 SectorAggregate(순위 대상만)다. 순위가 매겨진
@@ -358,6 +370,7 @@ def get_sector_history(
                 rs_avg=rank_item.rs_avg.value or 0.0,
                 rank_basis_excess_return=(
                     rank_item.excess_returns[period].value if period else None),
+                provisional=is_provisional,
             ))
 
     sector_items = [
@@ -376,7 +389,8 @@ def get_sector_history(
     return SectorHistoryResponse(
         weeks=weeks, sectors=sector_items, dates=dates, span_days=span_days,
         rankings=rankings, market_filter=(market or "all").lower(),
-        as_of_date=as_of_date, period=period)
+        as_of_date=as_of_date, period=period,
+        provisional_date=provisional[0] if provisional is not None else None)
 
 
 # ---------------------------------------------------------------------------

@@ -11,6 +11,8 @@ export interface SectorHistoryWeek {
   rs_avg: number
   // 순위 기준 기간(요청 period)의 초과수익률(%). period 미지정(composite 순위)이면 null.
   rank_basis_excess_return?: number | null
+  // 진행 중인 주(부분 주)의 잠정 순위 점이면 true — history 끝에만 최대 한 점. 표의 as_of_date 와 같은 날짜.
+  provisional?: boolean
 }
 
 // 섹터별 히스토리 아이템
@@ -27,6 +29,8 @@ export interface SectorHistoryResponse {
   sectors: SectorHistoryItem[]
   // 순위 기준 echo — '1w'/'1m'/'3m'(표의 기간 탭과 같은 기준) 또는 null(composite).
   period?: string | null
+  // 잠정점 날짜(없으면 null). sectors[].history 끝에만 실리고 서버 dates[]/span_days 에는 들어가지 않는다.
+  provisional_date?: string | null
 }
 
 // 순위 기준 — 표(/sectors/ranking)의 기간·시장 토글과 같은 값을 넘기면 Bump 가 표와 같은 순위를 그린다.

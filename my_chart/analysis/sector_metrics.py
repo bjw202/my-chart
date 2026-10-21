@@ -945,8 +945,28 @@ def compute_sector_history(
     daily_db_path: str | None = None,
     market: str = "all",
     period: str | None = None,
+    as_of: str | None = None,
 ) -> tuple[list[str], list[list[SectorAggregate]]]:
-    """최근 N주 섹터 랭킹 히스토리를 계산한다.
+    """최근 N주 섹터 랭킹 히스토리를 계산한다(끝난 주만 — 잠정점 없음).
+
+    :func:`compute_sector_history_with_provisional` 의 앞 두 값이다. 인자·반환 계약은 같다.
+    """
+    dates, rankings, _provisional = compute_sector_history_with_provisional(
+        db_path, weeks=weeks, daily_db_path=daily_db_path, market=market,
+        period=period, as_of=as_of)
+    return dates, rankings
+
+
+def compute_sector_history_with_provisional(
+    db_path: str,
+    weeks: int = 12,
+    daily_db_path: str | None = None,
+    market: str = "all",
+    period: str | None = None,
+    as_of: str | None = None,
+) -> tuple[list[str], list[list[SectorAggregate]],
+           tuple[str, list[SectorAggregate]] | None]:
+    """최근 N주 섹터 랭킹 히스토리 + 진행 중인 주의 잠정 순위를 계산한다.
 
     날짜는 정규 주간 격자(SPEC-SECTOR-GRID-001 REQ-SGR-001 ``compute_weekly_grid``)의
     ``history`` 에서 파생한다 — CG-1(ISO 주당 1바)·CG-3(부분 데이터 행 수 배제) 가 이미
@@ -961,20 +981,24 @@ def compute_sector_history(
         market: ``all`` / ``kospi`` / ``kosdaq`` — M6 신설(AC-SAG-039).
         period: ``None`` 이면 composite 순위(종전 동작). ``"1w"``/``"1m"``/``"3m"`` 면 표의
             같은 기간 탭과 같은 기준(그 기간 초과수익률 단독, AC-SAG-021)으로 순위를 매긴다.
+        as_of: 진행 중인 주 판정 기준일(``compute_weekly_grid`` 와 같다). ``None`` 이면 오늘 —
+            표 엔드포인트의 라이브 기본값과 같다. 테스트는 명시 인자로 고정한다(§8.4 규약 8).
 
     Returns:
-        (dates, rankings) 튜플. dates는 정규 격자 history 의 최근 weeks 개(오름차순),
+        (dates, rankings, provisional) 튜플. provisional 은 최신 격자 바가 부분 주일 때
+        ``(그 날짜, 순위 리스트)``, 아니면 ``None`` (아래 @MX:NOTE).
+        dates·rankings: dates는 정규 격자 history 의 최근 weeks 개(오름차순),
         rankings는 각 날짜에서 **순위가 매겨진** 섹터의 :class:`SectorAggregate` 리스트
         (rank 오름차순). AG-5 는 적용하지 않고 AG-4/AG-7 섹터는 등가중으로 대체한다
         (AC-SUX-019, 아래 @MX:NOTE). 그래도 순위가 없는 섹터(``rank is None``)는 그 날짜에서 빠진다.
         둘은 같은 길이·같은 순서.
     """
-    grid = compute_weekly_grid(db_path)
+    grid = compute_weekly_grid(db_path, as_of)
     all_history = [bar.date for bar in grid.history]
     history_dates = all_history[-weeks:] if weeks > 0 else all_history
 
     if not history_dates:
-        return [], []
+        return [], [], None
 
     # @MX:NOTE: [AUTO] Bump 순위 원천 = 섹터 표와 같은 `compute_sector_aggregates(period=...)`.
     #   화면은 표의 기간 탭(1W/1M/3M)을 그대로 넘겨 표와 같은 기간 단독 순위를 그린다(2026-10-21
@@ -998,13 +1022,26 @@ def compute_sector_history(
         grid=grid,
         universe=_valid_universe(db_path, daily_db_path, None, history_dates[-1]),
         registry_mapping=_load_registry_mapping(None))
-    rankings: list[list[SectorAggregate]] = []
-    for date in history_dates:
+    def _ranked_at(date: str) -> list[SectorAggregate]:
         result = compute_sector_aggregates(
             db_path, date, daily_db_path, market=market, as_of=date,
             compute_rank_change=False, period=period, shared=shared,
             apply_min_members=False, equal_weight_fallback=True)
         ranked = [a for a in result.aggregates if a.rank is not None]
         ranked.sort(key=lambda a: a.rank)
-        rankings.append(ranked)
-    return history_dates, rankings
+        return ranked
+
+    rankings = [_ranked_at(date) for date in history_dates]
+
+    # @MX:NOTE: [AUTO] 잠정점(2026-10-22 사용자 결정) — 표(/sectors/ranking)는 격자 `latest`
+    #   (진행 중인 주 바 포함, `_get_latest_valid_date`)로 순위를 매기지만 `history` 는 끝난 주만
+    #   담아 Bump 마지막 점이 표보다 한 주 늦었다. 최신 바가 부분 주면 그 날짜를 같은 호출로 한 번 더
+    #   집계해 잠정 순위로 돌려준다. `as_of=latest.date` 여도 같은 ISO 주의 일요일 이전이라 부분 주
+    #   판정은 그대로이고, 수익률 앵커는 `history`(최신 바 제외)에서만 고르므로 표와 같은 창을 쓴다.
+    #   dates/rankings 에는 넣지 않는다 — 끝난 주 last-N 계약(AC-SAG-040 len(dates)==weeks)을 지킨다.
+    latest = grid.latest
+    provisional = (
+        (latest.date, _ranked_at(latest.date))
+        if latest is not None and latest.is_partial_week and latest.date > history_dates[-1]
+        else None)
+    return history_dates, rankings, provisional
