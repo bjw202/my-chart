@@ -29,3 +29,12 @@ _<pending run-phase — manager-develop가 작성>_
 ## §E.4 Sync-phase Audit-Ready Signal
 
 _<pending sync-phase — manager-docs가 작성, sync_commit_sha 필드 포함>_
+
+## §F Phase 4 Mode Selection
+
+- 날짜: 2026-10-21 · Implementation Kickoff Approval 통과 (구현 승인=승인, 진행 방식=자율 goal 무장)
+- 입력 파라미터: tier=M · 파일 범위 약 5종 · 도메인 1-2개(Python 테스트 + 조건부 frontend 설정) · 코딩 중심 · 병렬 이익 LOW
+- 모드 평가: direct 미선정(비자명 변경) / fanout 미선정(코딩 중심·다중 도메인 조사 아님) / sweep 미선정(대량 기계적 변형 아님) / agent-team 미선정(명시 요청 없음)
+- Decision: serial (단일 manager-develop 위임, M1→M4 순차, L1 격리 워크트리)
+- 근거: 코딩 중심 작업은 Anthropic coding-task parallelism caveat에 따라 serial이 기본이며, M2는 M1 관측에, M3는 M1·M2 결과에 종속되는 순서 고정 단계라 병렬화 이익이 없다.
+- 자율 진행: 완료 조건 goal 무장 — `.moai/state/verify/develop-hermetic/run-complete.md` 존재 + `verdict: PASS` 포함 (에이전트가 DB-less 스위트 exit 0 + 기준선 회귀 0을 자체 검증한 뒤 기록하는 마커)
