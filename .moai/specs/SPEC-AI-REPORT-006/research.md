@@ -1,0 +1,61 @@
+# SPEC-AI-REPORT-006 — 조사 기록
+
+작성: manager-spec, 2026-10-21. 이 SPEC의 모든 코드베이스·환경 사실 주장은 아래 프로브 표에 명령과 관측 결과를 함께 둔다(lessons #10). "관측"은 이번 세션에서 명령을 실행해 본 것, "추론"은 관측에서 끌어낸 것, "미관측"은 확인하지 못한 것으로 §4 Gaps에 모은다. 프로브가 남긴 파일은 `.moai/state/verify/t18-plan/`(git 무시 경로, P20)에 있다.
+
+## 1. 문제의 뿌리
+
+- 감사기 `audit_report.py`는 감수 기록 `review`가 없으면(또는 형식이 틀리면) 결함을 낸다. 관측: 합성 기록 없이 돌리면 10개 코드(감수 관련 9개 + `LATEST_SEARCH_NAVER`)가 나온다(P2-A, P3).
+- 하네스 지침에는 감수 기록을 쓰라는 규칙이 없다. 규칙 7은 오히려 "최종 감사를 통과하지 못하면 초안까지만 만들고 끝낸다"고 한다(P5). 2026-10-21 라이브 실행에서 goose는 감수 없이 초안에서 멈췄고 `assumptions.md`에 "독립 에이전트 검토 아님", "브라우저가 없어 화면 검토는 미완료"라고 적었다(P3 부속 관측).
+- goose가 감수 기록의 해시를 스스로 계산할 방법은 없다: Bash 허용은 렌더·감사 스크립트 두 개뿐이고 PATH도 `/usr/bin:/bin:/usr/sbin:/sbin`뿐이다(P6). 감사기 출력(`delivery-audit.json`)은 `input_sha256`·`preview_sha256`을 담고 있어(P4) 그것을 옮겨 적는 길이 있지만, 이 SPEC은 서버가 `review/context.json`에 값을 미리 적어 두어 옮겨 적기 오류를 없앤다(REQ-AIR6-012).
+- 화면 확인은 goose 쪽에서는 구조적으로 불가능하다(브라우저 도구 없음, 허용 목록 밖). 그래서 "서버가 찍고 별도 세션이 본다"가 된다. 서버가 찍은 이미지를 감수 세션이 `Read`할 수 있다는 점(`Read(./**)` 허용, P6)은 허용 설정으로는 확인됐지만 실제 이미지 열람은 미관측이다(G1).
+
+## 2. 프로브 표
+
+각 행: 주장 | 명령 | 관측 결과. 경로는 작업공간 `/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/t18`(이하 W) 기준이며, 라이브 실행 폴더는 `~/.goose-harness/runs/a5becbb9b1a14483a1055c118d1b0be8`(이하 R)다. `PY`는 서버용 가상환경의 파이썬 `/Users/byunjungwon/Dev/my_chart/.venv/bin/python`(코드 폴더와 다른 경로, 3.13.11)이고, goose 하네스의 `python3`는 시스템 `/usr/bin/python3`(P19)다.
+
+| ID | 주장 | 명령 | 관측 결과 |
+|---|---|---|---|
+| P1 | 감사기는 `review`의 `input_sha256`, `preview_sha256`, `reviewed_at`, `mode`, `checks`(5종), `issues`를 요구한다 | `cat -n W/backend/goose_harness_src/skills/goose/workflows/fact-check/scripts/audit_report.py` (95~105행) | `:95 checks=('source_accuracy','calculations','coverage','opinion','visual')`; `:96` 입력 해시 불일치 → `AUDIT_INPUT_VERSION`; `:97` 미리보기 해시 → `AUDIT_PREVIEW_VERSION`; `:98-99` 시각 → `AUDIT_TIME`(`reviewed_at`이 `cutoff`보다 이르거나 미래면); `:100` `mode`가 `independent_agent`·`separate_review_pass` 밖이면 `AUDIT_MODE`; `:101-103` 각 검사 `status=='pass'`와 비어 있지 않은 `evidence` 없으면 `REVIEW_<NAME>`; `:104-105` `issues`에 `resolved` 아닌 것이 있으면 `UNRESOLVED_ISSUE` |
+| P2 | 형식을 갖춘 감수 기록 하나로 대상 8개가 사라지고 각 필드가 해당 코드를 담당한다 | `/usr/bin/python3 -I W/.moai/state/verify/t18-plan/audit_probe.py` (합성 기록, 증거 폴더 안에서만 사용, 전달 안 됨). 출력: `audit_probe.out` | A 기록 없음: `[AUDIT_INPUT_VERSION, AUDIT_MODE, AUDIT_PREVIEW_VERSION, AUDIT_TIME, LATEST_SEARCH_NAVER, REVIEW_CALCULATIONS, REVIEW_COVERAGE, REVIEW_OPINION, REVIEW_SOURCE_ACCURACY, REVIEW_VISUAL]` / B 전부 pass: `[LATEST_SEARCH_NAVER]` / C visual=revise: `[LATEST_SEARCH_NAVER, REVIEW_VISUAL]` / D 입력 해시 0: `[AUDIT_INPUT_VERSION, LATEST_SEARCH_NAVER]` / E 미리보기 해시 0: `[AUDIT_PREVIEW_VERSION, LATEST_SEARCH_NAVER]` / F mode 틀림: `[AUDIT_MODE, LATEST_SEARCH_NAVER]` / G 미해결 issue: `[LATEST_SEARCH_NAVER, UNRESOLVED_ISSUE]` |
+| P3 | 2026-10-21 라이브 실행의 감사 결과가 P2-A와 같은 10개 코드다 | `/usr/bin/python3 -I -c "import json; d=json.load(open('R/delivery-audit.json')); print(d['decision'], sorted(f['code'] for f in d['findings'])); print(d['review'])"` 및 `find R -maxdepth 2` | `revise ['AUDIT_INPUT_VERSION','AUDIT_MODE','AUDIT_PREVIEW_VERSION','AUDIT_TIME','LATEST_SEARCH_NAVER','REVIEW_CALCULATIONS','REVIEW_COVERAGE','REVIEW_OPINION','REVIEW_SOURCE_ACCURACY','REVIEW_VISUAL']`, `review`는 전부 `None`. R에는 `assumptions.md`, `company-input.json`, `dart/`, `delivery-audit.json`, `draft/`만 있고 `audit-review.json`·`final/`은 없음. P2-A와 같은 집합 |
+| P4 | 감사기 출력의 해시가 파일 해시와 일치한다 | `/usr/bin/python3 -I -c "…sha256 of R/company-input.json, R/draft/report-input.json, R/draft/report.html vs delivery-audit.json…"` | `input_sha256 b83f48e1…374fc` = `company-input.json` = `draft/report-input.json`; `preview_sha256 480b6f77…2e0e6` = `draft/report.html`. 세 쌍 모두 일치 |
+| P5 | 하네스 규칙 7 원문 | `sed -n 16p W/backend/goose_harness_src/harness-instructions.md` | `7. 브라우저가 없으므로 화면 확인(visual) 검사를 통과로 기록하지 않는다. 최종 감사를 통과하지 못하면 초안까지만 만들고 끝낸다.` 감수 기록을 쓰라는 규칙은 1~8번에 없음(`cat -n`으로 전체 확인) |
+| P6 | goose 권한: Bash는 렌더·감사 스크립트 두 개, 쓰기는 `./runs/**`, 읽기는 `./**`, PATH 제한 | `cat W/backend/goose_harness_src/claude-settings.json` | `allow`: WebSearch, WebFetch, Agent, Skill, `Read(./**)`, `Write(./runs/**)`, `Edit(./runs/**)`, `Bash(python3 .claude/skills/goose/workflows/stock-report/scripts/render_report.py:*)`, `Bash(python3 …/fact-check/scripts/audit_report.py:*)`; `deny`: `.claude/**`·`CLAUDE.md` 쓰기, `Bash(*..*)`, `Bash(* /*)`, `Bash(*~*)`, `Bash(*$*)`, `Read(../**)`, `.env` 읽기; `env.PATH=/usr/bin:/bin:/usr/sbin:/sbin`. 매니페스트의 이 파일 해시: `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3` |
+| P7 | 매니페스트 = 원본 재생성 결과(기준선) | `PY -m backend.services.goose_harness > …/manifest_regen.json` 후 JSON 대조 | `manifest equals regen: True 33`(파일 33개). 기준선은 `goose-manifest.json`이다(벤더링 원본의 `DISTRIBUTION.json`은 `report-input.md` 해시가 달라 같지 않다 — `grep -n report-input.md` 두 파일 대조 관측: `DISTRIBUTION.json` `0cf708e4…`, `goose-manifest.json` `b571d2d0…`) |
+| P8 | 작업 서비스 구조: 1차 세션은 `_run`(잠금 밖 태스크)에서 실행기를 부르고 결과로 종료 상태를 정한다; 운영 인스턴스에만 훅·수집기가 붙는다 | `grep -n "async def _run\|async def start\|^_service = " W/backend/services/goose_job_service.py` → `202 start`, `238 _run`, `387 _service`; 이어서 `sed -n 202,223p`, `238,275p`, `387,390p` 같은 파일 | `_run`(238~275행): `try { if prefetcher: _prefetch → 무결성 재검사; result = await runner(...) } except CancelledError {…cancelled; raise} except Exception {error/exit_error}`; `result.status=="done"`이면 종료 훅 후 `_finish(done)`. `start()`는 `async with self._lock` 안에서 4~8단계 판정 후 `asyncio.create_task(self._run(job))`로 잠금 밖에서 실행. `_service = GooseJobService(on_finish=…, prefetcher=DartPrefetcher())` |
+| P9 | `select_report` 호출처와 테스트 | `grep -rn "select_report" W/backend --include="*.py"` | `goose_runner.py:167`(정의, `@MX:ANCHOR` fan_in 3 표기), `:465`(`run_goose`), `goose_storage.py:101`(`archive_job`); 테스트는 `backend/tests/test_goose_runner.py`만 |
+| P10 | 스트림에서 `Read` 도구 호출의 경로와 도구 결과를 짝지을 수 있다 | `PY -I -c "…backend/tests/fixtures/goose_stream_299030.jsonl…"` | 줄 종류 `{'system':93,'assistant':55,'user':43,'rate_limit_event':2,'tool_progress':2,'result':1}`; `assistant`의 `tool_use`(`name:"Read"`, `input.file_path`) 6건, 경로는 절대 경로(픽스처는 하네스 경로가 `/HARNESS`로 치환됨); `user` 줄에 `tool_result`(`tool_use_id`, `type`, `content`). 성공 예시에는 `is_error` 키가 없었다(오류 표지 이름은 미관측, G1). 이미지 `Read` 결과의 모양은 미관측 |
+| P11 | 서버 파이썬 환경 | `PY --version`; `-m pip list \| grep …`; `-c "import playwright"`; `-c "import websockets"`; `grep -n "pillow\|websockets" pyproject.toml` | Python 3.13.11; `httpx 0.28.1`, `pillow 12.1.1`, `plotly 6.6.0`; `playwright`: `ModuleNotFoundError`; `websockets 16.0` import 가능; `pyproject.toml`에 `pillow`·`websockets` 선언 없음(출력 없음). 타일 자르기는 CDP `clip`으로 해 Pillow가 필요 없다(P14) |
+| P12 | 이 호스트의 브라우저 후보 | `ls ~/Library/Caches/ms-playwright`; `…/chrome-headless-shell --version`; `ls /Applications \| grep -i chrome`; `which chromium chromium-browser google-chrome` | `chromium_headless_shell-1148/1208/1228/1234/1243`, `chromium-*` 존재; `…1243/chrome-headless-shell-mac-arm64/chrome-headless-shell --version` → `Google Chrome for Testing 153.0.8010.12`; `/Applications/Google Chrome.app` 있음(실행은 안 해 봄, G2); `which`는 모두 not found. 리포 어디에도 브라우저 설치·경로 선언 없음(`grep -rn "ms-playwright\|PLAYWRIGHT" backend scripts dev.sh launch-dev.sh` 결과 없음) |
+| P13 | 명령행 스크린샷이 되고 매우 큰 창 높이도 받는다 | `…/chrome-headless-shell --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,2000 --screenshot=… file://R/draft/report.html`(높이 30000도) | 종료 코드 0. `desktop.png` 1280×2000, `mobile.png` 390×2000, `mobile_tall.png` 390×30000(Pillow로 크기 확인). 모바일 이미지를 `Read`로 열어 한글 본문이 보임(이 세션에서 직접 확인). 창 높이를 모르는 채로는 전체 페이지 높이를 알 수 없다 |
+| P14 | DevTools 프로토콜로 전체 높이·가로 넘침·전체 캡처를 얻는다 | `PY -I W/.moai/state/verify/t18-plan/cdp_probe.py`, 출력 `cdp_probe.out` | `ws_found True t=0.29`; `desktop {'sw':1280,'cw':1280,'sh':20160}` png 3,862,473 바이트; `mobile {'sw':390,'cw':390,'sh':30683}` png 3,530,677 바이트; 전체 `t=7.86s`(고정 대기 3초×2 포함). 즉 이 초안은 모바일 문서 수준 가로 넘침 없음. 전체 높이 `clip`(y=0)은 관측, `y>0` 타일 `clip`은 미관측(G3) |
+| P15 | 같은 입력을 다시 렌더하면 바이트가 같다(`--final`의 미리보기 일치 조건이 성립) | `/usr/bin/python3 -I ~/.goose-harness/.claude/skills/goose/workflows/stock-report/scripts/render_report.py --input R/company-input.json --output-dir W/.moai/state/verify/t18-plan/rerender`(설치본 스크립트 사용), 출력 `rerender.out` | 재렌더 `480b6f77…2e0e6` = 원본 `draft/report.html` → `identical True` |
+| P16 | 초안 HTML 성질 | `grep -c "<script" R/draft/report.html`; `grep -o "<link[^>]*>"`; `grep -o "https\?://…"` | `<script` 0개, `<link rel="stylesheet">` 2개(Pretendard CDN·Google Fonts), 크기 1,043,346 바이트, `@media(max-width:800px)`·`(max-width:1100px)`·print 규칙 있음 → 스크립트 비활성이어도 화면이 같고, 외부 글꼴만 네트워크 차단 영향을 받는다 |
+| P17 | 기준선: goose 백엔드 테스트 | `PY -m pytest backend/tests -k goose -q -p no:cacheprovider`, 출력 `pytest_goose_baseline.log` | `267 passed, 214 deselected, 1 warning in 16.52s`, 종료 코드 0 |
+| P18 | 프론트 단계 목록 위치 | `sed -n 52,80p W/frontend/src/utils/gooseJob.ts`; `sed -n 10,28p …ProgressPanel.tsx`; `grep -n dart_prefetch …` | `gooseJob.ts:55` `GOOSE_STAGES` 11개(`dart_prefetch … session_end`, `render_final`이 `audit` 다음); `gooseJob.ts:55-67` 목록 전체; `ProgressPanel.tsx:14-26` 라벨 맵(`STAGE_LABELS`); `types/aiReport.ts:63-74` `GooseStage`; 고정 단언: `gooseJob.test.ts:49-52`(“단계 11개”), `ProgressPanel.test.tsx:31` |
+| P19 | goose 세션이 쓰는 `python3`는 시스템 3.9 | `/usr/bin/python3 --version` | `Python 3.9.6`(스크립트는 표준 라이브러리만 쓰므로 P2·P15를 이 인터프리터로 돌려 동작 확인) |
+| P20 | 증거 폴더는 git이 추적하지 않는다 | `git check-ignore -v W/.moai/state/verify/t18-plan/cdp_probe.py` | `.gitignore:205:**/.moai/state/` 일치 |
+| P21 | 프런트매터 스키마 SSOT 파일이 이 작업공간에 없다 | `ls W/.claude/rules/moai/development/spec-frontmatter-schema.md` | `No such file or directory` → 005의 프런트매터(12필드 + `tier`, `related_specs`)를 선례로 썼다(G7) |
+| P22 | `phase` 선례 | `grep -n "phase:" .moai/specs/SPEC-TEST-HERMETIC-001/spec.md` | `phase: "v0.6.0 target"` — 가장 최근 SPEC의 목표 릴리스를 따랐다(추론, 릴리스 계획 문서는 미확인) |
+
+## 3. 설계에 영향을 준 관측과 추론
+
+1. **감수 세션을 새 `claude -p`로 두면 `separate_review_pass`가 사실이 된다.** 1차 세션 안에서 서브에이전트를 부르는 방식(`independent_agent`)은 허용 설정에 `Agent`가 있어(P6) 가능하지만, 화면 캡처가 초안 뒤에야 가능해 같은 세션 안에서는 이미지를 줄 수 없다. 그래서 서버가 두 세션 사이에서 일하는 구조가 자연스럽다(추론).
+2. **영수증은 서버가 세션 종료 후에 쓴다.** 하네스 세션은 `Write(./runs/**)`로 `runs/` 아래 어느 곳이든 쓸 수 있어(P6) 영수증을 스스로 쓰거나 `final/render-validation.json`을 꾸밀 수 있다. 그러므로 최종본 인정의 근거는 세션이 쓴 파일이 아니라 서버가 세션이 끝난 뒤에 쓴 영수증이어야 한다(추론, REQ-AIR6-015·016).
+3. **타일은 CDP `clip`으로 직접 자른다.** 전체 이미지(3.5~3.9 MB, 높이 2만~3만 px)는 한 장으로 읽을 수 없다(`Read` 이미지 축소 한계는 미관측, G4). 타일 높이 1568px은 이미지 긴 변 한계에 대한 추론값이며 M1이 측정해 확정한다.
+4. **타일 수.** 이 초안은 데스크톱 20160px → 13타일, 모바일 30683px → 20타일(1568px 기준 올림 계산, 추론). 합 33장을 감수 세션이 모두 읽는다. 비용(시간·토큰)은 미관측(G5).
+5. **가로 넘침은 문서 수준 `scrollWidth > clientWidth`로 판정한다.** 이 초안은 모바일에서 `390 = 390`(P14).
+
+## 4. Gaps (미관측 — 모두 run 단계 M1·M6에서 관측한다)
+
+| ID | 미관측 항목 | 영향 | 해소 위치 |
+|---|---|---|---|
+| G1 | 헤드리스 `claude -p`가 하네스에서 PNG를 `Read`해 실제로 보는지, 이미지 `Read`의 `tool_use`·`tool_result` 스트림 모양과 오류 표지 이름 | 영수증의 열람 판정(REQ-AIR6-015)과 감수 전체의 전제 | M1 GO/NO-GO 스파이크(NO-GO면 manager-spec 재위임) |
+| G2 | `Google Chrome.app`(headless=new)으로 CDP 구동 | 브라우저 후보 | M1 — 관측 못 하면 지원 목록에서 빼고 README에 명시 |
+| G3 | CDP `Page.captureScreenshot`의 `y>0` 타일 `clip`, `Emulation.setScriptExecutionDisabled`, 네트워크 차단 방식(`--host-resolver-rules` 또는 `Network.setBlockedURLs`) | REQ-AIR6-006·009 | M1 |
+| G4 | 이미지 `Read`의 축소 한계와 1568px 타일의 가독성 | 타일 높이 | M1 |
+| G5 | 감수 세션의 소요 시간·토큰, 기본 시간 상한 900초(=1차 세션 상한 `DEFAULT_TIMEOUT_SEC`, 근거 없는 차용) | 시간 상한 | M6 실측 후 `progress.md`에 기록 |
+| G6 | 감수 세션이 사실 대조를 충실히 하는지 | 품질 — 기계 검증 불가(범위 밖 명시) | 해소 불가, 문서화 |
+| G7 | 프런트매터 스키마 SSOT 파일이 작업공간에 없어 `moai spec lint` 기준을 직접 대조하지 못함 | 낮음 | 작성 후 `moai spec lint` 실행 결과를 `progress.md §E.1`에 기록 |
+| G8 | 외부 글꼴 차단 상태의 화면 모양(글꼴 대체) | 화면 판정의 충실도 | M1에서 차단/비차단 두 장을 비교 관측 |
+| G9 | `--no-sandbox` 필요 여부(프로브는 사용) | 보안 | M1 — 필요하면 사유와 완화(스크립트 비활성·네트워크 차단·`file://` 한정)를 `progress.md`에 기록 |
