@@ -58,6 +58,41 @@
 
 **증거 경로**: `probe_geometry.out`, `attempt1.out`, `attempt1/{record.json,tokens.json,prompt.txt,attempt1-stream.jsonl,attempt1-argv.json,attempt1-stderr.txt}`, `timing_and_write_probe.out`, `timing-stream.jsonl`(19.9 MB), `writeprobe-stream.jsonl`.
 
+### M2 캡처 모듈 — 2026-10-21
+
+**산출**: `backend/services/goose_screenshot.py`(신규), `backend/tests/test_goose_screenshot.py`(신규, 34개). 증거 폴더 `.moai/state/verify/t18-m2/`(git 무시 경로): `red_stub.out`, `mutations.out`, `mutate.py`(되돌림 하네스), `real_capture.py`·`real_capture.out`(실제 브라우저 수동 실행). 파이썬 `../../../.venv/bin/python`(3.13.11), 린트 `python3 -m ruff`(시스템 0.14.11 — 서버 venv에는 ruff 없음).
+
+**기준선·결과 (직접 실행)**
+- 전: `../../../.venv/bin/python -m pytest backend/tests -k goose -q` → `267 passed, 214 deselected, 1 warning in 16.66s`
+- 후: 같은 명령 → `301 passed, 214 deselected, 1 warning in 22.31s` (267 + 신규 34, 실패 0, 기존 테스트 수정 0)
+- 신규 파일만: `34 passed`. 커버리지 `coverage run --include='*/goose_screenshot.py' -m pytest backend/tests/test_goose_screenshot.py` → `backend/services/goose_screenshot.py 242 13 95% 97-109, 207, 308` (97-109는 `/json/list` 탐색 루프 — 아래 수동 실행이 대신 관측)
+- 린트: `python3 -m ruff check backend/services/goose_screenshot.py backend/tests/test_goose_screenshot.py` → `All checks passed!` (`ruff format --check`는 기존 `goose_runner.py`도 재포맷 대상이라 적용하지 않음)
+
+**RED 관측 순서**: 구현을 먼저 초안으로 쓴 뒤 시험을 썼으므로(TDD 순서 위반) 구현을 스크래치로 치우고 상수·빈 `capture`만 있는 스텁으로 바꿔 `red_stub.out`을 얻었다 → `34 failed` (전부 `NotImplementedError`/속성 없음). 이어 구현을 복원해 `34 passed`. 그 뒤 AC별 되돌림 RED는 `mutate.py`가 보호 동작을 하나씩 임시로 되돌리고 시험을 돌린 뒤 복원했다. 마지막 줄 `restored-sha-match: True`(원본 해시와 일치).
+
+| AC | 상태 | 시험 | 되돌림 변이 → 관측한 RED (`mutations.out` 원문 요약) |
+|---|---|---|---|
+| 006 | PASS | `test_air6_006_*` 5개(드라이버 2 포함) | (a) 타일 없이 한 장 → 5건 실패 · (b) 같은 폭 → 1건 · (c) 모바일 에뮬레이션 누락 → 8건 · (d) 스크립트 비활성이 navigate 뒤 → 2건 · (e) 보고서 내용으로 파일 이름 → 1건 · (f) 심볼릭 링크 검사 전부 제거 → 2건 · (g) 폴더 링크(해석 경로) 검사 제거 → 1건 |
+| 007 | PASS | `test_air6_007_*` 8개 | (a) 키 이름 변경 → 5건 · (b) 시간대 없음 → 4건 · (c) 입력 JSON 해시 → 2건 · (d) 메모리 사본 해시 → 1건 · (e) `>=` 넘침 → 3건 |
+| 008 | PASS | `test_air6_008_*` 12개 | (a) 상한 없음 → 2건 · (a') 상한 경계 `>=` → 1건 · (b) 앞 30개만 저장 → 2건 · (c) 예산 미적용 → 2건 · (d) 크기 상한 없음 → 1건 · (d') 크기 경계 `>=` → 1건 · (e) 임시 프로필을 성공 경로에서만 삭제 → 4건 · (f) 실패 뷰포트 부분 타일 미정리 → 1건 |
+| 009 | PASS | `test_air6_009_*` 4개(CdpDriver 호출 형태 1 포함) | (a) 비허용 인자 추가 → 1건 · (b) 스크립트 비활성 누락 → 2건 · (c) 네트워크 차단 누락 → 1건 · (d) 디버깅 주소 0.0.0.0 → 1건 · (e) 글꼴 호스트 예외 → 1건 |
+| 010 | PASS | `test_air6_010_*` 4개 | (a) 환경 변수 무시 → 24건 · (b) 잘못된 변수에서 폴백 → 1건 · (c) 후보 없음에서 예외 → 2건 · (d) 빌드 번호 문자열 비교 → 1건 · (d') 첫 후보 선택 → 1건 · (e) PATH 탐색 → 1건 |
+| 002(모듈 몫) | PASS | `test_air6_002_cancel_kills_browser_group_and_profile` | (b) 직계 프로세스만 종료 → 7건 · 취소 때 정리 생략 → 7건 |
+
+변이 33개 모두 RED 관측(적용 실패·미관측 0). `Google Chrome.app`(E)은 PATH 후보 폴더에 같은 이름 실행 파일(`Google Chrome`)로 흉내 냈고 앱 번들 구조 자체는 만들지 않았다 — 모듈에 그런 경로 탐색 코드가 없어 변이도 PATH 탐색(e) 하나로 대표했다.
+
+**실제 브라우저 수동 실행** (`real_capture.out`, pytest 밖): 합성 페이지(높이 4200px, 외부 `<link>` + `<script>`)에 `gs.capture` 1회 → `outcome: complete`, `browser {HeadlessChrome, 153.0.8010.12, playwright_cache}`(환경 변수 없이 캐시 탐색), 데스크톱 `[1568,1568,1064]`·모바일 같은 분할, 파일 `desktop-01..03.png`, `mobile-01..03.png`, `index.json`, 종료 후 `goose-shot-*` 프로필 폴더·브라우저 프로세스 잔존 0(`pgrep` 출력 없음). 모바일 `scroll_width` 980은 합성 페이지에 `<meta viewport>`가 없어서이며 모듈 문제가 아니다(M1 라이브 초안은 390=390).
+
+**SPEC 대비 차이·결정 (모두 SPEC 문구 수정은 요구하지 않음)**
+- 실제 브라우저 시험은 pytest에 두지 않았다: 공용 네트워크 가드(`conftest.py`)가 루프백 `socket.connect`까지 막아 `/json/list`·WebSocket이 불가능하다. 대신 수동 실행으로 대체.
+- `index.json` 스키마에 실패 사유 필드가 없어 사유 코드는 뷰포트의 `error`에 둔다. `unavailable`은 두 뷰포트 `status: skipped` + `error: browser_not_found | browser_env_not_executable`. 시작 실패는 `browser_start_failed:<예외 이름>`, 예산 초과 `budget_exceeded`, 취소 `cancelled`, 심볼릭/비정규 초안 `draft_not_regular_file`·`draft_outside_job_dir`. 예외 메시지는 경로가 샐 수 있어 클래스 이름만 적는다.
+- 실패한 뷰포트의 `metrics`는 4개 키를 모두 `null`로 둔다(스키마 키 집합 유지). `AI_REPORT_GOOSE_BROWSER`가 빈 문자열이면 미설정으로 본다.
+- `screens/`는 서버 소유 폴더라 캡처 시작 때 비우고 다시 만든다. 색인은 임시 파일 + 원자적 교체로 쓴다.
+- 프로세스 종료는 `terminate_group`(SIGTERM→유예→SIGKILL) 대신 `killpg(SIGKILL)` + `wait()`로 했다: 프로필을 어차피 지우므로 정상 종료가 필요 없고, 취소 중에도 동기로 끝나며, 좀비를 회수해야 `killpg(pgid, 0)`이 `ProcessLookupError`가 된다.
+- `websockets`는 `pyproject.toml`에 아직 선언돼 있지 않다(M5 소관, plan M5 행). 서버 venv에는 16.0이 설치돼 있어 import는 통과.
+
+**미관측/한계**: 실제 `file://` 로드의 로드 이벤트 대기 시간 분포(1회 관측, 즉시 완료), Linux 캐시 구조(G12), 외부 요청 0건을 로컬 소켓으로 확인하는 일은 M1에서 수행했고 이 모듈 경로로는 재측정하지 않았다(`Network.setBlockedURLs ["*"]` 호출 형태만 시험). 예산 60초 안에서 33장 캡처가 실제로 몇 초 걸리는지는 M6 라이브에서 측정.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
