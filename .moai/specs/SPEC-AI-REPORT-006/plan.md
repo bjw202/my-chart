@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 구현 계획
 
-상태: draft · 버전 0.2.0 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
+상태: draft · 버전 0.3.0 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
 
 ## 1. 접근 요약
 
@@ -41,12 +41,14 @@ _run(job) [잠금 밖, active 유지]
 
 | 마일스톤 | 우선순위 | 산출 | 선행 | 핵심 검증 |
 |---|---|---|---|---|
-| M1 스파이크·픽스처 (GO/NO-GO) | High | 브라우저 실구동 기록(G3·G4·G8·G9), 캐너리 타일 실험(AC-019), 라이브 초안에서 뽑은 합성·녹화 HTML 픽스처, 기존 초안 4개의 높이·타일 분포 재측정(P26)과 타일 상한 확정, 스키마(§design 4) 값 확정 | 없음 | **GO = AC-AIR6-019 통과(REQ-AIR6-020).** NO-GO면 M2~M6 코드를 병합하지 않고 `progress.md`에 관측을 적은 뒤 SPEC을 계획 단계로 되돌린다(manager-spec 재위임 + 운영자 결정, "화면 확인"의 의미가 바뀔 수 있음). 나머지 Gap은 관측값을 `progress.md`에 기록하고 값이 다르면 코드 작성 전에 manager-spec 재위임으로 반영 |
+| M1 스파이크·픽스처 (GO/NO-GO) | High | 브라우저 실구동 기록(G3·G4·G8·G9), 캐너리 타일 실험(AC-019 — M1 전용 스파이크 스크립트로 찍으며 M2 캡처 모듈에 의존하지 않는다), 라이브 초안에서 뽑은 합성·녹화 HTML 픽스처, 기존 초안 4개의 높이·타일 분포 재측정(P26)과 타일 상한 확정, 스키마(§design 4) 값 확정 | 없음 | **GO = AC-AIR6-019 통과(REQ-AIR6-020): 두 뷰포트의 본문 크기 토큰 인용 + 모든 캐너리 타일의 `Read` 짝 + `y > 0` 타일 `clip` 확인.** 타일 상한·`Read` 시간이 부족하면 GO/NO-GO는 그대로 두고 조정 후 진행(상한·시간 상한을 올려 manager-spec 재위임으로 반영한 뒤에만 M2 병합). NO-GO면 M2~M6 코드를 병합하지 않고 `progress.md`에 관측을 적은 뒤 SPEC을 계획 단계로 되돌린다(manager-spec 재위임 + 운영자 결정, "화면 확인"의 의미가 바뀔 수 있음). 나머지 Gap은 관측값을 `progress.md`에 기록하고 값이 다르면 코드 작성 전에 manager-spec 재위임으로 반영 |
 | M2 캡처 모듈 | High | `goose_screenshot.py` + `test_goose_screenshot.py` (AC-006~010) | M1 | 가짜 브라우저 드라이버로 타일·색인·한도·격리·탐색, 되돌림 RED |
 | M3 감수 세션·영수증 | High | `goose_runner.run_review`·`build_review_prompt`·열람·쓰기 시도 기록 수집, `goose_review.py`(컨텍스트·스냅샷·영수증·`evaluate_admissibility`), `test_goose_review.py` (AC-011·012·014·015·021) | M2 | 가짜 `claude` 스크립트, 합성 스트림 픽스처로 열람·쓰기 집계, 되돌림 RED |
 | M4 작업 서비스 연결·최종본 인정·프론트 | High | `goose_job_service` 후처리·이벤트·스위치·취소·fail-open·전달 상태 재계산, `select_report`가 판정 함수 호출(+기존 테스트 갱신), 프론트 단계, 격리 통합 시험 (AC-001~005·016·020·022) | M3 | 순서·취소·fail-open·인정 표(AC-016) 전부 되돌림 RED, 프론트 단위 테스트. AC-022를 만들 수 없으면 Gap으로 `progress.md`에 기록 |
 | M5 하네스 지침·매니페스트·문서 | Medium | `harness-instructions.md` 규칙 7 개정·규칙 9, 매니페스트 재생성, `pyproject.toml`, README·`.env.example` (AC-013) | M4 | 매니페스트 = 재생성, 설정·스킬 불변, 서버 재시작 후 무결성 통과 |
 | M6 라이브 관측 게이트 | High | 020150 라이브 실행 ≤2회와 판정표 (AC-018), 시간·토큰 실측(G5). 라이브 실행은 `LATEST_SEARCH_NAVER`가 남아 `final`에 도달하지 못한다(카드 t19 소관) — 최종본 인정 경로는 AC-022가 대신 확인 | M5 | `progress.md §E.2`에 명령·출력 원문. 미충족이면 SPEC을 닫지 않는다 |
+
+AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배정하지 않는다. M2~M5 각 종료 때 `pytest backend/tests -k goose`로 확인하고 최종 판정은 M5 종료 시점에 한다(iter2 N10a).
 
 실행 방식 제안: **serial**(마일스톤 순서 의존, 코딩 중심). Tier L 기준(마일스톤 ≥3, 파일 ≥10)에 해당하므로 `manager-lead` 대상이 될 수 있으나 병렬화 이점이 작아 마일스톤마다 보고하는 직렬 진행을 권한다. 쓰기 에이전트는 동시에 하나만 돌린다. 최종 선택은 plan→run 경계의 승인 게이트가 한다.
 
@@ -57,7 +59,7 @@ _run(job) [잠금 밖, active 유지]
 | 헤드리스 세션이 이미지를 읽지 못하거나 읽고도 내용을 인식하지 못한다(G1·G4) | 중 | M1 GO/NO-GO를 캐너리 토큰 인용으로 판정(AC-019). NO-GO면 설계 재검토(예: 이미지 대신 서버가 만든 텍스트 DOM 요약 — "화면 확인"의 의미가 바뀌므로 manager-spec 재위임과 운영자 결정 필요) |
 | 감수 세션이 이미지를 열지 않고 pass를 선언 | 중 | 영수증이 `tiles_read`로 거른다 → `draft`(AC-016 `tile_not_read`). 실패해도 지금과 같은 결과다 |
 | 감수 세션이 초안·입력·화면 색인·타일을 몰래 수정(`Write(./runs/**)` 권한) | 낮음 | 세션 전 스냅샷 대조 + `Write`/`Edit` 호출 기록으로 인정 거부(AC-014·016). 도구 밖 경로의 변경 후 복원은 증명 못함(Gap) |
-| 감수 세션이 `[렌더 차이]` 표지를 빠뜨려 정상 최종본이 `draft`가 된다 | 중 | 안전한 방향의 실패이고 사유 `font_note_missing`이 남는다. 지침이 표지 문구를 고정한다(AC-013). 라이브에서 빈도를 관측(AC-018 비게이팅) |
+| 감수 세션이 `[렌더 차이]` 표지를 빠뜨려 정상 최종본이 `draft`가 된다 | 중 | 표지 누락은 조건 17 미충족, 전달 `draft`로 가는 설계된 안전 방향 결과이며 사유 `font_note_missing`이 남는다(규칙 7 불변식 위반 아님). 지침이 표지 문구를 고정한다(AC-013). 라이브에서는 모든 회차가 누락이면 AC-018 (나)군 불충족으로 게이트 실패, 일부 회차만 누락이면 빈도를 기록한다 |
 | 타일 상한 30에서도 긴 보고서가 `too_tall`이 된다 | 낮음 | 상한은 관측된 최대(모바일 20타일)의 1.5배(P26). M1이 재측정해 조정. 타일 33~60장을 900초 안에 읽는 시간은 미측정(G5) — M6에서 실측 |
 | 자정(KST)을 넘겨 후처리가 끝나면 감사기가 `FRESHNESS_CUTOFF`를 낸다(`audit_report.py:32-33`) | 낮음 | 게이팅 코드가 아니므로 기록만 한다(AC-018) |
 | 후처리 시간으로 작업 전체가 길어짐 | 중 | 캡처 60초·감수 900초 상한, 끄기 스위치. 실측은 M6 |

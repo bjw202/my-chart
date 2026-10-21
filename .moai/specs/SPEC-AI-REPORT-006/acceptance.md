@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 인수 기준
 
-버전 0.2.0 · 요구사항은 `spec.md §4`(REQ-AIR6-001~020), 인수 기준 AC-AIR6-001~022. 각 AC는 Given-When-Then, 실행 명령, 기댓값, 그리고 **이 AC가 잡아내는 틀린 구현(대조)** 과 **잡지 못하는 것** 을 적는다. 대조 항목은 run 단계에서 실제로 되돌림을 적용해 RED를 관측해야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다.
+버전 0.3.0 · 요구사항은 `spec.md §4`(REQ-AIR6-001~020), 인수 기준 AC-AIR6-001~022. 각 AC는 Given-When-Then, 실행 명령, 기댓값, 그리고 **이 AC가 잡아내는 틀린 구현(대조)** 과 **잡지 못하는 것** 을 적는다. 대조 항목은 run 단계에서 실제로 되돌림을 적용해 RED를 관측해야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다.
 
 ## §A 공통 실행 조건
 
@@ -52,7 +52,7 @@
 
 ### AC-AIR6-004 — 끄기 스위치 (REQ-AIR6-004)
 
-- Given: 호출 횟수를 세는 가짜 캡처기·감수기, 가짜 실행기(`draft/report.html`과 `final/report.html` + `delivery_allowed: true`를 둘 다 만든 것으로 가정), `AI_REPORT_GOOSE_REVIEW=0`
+- Given: 호출 횟수를 세는 가짜 캡처기·감수기, 가짜 실행기(`draft/report.html`과 `final/report.html` + `delivery_allowed: true`를 둘 다 만든 것으로 가정, 실제 실행기가 영수증 없이 계산하는 값 `draft`를 돌려줌), `AI_REPORT_GOOSE_REVIEW=0`
 - When: 작업 실행
 - Then: 캡처기·감수기 호출 0, `screenshot`·`review`·`render_final` 이벤트 0, `review/receipt.json`의 `outcome == "disabled"`, 실행기 호출 1, 전달 상태 `draft`(영수증이 인정하지 않으므로 `final/`이 있어도 `draft`). 같은 테스트에서 변수 미설정 시 캡처기 1·감수기 1 호출(대조)
 - 명령: `PY -m pytest backend/tests/test_goose_job_service.py -k air6_004 -q`
@@ -159,11 +159,12 @@
   - (7) 타일 PNG를 바꿨다가 종료 전에 원래 바이트로 복원(디스크 해시는 시작·종료 동일), 스트림에는 그 타일에 대한 `Edit` 호출이 있음
   - (8) `Write` 시도가 `draft/` 안 파일을 향함(도구 결과는 오류, 디스크 불변)
   - (9) `review/` 아래 파일만 씀(`audit-review.json`, `delivery-audit.json` 등 정상 쓰기)
+  - (10) `Write` 호출의 대상이 대소문자만 다른 경로(`runs/<id>/Screens/mobile-01.png`)를 향함(디스크 불변 — 대소문자를 구분하지 않는 파일시스템을 가정한 방어, research P32)
 - When: 후처리 실행 후 영수증을 읽고 `select_report`를 부른다(감수 세션이 `final/`과 `delivery_allowed: true`를 만들어 둔 것으로 가정)
-- Then: (1) `draft_unchanged == true`, start/end 쌍이 같고 `screens.snapshot_start == snapshot_end`, `judged_writes == []`. (2)·(3) `draft_unchanged == false`, 해당 쌍이 다름, `visual_admissible == false`, `reasons`에 `draft_changed`. (4) `snapshot_start != snapshot_end`, `reasons`에 `screens_changed`, `select_report == ("draft", …)`. (5)·(6) 같은 결과(`screens_changed`). (7) 스냅샷은 같지만 `judged_writes`에 그 타일 경로가 있고 `reasons`에 `judged_input_write_attempt`, `select_report == ("draft", …)`. (8) `judged_writes`에 `draft/` 경로, 같은 사유. (9) `judged_writes == []`이고 위 사유가 없다(정상 쓰기를 오탐하지 않음)
+- Then: (1) `draft_unchanged == true`, start/end 쌍이 같고 `screens.snapshot_start == snapshot_end`, `judged_writes == []`. (2)·(3) `draft_unchanged == false`, 해당 쌍이 다름, `visual_admissible == false`, `reasons`에 `draft_changed`. (4) `snapshot_start != snapshot_end`, `reasons`에 `screens_changed`, `select_report == ("draft", …)`. (5)·(6) 같은 결과(`screens_changed`). (7) 스냅샷은 같지만 `judged_writes`에 그 타일 경로가 있고 `reasons`에 `judged_input_write_attempt`, `select_report == ("draft", …)`. (8) `judged_writes`에 `draft/` 경로, 같은 사유. (9) `judged_writes == []`이고 위 사유가 없다(정상 쓰기를 오탐하지 않음). (10) `judged_writes`에 그 경로가 있고(비교는 대소문자를 무시), 사유 `judged_input_write_attempt`, `select_report == ("draft", …)`
 - 명령: `PY -m pytest backend/tests/test_goose_review.py -k air6_014 -q`
-- 잡는 구현(되돌림 RED): (a) 종료 해시를 다시 계산하지 않고 시작 해시를 복사 → (2)(3)에서 `true`, (b) 한쪽 파일만 비교 → 다른 쪽 변경 경우 RED, (c) **screens 스냅샷을 아예 만들지 않음(또는 세션 후에야 측정)** → (4)(5)(6)에서 `screens_changed`가 안 나고 `final`이 선택됨, (d) 파일 집합을 빼고 해시만 비교 → (6) RED, (e) `Write`/`Edit` 호출 기록 누락 → (7)(8) RED, (f) 결과가 오류인 시도는 무시 → (8) RED, (g) `review/` 쓰기까지 위반으로 셈 → (9) RED
-- 잡지 못하는 것: 도구 호출이 아닌 경로(허용된 두 스크립트의 부작용)로 바뀌었다 복원되는 변경(Gap G11), `draft/`·`screens/` 밖 파일 변경(범위 밖)
+- 잡는 구현(되돌림 RED): (a) 종료 해시를 다시 계산하지 않고 시작 해시를 복사 → (2)(3)에서 `true`, (b) 한쪽 파일만 비교 → 다른 쪽 변경 경우 RED, (c) **screens 스냅샷을 아예 만들지 않음(또는 세션 후에야 측정)** → (4)(5)(6)에서 `screens_changed`가 안 나고 `final`이 선택됨, (d) 파일 집합을 빼고 해시만 비교 → (6) RED, (e) `Write`/`Edit` 호출 기록 누락 → (7)(8) RED, (f) 결과가 오류인 시도는 무시 → (8) RED, (g) `review/` 쓰기까지 위반으로 셈 → (9) RED, (h) 대소문자를 구분하는 경로 비교 → (10) RED
+- 잡지 못하는 것: 도구 호출이 아닌 경로(허용된 두 스크립트의 부작용)로 바뀌었다 복원되는 변경(Gap G11), `draft/`·`screens/` 밖 파일 변경(범위 밖). 대소문자만 다른 경로로 타일을 `Read`한 경우는 읽음으로 세지 않는다(안전 방향 — 최악의 결과는 `tile_not_read`로 `draft`)
 
 ### AC-AIR6-015 — 영수증과 열람 집계 (REQ-AIR6-015)
 
@@ -176,50 +177,85 @@
   - S6: 서브에이전트(`parent_tool_use_id` 있음)의 읽기
   - S7: 세션이 `review/receipt.json`에 `visual_admissible: true`를 직접 써 둠
   - S8: `tool_result.is_error`가 `false`인 `Read`(성공), 키가 없는 `Read`(성공), `true`인 `Read`(오류)가 한 스트림에 섞임(기존 스트림 픽스처의 실제 비율: 없음 33·`false` 4·`true` 3, research P10)
+  - S9: 영수증 쓰기 실패. (a) S7처럼 세션이 쓴 `review/receipt.json`이 있는 상태에서 서버의 교체 단계만 실패(제거는 성공; 테스트가 교체 함수를 실패하도록 패치), (b) 제거와 교체가 모두 실패해 세션이 쓴 파일이 남음
 - When: 영수증 작성 함수에 스트림과 상태를 넣는다
-- Then: §B 키 집합과 동등. `tiles_read`: S1 세 파일 전부, S2 비어 있음, S3 비어 있음, S4 `{mobile-01, desktop-01}`, S5 비어 있음, S6 서브에이전트가 읽은 파일 포함. S7은 서버가 쓴 값으로 덮어써져 `visual_admissible`이 서버 판정을 따른다(스트림에 열람이 없으면 `false`). S8: `false`·키 없음 `Read`는 읽음, `true`는 읽음이 아님
+- Then: §B 키 집합과 동등. `tiles_read`: S1 세 파일 전부, S2 비어 있음, S3 비어 있음, S4 `{mobile-01, desktop-01}`, S5 비어 있음, S6 서브에이전트가 읽은 파일 포함. S7은 서버가 쓴 값으로 덮어써져 `visual_admissible`이 서버 판정을 따른다(스트림에 열람이 없으면 `false`). S8: `false`·키 없음 `Read`는 읽음, `true`는 읽음이 아님. S9(a): 쓰기가 실패해도 세션이 쓴 영수증이 남아 있지 않다(서버가 먼저 제거), `select_report == ("draft", …)`이고 첫 사유 `no_receipt`, 작업 `done`, 로그에 `receipt_write_failed` 1건, 완료 이벤트 전달 상태 `draft`. S9(b): 작업 `done`, 로그 `receipt_write_failed`, 완료 이벤트 전달 상태 `draft`(`final` 아님). S9(b)에서 보관 단계의 `select_report`가 디스크의 낡은 영수증을 다시 읽는 경로는 막지 못한다(Gap G14 — 이 시나리오는 서비스가 확정한 이벤트 값만 단언한다)
 - 명령: `PY -m pytest backend/tests/test_goose_review.py -k air6_015 -q`
-- 잡는 구현: (a) `tool_use`만 세기 → S2·S3 RED, (a') `is_error`가 "키 있음"이면 오류로 취급(`false`도 오류) → S8 RED, (b) 기본 이름·부분 문자열로 비교 → S5 RED, (c) 상대 경로 해석 누락 → S4 RED, (d) 서브에이전트 읽기 무시 → S6 RED, (e) 세션이 쓴 영수증을 덮어쓰지 않고 존중 → S7 RED
-- 잡지 못하는 것: 실제 `claude`의 이미지 `Read` 스트림 모양(G1 — M1 스파이크에서 실제 스트림 1건을 녹화해 S1 픽스처를 그것으로 교체한다)
+- 잡는 구현: (a) `tool_use`만 세기 → S2·S3 RED, (a') `is_error`가 "키 있음"이면 오류로 취급(`false`도 오류) → S8 RED, (b) 기본 이름·부분 문자열로 비교 → S5 RED, (c) 상대 경로 해석 누락 → S4 RED, (d) 서브에이전트 읽기 무시 → S6 RED, (e) 세션이 쓴 영수증을 덮어쓰지 않고 존중 → S7 RED, (f) 쓰기 실패 때 세션이 쓴 영수증을 제거하지 않고 둠(제거 없이 교체만 시도) → S9(a)에서 파일 잔존으로 RED, (g) S9(b)에서 이벤트가 영수증 판정을 건너뛰고 `final` → RED
+- 잡지 못하는 것: 실제 `claude`의 이미지 `Read` 스트림 모양(G1 — M1 스파이크에서 실제 스트림 1건을 녹화해 S1 픽스처를 그것으로 교체한다), S9(b)의 보관 단계 재판정(G14)
 
 ### AC-AIR6-016 — 최종본 인정과 규칙 7 불변식 (REQ-AIR6-016)
 
-REQ-AIR6-016이 정의한 단일 함수 `evaluate_admissibility`의 조건 18개(기존 `final_not_allowed` + 17개)를 **조건마다 케이스 하나**로 시험하는 표 구동 시험이다. 같은 함수를 영수증 작성기(`reasons` 채움)와 `select_report`가 호출한다.
+조건 18개를 표 구동으로 시험한다. 조건 0(`final_not_allowed`)은 `select_report`가 평가하고, 조건 1~17은 단일 순수 함수 `evaluate_admissibility`가 평가한다. 영수증 작성기와 `select_report`가 같은 함수를 호출하며 작성기는 1~17만 평가한다. 함수는 예외를 던지지 않고 읽을 수 없는 입력은 미충족으로 본다(REQ-AIR6-016의 읽기 보호 규칙).
 
-- Given: 작업 폴더 픽스처 빌더. 기준 픽스처 P = 모든 조건을 만족하는 상태(`final/report.html` + `final/render-validation.json{delivery_allowed: true}` + `draft/` + 색인 complete·모바일 넘침 없음·타일 파일·서버 방식으로 쓴 영수증 `outcome: reviewed`·`tiles_read` 전부·`judged_writes: []`·스냅샷 start==end·유효한 `audit-review.json`(`separate_review_pass`, `visual: pass`, 증거에 `[렌더 차이]`)). 케이스마다 P에서 **정확히 하나만** 바꾼다:
+**되돌림 주장의 정확한 범위.** 한 조건의 검사를 제거했을 때 관측되는 변화에는 두 수준이 있다.
+- **수준 A (결과가 뒤집힘)**: 그 조건 하나만 어기는 *격리 케이스*의 결과가 `draft`에서 `final`로 바뀐다. 조건 0, 2~12, 14~17의 16개가 여기에 속한다.
+- **수준 B (사유 목록이 바뀜)**: 읽기 보호 조건 1(영수증 존재)과 13(`audit-review.json` 존재)은 입력을 아예 못 읽는 상황을 막는다. 그 상황에서는 다른 조건도 입력을 못 읽어 미충족이 되므로, 1이나 13을 제거해도 결과는 `draft`로 남고 보고되는 사유 목록만 달라진다(예: 1을 빼면 `no_receipt` 대신 `receipt_invalid`가 보고됨). 모든 케이스가 `reasons` 목록 전체를 **순서까지 정확히** 단언하므로 수준 B도 RED로 관측된다.
 
-| 케이스 | 변경 | 기대 첫 사유 코드 |
+아래 "자연 흐름" 케이스는 실제 공격 경로를 재현한다. 여러 조건이 함께 걸려 어느 한 조건의 제거로는 뒤집히지 않으므로 되돌림 대상이 아니며, 공격이 막히는지를 보이는 용도다.
+
+- Given: 작업 폴더 픽스처 빌더. 기준 픽스처 P = 모든 조건을 만족하는 상태(`final/report.html` + `final/render-validation.json{delivery_allowed: true}` + `draft/` + 색인 complete·모바일 넘침 없음·타일 파일·서버 방식으로 쓴 영수증 `outcome: reviewed`·`tiles_read` 전부·`judged_writes: []`·스냅샷 start==end·유효한 `audit-review.json`(`separate_review_pass`, `visual: pass`, 증거에 `[렌더 차이]`, `reviewed_at` ≥ 색인 `finished_at`, `preview_sha256` 일치)). 격리 케이스는 P에서 **정확히 하나의 입력만** 바꾼다. 색인·타일처럼 화면 스냅샷에 속하는 파일을 바꾸는 격리 케이스는 빌더가 영수증의 `snapshot_start`·`snapshot_end`를 바뀐 상태로 다시 측정해 맞춘다(세션 시작 전에 이미 그 상태였던 것과 같다). 그래야 스냅샷 조건 6이 함께 걸리지 않는다
+
+**격리 케이스 (한 조건씩)**
+
+| 케이스 | 변경 (P에서 하나만) | 기대 `reasons` (정확히) | 격리하는 조건 · 수준 |
+|---|---|---|---|
+| (a) | 변경 없음 | `[]` → `("final", final_dir)` | — |
+| (n) | `final/render-validation.json`의 `delivery_allowed: false` | `select_report` 쪽 `[final_not_allowed]`. `evaluate_admissibility`를 직접 부르면 admissible(`[]`) | 0 · A |
+| (b) | 영수증 파일 삭제 | `[no_receipt]` | 1 · B |
+| (b2-i) | 영수증 `schema_version: 2` | `[receipt_invalid]` | 2 · A |
+| (b2-ii) | 영수증에서 진단용 키(`reasons`) 하나 삭제 | `[receipt_invalid]` | 2 · A |
+| (r) | 영수증 `outcome: timeout` | `[review_not_completed]` | 3 · A |
+| (w) | 영수증 `judged_writes`에 `draft/` 경로 1건 | `[judged_input_write_attempt]` | 4 · A |
+| (d) | 색인 `outcome: partial`(나머지 값은 그대로) | `[screens_not_complete]` | 5 · A |
+| (s) | 영수증 작성 뒤 `index.json`의 모바일 `horizontal_overflow`를 `true`→`false`로 위조(영수증 스냅샷은 `true` 상태의 색인) | `[screens_changed]` | 6 · A |
+| (x) | 영수증 작성 뒤 `screens/`에 색인에 없는 새 파일 `mobile-99.png` 추가 | `[screens_changed]` | 6 · A |
+| (t7) | 타일 하나를 세션 시작 전에 삭제(색인에는 그대로 있음, 스냅샷은 삭제 상태로 일관) | `[tile_missing]` | 7 · A |
+| (g2) | 타일 하나의 바이트를 세션 시작 전에 변조(스냅샷은 변조 상태로 일관, 색인 해시는 원본) | `[tile_hash_mismatch]` | 8 · A |
+| (k) | 영수증 작성 뒤 `draft/report-input.json` 바이트 변경 | `[draft_changed]` | 9 · A |
+| (k2) | 영수증의 `hashes.preview_end`가 디스크의 `draft/report.html` 해시와 다름 | `[draft_changed]` | 9 · A |
+| (e) | 색인 `preview_sha256`이 현재 `draft/report.html` 해시와 다름(낡은 화면; 스냅샷은 그 상태로 일관) | `[preview_hash_mismatch]` | 10 · A |
+| (m) | `audit-review.json`의 `preview_sha256`이 현재 `draft/report.html` 해시와 다름 | `[preview_hash_mismatch]` | 10 · A |
+| (c) | 타일 하나가 `tiles_read`에 없음 | `[tile_not_read]` | 11 · A |
+| (c2) | 영수증 `tiles_expected`가 색인의 타일 목록과 다름 | `[tile_not_read]` | 11 · A |
+| (f) | 색인 모바일 `horizontal_overflow: true`(스냅샷은 그 상태로 일관) | `[mobile_overflow]` | 12 · A |
+| (o) | `audit-review.json` 삭제(영수증 작성 뒤) | `[no_audit_review]` | 13 · B |
+| (h) | `audit-review.json`의 `mode: independent_agent` | `[mode_not_separate_review_pass]` | 14 · A |
+| (i) | `checks.visual.status: revise` | `[visual_not_pass]` | 15 · A |
+| (j) | `reviewed_at`이 색인 `finished_at`보다 이름 | `[reviewed_before_capture]` | 16 · A |
+| (p) | `checks.visual.evidence`에서 `[렌더 차이]` 표지 제거 | `[font_note_missing]` | 17 · A |
+
+**읽기 실패 케이스 (fail-closed 시험 — 특정 조건의 되돌림 대상이 아님)**
+
+| 케이스 | 변경 | 기대 `reasons` (정확히) |
 |---|---|---|
-| (a) | 변경 없음 | 없음 → `("final", final_dir)` |
-| (n) | `delivery_allowed: false` | `final_not_allowed` |
-| (b) | 영수증 파일 삭제 | `no_receipt` |
-| (b2) | 영수증을 깨진 JSON으로 / `schema_version: 2`로 / 고정 키 하나 삭제(각각 하위 케이스) | `receipt_invalid` |
-| (r) | 영수증 `outcome: timeout` (나머지는 P) | `review_not_completed` |
-| (w) | 영수증 `judged_writes`에 `draft/` 경로 1건 | `judged_input_write_attempt` |
-| (d) | 색인 `outcome: unavailable`(감수 기록은 `visual: pass` 유지) | `screens_not_complete` |
-| (g) | 영수증 작성 **뒤** 타일 파일 하나를 다른 바이트로 덮어씀(영수증의 `visual_admissible: true`는 그대로) | `screens_changed` |
-| (g2) | 캡처 직후·세션 시작 전에 타일을 변조하고 그 상태에서 영수증 작성기를 돌림(스냅샷 start==end==변조본) | `tile_hash_mismatch` |
-| (g3) | 색인에 적힌 타일 파일 하나 삭제(영수증 작성 뒤) | `screens_changed`(스냅샷 불일치가 먼저). 영수증 작성 전에 삭제한 변형은 `tile_missing` |
-| (s) | 영수증 작성 뒤 `index.json`의 모바일 `horizontal_overflow`를 위조해 `false`로(원래 `true` 상태에서 작성) | `screens_changed` |
-| (k) | 영수증은 P와 같고 작성 뒤 `draft/report.html` 변경 | `draft_changed` |
-| (e) | 색인 `preview_sha256`이 현재 `draft/report.html` 해시와 다름(낡은 화면; 스냅샷은 그 상태로 일관) | `preview_hash_mismatch` |
-| (m) | `audit-review.json`의 `preview_sha256`이 현재 초안 해시와 다름 | `preview_hash_mismatch` |
-| (c) | 타일 하나가 `tiles_read`에 없음 | `tile_not_read` |
-| (f) | 모바일 `horizontal_overflow == true`(스냅샷 일관) | `mobile_overflow` |
-| (o) | `audit-review.json` 삭제(영수증 작성 뒤) | `no_audit_review` |
-| (h) | `audit-review.json` `mode == "independent_agent"` | `mode_not_separate_review_pass` |
-| (i) | `checks.visual.status == "revise"` | `visual_not_pass` |
-| (j) | `reviewed_at`이 색인 `finished_at`보다 이름 | `reviewed_before_capture` |
-| (p) | `visual.evidence`에서 `[렌더 차이]` 표지 제거 | `font_note_missing` |
-| (q) | 영수증의 `visual_admissible: true`·`reasons: []`는 그대로 두고 위 (g)처럼 디스크만 변조 | 저장된 불리언을 믿지 않고 `draft`(= (g)와 같은 코드) |
+| (b3) | 영수증이 깨진 JSON | `[receipt_invalid]` (예외 없음, 의존 조건 3·4·6·9·11은 보고하지 않음) |
+| (d2) | 색인 파일이 깨진 JSON(스냅샷은 그 상태로 일관) | `[screens_not_complete]` (예외 없음, 의존 조건 7·8·11·12는 보고하지 않음) |
+| (o2) | `audit-review.json`이 깨진 JSON | `[no_audit_review]` (예외 없음, 의존 조건 14~17은 보고하지 않음) |
 
-- When: 각 케이스에서 `evaluate_admissibility(job_dir)`와 `select_report(job_dir)`를 호출하고, `archive_job`이 같은 `delivery_status`를 쓰는지 확인한다. 영수증 작성기를 거치는 케이스((g2) 등)는 작성기가 `reasons`를 채운 결과를 읽는다
-- Then: (a)만 `("final", final_dir)`. 나머지는 모두 `("draft", draft_dir)`이고 `reasons` 목록의 **첫 항목**이 표의 코드(고정 평가 순서)이며 로그에 남는다. 이 목록에는 해당 케이스가 만족하지 못한 모든 코드가 포함된다(예: (g)는 `screens_changed`를 포함). `archive_job`의 `delivery_status`도 같다. 추가로 영수증 없는 `final/`만 있는 폴더(draft 없음)는 `None`(기존 규칙)
+**자연 흐름 케이스 (여러 조건이 함께 걸림 — 되돌림 대상 아님)**
+
+| 케이스 | 변경 | 기대 `reasons` (정확히) |
+|---|---|---|
+| (g) | 영수증 작성 뒤 타일 하나를 다른 바이트로 덮어씀(영수증의 저장된 `visual_admissible: true`·`reasons: []`는 그대로) | `[screens_changed, tile_hash_mismatch]` |
+| (g3) | 영수증 작성 뒤 색인에 적힌 타일 파일 하나 삭제 | `[screens_changed, tile_missing]` |
+| (kr) | 영수증 작성 뒤 `draft/report.html` 바이트 변경 | `[draft_changed, preview_hash_mismatch]` |
+
+- When: 각 케이스에서 `evaluate_admissibility(job_dir)`와 `select_report(job_dir)`를 호출하고, `archive_job`이 같은 `delivery_status`를 쓰는지 확인한다. 영수증 작성기를 거치는 케이스는 작성기가 `reasons`를 채운 결과를 읽어 같은 시점의 `select_report` 사유와 비교한다
+- Then: (a)만 `("final", final_dir)`. 나머지는 모두 `("draft", draft_dir)`이고 `reasons`가 표의 기대 목록과 **순서까지 정확히 같다**. 첫 항목이 로그에 남는다. `archive_job`의 `delivery_status`도 같다. 추가로 영수증 없는 `final/`만 있고 `draft/`가 없는 폴더는 `None`(기존 규칙)
 - 명령: `PY -m pytest backend/tests/test_goose_runner.py backend/tests/test_goose_review.py -k air6_016 -q`
-- 잡는 구현(**조건 18개 각각의 되돌림으로 RED 관측** — 해당 조건 검사만 제거한 변형에서 해당 케이스만 `final`이 되어 RED): 영수증 확인 전체 제거 → (b)~(q) 전부 RED. 조건별: `final_not_allowed`→(n), `no_receipt`→(b), `receipt_invalid`→(b2) 세 변형, `review_not_completed`→(r), `judged_input_write_attempt`→(w), `screens_not_complete`→(d), `screens_changed`→(g)(g3)(s), `tile_missing`→(g3 변형), `tile_hash_mismatch`→(g2), `draft_changed`→(k), `preview_hash_mismatch`→(e)(m), `tile_not_read`→(c), `mobile_overflow`→(f), `no_audit_review`→(o), `mode_not_separate_review_pass`→(h), `visual_not_pass`→(i), `reviewed_before_capture`→(j), `font_note_missing`→(p). **저장된 `visual_admissible`을 입력으로 사용하는 구현 → (q)(g)(k)에서 RED.** 판정 함수를 영수증 작성기와 `select_report`가 따로 구현(조건 목록 갈라짐) → 두 호출 결과 비교 단언(작성기 `reasons` == 같은 시점 `select_report` 사유) RED
-- 잡지 못하는 것: 영수증 조건을 모두 만족하면서 판단이 틀린 감수(범위 밖 — 영수증은 열람 사실과 판단 대상 불변만 증명), 도구 밖 경로 변조(G11)
+- 잡는 구현(조건별 되돌림 RED — 해당 조건의 검사만 제거한 변형에서 아래 케이스가 RED):
+  - 수준 A: 0→(n), 2→(b2-i)(b2-ii), 3→(r), 4→(w), 5→(d), 6→(s)(x), 7→(t7), 8→(g2), 9→(k)(k2), 10→(e)(m), 11→(c)(c2), 12→(f), 14→(h), 15→(i), 16→(j), 17→(p). 각 변형에서 해당 케이스가 `final`이 되어 RED
+  - 수준 B: 1→(b), 13→(o). 각 변형에서 결과는 `draft`로 남지만 사유 목록이 기대와 달라져 RED
+  - 읽기 실패 처리를 허용으로 바꾼 변형(fail-open) → (b)(b3)(d2)(o)(o2)가 `final`이 되어 RED. 읽기 실패에서 예외를 던지는 변형 → (b3)(d2)(o2)가 오류로 RED
+  - **저장된 `visual_admissible`을 입력으로 사용하는 구현 → (g)(kr)에서 RED**(디스크가 바뀌었는데 `final`)
+  - 판정 함수를 영수증 작성기와 `select_report`가 따로 구현(조건 목록 갈라짐) → 두 호출 결과 비교 단언(작성기 `reasons` == 같은 시점 `select_report` 사유) RED
+  - 되돌림 대상이 아닌 짝: 6과 8, 9와 10은 같은 공격(타일 덮어쓰기, 보고서 변경)에 함께 걸려 (g)(kr)에서는 한쪽을 빼도 다른 쪽이 막는다 — 그래서 각자의 격리 케이스로 시험한다
+- 잡지 못하는 것: 영수증 조건을 모두 만족하면서 판단이 틀린 감수(범위 밖 — 영수증은 열람 사실과 판단 대상 불변만 증명), 도구 밖 경로 변조(G11), `final/` 산출물이 렌더러가 만든 것인지(조건 0은 두 파일의 존재와 `delivery_allowed`만 본다, G13), `audit-review.json`이 영수증 작성 뒤에 바뀌는 경우(G15)
 
 ### AC-AIR6-017 — 테스트 격리와 회귀 (REQ-AIR6-017)
+
+횡단 기준이다. M2~M5 각 마일스톤 종료 때 `pytest backend/tests -k goose`로 확인하고, 최종 판정은 M5 종료 시점에 한다(plan.md §3).
 
 - Given: 변경 후 작업 트리
 - When: goose 백엔드 테스트 전체와 새 테스트를 실행하고, 격리 점검을 한다
@@ -232,7 +268,9 @@ REQ-AIR6-016이 정의한 단일 함수 `evaluate_admissibility`의 조건 18개
 
 라이브 관측 게이트다. 통과해야 SPEC을 닫는다(§F). 감수 세션(모델)의 판단에 달려 있으므로 같은 KST 날짜에 020150으로 최대 2회 실행할 수 있다.
 
-**통과 규칙(명시).** 게이트는 다음 둘이 모두 참일 때 통과다: (가) 실행한 **모든 회차**가 5(안전·정합)를 만족한다. (나) 실행한 회차 중 **적어도 한 회차**가 1~4를 모두 만족한다. 1~4를 만족하지 못한 회차는 원인을 `progress.md §E.2`에 남겨야 한다(원인 없는 실패 회차는 게이트 실패). 두 번째 회차는 첫 회차가 기록된 원인으로 1~4를 만족하지 못했을 때만 허용되는 재시도이며 추가 관문이 아니다. LLM 판단의 비결정성 때문에 한 회차 통과로 충분하되, 안전 속성(5)은 회차를 가리지 않는다.
+**통과 규칙(명시).** 게이트는 다음 둘이 모두 참일 때 통과다: (가) 실행한 **모든 회차**가 5(안전 불변식)를 만족한다. (나) 실행한 회차 중 **적어도 한 회차**가 1~4(작업·화면·열람·기록 형식)를 모두 만족한다. 1~4를 만족하지 못한 회차는 원인을 `progress.md §E.2`에 남겨야 한다(원인 없는 실패 회차는 게이트 실패). 두 번째 회차는 첫 회차가 기록된 원인으로 1~4를 만족하지 못했을 때만 허용되는 재시도이며 추가 관문이 아니다. LLM 판단의 비결정성 때문에 한 회차 통과로 충분하되, 안전 불변식(5)은 회차를 가리지 않는다.
+
+**`[렌더 차이]` 표지 누락의 결과는 한 가지다.** 누락은 서버 조건 17(`font_note_missing`) 미충족이므로 영수증이 화면 확인을 인정하지 않고 전달은 `draft`가 된다. 이는 설계된 안전 방향 결과이며 규칙 7 불변식 결함이 아니다. 게이트에서의 취급: 한 회차의 누락은 그 회차가 (나)군의 4를 만족하지 못하게 할 뿐 (가)군 실패가 아니다. 모든 회차에서 누락되면 (나)가 불충족이라 게이트가 실패한다.
 
 - Given: M5 반영 후 서버 재시작과 AC-013 #5 통과, 기준선 research.md P2·P3(같은 종목 이전 실행에서 대상 8종 전부 발생), 운영 호스트에 Playwright 캐시의 `chrome-headless-shell`이 있음
 - When: 앱에서 020150으로 goose 작업을 실행하고 끝까지 기다린다. 452190은 선택 관측(게이트 아님)
@@ -240,51 +278,55 @@ REQ-AIR6-016이 정의한 단일 함수 `evaluate_admissibility`의 조건 18개
   1. 작업 `status: done`
   2. `R/screens/index.json`의 `outcome == "complete"`이고 두 뷰포트 `ok`, 타일 파일이 모두 존재하며 SHA-256 일치
   3. `R/review/receipt.json`: `screens.tiles_read`가 `screens.tiles_expected`를 모두 포함(감수 세션이 모든 타일을 실제로 열었다), `process.exit_code == 0`, `draft_unchanged == true`, `judged_writes == []`, `screens.snapshot_start == snapshot_end`
-  4. **감수 기록의 형식이 올바르다**(정직한 부정 결과를 가로막지 않는 조건): `python3 -I ~/.goose-harness/.claude/skills/goose/workflows/fact-check/scripts/audit_report.py --input R/draft/report-input.json --preview R/draft/report.html --review R/audit-review.json --output "$S/audit.json"`의 결함 코드 집합이 `{AUDIT_INPUT_VERSION, AUDIT_PREVIEW_VERSION, AUDIT_TIME, AUDIT_MODE}`와 교집합이 공집합이고, `R/audit-review.json`의 5개 검사(`source_accuracy`, `calculations`, `coverage`, `opinion`, `visual`)가 모두 존재하며 각 `evidence`가 비어 있지 않다. 각 검사의 `status`가 `pass`인지 `revise`인지는 게이트 조건이 아니다 — 기록만 한다(`REVIEW_SOURCE_ACCURACY`·`REVIEW_CALCULATIONS`·`REVIEW_COVERAGE`·`REVIEW_OPINION`·`REVIEW_VISUAL`이 정당한 `revise` 때문에 남는 것은 정상이다)
-  5. 규칙 7 정합(모든 회차): (i) `audit-review.json`의 `checks.visual.status == "pass"`이면 `receipt.visual_admissible == true`이고 `reasons`가 비어 있다. (ii) `receipt.visual_admissible == false`이면 전달 상태(`job.json`/작업 완료 이벤트의 `delivery_status`)는 `draft`다. (iii) 전달 상태가 `final`이면 `R/final/delivery-audit.json`의 `decision == "pass"`다. (iv) `visual.evidence`가 연 타일 파일 이름을 하나 이상 적고 `[렌더 차이]` 표지로 시작한다. (v) 작업 완료 이벤트의 `delivery_status`가 `R`을 보관한 폴더의 `job.json`의 값과 같다(REQ-AIR6-019)
-- **알려진 한계(7번 결함 처리).** 020150 라이브 실행에서는 네이버 검색이 `blocked`로 기록돼(research P23) `LATEST_SEARCH_NAVER`가 남고 감사 결정이 `pass`가 되지 못하므로 `--final`이 실행되지 않는다 — 카드 t19가 해소한다. 따라서 이 AC의 5(ii)·5(iii)는 라이브에서 "`draft`·최종본 없음" 쪽만 관측되고, `final` 인정 경로는 AC-AIR6-022(격리 통합 시험)와 AC-016이 담당한다
-- 비게이팅(기록만): 5개 검사 각각의 `pass`/`revise` 결과와 `REVIEW_*` 코드 잔존, `LATEST_SEARCH_NAVER` 등 이 SPEC 범위 밖 결함, 최종본 도달 여부, 소요 시간·토큰(research G5), 진행 패널 화면 배치, `[렌더 차이]` 표지 누락으로 `font_note_missing`이 난 빈도, **자정(KST)을 넘겨 후처리 감사에서 `FRESHNESS_CUTOFF`가 추가로 난 경우**(`audit_report.py:32-33`, research P31 — 게이팅 코드가 아니므로 기록만)
-- 실패 시 기록: 2 실패 → 캡처 결함(브라우저·타일), 2 통과·3 실패 → 감수 세션이 이미지를 안 열었거나 영수증 수집 결함(스트림 모양 확인), 3 통과·4 실패 → 지침 미준수 또는 컨텍스트 결함(남은 코드와 해당 필드를 그대로 기록), 5 위반 → 규칙 7 불변식 결함(최우선). 어느 경우든 SPEC은 닫지 않고 manager-spec 재위임으로 고친 뒤 다시 잰다
+  4. **감수 기록의 형식이 올바르다**(정직한 부정 결과를 가로막지 않는 조건): `python3 -I ~/.goose-harness/.claude/skills/goose/workflows/fact-check/scripts/audit_report.py --input R/draft/report-input.json --preview R/draft/report.html --review R/audit-review.json --output "$S/audit.json"`의 결함 코드 집합이 `{AUDIT_INPUT_VERSION, AUDIT_PREVIEW_VERSION, AUDIT_TIME, AUDIT_MODE}`와 교집합이 공집합이고, `R/audit-review.json`의 5개 검사(`source_accuracy`, `calculations`, `coverage`, `opinion`, `visual`)가 모두 존재하며 각 `evidence`가 비어 있지 않고, `checks.visual.evidence`가 `[렌더 차이]` 표지를 **포함**한다(서버 조건 17과 같은 기준). 각 검사의 `status`가 `pass`인지 `revise`인지는 게이트 조건이 아니다 — 기록만 한다(`REVIEW_SOURCE_ACCURACY`·`REVIEW_CALCULATIONS`·`REVIEW_COVERAGE`·`REVIEW_OPINION`·`REVIEW_VISUAL`이 정당한 `revise` 때문에 남는 것은 정상이다)
+  5. **안전 불변식(모든 회차)**: (i) `receipt.visual_admissible == false`이면 전달 상태(`job.json`/작업 완료 이벤트의 `delivery_status`)는 `draft`다. (ii) 전달 상태가 `final`이면 `R/final/delivery-audit.json`의 `decision == "pass"`다. (iii) 작업 완료 이벤트의 `delivery_status`가 `R`을 보관한 폴더의 `job.json`의 값과 같다(REQ-AIR6-019). (iv) 영수증 내부 정합: `visual_admissible == true`이면 `reasons`가 비어 있고 `false`이면 비어 있지 않다
+- **알려진 한계(7번 결함 처리).** 020150 라이브 실행에서는 네이버 검색이 `blocked`로 기록돼(research P23) `LATEST_SEARCH_NAVER`가 남고 감사 결정이 `pass`가 되지 못하므로 `--final`이 실행되지 않는다 — 카드 t19가 해소한다. 따라서 이 AC의 5(i)·5(ii)는 라이브에서 "`draft`·최종본 없음" 쪽만 관측되고, `final` 인정 경로는 AC-AIR6-022(격리 통합 시험)와 AC-016이 담당한다
+- 비게이팅(기록만): 5개 검사 각각의 `pass`/`revise` 결과와 `REVIEW_*` 코드 잔존, `checks.visual.status == "pass"`인데 `visual_admissible == false`인 회차의 수와 그 `reasons`(표지 누락·타일 미열람 등 — 지침 미준수로 분류), `visual.evidence`가 표지로 *시작*하는지 여부(지침은 시작을 요구하고 서버와 게이트는 포함만 확인한다), `LATEST_SEARCH_NAVER` 등 이 SPEC 범위 밖 결함, 최종본 도달 여부, 소요 시간·토큰(research G5), 진행 패널 화면 배치, **자정(KST)을 넘겨 후처리 감사에서 `FRESHNESS_CUTOFF`가 추가로 난 경우**(`audit_report.py:32-33`, research P31 — 게이팅 코드가 아니므로 기록만)
+- 실패 시 기록: 2 실패 → 캡처 결함(브라우저·타일), 2 통과·3 실패 → 감수 세션이 이미지를 안 열었거나 영수증 수집 결함(스트림 모양 확인), 3 통과·4 실패 → 지침 미준수(표지 누락 포함) 또는 컨텍스트 결함(남은 코드와 해당 필드를 그대로 기록), 5 위반 → 규칙 7 불변식 결함(최우선; 5는 안전 불변식만 가리키며 표지 누락·미인정 `pass`는 5가 아니라 4와 비게이팅 기록의 몫이다). 어느 경우든 SPEC은 닫지 않고 manager-spec 재위임으로 고친 뒤 다시 잰다
 - 대조(되돌림 관측): 같은 회차의 `R/draft`에 대해 `--review`를 주지 않은 감사 출력은 P2-A와 같이 형식 코드 4개(와 `REVIEW_*` 5개)를 모두 낸다 — 4의 판정이 이 입력에서 공집합이 될 수 있음을 보이는 기준선으로 같이 기록한다
-- 잡는 구현: 캡처는 되지만 감수 세션이 지침을 따르지 않아 `audit-review.json`이 없음 → 4 실패, 감수 세션이 해시를 틀리게 옮김 → `AUDIT_INPUT_VERSION`/`AUDIT_PREVIEW_VERSION`으로 4 실패, 타일을 열지 않고 `visual: pass`를 적음 → 영수증이 인정하지 않아 전달은 안전하게 `draft`로 내려가지만(5(ii) 만족) `pass`와 `visual_admissible: false`가 어긋나 5(i)가 위반으로 기록된다 — 지침 미준수로 분류해 지침을 고친 뒤 다시 잰다. 감수 세션이 결함을 찾아 정직하게 `revise`를 적음 → 4·5 모두 만족(게이트를 막지 않는다)
+- 잡는 구현: 캡처는 되지만 감수 세션이 지침을 따르지 않아 `audit-review.json`이 없음 → 4 실패, 감수 세션이 해시를 틀리게 옮김 → `AUDIT_INPUT_VERSION`/`AUDIT_PREVIEW_VERSION`으로 4 실패, `visual` 증거에 표지를 빠뜨림 → 조건 17로 영수증이 인정하지 않아 전달은 안전하게 `draft`(5 만족)이고 그 회차는 4 실패로 (나)군에서 탈락, 타일을 열지 않고 `visual: pass`를 적음 → 영수증이 인정하지 않아 전달은 안전하게 `draft`(5 만족)로 내려가지만 3 실패로 그 회차는 (나)군에서 탈락하고 비게이팅 기록에 "`pass`인데 미인정"으로 남는다(지침 미준수로 분류해 지침을 고친 뒤 다시 잰다). 감수 세션이 결함을 찾아 정직하게 `revise`를 적음 → 4·5 모두 만족(게이트를 막지 않는다)
 - 잡지 못하는 것: 감수 세션이 열었다고 한 자료를 실제로 끝까지 읽었는지, 사실 대조의 충실도(스트림 기록으로 열람 사실만 확인, G6), `final` 인정 경로의 라이브 관측(위 한계)
 
 ### AC-AIR6-019 — M1 GO/NO-GO 게이트: 캐너리 토큰 인용 (REQ-AIR6-020)
 
-M1은 게이트다. 실제 `claude -p`가 서버가 만든 PNG를 정말 "보는지"를 이진으로 판정한다. 성공한 `tool_result` 하나는 모델이 이미지를 인지했다는 증거가 아니다(이미지가 너무 커 축소됐거나 글자가 뭉개졌을 수 있다, G4).
+M1은 게이트다. 실제 `claude -p`가 서버가 만든 PNG를 정말 "보는지"를 이진으로 판정한다. 성공한 `tool_result` 하나는 모델이 이미지를 인지했다는 증거가 아니다(이미지가 너무 커 축소됐거나 글자가 뭉개졌을 수 있다, G4). REQ-AIR6-020과 이 AC는 같은 GO 정의를 쓴다.
 
-- Given: 실제 `claude`(설치본)와 설치된 하네스, 캡처 모듈 경로(또는 M1 스파이크 스크립트가 같은 CDP 호출을 쓴 것)로 만든 캐너리 페이지 — 임의 토큰 3개(영숫자 6자, 매번 새로 생성, 파일·프롬프트에 사전 노출 없음)를 각각 (가) 보고서 본문 글자 크기(초안의 계산된 `font-size`를 M1이 측정해 사용), (나) 그보다 작은 두 크기로 그린 페이지. 토큰 (가)는 첫 타일 바깥, 즉 `y > 0` 타일 안에 놓는다. 데스크톱(1280)·모바일(390) 뷰포트 각각의 타일
+- Given: 실제 `claude`(설치본)와 설치된 하네스, 그리고 **M1 전용 스파이크 스크립트**(증거 폴더 `$S`에 보관하고 병합하지 않는다). 스크립트는 M2 캡처 모듈에 의존하지 않고, REQ-AIR6-006·009가 정한 것과 같은 DevTools 호출(뷰포트 1280/390, 모바일 에뮬레이션, 스크립트 비활성, 외부 네트워크 전면 차단, `file://`, 높이 1568px `clip` 타일)로 캐너리 페이지를 찍는다. 캐너리 페이지는 두 뷰포트 모두 타일이 2개 이상이 되는 높이로 만든다. 뷰포트마다 임의 토큰 3개(영숫자 6자, 매번 새로 생성, 파일·프롬프트에 사전 노출 없음)를 (가) 보고서 본문 글자 크기(초안의 계산된 `font-size`를 M1이 측정해 사용) 1개, (나) 그보다 작은 두 크기 각 1개로 그린다. 본문 크기 토큰 (가)는 첫 타일 바깥, 즉 `y > 0` 타일 안에 놓는다
 - When: 감수 세션과 같은 인자·설정(REQ-AIR6-011)으로 `claude -p`를 실행해 "각 타일 파일을 Read로 열고 그림 안의 토큰을 그대로 답하라"고 시킨다. 프롬프트에는 토큰도 정답도 없다. 스트림을 서버 쪽에서 기록한다
-- Then (GO 조건 전부):
-  1. 응답이 **두 뷰포트의 본문 크기 토큰 (가)를 정확히(대소문자 포함 문자열 일치) 인용**한다
-  2. 스트림에 각 타일에 대한 `Read` `tool_use`와 짝이 맞는 `tool_result`가 있고 `is_error`가 `false`이거나 키가 없다
+- Then (GO 조건 전부 — REQ-AIR6-020과 동일):
+  1. 응답이 **두 뷰포트의 본문 크기 토큰 (가) 2개를 모두 정확히(대소문자 포함 문자열 일치) 인용**한다
+  2. 스트림에 **모든 캐너리 타일**에 대한 `Read` `tool_use`와 짝이 맞는 `tool_result`가 있고 `is_error`가 `false`이거나 키가 없다
   3. `y > 0` 타일의 PNG가 `y == 0` 타일과 해시가 다르고 높이가 요청 구간과 같다(타일 `clip` 동작, G3)
-  4. 위 판정과 함께 **가독성 임계값**(토큰을 맞게 인용한 가장 작은 글자 크기)과 `Read` 한 번에 걸린 시간을 `progress.md §E.2`에 측정값으로 적는다(G4·G5 — 메모가 아니라 수치)
-  5. 기존 초안 4개의 높이·타일 분포를 재측정해 기록하고 타일 상한이 최대 타일 수의 1.5배 이상임을 확인한다(REQ-AIR6-008, research P26). 부족하면 상한을 올려 manager-spec 재위임으로 이 문서에 반영한다
-- NO-GO: 위 1~3 중 하나라도 어긋나는 모든 경우(토큰 오인용·거부·오류 `tool_result`·시간 초과·`claude` 부재 포함). NO-GO 결과: M2~M6 코드를 병합하지 않는다, 관측 원문(명령·출력)을 `progress.md §E.2`에 기록한다, SPEC은 계획 단계로 되돌아가며 **이 문서는 바뀌지 않은 채** manager-spec 재위임과 운영자 결정(예: 타일 높이 축소 재시도 1회, 또는 "화면 확인"의 의미 변경)을 거친다. 타일 높이를 줄여 재시도해 GO가 되면 그 높이가 새 상수가 되고 AC-006의 타일 높이 리터럴은 재계산해 manager-spec 재위임으로 고친다
+- NO-GO: 위 1~3 중 하나라도 어긋나는 모든 경우(본문 크기 토큰 오인용·거부·오류 `tool_result`·시간 초과·`claude` 부재 포함). NO-GO 결과: M2~M6 코드를 병합하지 않는다, 관측 원문(명령·출력)을 `progress.md §E.2`에 기록한다, SPEC은 계획 단계로 되돌아가며 **이 문서는 바뀌지 않은 채** manager-spec 재위임과 운영자 결정(예: 타일 높이 축소 재시도 1회, 또는 "화면 확인"의 의미 변경)을 거친다. 타일 높이를 줄여 재시도해 GO가 되면 그 높이가 새 상수가 되고 AC-006의 타일 높이 리터럴은 재계산해 manager-spec 재위임으로 고친다
+- GO 판정과 무관한 기록 (모두 `progress.md §E.2`에 측정값으로, 메모가 아니라 수치):
+  4. **가독성 임계값**: (나) 토큰을 포함해 토큰을 맞게 인용한 가장 작은 글자 크기. (나) 토큰의 오인용은 NO-GO가 아니며 이 임계값으로만 기록한다(G4). `Read` 한 번에 걸린 시간도 적는다(G5)
+  5. 기존 초안 4개의 높이·타일 분포를 재측정해 기록한다(REQ-AIR6-008, research P26)
+- 조정 후 진행 (GO/NO-GO를 바꾸지 않는다, 부족하면 M2 병합 전에 이 문서를 고친다):
+  - (a) 타일 상한(`TILE_CAP`)이 5에서 재측정한 최대 타일 수의 1.5배보다 작으면 상한을 올려 REQ-AIR6-008과 AC-AIR6-008을 manager-spec 재위임으로 고친 뒤에만 M2를 병합한다
+  - (b) `Read` 한 번의 시간 × 33(020150 초안의 타일 수: 데스크톱 13 + 모바일 20, research P26)이 감수 시간 상한 기본값 900초(`AI_REPORT_GOOSE_REVIEW_TIMEOUT`)를 넘으면 기본값을 올려 REQ-AIR6-011과 AC-AIR6-011, research G5를 manager-spec 재위임으로 고친 뒤에만 M2를 병합한다
 - 명령: M1 스파이크 스크립트(증거 폴더 `$S`에 보관)와 그 출력 원문. 자동 시험이 아니라 관측 게이트다(실제 `claude`·브라우저 사용 — REQ-AIR6-017의 격리 시험과 구분되는 유일한 예외로, M1에서만 허용)
-- 잡는 구현(= 이 게이트가 막는 오판): 이미지 `Read`가 성공으로 보이지만 모델이 내용을 못 보는 환경 → 토큰 미인용으로 NO-GO. 프롬프트에 정답을 넣어 통과시키는 스크립트 오류 → 토큰이 사전 노출되지 않았음을 `claude` 입력 로그로 확인(위 Given)
+- 잡는 구현(= 이 게이트가 막는 오판): 이미지 `Read`가 성공으로 보이지만 모델이 내용을 못 보는 환경 → 토큰 미인용으로 NO-GO. 프롬프트에 정답을 넣어 통과시키는 스크립트 오류 → 토큰이 사전 노출되지 않았음을 `claude` 입력 로그로 확인(위 Given). `y > 0` 타일이 실제로는 `y == 0` 타일과 같은 그림(`clip` 무시) → 3번으로 NO-GO
 - 잡지 못하는 것: 실제 보고서 화면의 모든 시각 결함 인식(토큰 인용은 "글자를 읽을 수 있다"까지만), 감수 세션이 실제 감수에서 모든 타일을 꼼꼼히 보는지(G6)
 
 ### AC-AIR6-020 — 작업 완료 이벤트의 전달 상태 소유 (REQ-AIR6-019)
 
-- Given: 가짜 실행기(1차 세션 직후 `RunResult.delivery_status`로 `"draft"`를 돌려줌 — 영수증이 아직 없으므로 `select_report`도 `draft`), 가짜 캡처기, 가짜 감수기(`final/`·`delivery_allowed: true`·영수증 인정 조건을 모두 만족하는 디스크 상태를 만든다), 임시 `runs`/보관 폴더. 시나리오 (1) 실제 종료 훅(`archive_job`)을 주입, (2) 훅 없음, (3) 훅이 `{}`를 돌려줌(`archive_job`이 `None`), (4) 감수기가 인정되지 않는 상태를 만든다(훅 주입), (5) 스위치 `AI_REPORT_GOOSE_REVIEW=0`(훅 없음)
+- Given: 가짜 실행기(1차 세션 직후 `RunResult.delivery_status`로 `"draft"`를 돌려줌 — 영수증이 아직 없으므로 `select_report`도 `draft`), 가짜 캡처기, 가짜 감수기(`final/`·`delivery_allowed: true`·영수증 인정 조건을 모두 만족하는 디스크 상태를 만든다), 임시 `runs`/보관 폴더. 시나리오 (1) 실제 종료 훅(`archive_job`)을 주입, (2) 훅 없음, (3) 훅이 `{}`를 돌려줌(`archive_job`이 `None`), (4) 감수기가 인정되지 않는 상태를 만든다(훅 주입), (5) 스위치 `AI_REPORT_GOOSE_REVIEW=0`(훅 없음), (6) 두 번째 무결성 검사 실패(훅 없음). (5)(6)의 가짜 실행기는 일부러 같은 디스크 상태의 `select_report` 결과(`draft`)와 **다른** 값 `"final"`을 돌려준다 — 실제 실행기에서는 나오지 않는 값이며 전달 상태 값의 출처를 가르기 위한 것이다
 - When: 작업 실행 후 완료 이벤트의 `data.delivery_status`와 보관된 `job.json`의 값을 읽는다
-- Then: (1) 이벤트 `delivery_status == "final"`, `job.json`도 `"final"`, 둘이 `archive_job`의 반환과 같다 — 실행기 값 `draft`와 **다른** 경우다. (2) 이벤트 `"final"`(`select_report` 재계산값). (3) 이벤트 `"final"`(재계산값, 실행기의 `draft`가 아님). (4) 이벤트 `"draft"`, `job.json` `"draft"`. (5) 후처리가 돌지 않았으므로 실행기가 계산한 값을 그대로 쓴다
+- Then: (1) 이벤트 `delivery_status == "final"`, `job.json`도 `"final"`, 둘이 `archive_job`의 반환과 같다 — 실행기 값 `draft`와 **다른** 경우다. (2) 이벤트 `"final"`(`select_report` 재계산값). (3) 이벤트 `"final"`(재계산값, 실행기의 `draft`가 아님). (4) 이벤트 `"draft"`, `job.json` `"draft"`. (5) 후처리가 돌지 않았으므로 실행기가 계산한 값 `"final"`을 그대로 쓴다(재계산하면 `draft`가 되어 어긋난다). (6) 캡처·감수가 시작되지 않았으므로 실행기 값 `"final"`을 그대로 쓴다
 - 명령: `PY -m pytest backend/tests/test_goose_job_service.py -k air6_020 -q`
-- 잡는 구현: (a) 이벤트에 `result.delivery_status`를 그대로 사용(스테일) → (2)(3)에서 `draft`로 RED, (b) 훅 값이 없을 때만 재계산하고 훅 값이 `None`인 경우를 처리하지 않음 → (3) RED, (c) 이벤트와 `job.json`이 서로 다른 시점의 값 → (1)에서 불일치 RED, (d) 스위치 0일 때도 재계산(영수증 `disabled`라 `draft`로 바뀌는 것이 아니라 실행기 값 보존을 단언) → (5)의 값이 어긋나면 RED
-- 잡지 못하는 것: 실제 보관 폴더 구조의 모든 파일(`goose_storage` 기존 시험 담당)
+- 잡는 구현: (a) 이벤트에 `result.delivery_status`를 그대로 사용(스테일) → (2)(3)에서 `draft`로 RED, (b) 훅 값이 없을 때만 재계산하고 훅 값이 `None`인 경우를 처리하지 않음 → (3) RED, (c) 이벤트와 `job.json`이 서로 다른 시점의 값 → (1)에서 불일치 RED, (d) 스위치 0일 때도 재계산 → (5)에서 `draft`가 나와 RED(실행기 값 `final`과 달라서 관측됨), (e) 무결성 재검사가 실패한 경우에도 재계산 → (6)에서 `draft`가 나와 RED
+- 잡지 못하는 것: 실제 보관 폴더 구조의 모든 파일(`goose_storage` 기존 시험 담당), 영수증 쓰기 실패 때의 이벤트 값(AC-015 S9가 담당)
 
 ### AC-AIR6-021 — 글꼴 차단 증거 문구 요건 (REQ-AIR6-013, REQ-AIR6-016 조건 17)
 
-운영자 결정(2026-10-21): 캡처는 외부 네트워크를 전부 막으므로 렌더링이 실제 화면과 다르다. 감수 기록이 그 사실을 적었는지 서버가 확인한다.
+운영자 결정(2026-10-21): 캡처는 외부 네트워크를 전부 막으므로 렌더링이 실제 화면과 다르다. 감수 기록이 그 사실을 적었는지 서버가 확인한다. 표지 누락의 결과는 한 가지다: 조건 17 미충족, 전달 `draft`(설계된 안전 방향 결과).
 
 - Given: AC-016의 기준 픽스처 P 변형. 케이스: (1) `visual.evidence`가 `[렌더 차이]`로 시작하고 차단 사실을 적음, (2) 표지를 앞에서 뒤로 옮긴 문구(포함은 하지만 시작 아님)는 **인정**(조건은 "포함"), (3) 표지 없음, (4) 비슷한 문구(`[렌더링 차이]`, `[render diff]`)
 - When: `evaluate_admissibility`와 `select_report`를 호출한다. 별도로 `context.json`의 `screens.render_note`와 하네스 지침 문구를 읽는다
-- Then: (1)(2) 다른 조건이 충족되면 `final`. (3)(4) `("draft", …)`, 첫 사유 `font_note_missing`. `render_note`는 AC-012의 고정 문장이고 지침(규칙 9)에 `[렌더 차이]` 표지 문구가 있다
+- Then: (1)(2) 다른 조건이 충족되면 `final`. (3)(4) `("draft", …)`, `reasons == [font_note_missing]`. `render_note`는 AC-012의 고정 문장이고 지침(규칙 9)에 `[렌더 차이]` 표지 문구가 있다
 - 명령: `PY -m pytest backend/tests/test_goose_review.py backend/tests/test_goose_harness.py -k air6_021 -q`
-- 잡는 구현(되돌림 RED): (a) 조건 17을 제거 → (3)(4)가 `final`이 되어 RED, (b) 정확히 일치하지 않는 표지도 인정(정규식 완화) → (4) RED, (c) 지침에서 표지 문구 삭제 → 지침 문구 단언 RED, (d) 컨텍스트에서 `render_note` 누락 → AC-012 RED
-- 잡지 못하는 것: 표지 문구가 실제로 차이를 이해하고 적었는지(문자열 존재만 확인 — 약한 증거), 차이가 판단에 미치는 영향. 라이브에서의 표지 누락 빈도는 AC-018 비게이팅 기록
+- 잡는 구현(되돌림 RED): (a) 조건 17을 제거 → (3)(4)가 `final`이 되어 RED, (b) 정확히 일치하지 않는 표지도 인정(정규식 완화) → (4) RED, (c) 지침에서 표지 문구 삭제 → 지침 문구 단언 RED, (d) 컨텍스트에서 `render_note` 누락 → AC-012 RED, (e) 표지가 시작에 있을 때만 인정(조건을 "시작"으로 구현) → (2)가 `draft`가 되어 RED
+- 잡지 못하는 것: 표지 문구가 실제로 차이를 이해하고 적었는지(문자열 존재만 확인 — 약한 증거), 차이가 판단에 미치는 영향. 라이브에서의 표지 누락 빈도는 AC-018의 (나)군 형식 요건과 비게이팅 기록
 
 ### AC-AIR6-022 — 최종본 인정 경로의 격리 통합 시험 (REQ-AIR6-016·019, plan-audit D7)
 
@@ -306,10 +348,12 @@ M1은 게이트다. 실제 `claude -p`가 서버가 만든 PNG를 정말 "보는
 | 모바일 문서 폭 넘침 | `horizontal_overflow`가 참이면 최종본 불가 | AC-007·016 |
 | 감수 세션이 초안을 몰래 수정 | 영수증 `draft_unchanged: false`, 최종본 불가 | AC-014·016 |
 | 감수 세션이 `screens/` 색인·타일을 고치거나 추가·복원 | 스냅샷 불일치 또는 `Write`/`Edit` 기록 → 최종본 불가 | AC-014·016 |
+| 감수 세션이 대소문자만 다른 경로로 `screens/`를 씀 | `judged_writes`에 기록(대소문자 무시 비교), 최종본 불가 | AC-014 |
 | 감수 세션이 영수증을 위조 | 서버가 종료 후 덮어씀, 판정은 저장된 불리언을 믿지 않고 재계산 | AC-015·016 |
+| 서버의 영수증 쓰기가 실패 | 세션이 쓴 영수증을 먼저 제거, 남으면 이벤트 `draft`, 로그 `receipt_write_failed` | AC-015 |
 | 감수 세션이 결함을 찾아 정직하게 `revise`를 기록 | 게이트를 막지 않음, 전달 `draft` | AC-018 |
 | 정상 감수인데 첫 세션 값과 영수증 뒤 값이 다름 | 완료 이벤트는 영수증 뒤 값 | AC-020 |
-| 글꼴 차단 증거 표지 누락 | `font_note_missing`, 최종본 불가 | AC-021 |
+| 글꼴 차단 증거 표지 누락 | 조건 17 미충족, 전달 `draft`(설계된 안전 방향 결과) | AC-021 (라이브: AC-018 (나)군 형식 요건) |
 | 라이브 020150이 `LATEST_SEARCH_NAVER`로 `final`에 못 감 | 인정 경로는 격리 통합 시험으로 확인 | AC-022 |
 | 감수 세션이 타일을 열지 않고 `pass` 선언 | `tile_not_read`로 최종본 불가 | AC-015·016 |
 | 끄기 스위치 | 후처리 없음, 영수증 `disabled`, 전달 `draft` | AC-004 |
@@ -317,17 +361,18 @@ M1은 게이트다. 실제 `claude -p`가 서버가 만든 PNG를 정말 "보는
 | 후처리 중 무결성 재검사 실패 | 캡처·감수 없음, 영수증 `integrity_failed` | AC-001 |
 | 외부 웹 글꼴 차단으로 글꼴 대체(전면 차단, 운영자 결정) | 화면은 대체 글꼴, 증거에 `[렌더 차이]` 표지 필수 | AC-009(차단 전부), AC-013(문구), AC-021(서버 확인), AC-018(관측) |
 | Playwright 캐시에 `chrome-headless-shell` 없음, `PATH`에 다른 Chrome 있음 | `unavailable`, 다른 브라우저로 폴백하지 않음 | AC-010 |
+| 영수증·`audit-review.json`·색인이 깨져 있거나 없음 | 예외 없이 해당 보호 조건의 사유만 보고, `draft` | AC-016 |
 
 ## §E 품질 게이트
 
 - 새 모듈(`goose_screenshot.py`, `goose_review.py`) 줄 커버리지 85% 이상. 측정은 `coverage run --source=backend -m pytest <파일>` → `coverage report`(lessons #9의 커버리지 측정 함정)
 - `ruff check` 새 경고 0(기준선 대비)
-- 대조 항목은 되돌림 RED 관측 후에만 GREEN 기록(§A). 영수증 판정(AC-016)은 조건 18개(`final_not_allowed` + 17개) 각각의 되돌림을 개별로 관측한다
+- 대조 항목은 되돌림 RED 관측 후에만 GREEN 기록(§A). 영수증 판정(AC-016)은 조건 18개(`final_not_allowed` + 17개) 각각을 AC-016에 적은 수준으로 관측한다: 수준 A 16개는 해당 격리 케이스가 `draft`에서 `final`로 뒤집히는 것을, 수준 B 2개(조건 1·13)는 사유 목록이 달라지는 것을 관측한다. 관측하지 못한 되돌림은 조건 번호와 사유를 `progress.md §E.2`에 Gap으로 적는다(위 AC-016의 "자연 흐름" 케이스는 되돌림 대상이 아니다)
 - @MX: 캡처 모듈의 브라우저 프로세스 진입점과 `select_report` 영수증 확인에 `@MX:ANCHOR`·`@MX:WARN`(+REASON), 주석 언어는 `code_comments: ko`
 
 ## §F 완료 정의
 
-- AC-AIR6-019(M1 GO/NO-GO) GO — 이후에만 M2 이후 코드를 병합
+- AC-AIR6-019(M1 GO/NO-GO) GO와 조정 후 진행 규칙 (a)(b)의 반영 — 이후에만 M2 이후 코드를 병합
 - AC-AIR6-001~017, 020~022 통과(명령·출력·기준선을 `progress.md §E.2`에 원문으로). AC-022를 만들 수 없으면 사유와 함께 Gap으로 기록
 - AC-AIR6-018 통과(라이브 관측 게이트 — 통과 규칙은 AC-018 본문. 실패 기록만으로는 닫지 않는다)
 - M1 관측값(research §4 G3·G4·G5·G8·G9)이 `progress.md §E.2`에 기록됨
