@@ -98,7 +98,7 @@ router → deep_research_service.stream_deep_analysis
   └─ SSE 어댑터: event:phase / data:{markdown chunk} / event:done / event:error
 ```
 
-**Rate limiting**: Deep 전용 독립 카운터 (`AI_REPORT_DEEP_DAILY_QUOTA=15`, `AI_REPORT_DEEP_BURST_LIMIT=1`, 분당 윈도우 60s) — Perplexity 쿼터와 분리
+**Rate limiting**: 2026-10-21부터 하루 쿼터 없음(`4be2906`·`cb6b1ff`). goose 심층 분석은 한 번에 한 작업만 실행하고 진행 중이면 429 `goose_busy`, 빠른 분석은 `AI_REPORT_BURST_LIMIT`(기본 3회/60s) burst 제한만 남음. `AI_REPORT_DEEP_DAILY_QUOTA`·`AI_REPORT_DEEP_BURST_LIMIT`는 위 Deep 서비스와 함께 SPEC-AI-REPORT-004에서 제거됨
 
 **진행 상태 패널 (v1.0.4)**: `PhaseEvent` 타입 (discriminated union) + `DeepProgress` 상태 → `<ProgressPanel>` 컴포넌트. 5소스 + 합성 단계의 pending/running/done/failed 전환을 실시간 SSE로 반영, 캐시 재사용(`SourceResult.cached`) 표시.
 

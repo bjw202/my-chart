@@ -45,7 +45,7 @@
      - 수집 소스: Perplexity(sonar-reasoning-pro) + Brave Search + Tavily(advanced) + Naver(웹) + YouTube (asyncio 병렬, 최소 2/5 성공 게이트)
      - 스테이징: `/tmp/analysis_{code}_{ts}_{uuid8}/` 격리 디렉토리에 `summary.md` + `sources/*.json|md` 저장
      - 합성: Claude Code CLI subprocess (기본 `claude-sonnet-4-6`, `AI_REPORT_DEEP_MODEL=opus`로 스위칭 가능), `--permission-mode bypassPermissions --add-dir`로 스테이징 dir 접근
-     - Rate limit: Deep 전용 독립 쿼터 (`AI_REPORT_DEEP_DAILY_QUOTA=15`, `AI_REPORT_DEEP_BURST_LIMIT=1`)
+     - Rate limit: 2026-10-21부터 하루 호출 횟수 제한 없음(`4be2906`·`cb6b1ff`). 심층(goose)은 한 번에 한 작업만 실행(진행 중이면 429 `goose_busy`), 빠른 분석은 burst 제한(`AI_REPORT_BURST_LIMIT`, 기본 3회/60초)만 유지. 위 5-소스 Deep 서비스와 `AI_REPORT_DEEP_*` 쿼터 변수는 SPEC-AI-REPORT-004에서 제거됨
      - 캐시 재사용 (v1.0.3): 빠른 분석 후 10분 내 같은 종목 심층 분석 시 Perplexity HTTP 호출 스킵 (메모리 TTL 캐시)
    - **진행 상태 패널 (v1.0.4)**: 심층 분석 모달에 per-source 실시간 진행 UI. `event: phase` SSE 이벤트(`source_start`/`source_done`/`collecting_done`/`staging_done`/`synthesis_start`/`synthesis_first_chunk`) 기반, 5소스 아이콘(⏸/⏳/✅/❌) + duration + count + 캐시 재사용 라벨 + Claude 합성 단계(idle/waiting/streaming) 표시
    - **안정화 (v1.0.5)**: Claude CLI subprocess `StreamReader` limit 64KB → 4MB (LimitOverrunError 방지), 합성 중 미처리 예외를 `event: error`로 변환해 프론트 전달, `logging.basicConfig(INFO)`로 `.dev-server.log` 가시화
