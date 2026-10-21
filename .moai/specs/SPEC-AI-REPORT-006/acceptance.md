@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 인수 기준
 
-버전 0.3.2 · 요구사항은 `spec.md §4`(REQ-AIR6-001~020), 인수 기준 AC-AIR6-001~022. 각 AC는 Given-When-Then, 실행 명령, 기댓값, 그리고 **이 AC가 잡아내는 틀린 구현(대조)** 과 **잡지 못하는 것** 을 적는다. 대조 항목은 run 단계에서 실제로 되돌림을 적용해 RED를 관측해야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다.
+버전 0.3.3 · 요구사항은 `spec.md §4`(REQ-AIR6-001~020), 인수 기준 AC-AIR6-001~022. 각 AC는 Given-When-Then, 실행 명령, 기댓값, 그리고 **이 AC가 잡아내는 틀린 구현(대조)** 과 **잡지 못하는 것** 을 적는다. 대조 항목은 run 단계에서 실제로 되돌림을 적용해 RED를 관측해야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다.
 
 ## §A 공통 실행 조건
 
@@ -136,13 +136,13 @@
 - Given: 변경 후 작업 트리
 - When: 아래 명령을 실행한다
 - Then:
-  1. 지침 존재: `harness-instructions.md`가 (i) 규칙 7에서 1차 세션의 `audit-review.json` 작성·`--final` 실행 금지, (ii) 규칙 9에서 `review/context.json` 읽기, 모든 타일 Read, `separate_review_pass`, `copy_into_review_record` 값 그대로 옮기기, `draft/` 수정 금지, `visual`을 `pass`로 적는 조건(모든 타일 열람 + 타일 이름·모바일 지표를 `evidence`에 기재)과 `revise` 조건, 결정이 `pass`일 때만 `--final`, 일어나지 않은 일을 통과로 적지 않기(i), `screens/` 수정 금지, 결함을 찾은 검사는 `revise` + 구체적 증거 + `open` issue(정직한 `revise`는 허용), `visual` 증거를 리터럴 표지 `[렌더 차이]`로 시작해 "외부 네트워크와 웹 글꼴을 막고 그려 실제 화면과 조금 다르다"를 적기를 담는다. 테스트는 각 항목의 고정 문구를 파일에서 찾는다(문구 목록은 테스트가 상수로 가진다)
+  1. 지침 존재: `harness-instructions.md`가 (i) 규칙 7에서 1차 세션의 `audit-review.json` 작성·`--final` 실행 금지, (ii) 규칙 10(하위 `10-1`~`10-10`)에서 `review/context.json` 읽기, 모든 타일 Read, `separate_review_pass`, `copy_into_review_record` 값 그대로 옮기기, `draft/` 수정 금지, `visual`을 `pass`로 적는 조건(모든 타일 열람 + 타일 이름·모바일 지표를 `evidence`에 기재)과 `revise` 조건, 결정이 `pass`일 때만 `--final`, 일어나지 않은 일을 통과로 적지 않기(10-10), `screens/` 수정 금지, 결함을 찾은 검사는 `revise` + 구체적 증거 + `open` issue(정직한 `revise`는 허용), `visual` 증거를 리터럴 표지 `[렌더 차이]`로 시작해 "외부 네트워크와 웹 글꼴을 막고 그려 실제 화면과 조금 다르다"를 적기를 담는다. 테스트는 각 항목의 고정 문구를 파일에서 찾는다(문구 목록은 테스트가 상수로 가진다)
   2. 매니페스트: 원본 재생성 결과 == 커밋된 매니페스트(`PY -m backend.services.goose_harness`를 JSON 비교)
   3. 권한 불변: `claude-settings.json`의 SHA-256 == `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3`(research P6 기준선)
   4. 벤더링 스킬 불변: `git diff --stat -- backend/goose_harness_src/skills`가 비어 있다
   5. 서버 재시작 후 설치본이 무결성 검사를 통과한다(라이브 단계, M5)
 - 명령: `PY -m pytest backend/tests/test_goose_harness.py -k air6_013 -q`; `git diff --stat -- backend/goose_harness_src/skills backend/goose_harness_src/claude-settings.json`
-- 잡는 구현: (a) 규칙 9의 핵심 문구(`[렌더 차이]` 표지 문구 포함) 삭제 → #1 RED, (b) 지침만 고치고 매니페스트 미재생성 → #2 RED(`verify_source`가 해시 불일치 보고), (c) 허용 목록에 명령 추가 → #3 RED, (d) 벤더링 `delivery-audit.md`를 고침 → #4 RED
+- 잡는 구현: (a) 규칙 10의 핵심 문구(`[렌더 차이]` 표지 문구 포함) 삭제 → #1 RED, (b) 지침만 고치고 매니페스트 미재생성 → #2 RED(`verify_source`가 해시 불일치 보고), (c) 허용 목록에 명령 추가 → #3 RED, (d) 벤더링 `delivery-audit.md`를 고침 → #4 RED
 - 잡지 못하는 것: 지침 문구가 실제로 모델 행동을 바꾸는지(문구 존재 검사는 약한 증거다 — 행동은 AC-018 라이브가 판정)
 
 ### AC-AIR6-014 — 감수 중 판단 대상 불변과 변조 탐지 (REQ-AIR6-014)
@@ -330,7 +330,7 @@ M1은 게이트다. 실제 `claude -p`가 서버가 만든 PNG를 정말 "보는
 
 - Given: AC-016의 기준 픽스처 P 변형. 케이스: (1) `visual.evidence`가 `[렌더 차이]`로 시작하고 차단 사실을 적음, (2) 표지를 앞에서 뒤로 옮긴 문구(포함은 하지만 시작 아님)는 **인정**(조건은 "포함"), (3) 표지 없음, (4) 비슷한 문구(`[렌더링 차이]`, `[render diff]`)
 - When: `evaluate_admissibility`와 `select_report`를 호출한다. 별도로 `context.json`의 `screens.render_note`와 하네스 지침 문구를 읽는다
-- Then: (1)(2) 다른 조건이 충족되면 `final`. (3)(4) `("draft", …)`, `reasons == [font_note_missing]`. `render_note`는 AC-012의 고정 문장이고 지침(규칙 9)에 `[렌더 차이]` 표지 문구가 있다
+- Then: (1)(2) 다른 조건이 충족되면 `final`. (3)(4) `("draft", …)`, `reasons == [font_note_missing]`. `render_note`는 AC-012의 고정 문장이고 지침(규칙 10, 10-6)에 `[렌더 차이]` 표지 문구가 있다
 - 명령: `PY -m pytest backend/tests/test_goose_review.py backend/tests/test_goose_harness.py -k air6_021 -q`
 - 잡는 구현(되돌림 RED): (a) 조건 17을 제거 → (3)(4)가 `final`이 되어 RED, (b) 정확히 일치하지 않는 표지도 인정(정규식 완화) → (4) RED, (c) 지침에서 표지 문구 삭제 → 지침 문구 단언 RED, (d) 컨텍스트에서 `render_note` 누락 → AC-012 RED, (e) 표지가 시작에 있을 때만 인정(조건을 "시작"으로 구현) → (2)가 `draft`가 되어 RED
 - 잡지 못하는 것: 표지 문구가 실제로 차이를 이해하고 적었는지(문자열 존재만 확인 — 약한 증거), 차이가 판단에 미치는 영향. 라이브에서의 표지 누락 빈도는 AC-018의 (나)군 형식 요건과 비게이팅 기록

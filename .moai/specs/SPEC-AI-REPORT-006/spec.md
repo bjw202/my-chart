@@ -1,7 +1,7 @@
 ---
 id: SPEC-AI-REPORT-006
 title: "goose 후처리 감수 (서버가 초안 화면을 찍고, 별도 감수 세션이 audit-review.json을 쓴다)"
-version: "0.3.2"
+version: "0.3.3"
 status: draft
 created: 2026-10-21
 updated: 2026-10-21
@@ -26,6 +26,7 @@ related_specs: [SPEC-AI-REPORT-004, SPEC-AI-REPORT-005]
 | 0.3.0 | 2026-10-21 | manager-spec | plan-audit 2차 FAIL(`.moai/reports/t18/plan-audit-iter2.md`, 결함 N1~N10) 반영. N1: AC-018 항목 5를 안전 불변식(모든 회차)과 형식 요건((나)군)으로 분리하고 `[렌더 차이]` 표지 누락의 결과를 "조건 17 미충족, 전달 `draft`" 한 가지로 통일. N2: REQ-020과 AC-019의 GO 정의를 하나로 맞추고 M1 스파이크를 M2 산출물과 독립시킴. N3: 판정 함수의 읽기 보호 규칙을 명시하고 조건별 되돌림 주장을 수준 A(결과 뒤집힘)·수준 B(사유 목록 변화)로 정직하게 다시 쓰고 조건을 하나씩만 어기는 격리 케이스를 추가. N5: 영수증 쓰기 순서와 실패 시 `draft`(REQ-015, REQ-019). N7: 조건 0은 `select_report`, 1~17은 `evaluate_admissibility`임을 명시. N9: REQ-001의 "byte-for-byte" 범위를 작업 흐름과 이벤트로 한정. N10(c) 대소문자 무시 쓰기 비교(REQ-014). N4는 Gap(G13), N10(d)는 근거와 함께 기각(G15). REQ 20개·AC 22개로 개수 변동 없음 |
 | 0.3.1 | 2026-10-21 | manager-spec | plan-audit 3차 PASS-WITH-DEBT(`.moai/reports/t18/plan-audit-iter3.md`, N11~N16) 조건 반영(소형 텍스트 패치). N11: 화면 색인을 읽을 수 없을 때 건너뛰는 조건 목록에 16을 추가해 AC-016 (d2)와 일치시킴(REQ-016, design §5, AC-016 (d2)). N12: 영수증 작성기는 영수증 사실을 인자로 판정 코어를 부르고, `select_report`와 재평가는 디스크 영수증을 읽는 래퍼를 부름(REQ-015, REQ-016, design §5). N13: 감수 세션 시작 전에 기존 `audit-review.json`과 `final/`을 삭제(REQ-014, design §2·§9, AC-014 사전 심기 케이스 (11)~(13)). N14: screens 스냅샷을 상대 경로 기준 재귀로 명시(REQ-014, design §4.3, AC-014 (6b)). N15: M1 캐너리 타일 위치와 타일 `clip` 확인을 REQ-020에 반영. N16: plan.md 병합 의무 2단계가 규칙 번호를 쓰는 모든 산출물을 포함하도록 확장. REQ 20개·AC 22개로 개수 변동 없음 |
 | 0.3.2 | 2026-10-21 | manager-spec | plan-audit 3차 델타 검사(`.moai/reports/t18/plan-audit-iter3-delta.md`, N17·N18) 반영(소형 텍스트 패치). N17: 감수 세션 전 정리의 삭제가 실패하면 서버가 먼저 시작 값(해시·screens 스냅샷)을 측정해 시작·종료 값으로 함께 영수증에 쓰고 나서 `review_failed`로 끝낸다(REQ-014, design §2, AC-014 (13)과 되돌림 (m)). AC-014 (13)의 기대 목록 `[review_not_completed, tile_not_read]`은 손으로 다시 유도해 그대로 맞음. N18: "같은 함수"를 "같은 조건 코어"로 정정(design §1·§5, acceptance AC-016 머리말, spec D9). REQ 20개·AC 22개·조건 18개·사유 코드 변동 없음 |
+| 0.3.3 | 2026-10-21 | manager-spec | 문구 패치. 규칙 9 → 규칙 10: SPEC-AI-REPORT-007(t19)의 네이버 규칙이 먼저 규칙 9를 차지해 구현(M5, 커밋 33e3c18)에서 감수 세션 규칙이 규칙 10(하위 항목 `10-1`~`10-10`, (a)~(i) 대체)이 됐다. 규칙 7은 1차 세션 한정, 규칙 4 "최종본:" 줄에 "(감수 세션만 실행한다 — 규칙 7·10)" 추가. 문서 문구만 바꿨고 REQ·AC 번호, 개수(REQ 20개·AC 22개), 조건, 사유 코드 변동 없음 |
 
 관계: SPEC-AI-REPORT-004(goose 하네스)·005(DART 사전 수집)의 후속이다. 두 SPEC의 작업 서비스·실행기·하네스 설치 구조를 그대로 쓰고, goose 1차 세션이 끝난 뒤에 "화면 캡처 → 별도 감수 세션" 두 단계를 붙인다. 004·005 문서는 수정하지 않는다.
 
@@ -69,7 +70,7 @@ goose가 만든 보고서는 "최종본"이 되려면 감사 스크립트(`audit
 | [NEW] | `backend/services/goose_review.py` | 감수 컨텍스트(`review/context.json`)·세션 전 스냅샷·영수증(`review/receipt.json`) 작성, 열람·쓰기 시도 기록 집계, 단일 판정 함수 `evaluate_admissibility` |
 | [MODIFY] | `backend/services/goose_runner.py` | 감수 세션 실행(`run_review`), 감수 프롬프트, Read·Write·Edit 기록 수집, `select_report`가 판정 함수를 호출 |
 | [MODIFY] | `backend/services/goose_job_service.py` | 1차 세션 뒤 후처리(재검사 → 캡처 → 스냅샷 → 감수 → 영수증 → 전달 상태 재계산), 진행 이벤트, 끄기 스위치, 취소·fail-open |
-| [MODIFY] | `backend/goose_harness_src/harness-instructions.md` | 규칙 7 개정, 감수 세션 규칙 9 추가 |
+| [MODIFY] | `backend/goose_harness_src/harness-instructions.md` | 규칙 7 개정, 감수 세션 규칙 10(하위 10-1~10-10) 추가 |
 | [MODIFY] | `backend/goose_harness_src/goose-manifest.json` | 지침 변경에 따른 매니페스트 재생성 |
 | [MODIFY] | `pyproject.toml` | `websockets` 직접 의존성 선언 |
 | [MODIFY] | `frontend/src/types/aiReport.ts`, `frontend/src/utils/gooseJob.ts`, `frontend/src/components/ProgressPanel.tsx` | 진행 단계 `screenshot`·`review` 추가와 `render_final` 위치 조정, 표시 문구 |

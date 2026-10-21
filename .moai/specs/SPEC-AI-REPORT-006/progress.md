@@ -2,10 +2,10 @@
 
 ## §E.1 Plan-phase Audit-Ready Signal
 
-- plan_revised_at: 2026-10-21 (v0.3.2, 3차 델타 검사 N17·N18 반영 — 소형 텍스트 패치. 앞서 v0.3.1은 3차 감사 PASS-WITH-DEBT 조건 N11~N16 반영)
-- plan_status: draft (v0.3.2). 3차 델타 검사 보고서 `.moai/reports/t18/plan-audit-iter3-delta.md`(N17·N18). 3차 감사 보고서 `.moai/reports/t18/plan-audit-iter3.md`(결함 N11~N16). 감사 보고서: 1차 `.moai/reports/t18/plan-audit.md`(결함 D1~D14), 2차 `.moai/reports/t18/plan-audit-iter2.md`(결함 N1~N10)
+- plan_revised_at: 2026-10-21 (v0.3.3, t19 병합 뒤 감수 규칙 번호 9 → 10 반영 — 문구 패치. 앞서 v0.3.2는 3차 델타 검사 N17·N18 반영 소형 텍스트 패치, v0.3.1은 3차 감사 PASS-WITH-DEBT 조건 N11~N16 반영)
+- plan_status: draft (v0.3.3). 3차 델타 검사 보고서 `.moai/reports/t18/plan-audit-iter3-delta.md`(N17·N18). 3차 감사 보고서 `.moai/reports/t18/plan-audit-iter3.md`(결함 N11~N16). 감사 보고서: 1차 `.moai/reports/t18/plan-audit.md`(결함 D1~D14), 2차 `.moai/reports/t18/plan-audit-iter2.md`(결함 N1~N10)
 - artifacts: spec.md, plan.md, acceptance.md, design.md, research.md, progress.md (Tier L)
-- counts: REQ 20개(REQ-AIR6-001~020), AC 22개(AC-AIR6-001~022). v0.3.0·v0.3.1·v0.3.2에서 개수 변동 없음(재계산 출력: `.moai/state/verify/t18-plan3/trace.py`)
+- counts: REQ 20개(REQ-AIR6-001~020), AC 22개(AC-AIR6-001~022). v0.3.0·v0.3.1·v0.3.2·v0.3.3에서 개수 변동 없음(재계산 출력: `.moai/state/verify/t18-plan3/trace.py`)
 - tier_rationale: Tier L — 새 서브시스템(브라우저 캡처) + 두 번째 `claude -p` 세션 + 전달 판정 변경 + 하네스 지침 + 프론트, 마일스톤 6개, 변경·신규 파일 약 20개
 - needs_clarification: 0건. 구 2건은 운영자 결정(2026-10-21)으로 해소 — spec.md D7, plan.md T9에 결정으로 기록 (지원 브라우저 = Playwright 캐시의 chrome-headless-shell만, 외부 네트워크 전면 차단)
 - probe_evidence: `.moai/state/verify/t18-plan/`(v0.1.0), `.moai/state/verify/t18-plan2/`(v0.2.0), `.moai/state/verify/t18-plan3/`(v0.3.0: `trace.py`와 그 출력) — 모두 git 무시 경로. v0.3.0에서 추가한 코드베이스·환경 주장은 research P32(대소문자 비구분 경로)·P33(`render_report.py --final`의 출력 파일)
@@ -125,7 +125,7 @@
 | 016 수준 B(조건 1, 13) | PASS | 1을 `receipt_invalid`로 바꿈(SPEC 모델) → `[b]`·S9(a) RED; 제거 → 같음. 13 제거 → `[o]`·`[o2]` RED (이 구현에서는 결과가 뒤집힘 — 조건 13 미충족이면 14~17을 평가하지 않기 때문) |
 | 016 조건 0 | M4 | `select_report` 연결은 M4. 여기서는 `evaluate_admissibility`가 `delivery_allowed:false`에 무관함만 시험((n) 절반) |
 | 016 기타 | PASS | 저장된 `visual_admissible` 입력 사용 → 19건 RED; 읽기 실패 허용 → 6건; 작성기가 디스크 래퍼 호출 → 30건; 영수증 이중 쓰기 → 3건; 읽기 보호에서 16 제외 → 2건 |
-| 021 | PASS (판정 부분) | 조건 17 제거·표지 완화·"시작" 한정 모두 RED. 지침 문구(규칙 9)는 M5 |
+| 021 | PASS (판정 부분) | 조건 17 제거·표지 완화·"시작" 한정 모두 RED. 지침 문구(규칙 10)는 M5 |
 | 014 (a)~(m) | PASS | 13개 변이 모두 RED ((e)(f)는 추적기 시험으로 RED) |
 | 015 (a)(a')(b)(c)(d)(e)(f) | PASS | 7개 모두 RED; (g)는 M4 |
 | 011 (a)~(f) + 기본 시간 상한 | PASS | 7개 모두 RED |

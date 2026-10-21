@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 구현 계획
 
-상태: draft · 버전 0.3.2 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
+상태: draft · 버전 0.3.3 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
 
 ## 1. 접근 요약
 
@@ -45,7 +45,7 @@ _run(job) [잠금 밖, active 유지]
 | M2 캡처 모듈 | High | `goose_screenshot.py` + `test_goose_screenshot.py` (AC-006~010) | M1 | 가짜 브라우저 드라이버로 타일·색인·한도·격리·탐색, 되돌림 RED |
 | M3 감수 세션·영수증 | High | `goose_runner.run_review`·`build_review_prompt`·열람·쓰기 시도 기록 수집, `goose_review.py`(컨텍스트·스냅샷·영수증·`evaluate_admissibility`), `test_goose_review.py` (AC-011·012·014·015·021) | M2 | 가짜 `claude` 스크립트, 합성 스트림 픽스처로 열람·쓰기 집계, 되돌림 RED |
 | M4 작업 서비스 연결·최종본 인정·프론트 | High | `goose_job_service` 후처리·이벤트·스위치·취소·fail-open·전달 상태 재계산, `select_report`가 판정 함수 호출(+기존 테스트 갱신), 프론트 단계, 격리 통합 시험 (AC-001~005·016·020·022) | M3 | 순서·취소·fail-open·인정 표(AC-016) 전부 되돌림 RED, 프론트 단위 테스트. AC-022를 만들 수 없으면 Gap으로 `progress.md`에 기록 |
-| M5 하네스 지침·매니페스트·문서 | Medium | `harness-instructions.md` 규칙 7 개정·규칙 9, 매니페스트 재생성, `pyproject.toml`, README·`.env.example` (AC-013) | M4 | 매니페스트 = 재생성, 설정·스킬 불변, 서버 재시작 후 무결성 통과 |
+| M5 하네스 지침·매니페스트·문서 | Medium | `harness-instructions.md` 규칙 7 개정·규칙 10(하위 10-1~10-10), 매니페스트 재생성, `pyproject.toml`, README·`.env.example` (AC-013) | M4 | 매니페스트 = 재생성, 설정·스킬 불변, 서버 재시작 후 무결성 통과 |
 | M6 라이브 관측 게이트 | High | 020150 라이브 실행 ≤2회와 판정표 (AC-018), 시간·토큰 실측(G5). 라이브 실행은 `LATEST_SEARCH_NAVER`가 남아 `final`에 도달하지 못한다(카드 t19 소관) — 최종본 인정 경로는 AC-022가 대신 확인 | M5 | `progress.md §E.2`에 명령·출력 원문. 미충족이면 SPEC을 닫지 않는다 |
 
 AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배정하지 않는다. M2~M5 각 종료 때 `pytest backend/tests -k goose`로 확인하고 최종 판정은 M5 종료 시점에 한다(iter2 N10a).
@@ -65,7 +65,7 @@ AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배�
 | 후처리 시간으로 작업 전체가 길어짐 | 중 | 캡처 60초·감수 900초 상한, 끄기 스위치. 실측은 M6 |
 | 새 테스트가 실제 브라우저·`claude`·네트워크를 건드림 | 중 | 가짜 드라이버 주입, 기존 네트워크 가드(005 AC-014)로 종료 시 0건 단언 |
 | 기존 `final` 선택 테스트 대량 갱신 | 중 | M4가 영향 개수를 기준선 대비로 먼저 측정하고 `progress.md`에 기록 |
-| 병합 순서 변경(리드 결정 2026-10-21): SPEC-AI-REPORT-007(카드 t19)이 먼저, 이 SPEC이 나중에 병합돼 겹치는 파일(`goose_job_service.py`·`harness-instructions.md`·`goose-manifest.json`·`test_goose_job_service.py`)에서 충돌한다 | 높음 | 이 SPEC이 나중 쪽이므로 007 `plan.md` §5 "필수 병합 단계" 4단계를 수행한다 — (1) 이 SPEC의 감수 규칙 9를 10으로 다시 매기고 하위 라벨·자기 참조도 바꾼다(007의 AC-AIR7-011 #4가 정상 교차 참조도 표시할 수 있다는 007 감사 부채 N9에 유의), (2) 규칙 9 번호를 쓰는 이 SPEC의 모든 산출물을 새 번호로 고친다 — acceptance.md(AC-013 #1과 잡는 구현 (a), AC-021 Then), design.md(§7의 `규칙 9 추가` 제목 줄과 규칙 본문의 `규칙 7·9`), spec.md(§3 변경 범위 표), plan.md(M5 행), research.md(G13의 `규칙 9 (h)`), 그리고 progress.md에 있다면 그 항목. 고친 뒤 `grep -n '규칙 9\|규칙 7·9\|rule 9' .moai/specs/SPEC-AI-REPORT-006/*.md`를 실행해 이 행의 설명을 뺀 옛 번호 잔존이 0임을 출력 원문으로 남긴다, (3) 매니페스트는 손으로 합치지 않고 재생성한다, (4) `_run` 순서와 진행 이벤트를 병합 트리에서 재확인한다. 단계별 관측 결과는 이 SPEC의 `progress.md`에 원문으로 남기고, 그 뒤에만 병합 완료로 본다. 007 문서는 수정하지 않는다. 007의 `plan.md §5`와 감사 부채 N9 인용은 이 워크트리에 007이 없어 확인하지 못했다(`ls .moai/specs \| grep 007` 출력 없음, 2026-10-21) — 병합 시점에 007의 커밋 id로 다시 인용한다 |
+| 병합 순서 변경(리드 결정 2026-10-21): SPEC-AI-REPORT-007(카드 t19)이 먼저, 이 SPEC이 나중에 병합돼 겹치는 파일(`goose_job_service.py`·`harness-instructions.md`·`goose-manifest.json`·`test_goose_job_service.py`)에서 충돌한다 | 높음 | 이 SPEC이 나중 쪽이므로 007 `plan.md` §5 "필수 병합 단계" 4단계를 수행한다. 번호 변경(1)·(2)은 M5에서 끝났다(커밋 33e3c18: 감수 규칙 = 규칙 10, 하위 라벨 `10-1`~`10-10`, 본문 자기 참조 `10-3`; 규칙 7은 1차 세션 한정으로 개정, 규칙 4 "최종본:" 줄에 "(감수 세션만 실행한다 — 규칙 7·10)" 추가). 아래는 당시 계획의 기록이다 — (1) 이 SPEC의 감수 규칙 9를 10으로 다시 매기고 하위 라벨·자기 참조도 바꾼다(007의 AC-AIR7-011 #4가 정상 교차 참조도 표시할 수 있다는 007 감사 부채 N9에 유의), (2) 규칙 9 번호를 쓰는 이 SPEC의 모든 산출물을 새 번호로 고친다 — acceptance.md(AC-013 #1과 잡는 구현 (a), AC-021 Then), design.md(§7의 `규칙 9 추가` 제목 줄과 규칙 본문의 `규칙 7·9`), spec.md(§3 변경 범위 표), plan.md(M5 행), research.md(G13의 `규칙 9 (h)`), 그리고 progress.md에 있다면 그 항목. 고친 뒤 `grep -n '규칙 9\|규칙 7·9\|rule 9' .moai/specs/SPEC-AI-REPORT-006/*.md`를 실행해 이 행의 설명을 뺀 옛 번호 잔존이 0임을 출력 원문으로 남긴다, (3) 매니페스트는 손으로 합치지 않고 재생성한다, (4) `_run` 순서와 진행 이벤트를 병합 트리에서 재확인한다. 단계별 관측 결과는 이 SPEC의 `progress.md`에 원문으로 남기고, 그 뒤에만 병합 완료로 본다. 007 문서는 수정하지 않는다. 007의 `plan.md §5`와 감사 부채 N9 인용은 이 워크트리에 007이 없어 확인하지 못했다(`ls .moai/specs \| grep 007` 출력 없음, 2026-10-21) — 병합 시점에 007의 커밋 id로 다시 인용한다 |
 | 영수증 판정이 너무 엄격해 정상 최종본도 `draft`가 된다 | 중 | 조건 하나하나가 `reasons`로 남아 원인이 보인다. 미인정 사유는 로그와 영수증에 기록 |
 
 ## 5. 품질 게이트와 완료 정의
