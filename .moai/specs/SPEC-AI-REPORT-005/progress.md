@@ -125,6 +125,70 @@ R3-3 반영: `test_air5_008_attachment_review_and_audit_reports`가 eleId 1·2 �
 - G-M2-3: AC-002·004·010의 작업 서비스 쪽 단언(실행기 호출 수, 상태 `cancelled`/`done`, `caplog`)은 M3. 이번에는 수집기 쪽만(취소 전파, 실패 시 정상 반환, 끄기 색인 모양).
 - G-M2-4: 실제 DART 응답에서의 목차·첨부 해석은 녹화 픽스처 3종(반기·사업·첨부 목차 2)만 관측. 금융업 등 다른 목차 표기와 `분기연결검토보고서` 이름은 미관측(라이브 AC-016).
 
+### M3 — 작업 서비스 연결·네트워크 가드·진행 단계 (2026-10-21, HEAD 06fb05f 기준)
+
+산출물: `backend/services/goose_job_service.py`(생성자 `prefetcher` 인자·기본값 없음, 운영 `_service`에만 `DartPrefetcher()`, `_run`에서 수집 → 무결성 재검사 → 실행기, `_prefetch`가 끄기 스위치·`dart_prefetch` 이벤트·fail-open 소유), `backend/tests/conftest.py`(신규, 네트워크 가드), `backend/tests/test_goose_job_service.py`(새 테스트 15개, `mods`에 `gdp` 추가), `backend/tests/test_goose_dart_prefetch.py`(가드 자체 검사 1개), 프론트 3개(`types/aiReport.ts`·`utils/gooseJob.ts`·`components/ProgressPanel.tsx`) + 고정 테스트 2개 갱신. 증거 `$S/aiR5/m3_*.log`.
+
+#### 설계 메모
+
+- 끄기 스위치(`AI_REPORT_GOOSE_DART_PREFETCH` 값을 공백 제거 후 `"0"`과 비교)는 작업 서비스만 본다. 꺼지면 `write_disabled_index`로 `outcome: disabled` 색인을 쓰고 이벤트 없이 실행기로 간다.
+- 무결성 재검사는 수집기가 주입된 서비스에서만 한다(스위치 `0`이어도 수행 — 비용이 작고 수집기 없는 기본값의 동작은 그대로). 재검사 실패는 종료 훅을 `("error", "integrity")`로 부르고 `error`/`integrity`로 닫는다.
+- 네트워크 가드: `goose_network_attempts`(기록 목록 + 대체 함수 설치)와 자동 픽스처 `_goose_network_guard`(종료 때 `network attempt in goose test: <기록>` 단언)를 나눴다. 범위는 `Path(str(request.node.fspath)).name`의 접두어(R3-1). pytest 9.0.2에서 `fspath`는 legacypath 플러그인이 제공(경고 없음).
+- 프론트 `dart_prefetch`가 맨 앞이라, 수집 단계가 없는 작업(수집기 없음·스위치 `0`)에서는 진행 패널에 `건너뜀`으로 보인다(기존 `stageStates` 규칙).
+
+#### RED (E8) — 구현 전
+
+1. 가드 자체 검사: `PY -m pytest backend/tests/test_goose_dart_prefetch.py -k air5_014_guard -q` → `E       fixture 'goose_network_attempts' not found`, `39 deselected, 1 warning, 1 error in 0.58s` (`aiR5/m3_red_1_guard.log`)
+2. 작업 서비스: `PY -m pytest backend/tests/test_goose_job_service.py -k air5 -q` → `E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'prefetcher'` ×12, `13 failed, 2 passed` (통과 2개는 수집기 없는 기본값의 현재 동작을 고정하는 `default_constructor_has_no_prefetch`·`no_dart_prefetch_stage…[no_prefetcher]`) (`aiR5/m3_red_2_jobservice.log`)
+3. 프론트: `npm --prefix frontend run test -- gooseJob ProgressPanel` → `Tests 4 failed | 10 passed (14)` (`aiR5/m3_red_3_frontend.log`)
+
+#### GREEN
+
+- 가드 자체 검사 단독(R3-1 선행 조건, 되돌림 관측 전): `… -k air5_014_guard -q` → `1 passed, 39 deselected` (`aiR5/m3_green_guard_selftest.log`, 관측 직전 재실행 `aiR5/m3_guard_selftest_preprobe.log`도 `1 passed`)
+- `PY -m pytest backend/tests/test_goose_job_service.py backend/tests/test_goose_dart_prefetch.py -k air5 -q` → `55 passed, 37 deselected` (`aiR5/m3_green_air5.log`)
+- 프론트 대상: `Test Files 2 passed (2)`, `Tests 14 passed (14)` (`aiR5/m3_green_frontend_targeted.log`)
+
+#### 대조 되돌림 관측 (`aiR5/m3_mutate.py` → `aiR5/m3_contrast_mutations.log`, 마지막 줄 `restored sha ok: True`)
+
+| AC | 잡는 구현(변형) | 결과 |
+|---|---|---|
+| 001 | (a) 수집을 `start()` 잠금 안에서 기다림 / (b) 실행기 뒤 / (c) 수집기 호출 누락 / (d) 출력 폴더 `runs/<job_id>` / (e) 재검사 누락 / (f) 생성자 기본값 실제 수집기 | 모두 RED — (a) `prefetch_runs_outside_lock…`(1초 상한), (f)는 `default_constructor…` FAILED + 같은 테스트 `ERROR` teardown `network attempt in goose test: [(b'dart.fss.or.kr', 443)]` |
+| 002 | (a) fail-open을 `except BaseException`로 / (c) 수집 호출을 `_run`의 `try` 밖에 | 둘 다 RED (`…fake_prefetch`·`…real_prefetch_request` FAILED). (b)는 M2에서 관측 |
+| 003 | (b) 수집 뒤에 이벤트 / (d) 꺼도 이벤트 | RED (`…emitted_once_before_prefetch` / `…[switch_off]`) |
+| 003 프론트 | (a) `GOOSE_STAGES`에서 `dart_prefetch` 제거 / (c) 표시 문구 빈 문자열 | RED `Tests 4 failed` / `Tests 1 failed` (`aiR5/m3_frontend_contrast.log`, 복원 sha 일치) |
+| 004 | (a) 스위치 무시 / (b) 끈 경우 색인 없음 / (c) 끈 경우 실행기 건너뜀 | 모두 RED. (a2) "수집기 안에서만 확인"은 작업 서비스 관점에서 (a)와 같은 변형(수집기 호출 수 1)이라 같은 단언(`calls["n"] == 0`)이 잡는다 — 별도 변형 없음 |
+| 010 | (e) 수집 예외 전파 | RED (`…exception_is_logged_and_runner_continues`) |
+
+#### AC-AIR5-014 되돌림 관측 (r1~r4, R3-2 대상 테스트 지정)
+
+가드 자체 검사 단독 통과를 먼저 확인한 뒤 실행했다. 가드는 원래 함수를 부르지 않으므로 실제 연결·DNS 조회는 없었다(기록된 시도는 대체 함수가 막은 `getaddrinfo`).
+
+- (r1) 대상: `backend/tests/test_goose_job_service.py::test_air5_010_prefetch_failures_still_run_goose[b_connect_error]` — 실제 `DartPrefetcher`를 쓰고 단언이 수집 성공과 무관(실행기 호출 1·`done`·색인 `outcome ∈ {failed, partial}`). `_real_prefetcher`에서 `MockTransport` 주입을 빼고 `-k "test_air5_010_prefetch_failures_still_run_goose and b_connect_error"` → `1 passed, 51 deselected, 1 error`, `ERROR …[b_connect_error]`, `E       AssertionError: network attempt in goose test: [(b'dart.fss.or.kr', 443)]` (본문은 통과, teardown에서 RED)
+- (r2) 생성자 기본값을 `prefetcher or goose_dart_prefetch.DartPrefetcher()`로 바꾸고 `test_goose_job_service.py` 전체 → `12 failed, 40 passed, 25 errors`; 기존 테스트 `test_ac007_same_code_twice_returns_existing_job_without_quota`·`test_done_result_emits_done_and_clears_active`·`test_b5_concurrent_starts_*`·`test_ac011_*` 등이 `ERROR` teardown `network attempt in goose test: [(b'dart.fss.or.kr', 443)]` (`aiR5/m3_revert_probes_full.log`)
+- (r3) conftest 종료 단언만 `pass`로 끄고 (r1) 재실행(같은 테스트 이름) → `1 passed, 51 deselected` GREEN — fail-open이 예외를 삼킨다는 실측(N1). 기록·대체 함수는 살아 있어 실제 연결 없음
+- (r4) 대체 함수가 기록을 남기지 않게 바꾸고 가드 자체 검사 → `FAILED backend/tests/test_goose_dart_prefetch.py::test_air5_014_guard_records_attempt`, `1 failed`
+- 복원: `restored sha ok: True`(4개 파일 sha256 원본과 일치), `git status --short backend/services backend/tests` → 의도한 4개 경로만
+
+#### AC-AIR5-014 격리 실행
+
+- `PATH=/usr/bin:/bin PY -m pytest <goose 7개 파일> -q` → `256 passed, 1 warning`, 종료 단언 실패 0건(`network attempt` 0회) (`aiR5/m3_ac014_isolation.log`)
+- `~/.goose-harness/runs` 개수·수정 시각 전후 동일: `before=[4 1792505284] after=[4 1792505284]` (`aiR5/m3_ac014_runs_before_after.log`)
+
+#### 회귀 (AC-AIR5-015)
+
+- 백엔드 goose 전체: 기준선 `PY -m pytest backend/tests -k goose -q` → `240 passed, 214 deselected` (`aiR5/m3_baseline_backend.log`) → M3 후 `256 passed, 214 deselected` (= 240 + 새 16, 실패 0) (`aiR5/m3_goose_regression.log`)
+- AC-015 명령(6개 파일, 수집기 테스트 제외) → `216 passed` (`aiR5/m3_ac015_backend.log`). 착수 전 같은 명령은 직접 재지 않았다 — 기준선 240에서 수집기 테스트 39개를 뺀 201로 산출(M2 로그 `201 passed` 기준선과 일치), M3 새 테스트 15개를 더하면 216
+- 프론트 전체: 기준선 `Test Files 1 failed | 96 passed (97)`, `Tests 840 passed (840)`, 실패 파일 `e2e/preset-flow.spec.ts` (`aiR5/m3_baseline_frontend_full.log`) → M3 후 `Test Files 1 failed | 96 passed (97)`, `Tests 842 passed (842)`, 실패 파일 같음 (`aiR5/m3_frontend_full.log`)
+- 타입 검사 `npm --prefix frontend run typecheck`(`tsc -b`) → 기준선·M3 후 모두 종료 0 (`aiR5/m3_baseline_typecheck.log`, `aiR5/m3_typecheck.log`)
+- 커버리지 `goose_job_service.py` 98%(273 stmts, 6 miss — 333-334는 끄기 색인 쓰기 실패 분기) (`aiR5/m3_coverage.log`)
+
+#### Gaps
+
+- G-M3-1: `ruff check` 미실행 — 가상환경에 ruff 없음(`No module named ruff`, G-M2-1과 같음).
+- G-M3-2: 끄기 색인 쓰기 실패 분기(로그만 남기고 계속) 테스트 없음.
+- G-M3-3: AC-003의 실제 화면 배치는 라이브 AC-016 때 눈으로 확인(비게이팅). 서버 재시작은 M4 몫이라 하지 않았다 — 실행 중 서버는 아직 옛 코드다.
+- G-M3-4: AC-010 (b)~(d)의 "다른 보고서 항목 `ok`"는 M2 수집기 테스트가 맡고, M3 작업 서비스 쪽은 실행기 호출 1·`done`·색인 `failed/partial`만 단언한다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

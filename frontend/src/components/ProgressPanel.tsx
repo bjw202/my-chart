@@ -12,6 +12,7 @@ import { GOOSE_STAGES } from '../utils/gooseJob'
 // ── 표시용 상수 ─────────────────────────────────────────────────────────────
 
 const STAGE_LABELS: Record<GooseStage, string> = {
+  dart_prefetch: '공시 원문 수집',
   goose_start: '세션 시작',
   plan: '분석 지침 읽기',
   research_tick: '자료 검색',

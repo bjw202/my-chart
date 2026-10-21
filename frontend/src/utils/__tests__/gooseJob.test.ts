@@ -46,8 +46,10 @@ describe('goose 작업 저장 키 (sessionStorage goose_job:{code})', () => {
 })
 
 describe('goose 진행 단계 누적 (design §3.5 측정 표)', () => {
-  it('단계 10개를 측정 표 순서대로 가진다', () => {
+  it('단계 11개를 순서대로 가진다 — 공시 원문 수집(dart_prefetch)이 맨 앞(SPEC-AI-REPORT-005)', () => {
+    expect(GOOSE_STAGES[0]).toBe('dart_prefetch')
     expect(GOOSE_STAGES).toEqual([
+      'dart_prefetch',
       'goose_start',
       'plan',
       'research_tick',
@@ -71,6 +73,13 @@ describe('goose 진행 단계 누적 (design §3.5 측정 표)', () => {
     expect(p.fetchStarted).toBe(1)
     expect(p.fetchDone).toBe(1)
     expect(p.lastFetch).toBe('네이버 금융 원문')
+  })
+
+  it('dart_prefetch 단계를 도달 목록에 넣는다(SPEC-AI-REPORT-005 AC-AIR5-003)', () => {
+    let p = makeInitialGooseProgress()
+    p = applyGooseStage(p, { stage: 'dart_prefetch', detail: null })
+    p = applyGooseStage(p, { stage: 'goose_start', detail: null })
+    expect(p.reached).toEqual(['dart_prefetch', 'goose_start'])
   })
 
   it('알 수 없는 단계는 무시한다(파서 불변 조건과 같은 태도)', () => {

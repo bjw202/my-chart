@@ -22,12 +22,13 @@ function stateOf(container: HTMLElement, stage: string): string | null {
 }
 
 describe('ProgressPanel — goose 진행 단계', () => {
-  it('측정 표의 단계 10개를 순서대로 렌더하고 옛 5소스 이름은 없다', () => {
+  it('단계 11개(공시 원문 수집 + 측정 표 10개)를 순서대로 렌더하고 옛 5소스 이름은 없다', () => {
     const { container } = render(<ProgressPanel progress={makeInitialGooseProgress()} />)
     const stages = Array.from(container.querySelectorAll('[data-stage]')).map((el) =>
       el.getAttribute('data-stage'),
     )
     expect(stages).toEqual([
+      'dart_prefetch',
       'goose_start',
       'plan',
       'research_tick',
@@ -43,6 +44,12 @@ describe('ProgressPanel — goose 진행 단계', () => {
       expect(screen.queryByText(old)).not.toBeInTheDocument()
     }
     expect(stages.every((s) => stateOf(container, s!) === 'pending')).toBe(true)
+  })
+
+  it('공시 원문 수집 단계를 표시 문구와 함께 렌더한다(SPEC-AI-REPORT-005 AC-AIR5-003)', () => {
+    const { container } = render(<ProgressPanel progress={progressOf('dart_prefetch')} />)
+    expect(container.querySelector('[data-stage="dart_prefetch"]')).toHaveTextContent('공시 원문 수집')
+    expect(stateOf(container, 'dart_prefetch')).toBe('running')
   })
 
   it('가장 늦게 도달한 단계는 진행 중, 앞의 도달 단계는 완료로 표시한다', () => {

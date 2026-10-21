@@ -747,3 +747,20 @@ def test_air5_004_disabled_index_shape(tmp_path):
     assert index["request_count"] == 0
     assert index["company"] is None
     assert index["started_at"].endswith("+09:00")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AC-AIR5-014 #4 — 네트워크 가드 자체 검사 (conftest.py, REQ-AIR5-015)
+
+
+def test_air5_014_guard_records_attempt(goose_network_attempts):
+    import socket
+
+    # 로컬 주소만 쓴다. 가드는 원래 함수를 부르지 않으므로 실제 연결은 일어나지 않는다
+    try:
+        socket.create_connection(("127.0.0.1", 9), timeout=1)
+    except Exception:  # noqa: BLE001 — 일부러 삼켜 fail-open 코드를 흉내 낸다
+        pass
+    assert [a for a in goose_network_attempts if a == ("127.0.0.1", 9)] == [("127.0.0.1", 9)]
+    assert len(goose_network_attempts) == 1
+    goose_network_attempts.clear()  # 비워야 종료 단언이 통과한다

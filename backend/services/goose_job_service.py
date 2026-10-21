@@ -10,6 +10,10 @@
   경로에서도 불리며, 그 전에 ``job.ending``에 종료 상태를 기록한다. 생성자 기본값은 훅 없음이고
   운영용 모듈 인스턴스에만 보관 훅을 붙인다.
 - 쿼터는 goose 전용(`AI_REPORT_GOOSE_DAILY_QUOTA`, 기본 5)이며 Fast·옛 Deep 카운터와 무관하다.
+- SPEC-AI-REPORT-005: ``prefetcher``(DART 원문 사전 수집기)를 주입하면 백그라운드 태스크가 goose 실행 직전에
+  ``runs/<job_id>/dart/``로 수집하고 무결성을 다시 검사한다. 생성자 기본값은 수집기 없음(기존 동작 그대로)이고
+  운영용 모듈 인스턴스에만 실제 DART 수집기를 붙인다. 끄기 스위치 `AI_REPORT_GOOSE_DART_PREFETCH=0`의
+  소유자는 이 서비스다(REQ-AIR5-004).
 """
 
 from __future__ import annotations
@@ -26,11 +30,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.services import goose_harness, goose_runner, goose_storage
+from backend.services import goose_dart_prefetch, goose_harness, goose_runner, goose_storage
 
 logger = logging.getLogger(__name__)
 
 ENV_DAILY_QUOTA = "AI_REPORT_GOOSE_DAILY_QUOTA"
+ENV_DART_PREFETCH = "AI_REPORT_GOOSE_DART_PREFETCH"  # "0"이면 DART 사전 수집을 끈다(REQ-AIR5-004)
 DEFAULT_DAILY_QUOTA = 5
 MAX_FINISHED_JOBS = 50
 TERMINAL_STATES = ("done", "error", "cancelled")
@@ -133,6 +138,8 @@ class StartOutcome:
 
 Runner = Callable[..., Awaitable[goose_runner.RunResult]]
 FinishHook = Callable[[Job, "goose_runner.RunResult | None"], Any]
+# 호출 계약: ``await prefetcher(code, out_dir) -> index``. 실패는 색인에 적고 정상 반환, 취소만 전파한다.
+Prefetcher = Callable[[str, Path], Awaitable[Any]]
 
 
 def _default_runs_root() -> Path:
@@ -199,6 +206,7 @@ class GooseJobService:
         limiter: GooseRateLimiter | None = None,
         runs_root: Callable[[], Path] | None = None,
         on_finish: FinishHook | None = None,
+        prefetcher: Prefetcher | None = None,
         max_finished: int = MAX_FINISHED_JOBS,
     ) -> None:
         self._runner: Runner = runner or goose_runner.run_goose
@@ -206,6 +214,7 @@ class GooseJobService:
         self.limiter = limiter or GooseRateLimiter()
         self._runs_root = runs_root or _default_runs_root
         self._on_finish = on_finish
+        self._prefetcher = prefetcher
         self._max_finished = max_finished
         self._jobs: dict[str, Job] = {}
         self._active_job_id: str | None = None
@@ -277,6 +286,16 @@ class GooseJobService:
             await self._emit(job, "progress", {"stage": ev.stage, "detail": ev.detail})
 
         try:
+            if self._prefetcher is not None:
+                await self._prefetch(job)
+                # 수집 때문에 시작 판정 검사와 claude 실행 사이가 벌어진다 — 실행 직전에 다시 검사한다(T13)
+                integrity = await asyncio.to_thread(self._integrity)
+                if not integrity.ok:
+                    logger.error("goose 작업 %s 실행 직전 무결성 재검사 실패 — 실행하지 않음: %s",
+                                 job.job_id, integrity.reason)
+                    extra = await self._call_finish_hook(job, None, ("error", "integrity"))
+                    await self._finish(job, "error", "integrity", extra)
+                    return
             result = await self._runner(
                 job_id=job.job_id, stock_name=job.stock_name, code=job.code, on_event=on_event
             )
@@ -300,6 +319,25 @@ class GooseJobService:
             kind = result.error_kind or "exit_error"
             extra = await self._call_finish_hook(job, result, ("error", kind))
             await self._finish(job, "error", kind, extra)
+
+    # @MX:ANCHOR: [AUTO] _prefetch — DART 사전 수집 단계의 단일 정의(REQ-AIR5-001~004·010).
+    # @MX:REASON: 끄기 스위치 판단·진행 이벤트·fail-open의 소유자가 여기다. 이벤트는 수집기 호출 전에
+    #             정확히 1번(AC-003), 스위치 0이면 수집기 미호출·disabled 색인·이벤트 없음(AC-004).
+    #             except를 BaseException으로 넓히면 취소가 삼켜져 goose가 실행된다(AC-002 대조 (a)).
+    # @MX:SPEC: SPEC-AI-REPORT-005
+    async def _prefetch(self, job: Job) -> None:
+        out_dir = self._runs_root() / job.job_id / "dart"
+        if os.environ.get(ENV_DART_PREFETCH, "").strip() == "0":
+            try:
+                goose_dart_prefetch.write_disabled_index(out_dir, job.code)
+            except Exception:  # noqa: BLE001 - 색인 쓰기 실패도 goose 실행을 막지 않는다
+                logger.exception("goose 작업 %s DART 사전 수집 끄기 색인 쓰기 실패", job.job_id)
+            return
+        await self._emit(job, "progress", {"stage": "dart_prefetch", "detail": None})
+        try:
+            await self._prefetcher(job.code, out_dir)
+        except Exception:  # noqa: BLE001 - fail-open(REQ-AIR5-010). CancelledError는 Exception이 아니라 전파된다
+            logger.exception("goose 작업 %s DART 사전 수집 실패 — goose 실행은 계속", job.job_id)
 
     async def _call_finish_hook(
         self, job: Job, result: goose_runner.RunResult | None, ending: tuple[str, str | None]
@@ -390,9 +428,12 @@ class GooseJobService:
 # @MX:WARN: [AUTO] 프로세스 전역 작업 서비스 — 라우터·lifespan이 같은 인스턴스를 쓴다.
 # @MX:REASON: 서버 전체 동시 1개(D10)와 이벤트 재생은 단일 uvicorn 워커의 메모리 상태에 의존한다.
 #             워커를 늘리면 작업이 워커별로 갈라진다. 테스트는 set_service()로 교체한다.
-# 보관 훅(M5)은 이 운영용 인스턴스에만 붙인다. 생성자 기본값은 훅 없음 — 테스트가 만든 서비스가
-# 실제 backend/reports에 쓰지 않게 한다.
-_service = GooseJobService(on_finish=goose_storage.make_finish_hook(runs_root=_default_runs_root))
+# 보관 훅(M5)과 DART 사전 수집기(SPEC-AI-REPORT-005)는 이 운영용 인스턴스에만 붙인다. 생성자 기본값은
+# 훅·수집기 없음 — 테스트가 만든 서비스가 실제 backend/reports에 쓰거나 DART에 요청하지 않게 한다.
+_service = GooseJobService(
+    on_finish=goose_storage.make_finish_hook(runs_root=_default_runs_root),
+    prefetcher=goose_dart_prefetch.DartPrefetcher(),
+)
 
 
 def get_service() -> GooseJobService:

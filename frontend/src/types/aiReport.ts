@@ -61,6 +61,7 @@ export type PhaseEvent =
 
 /** 진행 단계 (design §3.5 측정 표). 순서는 utils/gooseJob.ts의 GOOSE_STAGES. */
 export type GooseStage =
+  | 'dart_prefetch' // SPEC-AI-REPORT-005: 서버가 goose 실행 전에 DART 원문을 받는 단계
   | 'goose_start'
   | 'plan'
   | 'research_tick'

@@ -57,13 +57,14 @@ def _isolated_import(monkeypatch, *names: str) -> list[types.ModuleType]:
 @pytest.fixture
 def mods(monkeypatch):
     saved = {k: v for k, v in sys.modules.items() if k == "backend" or k.startswith("backend.")}
-    gh, gr, gjs = _isolated_import(
+    gh, gr, gjs, gdp = _isolated_import(
         monkeypatch,
         "backend.services.goose_harness",
         "backend.services.goose_runner",
         "backend.services.goose_job_service",
+        "backend.services.goose_dart_prefetch",
     )
-    yield types.SimpleNamespace(gh=gh, gr=gr, gjs=gjs)
+    yield types.SimpleNamespace(gh=gh, gr=gr, gjs=gjs, gdp=gdp)
     for k in [k for k in sys.modules if k == "backend" or k.startswith("backend.")]:
         if k not in saved:
             del sys.modules[k]
@@ -667,3 +668,321 @@ async def test_prune_failure_does_not_block_start(mods, tmp_path, monkeypatch):
     assert out.kind == "started"
     runner.release.set()
     await _finish(out.job)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-AI-REPORT-005 M3 — DART 사전 수집 연결 (REQ-AIR5-001~004·010, AC-AIR5-001~004·010)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DART_FIX = Path(__file__).parent / "fixtures" / "dart" / "recorded"
+
+
+class FakePrefetcher:
+    """호출 인자·순서를 기록하고, gate가 열릴 때까지 기다리는 가짜 수집기(코루틴)."""
+
+    def __init__(self, order: list | None = None, *, wait: bool = False, job_events=None, raise_exc=None):
+        self.order = order if order is not None else []
+        self.calls: list[tuple[str, Path]] = []
+        self.entered = asyncio.Event()
+        self.gate = asyncio.Event()
+        if not wait:
+            self.gate.set()
+        self.snapshots: list[list] = []
+        self.job_events = job_events  # 호출 순간 job.events 사본을 남길 때 쓰는 접근자
+        self.raise_exc = raise_exc
+
+    async def __call__(self, code, out_dir):
+        self.order.append("prefetch")
+        self.calls.append((code, Path(out_dir)))
+        if self.job_events is not None:
+            self.snapshots.append(list(self.job_events()))
+        self.entered.set()
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        await self.gate.wait()
+        return {"outcome": "complete"}
+
+
+class OrderRunner(FakeRunner):
+    def __init__(self, gr, order: list, **kw):
+        super().__init__(gr, **kw)
+        self.order = order
+        self.release.set()
+
+    async def __call__(self, **kw):
+        self.order.append("runner")
+        return await super().__call__(**kw)
+
+
+def _order_integrity(gh, order: list, fail_on: int | None = None):
+    count = {"n": 0}
+
+    def check():
+        count["n"] += 1
+        order.append("integrity")
+        if fail_on is not None and count["n"] == fail_on:
+            return gh.IntegrityResult(False, "manifest mismatch")
+        return gh.IntegrityResult(True, "ok")
+
+    return check
+
+
+def _dart_stages(job) -> list:
+    return [e for e in job.events if e.type == "progress" and e.data.get("stage") == "dart_prefetch"]
+
+
+class _FastClock:
+    """실제 DART 수집기용 가짜 시계·대기 — 1초 간격을 실제로 기다리지 않는다."""
+
+    def __init__(self) -> None:
+        self.t = 0.0
+
+    def monotonic(self) -> float:
+        return self.t
+
+    async def sleep(self, s: float) -> None:
+        self.t += max(0.0, s)
+
+
+def _real_prefetcher(mods, handler):
+    clock = _FastClock()
+    return mods.gdp.DartPrefetcher(
+        transport=__import__("httpx").MockTransport(handler), clock=clock.monotonic, sleep=clock.sleep
+    )
+
+
+async def test_air5_001_prefetch_runs_outside_lock_before_runner(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    order: list = []
+    pre = FakePrefetcher(order, wait=True)
+    runner = OrderRunner(mods.gr, order)
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+                   integrity=_order_integrity(mods.gh, order), prefetcher=pre)
+    # (a) 첫 start는 수집이 끝나기 전에 돌아온다(1초 상한)
+    out = await asyncio.wait_for(svc.start("020150", "롯데에너지머티리얼즈"), 1)
+    assert out.kind == "started"
+    await asyncio.wait_for(pre.entered.wait(), 1)
+    # 수집 대기 중: 같은 종목 → existing, 다른 종목 → busy
+    assert (await asyncio.wait_for(svc.start("020150", "롯데에너지머티리얼즈"), 1)).kind == "existing"
+    assert (await asyncio.wait_for(svc.start("005930", "삼성전자"), 1)).kind == "busy"
+    pre.gate.set()
+    await asyncio.wait_for(_finish(out.job), 5)
+    # (d) 출력 폴더는 <runs>/<job_id>/dart, (b)(c)(e) 순서
+    assert pre.calls == [("020150", tmp_path / "runs" / out.job.job_id / "dart")]
+    assert order == ["integrity", "prefetch", "integrity", "runner"]
+    assert (out.job.status, out.job.error_kind) == ("done", None)
+
+
+async def test_air5_001_second_integrity_failure_ends_job_without_runner(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    order: list = []
+    runner = OrderRunner(mods.gr, order)
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+                   integrity=_order_integrity(mods.gh, order, fail_on=2), prefetcher=FakePrefetcher(order))
+    out = await svc.start("020150", "롯데에너지머티리얼즈")
+    assert out.kind == "started"
+    await asyncio.wait_for(_finish(out.job), 5)
+    assert (out.job.status, out.job.error_kind) == ("error", "integrity")
+    assert runner.calls == []
+    assert order == ["integrity", "prefetch", "integrity"]
+    assert svc.active() is None
+    last = out.job.events[-1]
+    assert last.type == "error" and last.data["error_kind"] == "integrity"
+
+
+async def test_air5_001_default_constructor_has_no_prefetch(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    order: list = []
+    runner = OrderRunner(mods.gr, order, events=("goose_start",))
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+                   integrity=_order_integrity(mods.gh, order))
+    out = await svc.start("020150", "롯데에너지머티리얼즈")
+    await asyncio.wait_for(_finish(out.job), 5)
+    assert order == ["integrity", "runner"]
+    assert _dart_stages(out.job) == []
+    assert not (tmp_path / "runs" / out.job.job_id / "dart").exists()
+
+
+def test_air5_001_production_service_injects_dart_prefetcher(mods):
+    svc = mods.gjs.get_service()
+    assert isinstance(svc._prefetcher, mods.gdp.DartPrefetcher)
+    assert mods.gjs.GooseJobService()._prefetcher is None
+
+
+async def test_air5_002_cancel_and_shutdown_during_fake_prefetch(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+
+    async def scenario():
+        for how in ("cancel", "shutdown"):
+            pre = FakePrefetcher(wait=True)  # gate가 열리지 않는다 = 영원히 대기
+            runner = FakeRunner(mods.gr)
+            runner.release.set()
+            svc = _service(mods, tmp_path / how, runner, quota=5, monkeypatch=monkeypatch, prefetcher=pre)
+            job = (await svc.start("020150", "롯데에너지머티리얼즈")).job
+            await pre.entered.wait()
+            if how == "cancel":
+                await svc.cancel(job.job_id)
+            else:
+                await svc.shutdown()
+            assert (job.status, job.error_kind) == ("cancelled", None), how
+            assert job.events[-1].type == "cancelled", how
+            assert runner.calls == [], how
+            assert svc.active() is None
+
+    await asyncio.wait_for(scenario(), 5)
+
+
+async def test_air5_002_cancel_and_shutdown_during_real_prefetch_request(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+
+    async def scenario():
+        for how in ("cancel", "shutdown"):
+            gate, entered = asyncio.Event(), asyncio.Event()
+
+            async def hang(request):  # 비동기 처리기 — 스레드를 쓰지 않는다
+                entered.set()
+                await gate.wait()
+                return __import__("httpx").Response(200, content=b"")
+
+            runner = FakeRunner(mods.gr)
+            runner.release.set()
+            svc = _service(mods, tmp_path / how, runner, quota=5, monkeypatch=monkeypatch,
+                           prefetcher=_real_prefetcher(mods, hang))
+            job = (await svc.start("020150", "롯데에너지머티리얼즈")).job
+            await entered.wait()
+            if how == "cancel":
+                await svc.cancel(job.job_id)
+            else:
+                await svc.shutdown()
+            assert (job.status, job.error_kind) == ("cancelled", None), how
+            assert job.events[-1].type == "cancelled", how
+            assert runner.calls == [], how
+
+    await asyncio.wait_for(scenario(), 5)
+
+
+async def test_air5_003_dart_prefetch_stage_emitted_once_before_prefetch(mods, tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    holder: dict = {}
+    pre = FakePrefetcher(job_events=lambda: holder["job"].events)
+    runner = FakeRunner(mods.gr, events=("goose_start",))
+    runner.release.set()
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch, prefetcher=pre)
+    out = await svc.start("020150", "롯데에너지머티리얼즈")
+    holder["job"] = out.job
+    await asyncio.wait_for(_finish(out.job), 5)
+    # 수집기 진입 시점 사본에 dart_prefetch가 정확히 1개
+    snap = pre.snapshots[0]
+    assert [e.data for e in snap if e.type == "progress"] == [{"stage": "dart_prefetch", "detail": None}]
+    stages = [e.data["stage"] for e in out.job.events if e.type == "progress"]
+    assert stages.count("dart_prefetch") == 1
+    assert stages.index("dart_prefetch") < stages.index("goose_start")
+
+
+@pytest.mark.parametrize("variant", ["switch_off", "no_prefetcher"])
+async def test_air5_003_no_dart_prefetch_stage_when_off_or_absent(mods, tmp_path, monkeypatch, variant):
+    kw = {}
+    if variant == "switch_off":
+        monkeypatch.setenv("AI_REPORT_GOOSE_DART_PREFETCH", "0")
+        kw["prefetcher"] = FakePrefetcher()
+    else:
+        monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    runner = FakeRunner(mods.gr, events=("goose_start",))
+    runner.release.set()
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch, **kw)
+    out = await svc.start("020150", "롯데에너지머티리얼즈")
+    await asyncio.wait_for(_finish(out.job), 5)
+    assert _dart_stages(out.job) == []
+    assert out.job.status == "done"
+
+
+async def test_air5_004_switch_off_skips_prefetcher_writes_disabled_index(mods, tmp_path, monkeypatch):
+    requests: list = []
+
+    def record(request):
+        requests.append(str(request.url))
+        return __import__("httpx").Response(500, content=b"down")
+
+    real = _real_prefetcher(mods, record)
+    calls = {"n": 0}
+
+    async def spy(code, out_dir):  # 작업 서비스가 수집기를 부른 횟수를 센다
+        calls["n"] += 1
+        return await real(code, out_dir)
+
+    # 끄기 스위치 0: 요청 0, 색인 disabled, 수집기 호출 0, dart_prefetch 0, 실행기 1
+    monkeypatch.setenv("AI_REPORT_GOOSE_DART_PREFETCH", "0")
+    runner = FakeRunner(mods.gr)
+    runner.release.set()
+    svc = _service(mods, tmp_path / "off", runner, quota=5, monkeypatch=monkeypatch, prefetcher=spy)
+    out = await svc.start("020150", "롯데에너지머티리얼즈")
+    await asyncio.wait_for(_finish(out.job), 5)
+    index_path = tmp_path / "off" / "runs" / out.job.job_id / "dart" / "index.json"
+    index = __import__("json").loads(index_path.read_text(encoding="utf-8"))
+    assert requests == []
+    assert index["outcome"] == "disabled" and index["files"] == []
+    assert calls["n"] == 0
+    assert _dart_stages(out.job) == []
+    assert len(runner.calls) == 1 and out.job.status == "done"
+
+    # 대조: 변수 미설정이면 수집기 호출 1, 요청 ≥ 1
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    runner2 = FakeRunner(mods.gr)
+    runner2.release.set()
+    svc2 = _service(mods, tmp_path / "on", runner2, quota=5, monkeypatch=monkeypatch, prefetcher=spy)
+    out2 = await svc2.start("020150", "롯데에너지머티리얼즈")
+    await asyncio.wait_for(_finish(out2.job), 5)
+    assert calls["n"] == 1
+    assert len(requests) >= 1
+    assert len(runner2.calls) == 1
+
+
+def _fail_handler(case):
+    httpx = __import__("httpx")
+    list_html = (_DART_FIX / "list_020150_recent.html").read_bytes()
+
+    def handler(request):
+        if case == "a_list_500":
+            return httpx.Response(500, content=b"server error")
+        if case == "b_connect_error":
+            raise httpx.ConnectError("refused", request=request)
+        if case == "c_timeout":
+            raise httpx.ReadTimeout("slow", request=request)
+        # d: 목록은 정상, 목차는 노드 없는 HTML
+        if request.method == "POST":
+            return httpx.Response(200, content=list_html)
+        return httpx.Response(200, content=b"<html><body>no toc</body></html>")
+
+    return handler
+
+
+@pytest.mark.parametrize("case", ["a_list_500", "b_connect_error", "c_timeout", "d_no_toc"])
+async def test_air5_010_prefetch_failures_still_run_goose(mods, tmp_path, monkeypatch, case):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    runner = FakeRunner(mods.gr)
+    runner.release.set()
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+                   prefetcher=_real_prefetcher(mods, _fail_handler(case)))
+    out = await svc.start("020150", "롯데에너지머티리얼즈")
+    await asyncio.wait_for(_finish(out.job), 5)
+    assert len(runner.calls) == 1
+    assert (out.job.status, out.job.error_kind) == ("done", None)
+    index = __import__("json").loads(
+        (tmp_path / "runs" / out.job.job_id / "dart" / "index.json").read_text(encoding="utf-8"))
+    assert index["outcome"] in {"failed", "partial"}
+
+
+async def test_air5_010_prefetcher_exception_is_logged_and_runner_continues(mods, tmp_path, monkeypatch, caplog):
+    monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
+    runner = FakeRunner(mods.gr)
+    runner.release.set()
+    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+                   prefetcher=FakePrefetcher(raise_exc=RuntimeError("prefetch boom")))
+    with caplog.at_level("ERROR"):
+        out = await svc.start("020150", "롯데에너지머티리얼즈")
+        await asyncio.wait_for(_finish(out.job), 5)
+    assert len(runner.calls) == 1
+    assert (out.job.status, out.job.error_kind) == ("done", None)
+    recs = [r for r in caplog.records if r.levelname == "ERROR" and out.job.job_id in r.getMessage()]
+    assert recs and recs[0].exc_info is not None
+    assert isinstance(recs[0].exc_info[1], RuntimeError)

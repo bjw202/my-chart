@@ -53,6 +53,7 @@ export function clearGooseJob(code: string, jobId: string): void {
 // ── 진행 단계 (design §3.5) ─────────────────────────────────────────────────
 
 export const GOOSE_STAGES: readonly GooseStage[] = [
+  'dart_prefetch', // SPEC-AI-REPORT-005: goose 단계보다 앞(서버 사전 수집)
   'goose_start',
   'plan',
   'research_tick',
