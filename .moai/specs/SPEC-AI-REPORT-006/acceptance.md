@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 인수 기준
 
-버전 0.3.1 · 요구사항은 `spec.md §4`(REQ-AIR6-001~020), 인수 기준 AC-AIR6-001~022. 각 AC는 Given-When-Then, 실행 명령, 기댓값, 그리고 **이 AC가 잡아내는 틀린 구현(대조)** 과 **잡지 못하는 것** 을 적는다. 대조 항목은 run 단계에서 실제로 되돌림을 적용해 RED를 관측해야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다.
+버전 0.3.2 · 요구사항은 `spec.md §4`(REQ-AIR6-001~020), 인수 기준 AC-AIR6-001~022. 각 AC는 Given-When-Then, 실행 명령, 기댓값, 그리고 **이 AC가 잡아내는 틀린 구현(대조)** 과 **잡지 못하는 것** 을 적는다. 대조 항목은 run 단계에서 실제로 되돌림을 적용해 RED를 관측해야 GREEN으로 기록할 수 있다(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다.
 
 ## §A 공통 실행 조건
 
@@ -166,9 +166,9 @@
 - **사전 심기 케이스 (REQ-AIR6-014 첫 절, iter3 N13)** — 1차 goose 세션이 `Write(./runs/**)`로 감수 세션 시작 전에 파일을 심었고, 감수 세션이 그것을 덮어쓰지 않고 종료 코드 0으로 끝나는 경우다. 가짜 감수기는 진입 시점에 두 경로(`audit-review.json`, `final/`)의 존재를 기록한다. 영수증 작성기의 `reasons`(조건 1~17)와 `select_report`를 읽는다
   - (11) 심은 것: `audit-review.json`(`visual: pass`, 증거에 `[렌더 차이]`, 색인·초안 해시를 복사, `mode: separate_review_pass`, `reviewed_at`은 미래). 가짜 감수기: 모든 타일 `Read`를 스트림에 내고, 정상 `final/`(`delivery_allowed: true`)을 만들지만 `audit-review.json`은 쓰지 않은 채 종료 코드 0. 기대: 진입 시점에 `audit-review.json` 없음, 영수증 `outcome == "review_failed"`, 작성기 `reasons == [review_not_completed, no_audit_review]`, `select_report == ("draft", …)`
   - (12) 심은 것: `final/report.html` + `final/render-validation.json{delivery_allowed: true}`(`audit-review.json`은 없음). 가짜 감수기: 모든 타일을 읽고 context 값을 옮긴 정직한 `audit-review.json`(`visual: pass`, `[렌더 차이]` 포함)을 쓰되 `final/`은 만들지 않은 채 종료 코드 0. 기대: 진입 시점에 `final/` 없음, `outcome == "reviewed"`, 작성기 `reasons == []`, `select_report == ("draft", …)`(조건 0 `final_not_allowed`)
-  - (13) 삭제 실패: (11)의 심은 `audit-review.json`과 (12)의 심은 `final/`이 모두 있고, 서비스의 삭제 단계만 실패하도록 테스트가 삭제 함수를 패치한다. 기대: 가짜 감수기 호출 0, 작업 `done`, 영수증 `outcome == "review_failed"`, 작성기 `reasons == [review_not_completed, tile_not_read]`, `select_report == ("draft", …)`, 완료 이벤트 전달 상태 `draft`
+  - (13) 삭제 실패: (11)의 심은 `audit-review.json`과 (12)의 심은 `final/`이 모두 있고, 서비스의 삭제 단계만 실패하도록 테스트가 삭제 함수를 패치한다. 기대: 가짜 감수기 호출 0, 작업 `done`, 영수증 `outcome == "review_failed"`, 작성기 `reasons == [review_not_completed, tile_not_read]`, `select_report == ("draft", …)`, 완료 이벤트 전달 상태 `draft`. 이 목록은 서버가 삭제 실패 시점에 시작 값을 먼저 측정해 시작·종료 양쪽에 같은 값으로 쓴다는 규칙(REQ-014, iter3 델타 N17)을 전제로 한다 — 손으로 유도한 결과: 3 `review_not_completed` 미충족(outcome `review_failed`), 4·5·7·8·12 충족, 6·9는 지금 값 == 시작 값 == 종료 값이라 충족, 10은 심은 기록이 해시를 복사해 충족, 11 `tile_not_read` 미충족(감수기 미호출이라 읽은 타일 없음), 13~17은 심은 기록이 읽히고 형식이 맞아 충족. 시작 값을 비워 두면 6·9가 더해져 `[review_not_completed, screens_changed, draft_changed, tile_not_read]`가 된다(되돌림 (m))
 - 명령: `PY -m pytest backend/tests/test_goose_review.py backend/tests/test_goose_job_service.py -k air6_014 -q`
-- 잡는 구현(되돌림 RED): (a) 종료 해시를 다시 계산하지 않고 시작 해시를 복사 → (2)(3)에서 `true`, (b) 한쪽 파일만 비교 → 다른 쪽 변경 경우 RED, (c) **screens 스냅샷을 아예 만들지 않음(또는 세션 후에야 측정)** → (4)(5)(6)에서 `screens_changed`가 안 나고 `final`이 선택됨, (d) 파일 집합을 빼고 해시만 비교 → (6) RED, (e) `Write`/`Edit` 호출 기록 누락 → (7)(8) RED, (f) 결과가 오류인 시도는 무시 → (8) RED, (g) `review/` 쓰기까지 위반으로 셈 → (9) RED, (h) 대소문자를 구분하는 경로 비교 → (10) RED, (i) 감수 세션 시작 전 `audit-review.json` 삭제를 뺀 변형 → (11)에서 심은 파일이 남아 `outcome`이 `reviewed`, 작성기 `reasons == []`, `select_report`가 `final`이 되어 RED, (j) `final/` 삭제를 뺀 변형 → (12)에서 `select_report`가 `final`이 되어 RED, (k) 삭제 실패를 무시하고 세션을 시작하는 변형 → (13)에서 감수기 호출 1이 되어 RED, (l) 최상위 파일만 열거하는 비재귀 스냅샷 → (6b)에서 `screens_changed`가 안 나오고 `final`이 선택되어 RED
+- 잡는 구현(되돌림 RED): (a) 종료 해시를 다시 계산하지 않고 시작 해시를 복사 → (2)(3)에서 `true`, (b) 한쪽 파일만 비교 → 다른 쪽 변경 경우 RED, (c) **screens 스냅샷을 아예 만들지 않음(또는 세션 후에야 측정)** → (4)(5)(6)에서 `screens_changed`가 안 나고 `final`이 선택됨, (d) 파일 집합을 빼고 해시만 비교 → (6) RED, (e) `Write`/`Edit` 호출 기록 누락 → (7)(8) RED, (f) 결과가 오류인 시도는 무시 → (8) RED, (g) `review/` 쓰기까지 위반으로 셈 → (9) RED, (h) 대소문자를 구분하는 경로 비교 → (10) RED, (i) 감수 세션 시작 전 `audit-review.json` 삭제를 뺀 변형 → (11)에서 심은 파일이 남아 `outcome`이 `reviewed`, 작성기 `reasons == []`, `select_report`가 `final`이 되어 RED, (j) `final/` 삭제를 뺀 변형 → (12)에서 `select_report`가 `final`이 되어 RED, (k) 삭제 실패를 무시하고 세션을 시작하는 변형 → (13)에서 감수기 호출 1이 되어 RED, (l) 최상위 파일만 열거하는 비재귀 스냅샷 → (6b)에서 `screens_changed`가 안 나오고 `final`이 선택되어 RED, (m) 삭제 실패 때 시작 값을 측정하지 않고 비워 둔 채 `review_failed`로 가는 변형 → (13)에서 작성기 `reasons`에 `screens_changed`·`draft_changed`가 더해져 RED(결과 뒤집힘이 아니라 사유 목록 변화 — 전달 상태는 어느 쪽이든 `draft`)
 - 잡지 못하는 것: 도구 호출이 아닌 경로(허용된 두 스크립트의 부작용)로 바뀌었다 복원되는 변경(Gap G11), `draft/`·`screens/` 밖 파일 변경(범위 밖). 대소문자만 다른 경로로 타일을 `Read`한 경우는 읽음으로 세지 않는다(안전 방향 — 최악의 결과는 `tile_not_read`로 `draft`). 사전 심기 삭제는 `audit-review.json`과 `final/`만 다룬다 — 판정이 읽지 않는 `review/` 아래 다른 파일(예: `review/delivery-audit.json`)을 심어도 영향이 없어 지우지 않는다. 삭제 이후 감수 세션 시작 사이에 파일을 쓰는 주체는 이 SPEC의 작업 모델에 없다(1차 세션의 프로세스 그룹은 `run_goose`가 돌아오기 전에 항상 정리됨 — research P34, 그룹 밖으로 빠져나간 프로세스는 미관측)
 
 ### AC-AIR6-015 — 영수증과 열람 집계 (REQ-AIR6-015)
@@ -191,7 +191,7 @@
 
 ### AC-AIR6-016 — 최종본 인정과 규칙 7 불변식 (REQ-AIR6-016)
 
-조건 18개를 표 구동으로 시험한다. 조건 0(`final_not_allowed`)은 `select_report`가 평가하고, 조건 1~17은 단일 순수 함수 `evaluate_admissibility`가 평가한다. 영수증 작성기와 `select_report`가 같은 함수를 호출하며 작성기는 1~17만 평가한다. 함수는 예외를 던지지 않고 읽을 수 없는 입력은 미충족으로 본다(REQ-AIR6-016의 읽기 보호 규칙).
+조건 18개를 표 구동으로 시험한다. 조건 0(`final_not_allowed`)은 `select_report`가 평가하고, 조건 1~17은 단일 순수 함수 `evaluate_admissibility`가 평가한다. 영수증 작성기와 `select_report`가 같은 조건 코어를 실행하며(작성기는 코어를, `select_report`는 디스크 래퍼를 부른다) 작성기는 1~17만 평가한다. 함수는 예외를 던지지 않고 읽을 수 없는 입력은 미충족으로 본다(REQ-AIR6-016의 읽기 보호 규칙).
 
 **되돌림 주장의 정확한 범위.** 한 조건의 검사를 제거했을 때 관측되는 변화에는 두 수준이 있다.
 - **수준 A (결과가 뒤집힘)**: 그 조건 하나만 어기는 *격리 케이스*의 결과가 `draft`에서 `final`로 바뀐다. 조건 0, 2~12, 14~17의 16개가 여기에 속한다.

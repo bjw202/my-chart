@@ -1,13 +1,13 @@
 # SPEC-AI-REPORT-006 — 설계
 
-버전 0.3.1 · 요구사항 `spec.md §4`, 결정 `plan.md §2`, 프로브 `research.md`. 이 문서는 구현 세부(스키마·절차·경계)를 정한다. 코드 식별자는 run 단계에서 확정하며 여기서는 역할 이름으로 적는다.
+버전 0.3.2 · 요구사항 `spec.md §4`, 결정 `plan.md §2`, 프로브 `research.md`. 이 문서는 구현 세부(스키마·절차·경계)를 정한다. 코드 식별자는 run 단계에서 확정하며 여기서는 역할 이름으로 적는다.
 
 ## 1. 구성요소와 경계
 
 | 구성요소 | 위치 | 책임 | 하지 않는 일 |
 |---|---|---|---|
 | 캡처 모듈 | `goose_screenshot.py` | 브라우저 탐색·실행·종료, 두 뷰포트 타일 저장, `screens/index.json` | 감수·영수증·전달 판정 |
-| 감수 보조 모듈 | `goose_review.py` | `review/context.json` 작성, 세션 전 스냅샷, 열람·쓰기 시도 기록 집계, 영수증 작성, **단일 판정 함수 `evaluate_admissibility`**(영수증 작성기와 `select_report`가 함께 호출) | 프로세스 실행 |
+| 감수 보조 모듈 | `goose_review.py` | `review/context.json` 작성, 세션 전 스냅샷, 열람·쓰기 시도 기록 집계, 영수증 작성, **단일 판정 함수 `evaluate_admissibility`**(영수증 작성기와 `select_report`가 같은 조건 코어를 실행한다 — 작성기는 코어를, `select_report`는 래퍼를 부른다, §5) | 프로세스 실행 |
 | 실행기 | `goose_runner.py` | 감수 세션 `claude -p` 실행(`run_review`), 감수 프롬프트, 스트림에서 `Read`·`Write`·`Edit` 호출·결과 수집, `select_report`(판정 함수 호출) | 캡처, 영수증 쓰기 |
 | 작업 서비스 | `goose_job_service.py` | 후처리 순서·진행 이벤트·스위치·취소·fail-open, 영수증 쓰기 호출, 영수증 뒤 전달 상태 재계산 | 판정 규칙 정의 |
 | 하네스 지침 | `harness-instructions.md` | 1차·감수 세션 행동 규칙 | 서버 판정 |
@@ -23,7 +23,9 @@
   → emit screenshot → capture
         ✓ complete/partial    ✗ unavailable/failed/예외 (모두 index.json에 기록)
   → 세션 전 정리: 기존 audit-review.json과 final/ 삭제 (1차 세션이 심은 것 제거, REQ-AIR6-014)
-        ✗ 삭제 실패 → 감수 세션을 시작하지 않고 review_failed로 간다
+        ✗ 삭제 실패 → 서버가 먼저 시작 값(초안·입력·screens 색인·타일 해시, screens 스냅샷)을 측정해
+          시작·종료 값으로 함께 영수증에 쓰고(그래서 아무것도 바뀐 것으로 읽히지 않는다, iter3 델타 N17),
+          감수 세션을 시작하지 않고 review_failed로 끝낸다
   → 세션 전 스냅샷(초안·입력·screens 색인·타일 해시, screens 상대 경로 집합) + review/context.json 쓰기
       (캡처 결과와 무관하게 쓴다; screens.outcome·render_note 포함)
   → emit review → run_review
@@ -39,7 +41,7 @@
 | 무결성 재검사 실패 | 러너 결과대로 | draft | `integrity_failed` | 캡처·감수 없음 |
 | 브라우저 없음/실패/시간 초과 | done | draft(감수 결과와 무관하게 `final`은 인정 못 함) | 감수가 돌았으면 `reviewed` + 사유 `screens_not_complete` | 감수는 계속 실행(`visual: revise` 사유 기록) |
 | 감수 세션 시작 실패/비정상 종료/종료 코드 0이지만 `audit-review.json` 없음 | done | draft | `review_failed`(마지막 경우 reasons에 `no_audit_review`) | — |
-| 세션 전 정리 실패(기존 `audit-review.json`·`final/` 삭제 불가) | done | draft | `review_failed` | 감수 세션 시작 안 함. 남은 파일이 있어도 `outcome`이 `reviewed`가 아니라 조건 3이 막는다 |
+| 세션 전 정리 실패(기존 `audit-review.json`·`final/` 삭제 불가) | done | draft | `review_failed` | 감수 세션 시작 안 함. 삭제 실패 시점에 시작 값을 측정해 시작·종료 양쪽에 같은 값으로 기록(조건 6·9가 변경으로 읽지 않는다). 남은 파일이 있어도 `outcome`이 `reviewed`가 아니라 조건 3이 막는다 |
 | 감수 세션 시간 초과 | done | draft | `timeout` | 프로세스 그룹 종료 |
 | 취소 | cancelled | (훅이 초안 보관, 기존 규칙) | `cancelled`(best-effort) | 그룹 종료 |
 | 영수증 쓰기 실패 | done | draft. 서버는 쓰기 전에 기존 파일(세션이 쓴 것일 수 있음)을 먼저 제거하고 임시 파일 + 원자적 교체로 쓰므로, 쓰기가 실패해도 세션이 쓴 영수증이 남지 않는다(= final 불가). 제거마저 실패해 파일이 남으면 완료 이벤트의 전달 상태를 `draft`로 확정한다(보관 단계의 재판정은 Gap G14) | — | 제거 재시도, `receipt_write_failed` 로그 |
@@ -119,7 +121,7 @@
 | 16 | `reviewed_before_capture` | `reviewed_at >= index.finished_at` | 016 |
 | 17 | `font_note_missing` | `checks.visual.evidence`에 표지 `[렌더 차이]` 포함 | 013·016 |
 
-결과: 0~17이 모두 충족이면 `("final", final_dir)`, 아니면 `draft/report.html`이 정규 파일일 때 `("draft", draft_dir)`, draft도 없으면 `None`(기존 규칙). 영수증 작성기는 같은 함수를 1~17에 대해 호출해 `reasons`를 채운다(0은 `final/`이 생기기 전일 수 있어 작성 시점에는 평가하지 않는다).
+결과: 0~17이 모두 충족이면 `("final", final_dir)`, 아니면 `draft/report.html`이 정규 파일일 때 `("draft", draft_dir)`, draft도 없으면 `None`(기존 규칙). 영수증 작성기는 같은 조건 코어를 1~17에 대해 호출해 `reasons`를 채운다(0은 `final/`이 생기기 전일 수 있어 작성 시점에는 평가하지 않는다).
 
 **읽기 보호와 조건의 독립성 (iter2 N3).** 조건 대부분은 서로 다른 입력을 읽어 독립적으로 평가된다. 입력을 아예 읽지 못하는 경우만 보호 조건이 맡는다.
 

@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 구현 계획
 
-상태: draft · 버전 0.3.1 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
+상태: draft · 버전 0.3.2 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
 
 ## 1. 접근 요약
 
