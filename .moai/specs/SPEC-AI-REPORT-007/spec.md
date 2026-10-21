@@ -7,7 +7,7 @@ created: 2026-10-21
 updated: 2026-10-21
 author: manager-spec
 priority: High
-phase: "v0.5.5 target"
+phase: "v0.6.0 target"
 module: "backend/services"
 lifecycle: spec-anchored
 tags: "ai-report, goose, naver, prefetch, fail-open, harness"
@@ -27,7 +27,7 @@ related_specs: [SPEC-AI-REPORT-005, SPEC-AI-REPORT-004, SPEC-AI-REPORT-006, SPEC
 
 관계: SPEC-AI-REPORT-005(DART 원문 사전 수집, completed)와 같은 구조를 네이버 채널에 적용한다. 005의 수집기·색인·하네스 규칙 8은 수정하지 않고, 작업 서비스에 두 번째 수집기 하나를 끼운다. 004·005 문서는 수정하지 않는다. 같은 시기에 카드 t18이 SPEC-AI-REPORT-006(goose 최종본 경로, 커밋 `4663bb3`, draft)을 진행하며, 그 SPEC도 `harness-instructions.md`에 규칙 9를 더하고 매니페스트를 재생성하며 `goose_job_service.py`의 `_run`을 바꾼다(006 spec.md 65~67행). 두 SPEC의 병합 절차는 `plan.md §5`에 필수 단계로 둔다.
 
-`phase` 값 `"v0.5.5 target"`은 AI-REPORT 계열 순번(004 `v0.5.3`, 005 `v0.5.4`)을 이어 붙인 **미확정 가정**이다. 저장소에는 이 값을 고정하는 버전 원천이 없고(`pyproject.toml` `version = "0.1.0"`, 버전 태그 없음), 005 이후 완료된 SPEC과 006은 `v0.6.0 target`을 쓴다. 값 선택은 리드에게 맡긴다(`progress.md §E.1` 미결 사항 Q1).
+`phase` 값은 리드가 `"v0.6.0 target"`으로 정했다(2026-10-21, 근거 `progress.md` P15: TEST-HERMETIC-001·RS-REBALANCE-001·006이 모두 `v0.6.0 target`). 저장소에는 이 값을 고정하는 버전 원천이 없다(`pyproject.toml` `version = "0.1.0"`, 버전 태그 없음). 처음 적은 `"v0.5.5 target"`은 계열 순번을 이은 가정이었고 폐기했다.
 
 ---
 
