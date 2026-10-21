@@ -3,7 +3,7 @@
 테스트 대상: backend/services/goose_job_service.py
 - 시작 판정 4~8단계와 단일 잠금(design §4.3·§8, AC-AIR4-007·008, B5 동시성)
 - 닫힌 실패(AC-AIR4-001 (2b) — 시작 시 실패 기록이 있으면 모든 작업 error/integrity)
-- goose 전용 일일 쿼터(AI_REPORT_GOOSE_DAILY_QUOTA, Fast 카운터와 분리)
+- 하루 실행 횟수 제한 없음(사용자 결정 2026-10-21), 동시 실행 1개만 유지
 - 이벤트 재생·Last-Event-ID·실시간 대기(AC-AIR4-009), 구독 해제와 작업 분리(AC-AIR4-010)
 - 취소·서버 종료와 프로세스 그룹 정리(AC-AIR4-011)
 
@@ -25,13 +25,11 @@ import signal
 import sys
 import time
 import types
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 _BACKEND = Path(__file__).resolve().parents[1]
-_KST = timezone(timedelta(hours=9))
 
 
 def _isolated_import(monkeypatch, *names: str) -> list[types.ModuleType]:
@@ -100,9 +98,7 @@ def _ok_integrity(gh):
     return lambda: gh.IntegrityResult(True, "ok")
 
 
-def _service(mods, tmp_path, runner, *, quota=None, integrity=None, monkeypatch=None, **kw):
-    if quota is not None:
-        monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", str(quota))
+def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
     return mods.gjs.GooseJobService(
         runner=runner,
         integrity_check=integrity or _ok_integrity(mods.gh),
@@ -128,31 +124,11 @@ async def _collect(agen, n: int, timeout: float = 5.0) -> list:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 쿼터 (goose 전용, Fast와 분리)
+# 하루 실행 횟수 제한 없음 (사용자 결정 2026-10-21) — Fast 카운터와도 무관
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_quota_default_is_5_and_env_override(mods, monkeypatch):
-    monkeypatch.delenv("AI_REPORT_GOOSE_DAILY_QUOTA", raising=False)
-    assert mods.gjs.GooseRateLimiter().quota == 5
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "2")
-    assert mods.gjs.GooseRateLimiter().quota == 2
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "abc")
-    assert mods.gjs.GooseRateLimiter().quota == 5
-
-
-def test_quota_counts_per_kst_day(mods, monkeypatch):
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "1")
-    now = [datetime(2026, 10, 20, 23, 0, tzinfo=_KST)]
-    lim = mods.gjs.GooseRateLimiter(clock=lambda: now[0])
-    assert not lim.exhausted()
-    lim.consume()
-    assert lim.exhausted() and lim.used() == 1
-    now[0] = datetime(2026, 10, 21, 0, 1, tzinfo=_KST)
-    assert not lim.exhausted() and lim.used() == 0
-
-
-def test_goose_limiter_does_not_touch_deep_counters(mods):
+def test_goose_service_does_not_touch_fast_or_deep_counters(mods):
     # Fast/Deep 카운터를 import하지 않는다 — 모듈 원문에 옛 함수 이름이 없어야 한다.
     src = Path(mods.gjs.__file__).read_text()
     assert "check_rate_limit" not in src
@@ -165,16 +141,15 @@ def test_goose_limiter_does_not_touch_deep_counters(mods):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def test_ac007_same_code_twice_returns_existing_job_without_quota(mods, tmp_path, monkeypatch):
+async def test_ac007_same_code_twice_returns_existing_job(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     first = await svc.start("299030", "하나기술")
     await runner.started.wait()
     second = await svc.start("299030", "하나기술")
     assert (first.kind, second.kind) == ("started", "existing")
     assert second.job.job_id == first.job.job_id
     assert len(runner.calls) == 1
-    assert svc.limiter.used() == 1
     assert (tmp_path / "runs" / first.job.job_id).is_dir()
     runner.release.set()
     await _finish(first.job)
@@ -182,35 +157,37 @@ async def test_ac007_same_code_twice_returns_existing_job_without_quota(mods, tm
 
 async def test_other_code_while_running_is_busy_with_running_name(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     first = await svc.start("299030", "하나기술")
     await runner.started.wait()
     busy = await svc.start("005930", "삼성전자")
     assert busy.kind == "busy"
     assert busy.job.stock_name == "하나기술"
-    assert len(runner.calls) == 1 and svc.limiter.used() == 1
-    runner.release.set()
-    await _finish(first.job)
-
-
-async def test_quota_exhausted_blocks_new_start_but_not_same_code(mods, tmp_path, monkeypatch):
-    runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=1, monkeypatch=monkeypatch)
-    first = await svc.start("299030", "하나기술")
-    # 같은 종목(4단계)은 쿼터(6단계)보다 먼저 판정된다
-    assert (await svc.start("299030", "하나기술")).kind == "existing"
-    # 다른 종목(5단계)도 쿼터보다 먼저
-    assert (await svc.start("005930", "삼성전자")).kind == "busy"
-    runner.release.set()
-    await _finish(first.job)
-    assert (await svc.start("005930", "삼성전자")).kind == "rate_limit"
     assert len(runner.calls) == 1
+    runner.release.set()
+    await _finish(first.job)
 
 
-async def test_integrity_failure_records_error_job_without_run_quota_or_active(mods, tmp_path, monkeypatch):
+async def test_many_sequential_starts_same_day_are_never_refused(mods, tmp_path, monkeypatch):
+    """사용자 결정(2026-10-21): 하루 실행 횟수 제한을 없앤다. 같은 날 7번 연달아 시작해도 모두 started."""
+    monkeypatch.delenv("AI_REPORT_GOOSE_DAILY_QUOTA", raising=False)
+    runner = FakeRunner(mods.gr)
+    runner.release.set()  # 각 작업이 바로 끝나게 한다(동시 1개 제한과 무관하게 순차 시작)
+    svc = _service(mods, tmp_path, runner)
+    kinds = []
+    for _ in range(7):
+        out = await svc.start("299030", "하나기술")
+        kinds.append(out.kind)
+        await _finish(out.job)
+    assert kinds == ["started"] * 7
+    assert len(runner.calls) == 7
+    assert not hasattr(svc, "limiter")
+
+
+async def test_integrity_failure_records_error_job_without_run_or_active(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
     svc = _service(
-        mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+        mods, tmp_path, runner, monkeypatch=monkeypatch,
         integrity=lambda: mods.gh.IntegrityResult(False, "installed sha256 mismatch: x"),
     )
     out = await svc.start("299030", "하나기술")
@@ -218,7 +195,6 @@ async def test_integrity_failure_records_error_job_without_run_quota_or_active(m
     job = svc.get(out.job.job_id)
     assert (job.status, job.error_kind) == ("error", "integrity")
     assert svc.active() is None
-    assert svc.limiter.used() == 0
     assert runner.calls == []
     assert not (tmp_path / "runs" / job.job_id).exists()
     events = await _collect(svc.subscribe(job.job_id), 1)
@@ -226,22 +202,8 @@ async def test_integrity_failure_records_error_job_without_run_quota_or_active(m
     assert events[0].data["error_kind"] == "integrity"
 
 
-async def test_quota_is_judged_before_integrity(mods, tmp_path, monkeypatch):
-    calls = []
-
-    def integrity():
-        calls.append(1)
-        return mods.gh.IntegrityResult(False, "x")
-
-    svc = _service(mods, tmp_path, FakeRunner(mods.gr), quota=1, monkeypatch=monkeypatch,
-                   integrity=integrity)
-    svc.limiter.consume()
-    assert (await svc.start("299030", "하나기술")).kind == "rate_limit"
-    assert calls == []
-
-
 async def test_b5_fail_closed_startup_failure_blocks_every_later_start(mods, tmp_path, monkeypatch):
-    """AC-001 (2b) 서비스 쪽: 시작 시 실패 기록 → 모든 시작이 error/integrity, 쿼터·실행기 불변."""
+    """AC-001 (2b) 서비스 쪽: 시작 시 실패 기록 → 모든 시작이 error/integrity, 실행기 불변."""
     gh = mods.gh
     gh.reset_state()
     # 리포 매니페스트와 맞지 않는 원본으로 시작 설치 → 실패 기록
@@ -253,24 +215,21 @@ async def test_b5_fail_closed_startup_failure_blocks_every_later_start(mods, tmp
     assert status.ok is False
     runner = FakeRunner(mods.gr)
     svc = mods.gjs.GooseJobService(runner=runner, runs_root=lambda: tmp_path / "runs")
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "5")
     kinds = []
     for code, name in (("299030", "하나기술"), ("299030", "하나기술"), ("005930", "삼성전자")):
         out = await svc.start(code, name)
         kinds.append((out.kind, out.job.status, out.job.error_kind))
     assert kinds == [("integrity", "error", "integrity")] * 3
     assert runner.calls == []
-    assert svc.limiter.used() == 0
     assert svc.active() is None
     gh.reset_state()
 
 
 async def test_b5_concurrent_starts_different_codes_exactly_one_runs(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     a, b = await asyncio.gather(svc.start("299030", "하나기술"), svc.start("005930", "삼성전자"))
     assert sorted([a.kind, b.kind]) == ["busy", "started"]
-    assert svc.limiter.used() == 1
     await runner.started.wait()
     assert len(runner.calls) == 1
     runner.release.set()
@@ -279,11 +238,10 @@ async def test_b5_concurrent_starts_different_codes_exactly_one_runs(mods, tmp_p
 
 async def test_b5_concurrent_starts_same_code_one_job(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     outs = await asyncio.gather(*(svc.start("299030", "하나기술") for _ in range(3)))
     assert sorted(o.kind for o in outs) == ["existing", "existing", "started"]
     assert len({o.job.job_id for o in outs}) == 1
-    assert svc.limiter.used() == 1
     runner.release.set()
     await _finish(outs[0].job)
 
@@ -295,7 +253,7 @@ async def test_b5_concurrent_starts_same_code_one_job(mods, tmp_path, monkeypatc
 
 async def test_done_result_emits_done_and_clears_active(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr, events=("goose_start", "plan"))
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     assert svc.active() == {"job_id": out.job.job_id, "code": "299030",
                             "stock_name": "하나기술", "status": "running"}
@@ -313,7 +271,7 @@ async def test_done_result_emits_done_and_clears_active(mods, tmp_path, monkeypa
 @pytest.mark.parametrize("kind", ["binary_missing", "auth", "timeout", "empty_output", "exit_error"])
 async def test_runner_error_kinds_are_kept(mods, tmp_path, monkeypatch, kind):
     runner = FakeRunner(mods.gr, status="error", error_kind=kind)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     runner.release.set()
     await _finish(out.job)
@@ -326,7 +284,7 @@ async def test_runner_error_kinds_are_kept(mods, tmp_path, monkeypatch, kind):
 async def test_unexpected_runner_exception_is_exit_error(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
     runner.raise_exc = RuntimeError("boom")
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     runner.release.set()
     await _finish(out.job)
@@ -342,7 +300,7 @@ async def test_on_finish_hook_result_is_merged_into_terminal_event(mods, tmp_pat
         return {"run": "2026-10-20", "report_url": "/x/report.html"}
 
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch, on_finish=on_finish)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch, on_finish=on_finish)
     out = await svc.start("299030", "하나기술")
     runner.release.set()
     await _finish(out.job)
@@ -356,7 +314,7 @@ async def test_on_finish_failure_does_not_change_terminal_state(mods, tmp_path, 
         raise OSError("disk full")
 
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch, on_finish=on_finish)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch, on_finish=on_finish)
     out = await svc.start("299030", "하나기술")
     runner.release.set()
     await _finish(out.job)
@@ -366,7 +324,7 @@ async def test_on_finish_failure_does_not_change_terminal_state(mods, tmp_path, 
 async def test_finished_jobs_are_pruned_beyond_limit(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
     runner.release.set()
-    svc = _service(mods, tmp_path, runner, quota=10, monkeypatch=monkeypatch, max_finished=2)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch, max_finished=2)
     ids = []
     for _ in range(4):
         out = await svc.start("299030", "하나기술")
@@ -382,7 +340,7 @@ async def test_finished_jobs_are_pruned_beyond_limit(mods, tmp_path, monkeypatch
 
 async def test_ac009_replay_then_live_and_last_event_id(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr, events=("goose_start", "plan", "plan", "research_tick", "compose"))
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     await runner.started.wait()
     jid = out.job.job_id
@@ -405,7 +363,7 @@ async def test_ac009_replay_then_live_and_last_event_id(mods, tmp_path, monkeypa
 
 
 async def test_ac009_subscribe_unknown_job_raises_keyerror(mods, tmp_path, monkeypatch):
-    svc = _service(mods, tmp_path, FakeRunner(mods.gr), quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, FakeRunner(mods.gr), monkeypatch=monkeypatch)
     with pytest.raises(KeyError):
         await _collect(svc.subscribe("nope"), 1)
 
@@ -413,7 +371,7 @@ async def test_ac009_subscribe_unknown_job_raises_keyerror(mods, tmp_path, monke
 async def test_subscribe_after_last_seq_of_finished_job_ends_immediately(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
     runner.release.set()
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     await _finish(out.job)
     assert [e async for e in svc.subscribe(out.job.job_id, after=99)] == []
@@ -421,7 +379,7 @@ async def test_subscribe_after_last_seq_of_finished_job_ends_immediately(mods, t
 
 async def test_ac010_subscriber_disconnect_does_not_cancel_job(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr, events=("goose_start",))
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     await runner.started.wait()
     agen = svc.subscribe(out.job.job_id)
@@ -493,7 +451,6 @@ async def test_ac011_cancel_running_finished_and_unknown(mods, tmp_path, monkeyp
     svc = mods.gjs.GooseJobService(
         runner=runner, integrity_check=_ok_integrity(mods.gh), runs_root=lambda: harness / "runs",
     )
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "5")
     pids: list[int] = []
     try:
         # (2) 완료된 작업 J2: 즉시 끝나는 실행기로 만든다
@@ -527,7 +484,6 @@ async def test_ac011_shutdown_cancels_running_job_and_kills_group(mods, tmp_path
     svc = mods.gjs.GooseJobService(
         runner=runner, integrity_check=_ok_integrity(mods.gh), runs_root=lambda: harness / "runs",
     )
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "5")
     pids: list[int] = []
     try:
         j3 = (await svc.start("299030", "하나기술")).job
@@ -542,7 +498,7 @@ async def test_ac011_shutdown_cancels_running_job_and_kills_group(mods, tmp_path
 
 
 async def test_shutdown_without_running_job_is_noop(mods, tmp_path, monkeypatch):
-    svc = _service(mods, tmp_path, FakeRunner(mods.gr), quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, FakeRunner(mods.gr), monkeypatch=monkeypatch)
     await svc.shutdown()
     assert svc.active() is None
 
@@ -630,7 +586,7 @@ async def test_start_prunes_old_run_dirs_but_keeps_new_job_dir(mods, tmp_path, m
     root = tmp_path / "runs"
     names = _make_old_runs(root, 12)
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     out = await svc.start("299030", "하나기술")
     left = sorted(p.name for p in root.iterdir())
     assert out.job.job_id in left
@@ -641,24 +597,23 @@ async def test_start_prunes_old_run_dirs_but_keeps_new_job_dir(mods, tmp_path, m
 
 
 async def test_start_without_new_job_does_not_prune(mods, tmp_path, monkeypatch):
-    # 같은 종목(기존 작업 반환)·다른 종목(busy)·쿼터 소진은 새 작업이 아니므로 정리하지 않는다.
+    # 같은 종목(기존 작업 반환)·다른 종목(busy)은 새 작업이 아니므로 정리하지 않는다.
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=1, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
     first = await svc.start("299030", "하나기술")
     root = tmp_path / "runs"
     names = _make_old_runs(root, 11)
     assert (await svc.start("299030", "하나기술")).kind == "existing"
     assert (await svc.start("005930", "삼성전자")).kind == "busy"
     assert len(list(root.iterdir())) == 12
+    assert sorted(p.name for p in root.iterdir()) == sorted(names + [first.job.job_id])
     runner.release.set()
     await _finish(first.job)
-    assert (await svc.start("005930", "삼성전자")).kind == "rate_limit"
-    assert sorted(p.name for p in root.iterdir()) == sorted(names + [first.job.job_id])
 
 
 async def test_prune_failure_does_not_block_start(mods, tmp_path, monkeypatch):
     runner = FakeRunner(mods.gr)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch)
 
     def boom(*a, **k):
         raise OSError("disk")
@@ -756,7 +711,7 @@ async def test_air5_001_prefetch_runs_outside_lock_before_runner(mods, tmp_path,
     order: list = []
     pre = FakePrefetcher(order, wait=True)
     runner = OrderRunner(mods.gr, order)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
                    integrity=_order_integrity(mods.gh, order), prefetcher=pre)
     # (a) 첫 start는 수집이 끝나기 전에 돌아온다(1초 상한)
     out = await asyncio.wait_for(svc.start("020150", "롯데에너지머티리얼즈"), 1)
@@ -777,7 +732,7 @@ async def test_air5_001_second_integrity_failure_ends_job_without_runner(mods, t
     monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
     order: list = []
     runner = OrderRunner(mods.gr, order)
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
                    integrity=_order_integrity(mods.gh, order, fail_on=2), prefetcher=FakePrefetcher(order))
     out = await svc.start("020150", "롯데에너지머티리얼즈")
     assert out.kind == "started"
@@ -794,7 +749,7 @@ async def test_air5_001_default_constructor_has_no_prefetch(mods, tmp_path, monk
     monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
     order: list = []
     runner = OrderRunner(mods.gr, order, events=("goose_start",))
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
                    integrity=_order_integrity(mods.gh, order))
     out = await svc.start("020150", "롯데에너지머티리얼즈")
     await asyncio.wait_for(_finish(out.job), 5)
@@ -817,7 +772,7 @@ async def test_air5_002_cancel_and_shutdown_during_fake_prefetch(mods, tmp_path,
             pre = FakePrefetcher(wait=True)  # gate가 열리지 않는다 = 영원히 대기
             runner = FakeRunner(mods.gr)
             runner.release.set()
-            svc = _service(mods, tmp_path / how, runner, quota=5, monkeypatch=monkeypatch, prefetcher=pre)
+            svc = _service(mods, tmp_path / how, runner, monkeypatch=monkeypatch, prefetcher=pre)
             job = (await svc.start("020150", "롯데에너지머티리얼즈")).job
             await pre.entered.wait()
             if how == "cancel":
@@ -846,7 +801,7 @@ async def test_air5_002_cancel_and_shutdown_during_real_prefetch_request(mods, t
 
             runner = FakeRunner(mods.gr)
             runner.release.set()
-            svc = _service(mods, tmp_path / how, runner, quota=5, monkeypatch=monkeypatch,
+            svc = _service(mods, tmp_path / how, runner, monkeypatch=monkeypatch,
                            prefetcher=_real_prefetcher(mods, hang))
             job = (await svc.start("020150", "롯데에너지머티리얼즈")).job
             await entered.wait()
@@ -867,7 +822,7 @@ async def test_air5_003_dart_prefetch_stage_emitted_once_before_prefetch(mods, t
     pre = FakePrefetcher(job_events=lambda: holder["job"].events)
     runner = FakeRunner(mods.gr, events=("goose_start",))
     runner.release.set()
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch, prefetcher=pre)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch, prefetcher=pre)
     out = await svc.start("020150", "롯데에너지머티리얼즈")
     holder["job"] = out.job
     await asyncio.wait_for(_finish(out.job), 5)
@@ -889,7 +844,7 @@ async def test_air5_003_no_dart_prefetch_stage_when_off_or_absent(mods, tmp_path
         monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
     runner = FakeRunner(mods.gr, events=("goose_start",))
     runner.release.set()
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch, **kw)
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch, **kw)
     out = await svc.start("020150", "롯데에너지머티리얼즈")
     await asyncio.wait_for(_finish(out.job), 5)
     assert _dart_stages(out.job) == []
@@ -914,7 +869,7 @@ async def test_air5_004_switch_off_skips_prefetcher_writes_disabled_index(mods, 
     monkeypatch.setenv("AI_REPORT_GOOSE_DART_PREFETCH", "0")
     runner = FakeRunner(mods.gr)
     runner.release.set()
-    svc = _service(mods, tmp_path / "off", runner, quota=5, monkeypatch=monkeypatch, prefetcher=spy)
+    svc = _service(mods, tmp_path / "off", runner, monkeypatch=monkeypatch, prefetcher=spy)
     out = await svc.start("020150", "롯데에너지머티리얼즈")
     await asyncio.wait_for(_finish(out.job), 5)
     index_path = tmp_path / "off" / "runs" / out.job.job_id / "dart" / "index.json"
@@ -929,7 +884,7 @@ async def test_air5_004_switch_off_skips_prefetcher_writes_disabled_index(mods, 
     monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
     runner2 = FakeRunner(mods.gr)
     runner2.release.set()
-    svc2 = _service(mods, tmp_path / "on", runner2, quota=5, monkeypatch=monkeypatch, prefetcher=spy)
+    svc2 = _service(mods, tmp_path / "on", runner2, monkeypatch=monkeypatch, prefetcher=spy)
     out2 = await svc2.start("020150", "롯데에너지머티리얼즈")
     await asyncio.wait_for(_finish(out2.job), 5)
     assert calls["n"] == 1
@@ -961,7 +916,7 @@ async def test_air5_010_prefetch_failures_still_run_goose(mods, tmp_path, monkey
     monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
     runner = FakeRunner(mods.gr)
     runner.release.set()
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
                    prefetcher=_real_prefetcher(mods, _fail_handler(case)))
     out = await svc.start("020150", "롯데에너지머티리얼즈")
     await asyncio.wait_for(_finish(out.job), 5)
@@ -976,7 +931,7 @@ async def test_air5_010_prefetcher_exception_is_logged_and_runner_continues(mods
     monkeypatch.delenv("AI_REPORT_GOOSE_DART_PREFETCH", raising=False)
     runner = FakeRunner(mods.gr)
     runner.release.set()
-    svc = _service(mods, tmp_path, runner, quota=5, monkeypatch=monkeypatch,
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
                    prefetcher=FakePrefetcher(raise_exc=RuntimeError("prefetch boom")))
     with caplog.at_level("ERROR"):
         out = await svc.start("020150", "롯데에너지머티리얼즈")

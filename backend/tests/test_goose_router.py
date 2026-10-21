@@ -91,7 +91,6 @@ def env(monkeypatch, tmp_path):
     router_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(router_mod)  # type: ignore[union-attr]
     monkeypatch.setattr(router_mod.shutil, "which", lambda name: f"/usr/local/bin/{name}")
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "5")
 
     app = FastAPI()
     app.include_router(router_mod.router, prefix="/api")
@@ -151,34 +150,29 @@ async def test_ac007_second_same_code_request_returns_200_same_job(env):
     assert r1.json()["job_id"] == r2.json()["job_id"]
     await runner.started.wait()
     assert runner.calls == ["299030"]
-    assert svc.limiter.used() == 1
     runner.release.set()
     await _finish(svc.get(r1.json()["job_id"]))
 
 
+# 하루 실행 횟수 제한(옛 1·7행 goose_rate_limit)은 사용자 결정(2026-10-21)으로 없앴다.
 @pytest.mark.parametrize(
-    "row,running,quota_left,code,which,expect_status,expect_error",
+    "row,running,code,which,expect_status,expect_error",
     [
-        (1, False, False, "299030", True, 429, "goose_rate_limit"),
-        (2, False, False, "12AB56", True, 422, None),
-        (3, False, False, "999999", True, 404, None),
-        (4, False, False, "299030", False, 503, None),
-        (5, True, False, "299030", True, 200, None),
-        (6, True, False, "005930", True, 429, "goose_busy"),
-        (7, True, True, "005930", True, 429, "goose_busy"),
+        (2, False, "12AB56", True, 422, None),
+        (3, False, "999999", True, 404, None),
+        (4, False, "299030", False, 503, None),
+        (5, True, "299030", True, 200, None),
+        (6, True, "005930", True, 429, "goose_busy"),
     ],
 )
-async def test_ac008_decision_order(env, monkeypatch, row, running, quota_left, code, which,
+async def test_ac008_decision_order(env, monkeypatch, row, running, code, which,
                                     expect_status, expect_error):
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "1" if not running else ("2" if quota_left else "1"))
     runner = FakeRunner(env.gr)
     svc = env.use(runner)
     running_job = None
     if running:
         running_job = (await svc.start("299030", "하나기술")).job
         await runner.started.wait()
-    else:
-        svc.limiter.consume()
     if not which:
         monkeypatch.setattr(env.router.shutil, "which", lambda name: None)
     calls_before = len(runner.calls)
@@ -191,7 +185,7 @@ async def test_ac008_decision_order(env, monkeypatch, row, running, quota_left, 
         assert r.json()["job_id"] == running_job.job_id
     if row == 6:
         assert "하나기술" in r.json()["detail"]["detail"]
-    assert len(runner.calls) == calls_before  # 7행: 실행기 추가 호출 0
+    assert len(runner.calls) == calls_before  # 실행기 추가 호출 0
     # Fast 쿼터 카운터는 건드리지 않는다
     env.fast.check_rate_limit.assert_not_called()
     runner.release.set()
@@ -212,9 +206,25 @@ async def test_b5_two_simultaneous_requests_exactly_one_runs(env):
     loser = r1 if r1.status_code == 429 else r2
     assert loser.json()["detail"]["error"] == "goose_busy"
     await runner.started.wait()
-    assert len(runner.calls) == 1 and svc.limiter.used() == 1
+    assert len(runner.calls) == 1
     runner.release.set()
     await _finish(svc.get((r1 if r1.status_code == 202 else r2).json()["job_id"]))
+
+
+async def test_many_sequential_deep_requests_same_day_are_never_rate_limited(env):
+    """사용자 결정(2026-10-21): 하루 실행 횟수 제한 없음. 같은 날 7번 연달아 요청해도 모두 202."""
+    runner = FakeRunner(env.gr)
+    runner.release.set()
+    svc = env.use(runner)
+    statuses = []
+    async with _client(env.app) as c:
+        for _ in range(7):
+            r = await c.post("/api/ai-report/299030", params={"mode": "deep"})
+            statuses.append(r.status_code)
+            assert "goose_rate_limit" not in r.text
+            await _finish(svc.get(r.json()["job_id"]))
+    assert statuses == [202] * 7
+    assert len(runner.calls) == 7
 
 
 # M7: 옛 test_ai_report_router_deep_mode.py(삭제)의 Fast 경로 시험(mode 없음·fast·perplexity 알리아스,
@@ -404,7 +414,6 @@ async def _post_integrity_case(env, svc, harness):
     assert (job.status, job.error_kind) == ("error", "integrity")
     assert harness.calls() == 0
     assert active.json() is None
-    assert svc.limiter.used() == 0
 
 
 async def test_ac001_2b_source_changed_after_install_fails_closed(env, harness):
@@ -449,6 +458,5 @@ async def test_ac001_5_restart_restores_install_and_runs_once(env, harness):
     job = svc.get(r.json()["job_id"])
     await _finish(job)
     assert harness.calls() == 1
-    assert svc.limiter.used() == 1
     # 가짜 claude는 리포트 없이 exit 0 → empty_output(실행기 분류 그대로)
     assert (job.status, job.error_kind) == ("error", "empty_output")

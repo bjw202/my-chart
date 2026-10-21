@@ -61,7 +61,7 @@ describe('useAiReport — goose 작업 시작', () => {
     expect(result.current.goose.jobId).toBe('J1')
   })
 
-  it('429 goose_busy·goose_rate_limit은 구독하지 않고 안내를 남긴다', async () => {
+  it('429 goose_busy는 구독하지 않고 안내를 남긴다', async () => {
     startMock.mockResolvedValueOnce({ ok: false, error: 'goose_busy', message: '하나기술 분석이 진행 중입니다' })
     const { result } = renderHook(() => useAiReport())
     await act(async () => {

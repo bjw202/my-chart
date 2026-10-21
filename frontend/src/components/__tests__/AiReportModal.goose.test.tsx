@@ -3,7 +3,7 @@
  *
  * - AC-AIR4-018: "Goose" 라벨, iframe sandbox 값 고정, ReactMarkdown 렌더 없음
  * - AC-AIR4-019: 초안 배너("최종 감사 미통과 초안")와 중단 안내 — 결과 탭·기록 탭 모두
- * - 진행 패널 + 취소 버튼, 429 goose_busy / goose_rate_limit 안내, 기록 탭 kind별 표시
+ * - 진행 패널 + 취소 버튼, 429 goose_busy 안내(하루 횟수 제한 없음 — 2026-10-21), 기록 탭 kind별 표시
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -208,20 +208,16 @@ describe('진행 패널·취소·429 안내', () => {
     expect(screen.getByText(/끝난 뒤 다시 시도/)).toBeInTheDocument()
   })
 
-  it('429 goose_rate_limit: 일일 한도 안내', () => {
+  it('하루 횟수 제한은 없으므로 "내일 다시 시도" 안내를 붙이지 않는다', () => {
     render(
       <AiReportModal
         {...makeProps({
-          goose: gooseState({
-            status: 'error',
-            errorKind: 'goose_rate_limit',
-            message: 'Goose 분석 일일 한도(5회)를 모두 사용했습니다.',
-          }),
+          goose: gooseState({ status: 'error', errorKind: 'goose_rate_limit', message: '알 수 없는 거부' }),
         })}
       />,
     )
-    expect(screen.getByText('Goose 분석 일일 한도(5회)를 모두 사용했습니다.')).toBeInTheDocument()
-    expect(screen.getByText(/내일 다시/)).toBeInTheDocument()
+    expect(screen.getByText('알 수 없는 거부')).toBeInTheDocument()
+    expect(screen.queryByText(/내일 다시/)).not.toBeInTheDocument()
   })
 
   it('취소로 끝나면 취소 안내와 다시 시도 버튼(onStart deep)', () => {

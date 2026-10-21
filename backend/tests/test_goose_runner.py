@@ -634,3 +634,29 @@ async def test_runner_survives_oversized_line(gr, tmp_path):
     result, events = await _run(gr, tmp_path, str(fake))
     assert [e.stage for e in events] == ["session_end"]
     assert result.error_kind == "empty_output"
+
+
+# 라이브 실행 a5becbb9(2026-10-21)에서 goose는 runs/{job_id}/company-input.json을 썼고,
+# UI는 "리포트 입력 작성 — 건너뜀"을 보였다. 작업 폴더 바로 아래 *input.json은 모두 compose로 인식한다.
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/H/runs/m1p4/company-input.json", ["compose"]),
+        ("runs/m1p4/company-input.json", ["compose"]),
+        ("/H/runs/m1p4/input.json", ["compose"]),
+        ("runs/m1p4/input.json", ["compose"]),
+        # 하위 폴더(render가 쓰는 draft/report-input.json)는 세지 않는다
+        ("/H/runs/m1p4/draft/report-input.json", []),
+        ("/H/runs/m1p4/draft/input.json", []),
+        # 다른 작업·다른 이름·접미사가 붙은 파일은 세지 않는다
+        ("/H/runs/other/company-input.json", []),
+        ("/H/runs/m1p4/company-input.json.bak", []),
+        ("/H/runs/m1p4/assumptions.md", []),
+        ("/H/myruns/m1p4/input.json", []),
+        ("/H/runs/xm1p4/input.json", []),
+    ],
+)
+def test_compose_stage_recognizes_any_input_json_directly_under_job_dir(gr, path, expected):
+    mapper = gr.StageMapper(job_id="m1p4")
+    line = _tool_use("Write", {"file_path": path, "content": "{}"})
+    assert [e.stage for e in mapper.feed(line)] == expected

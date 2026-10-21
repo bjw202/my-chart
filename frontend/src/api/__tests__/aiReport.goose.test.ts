@@ -3,7 +3,7 @@
  *
  * 실제 네트워크 없음: fetch와 EventSource를 가짜로 바꾼다(B3).
  * 백엔드 계약(routers/ai_report.py): POST /ai-report/{code}?mode=deep → 202/200 {job_id},
- * 429 {detail: {error: goose_busy | goose_rate_limit, detail}}, SSE 이벤트 progress/done/error/cancelled,
+ * 429 {detail: {error: goose_busy, detail}} (하루 횟수 제한 없음 — 2026-10-21), SSE 이벤트 progress/done/error/cancelled,
  * 없는 작업 404, POST /ai-report/jobs/{id}/cancel, GET /ai-report/goose/active.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -100,27 +100,18 @@ describe('startGooseJob — 작업 시작 응답 해석', () => {
     })
   })
 
-  it('429 goose_rate_limit은 일일 한도 안내를 돌려준다', async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(429, {
-        detail: { error: 'goose_rate_limit', detail: 'Goose 분석 일일 한도(5회)를 모두 사용했습니다.' },
-      }),
-    )
-    expect(await startGooseJob('005930')).toEqual({
-      ok: false,
-      error: 'goose_rate_limit',
-      message: 'Goose 분석 일일 한도(5회)를 모두 사용했습니다.',
-    })
-  })
-
-  it('본문이 없는 429 goose_busy·goose_rate_limit도 기본 안내를 만든다', async () => {
+  it('본문이 없는 429 goose_busy도 기본 안내를 만든다', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(429, { detail: { error: 'goose_busy' } }))
     const busy = await startGooseJob('005930')
     expect(busy).toMatchObject({ ok: false, error: 'goose_busy' })
     expect(busy.ok === false && busy.message).toContain('분석이 진행 중입니다')
+  })
+
+  it('하루 횟수 제한 안내 문구는 더 이상 없다(알 수 없는 오류는 일반 안내)', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(429, { detail: { error: 'goose_rate_limit' } }))
     const rate = await startGooseJob('005930')
-    expect(rate.ok === false && rate.message).toContain('일일 한도')
+    expect(rate.ok === false && rate.message).not.toContain('일일 한도')
+    expect(rate.ok === false && rate.message).toContain('HTTP 429')
   })
 
   it('그 밖의 실패(503·네트워크)는 오류로 돌려준다', async () => {

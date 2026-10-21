@@ -117,7 +117,7 @@ export interface GooseJobState {
   progress: GooseProgress
   result: GooseResult | null
   message: string
-  /** error일 때 종류(goose_busy, goose_rate_limit, timeout, …) */
+  /** error일 때 종류(goose_busy, timeout, …) */
   errorKind?: string
 }
 

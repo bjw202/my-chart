@@ -46,7 +46,7 @@ async def generate_report(
 
     fast: 스트리밍 완료 시 리포트 자동 저장.
     deep: 202 {job_id}(새 작업 또는 무결성 실패 작업) / 200 {job_id}(같은 종목 실행 중) /
-          429 goose_busy | goose_rate_limit. 진행은 GET /ai-report/jobs/{job_id}/events로 구독.
+          429 goose_busy. 진행은 GET /ai-report/jobs/{job_id}/events로 구독.
 
     SSE 이벤트 타입:
     - phase: 단계 진행 알림 (Fast Mode heartbeat 포함)
@@ -57,7 +57,7 @@ async def generate_report(
     Returns 422 if code format is invalid or mode is not 'fast'/'deep'/'perplexity'.
     Returns 404 if stock not found in registry.
     Returns 503 if required binary is missing.
-    Returns 429 if rate limit exceeded or analysis already in progress (deep: goose_busy / goose_rate_limit).
+    Returns 429 if rate limit exceeded or analysis already in progress (deep: goose_busy).
     """
     # ── 공통 가드 1: 코드 형식 검증 (두 모드 모두 적용) ──
     if not _CODE_PATTERN.match(code):
@@ -136,7 +136,7 @@ async def _handle_fast_mode(code: str, stock_name: str) -> EventSourceResponse:
 #           라우터는 1~3단계(코드·종목·실행 파일)만 판정하고 4~8단계는 service.start()가 잠금 안에서 판정한다
 #           (design §8). 여기서 4~8단계를 미리 판정하면 동시 요청이 모두 통과한다.
 async def _handle_deep_mode(code: str, stock_name: str) -> Response:
-    """goose 작업 시작: 202 {job_id} / 200 {기존 job_id} / 429 goose_busy | goose_rate_limit."""
+    """goose 작업 시작: 202 {job_id} / 200 {기존 job_id} / 429 goose_busy (하루 횟수 제한 없음)."""
     # 3. claude 실행 파일
     if shutil.which("claude") is None:
         raise HTTPException(
@@ -151,12 +151,6 @@ async def _handle_deep_mode(code: str, stock_name: str) -> Response:
         raise HTTPException(
             status_code=429,
             detail={"error": "goose_busy", "detail": f"{outcome.job.stock_name} 분석이 진행 중입니다"},
-        )
-    if outcome.kind == "rate_limit":
-        quota = get_goose_service().limiter.quota
-        raise HTTPException(
-            status_code=429,
-            detail={"error": "goose_rate_limit", "detail": f"Goose 분석 일일 한도({quota}회)를 모두 사용했습니다."},
         )
     # started 또는 integrity(작업은 이미 error/integrity — 프론트는 이벤트 구독으로 받는다)
     return JSONResponse(status_code=202, content={"job_id": outcome.job.job_id})

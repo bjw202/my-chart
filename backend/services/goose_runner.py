@@ -3,7 +3,7 @@
 설계: design.md §3(명령·프롬프트·환경 변수·종료·진행 단계), §4.1(종료 사유 표),
 §5.2(리포트 선택 규칙 — 분류에 필요한 선택만 하고 복사는 M5 작업 서비스가 한다).
 
-경계(design §8): 무결성 검사·쿼터·실행 중 작업 등록·`runs/{job_id}/` 생성은 작업 서비스
+경계(design §8): 무결성 검사·실행 중 작업 등록·`runs/{job_id}/` 생성은 작업 서비스
 (M4)가 실행기 호출 전에 한다. 실행기는 프로세스를 띄우고, stream-json을 진행 단계로 바꿔
 콜백으로 넘기고, 끝나면 종료 사유를 분류해 ``RunResult``로 돌려준다.
 
@@ -213,7 +213,9 @@ class StageMapper:
     """design §3.5 측정 표. 알 수 없는 타입·깨진 JSON은 무시하고 예외를 던지지 않는다."""
 
     def __init__(self, job_id: str) -> None:
-        self._input_suffix = f"runs/{job_id}/input.json"
+        # compose 단계: 작업 폴더 바로 아래의 *input.json(input.json·company-input.json 등).
+        # 하위 폴더(render가 쓰는 draft/report-input.json)는 세지 않는다.
+        self._job_dir_suffix = f"/runs/{job_id}"
         # permission_denied 이벤트에는 명령이 없다(녹화 119줄). 직전 tool_use를 id로 기억해
         # 거부된 명령을 로그에 남긴다. 세션당 도구 호출 수가 적어도 상한을 둔다.
         self._tool_inputs: dict[str, tuple[str, str]] = {}
@@ -281,6 +283,10 @@ class StageMapper:
                 events.append(stage)
         return events
 
+    def _is_job_input(self, file_path: str) -> bool:
+        head, _, name = file_path.rpartition("/")
+        return name.endswith("input.json") and f"/{head}".endswith(self._job_dir_suffix)
+
     def _tool_stage(self, name: str, inp: dict, is_sub: bool) -> ProgressEvent | None:
         if is_sub:
             # 서브에이전트는 WebFetch만 집계한다(원문 열람 횟수)
@@ -291,7 +297,7 @@ class StageMapper:
             return ProgressEvent("research_tick")
         if name == "Agent" and inp.get("subagent_type") == "web-fetch":
             return ProgressEvent("fetch_start", detail=str(inp.get("description") or ""))
-        if name == "Write" and str(inp.get("file_path", "")).endswith(self._input_suffix):
+        if name == "Write" and self._is_job_input(str(inp.get("file_path", ""))):
             return ProgressEvent("compose")
         if name == "Bash":
             return _bash_stage(str(inp.get("command", "")))

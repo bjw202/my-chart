@@ -9,7 +9,7 @@
   돌려준 dict는 종료 이벤트 데이터에 합쳐진다(run, report_url, interrupted 등). 훅은 취소·오류
   경로에서도 불리며, 그 전에 ``job.ending``에 종료 상태를 기록한다. 생성자 기본값은 훅 없음이고
   운영용 모듈 인스턴스에만 보관 훅을 붙인다.
-- 쿼터는 goose 전용(`AI_REPORT_GOOSE_DAILY_QUOTA`, 기본 5)이며 Fast·옛 Deep 카운터와 무관하다.
+- 하루 실행 횟수 제한은 없다(사용자 결정 2026-10-21 — 단일 사용자). 서버 전체 동시 실행 1개만 지킨다.
 - SPEC-AI-REPORT-005: ``prefetcher``(DART 원문 사전 수집기)를 주입하면 백그라운드 태스크가 goose 실행 직전에
   ``runs/<job_id>/dart/``로 수집하고 무결성을 다시 검사한다. 생성자 기본값은 수집기 없음(기존 동작 그대로)이고
   운영용 모듈 인스턴스에만 실제 DART 수집기를 붙인다. 끄기 스위치 `AI_REPORT_GOOSE_DART_PREFETCH=0`의
@@ -34,9 +34,7 @@ from backend.services import goose_dart_prefetch, goose_harness, goose_runner, g
 
 logger = logging.getLogger(__name__)
 
-ENV_DAILY_QUOTA = "AI_REPORT_GOOSE_DAILY_QUOTA"
 ENV_DART_PREFETCH = "AI_REPORT_GOOSE_DART_PREFETCH"  # "0"이면 DART 사전 수집을 끈다(REQ-AIR5-004)
-DEFAULT_DAILY_QUOTA = 5
 MAX_FINISHED_JOBS = 50
 TERMINAL_STATES = ("done", "error", "cancelled")
 
@@ -51,45 +49,6 @@ _ERROR_MESSAGES = {
     "empty_output": "분석이 끝났지만 리포트가 만들어지지 않았습니다.",
     "exit_error": "분석 프로세스가 비정상 종료했습니다.",
 }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# goose 전용 일일 쿼터 (옛 Deep 레이트 리밋을 대체 — Fast·Deep 카운터와 공유하지 않음)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class GooseRateLimiter:
-    """KST 날짜별 goose 시작 횟수. 판정(exhausted)과 차감(consume)을 나눠 8단계에서만 차감한다."""
-
-    def __init__(self, clock: Callable[[], datetime] | None = None) -> None:
-        self._clock = clock or (lambda: datetime.now(_KST))
-        self._counts: dict[str, int] = {}
-
-    @property
-    def quota(self) -> int:
-        raw = os.environ.get(ENV_DAILY_QUOTA)
-        if not raw:
-            return DEFAULT_DAILY_QUOTA
-        try:
-            value = int(raw)
-        except ValueError:
-            logger.warning("%s 값이 정수가 아님(%r) — 기본값 %d 사용", ENV_DAILY_QUOTA, raw, DEFAULT_DAILY_QUOTA)
-            return DEFAULT_DAILY_QUOTA
-        return max(value, 0)
-
-    def _today(self) -> str:
-        return self._clock().astimezone(_KST).strftime("%Y-%m-%d")
-
-    def used(self) -> int:
-        return self._counts.get(self._today(), 0)
-
-    def exhausted(self) -> bool:
-        return self.used() >= self.quota
-
-    def consume(self) -> None:
-        today = self._today()
-        # 지난 날짜 키는 남길 이유가 없다
-        self._counts = {today: self._counts.get(today, 0) + 1}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -127,9 +86,9 @@ class Job:
 
 @dataclass(frozen=True)
 class StartOutcome:
-    """start() 판정 결과. kind: started | existing | busy | rate_limit | integrity.
+    """start() 판정 결과. kind: started | existing | busy | integrity.
 
-    busy면 ``job``은 실행 중인 다른 종목 작업(라우터가 종목명을 안내에 쓴다), rate_limit면 None.
+    busy면 ``job``은 실행 중인 다른 종목 작업(라우터가 종목명을 안내에 쓴다).
     """
 
     kind: str
@@ -203,7 +162,6 @@ class GooseJobService:
         *,
         runner: Runner | None = None,
         integrity_check: Callable[[], goose_harness.IntegrityResult] | None = None,
-        limiter: GooseRateLimiter | None = None,
         runs_root: Callable[[], Path] | None = None,
         on_finish: FinishHook | None = None,
         prefetcher: Prefetcher | None = None,
@@ -211,7 +169,6 @@ class GooseJobService:
     ) -> None:
         self._runner: Runner = runner or goose_runner.run_goose
         self._integrity = integrity_check or _default_integrity
-        self.limiter = limiter or GooseRateLimiter()
         self._runs_root = runs_root or _default_runs_root
         self._on_finish = on_finish
         self._prefetcher = prefetcher
@@ -220,7 +177,7 @@ class GooseJobService:
         self._active_job_id: str | None = None
         # @MX:WARN: [AUTO] 판정-후-등록 전체를 묶는 단일 잠금(design §4.2·§8).
         # @MX:REASON: 무결성 검사가 스레드로 넘어가며 await가 생긴다. 잠금 밖에서 4~8단계를 판정하면
-        #             동시 요청 두 개가 모두 통과해 서버 전체 동시 1개(D10)와 쿼터가 깨진다(B5 테스트).
+        #             동시 요청 두 개가 모두 통과해 서버 전체 동시 1개(D10)가 깨진다(B5 테스트).
         self._lock = asyncio.Lock()
 
     # ── 조회 ────────────────────────────────────────────────────────────────
@@ -239,8 +196,9 @@ class GooseJobService:
 
     # @MX:ANCHOR: [AUTO] start — goose 작업 시작 판정 4~8단계의 단일 정의(REQ-AIR4-008, design §4.3).
     # @MX:REASON: 라우터(mode=deep)·테스트·M6 프론트 흐름이 이 순서에 의존한다. 같은 종목 → 다른 종목
-    #             → 쿼터 → 무결성 → 등록 순서를 바꾸면 AC-007·008, AC-001 (2b)(3)(4)가 깨진다.
-    #             무결성 실패는 실행·쿼터 차감·active 등록 없이 error/integrity 작업만 남긴다(닫힌 실패).
+    #             → 무결성 → 등록 순서를 바꾸면 AC-007·008, AC-001 (2b)(3)(4)가 깨진다.
+    #             무결성 실패는 실행·active 등록 없이 error/integrity 작업만 남긴다(닫힌 실패).
+    #             6단계(일일 쿼터)는 사용자 결정(2026-10-21)으로 없앴다 — 단계 번호는 설계 문서와 맞춰 둔다.
     async def start(self, code: str, stock_name: str) -> StartOutcome:
         async with self._lock:
             running = self._jobs.get(self._active_job_id) if self._active_job_id else None
@@ -248,8 +206,6 @@ class GooseJobService:
                 if running.code == code:  # 4. 같은 종목 실행 중 → 기존 작업
                     return StartOutcome("existing", running)
                 return StartOutcome("busy", running)  # 5. 다른 종목 실행 중
-            if self.limiter.exhausted():  # 6. 일일 쿼터 소진
-                return StartOutcome("rate_limit", None)
             integrity = await asyncio.to_thread(self._integrity)  # 7. 무결성(파일 해시 — 스레드)
             job = Job(job_id=uuid.uuid4().hex, code=code, stock_name=stock_name)
             self._jobs[job.job_id] = job
@@ -257,15 +213,13 @@ class GooseJobService:
                 logger.error("goose 작업 %s 무결성 실패 — 실행하지 않음: %s", job.job_id, integrity.reason)
                 await self._finish(job, "error", "integrity", {})
                 return StartOutcome("integrity", job)
-            # 8. 작업 디렉터리 → active 등록 → 쿼터 차감 → 백그라운드 태스크
+            # 8. 작업 디렉터리 → active 등록 → 백그라운드 태스크
             runs_root = self._runs_root()
             (runs_root / job.job_id).mkdir(parents=True, exist_ok=True)
             self._prune_runs(runs_root, job.job_id)
             self._active_job_id = job.job_id
-            self.limiter.consume()
             job.task = asyncio.create_task(self._run(job), name=f"goose-{job.job_id}")
-            logger.info("goose 작업 시작 %s (%s %s), 쿼터 %d/%d",
-                        job.job_id, code, stock_name, self.limiter.used(), self.limiter.quota)
+            logger.info("goose 작업 시작 %s (%s %s)", job.job_id, code, stock_name)
             return StartOutcome("started", job)
 
     def _prune_runs(self, runs_root: Path, new_job_id: str) -> None:

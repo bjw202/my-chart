@@ -292,7 +292,7 @@ def install_at_startup(
 
 
 # @MX:ANCHOR: [AUTO] 작업 시작 직전 무결성 판정 (REQ-AIR4-001·008 무결성 단계, AC-AIR4-001 (2b)(3)(4))
-# @MX:REASON: M4 goose_job_service.start()가 잠금 안에서 호출한다. 실패 시 claude 미실행·쿼터 미차감.
+# @MX:REASON: M4 goose_job_service.start()가 잠금 안에서 호출한다. 실패 시 claude 미실행·active 미등록.
 def check_job_integrity() -> IntegrityResult:
     """시작 시 실패 기록과 설치본-매니페스트 대조를 모두 통과해야 ``ok``다."""
     status = _startup_status

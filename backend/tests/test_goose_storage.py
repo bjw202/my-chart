@@ -76,7 +76,6 @@ def env(real, monkeypatch, tmp_path):
     runs.mkdir(parents=True)
     monkeypatch.setattr(real.ars, "_REPORTS_BASE", reports)
     monkeypatch.setattr(real.router, "get_stock_name", lambda code: _NAMES.get(code))
-    monkeypatch.setenv("AI_REPORT_GOOSE_DAILY_QUOTA", "5")
     app = FastAPI()
     app.include_router(real.router.router, prefix="/api")
     ns = types.SimpleNamespace(

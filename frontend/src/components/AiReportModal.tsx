@@ -54,7 +54,6 @@ interface AiReportModalProps {
 // goose 시작 거부(429) 안내에 덧붙이는 한 줄 (design §7.1)
 const GOOSE_NOTICE_HINTS: Record<string, string> = {
   goose_busy: '진행 중인 분석이 끝난 뒤 다시 시도하세요.',
-  goose_rate_limit: '내일 다시 시도하세요.',
 }
 
 // ── 컴포넌트 ────────────────────────────────────────────────────────────────

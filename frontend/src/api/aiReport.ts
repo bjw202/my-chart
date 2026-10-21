@@ -161,7 +161,7 @@ export function createAiReportStream(
 
 // ── SPEC-AI-REPORT-004 M6: goose 작업 (mode=deep) ─────────────────────────────
 // 백엔드 계약(routers/ai_report.py): POST /ai-report/{code}?mode=deep → 202(새 작업)/200(같은 종목 실행 중)
-// {job_id}, 429 {detail: {error: goose_busy | goose_rate_limit, detail}}. 진행은 작업 이벤트 SSE로 받는다.
+// {job_id}, 429 {detail: {error: goose_busy, detail}}. 하루 횟수 제한은 없다(2026-10-21). 진행은 작업 이벤트 SSE로 받는다.
 
 export type GooseStartResult =
   | { ok: true; jobId: string }
@@ -169,7 +169,6 @@ export type GooseStartResult =
 
 const GOOSE_DEFAULT_MESSAGES: Record<string, string> = {
   goose_busy: '다른 종목의 Goose 분석이 진행 중입니다',
-  goose_rate_limit: 'Goose 분석 일일 한도를 모두 사용했습니다.',
 }
 
 /** goose 작업 시작. 429 본문을 읽어야 해서 axios 인터셉터 대신 fetch를 쓴다. */
