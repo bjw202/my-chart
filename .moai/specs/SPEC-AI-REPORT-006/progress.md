@@ -2,10 +2,10 @@
 
 ## §E.1 Plan-phase Audit-Ready Signal
 
-- plan_revised_at: 2026-10-21 (v0.3.3, t19 병합 뒤 감수 규칙 번호 9 → 10 반영 — 문구 패치. 앞서 v0.3.2는 3차 델타 검사 N17·N18 반영 소형 텍스트 패치, v0.3.1은 3차 감사 PASS-WITH-DEBT 조건 N11~N16 반영)
-- plan_status: draft (v0.3.3). 3차 델타 검사 보고서 `.moai/reports/t18/plan-audit-iter3-delta.md`(N17·N18). 3차 감사 보고서 `.moai/reports/t18/plan-audit-iter3.md`(결함 N11~N16). 감사 보고서: 1차 `.moai/reports/t18/plan-audit.md`(결함 D1~D14), 2차 `.moai/reports/t18/plan-audit-iter2.md`(결함 N1~N10)
+- plan_revised_at: 2026-10-21 (v0.3.4, sync 단계 보안 검토 S1~S9 반영 — 아래 §E.2 "Sync-phase security review". 앞서 v0.3.3, t19 병합 뒤 감수 규칙 번호 9 → 10 반영 — 문구 패치. 앞서 v0.3.2는 3차 델타 검사 N17·N18 반영 소형 텍스트 패치, v0.3.1은 3차 감사 PASS-WITH-DEBT 조건 N11~N16 반영)
+- plan_status: draft (v0.3.4). 3차 델타 검사 보고서 `.moai/reports/t18/plan-audit-iter3-delta.md`(N17·N18). 3차 감사 보고서 `.moai/reports/t18/plan-audit-iter3.md`(결함 N11~N16). 감사 보고서: 1차 `.moai/reports/t18/plan-audit.md`(결함 D1~D14), 2차 `.moai/reports/t18/plan-audit-iter2.md`(결함 N1~N10)
 - artifacts: spec.md, plan.md, acceptance.md, design.md, research.md, progress.md (Tier L)
-- counts: REQ 20개(REQ-AIR6-001~020), AC 22개(AC-AIR6-001~022). v0.3.0·v0.3.1·v0.3.2·v0.3.3에서 개수 변동 없음(재계산 출력: `.moai/state/verify/t18-plan3/trace.py`)
+- counts: REQ 20개(REQ-AIR6-001~020), AC 22개(AC-AIR6-001~022). v0.3.0·v0.3.1·v0.3.2·v0.3.3·v0.3.4에서 개수 변동 없음(재계산 출력: `.moai/state/verify/t18-plan3/trace.py`, v0.3.4는 `.moai/state/verify/t18-sync/trace_amend.py`)
 - tier_rationale: Tier L — 새 서브시스템(브라우저 캡처) + 두 번째 `claude -p` 세션 + 전달 판정 변경 + 하네스 지침 + 프론트, 마일스톤 6개, 변경·신규 파일 약 20개
 - needs_clarification: 0건. 구 2건은 운영자 결정(2026-10-21)으로 해소 — spec.md D7, plan.md T9에 결정으로 기록 (지원 브라우저 = Playwright 캐시의 chrome-headless-shell만, 외부 네트워크 전면 차단)
 - probe_evidence: `.moai/state/verify/t18-plan/`(v0.1.0), `.moai/state/verify/t18-plan2/`(v0.2.0), `.moai/state/verify/t18-plan3/`(v0.3.0: `trace.py`와 그 출력) — 모두 git 무시 경로. v0.3.0에서 추가한 코드베이스·환경 주장은 research P32(대소문자 비구분 경로)·P33(`render_report.py --final`의 출력 파일)
@@ -295,6 +295,27 @@ main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 
 **관측하지 못한 것.** 라이브에서 `final` 인정 경로는 보지 못했다(감수가 결함을 찾아 `draft`로 끝났으므로) — 이 경로는 AC-AIR6-022 격리 시험이 담당한다. 감수가 찾은 두 결함이 진짜 결함인지(차트 잘림·수치 불일치)는 내가 렌더 결과를 보고 확인하지 않았다(리드 보고만).
 
 **제품 후속 후보 (이 SPEC 범위 밖).** 렌더러의 390px 모바일 차트 잘림.
+
+### Sync-phase security review (2026-10-21) — 보안 검토 `--security --deep` 결과의 SPEC 반영 (v0.3.4)
+
+이 절은 plan 단계 담당(manager-spec)이 보안 검토 결과를 SPEC에 반영한 기록이다. 구현·수정 코드는 아직 없다(M7이 한다). 증거는 `.moai/state/verify/t18-sync/sec/`(git 무시 경로). 아래 "상태"는 SPEC 개정에서의 처리이며 수정이 반영·검증됐다는 뜻이 아니다. 판정(PASS/FAIL)은 하지 않는다.
+
+| ID | 심각도 | 내용 | SPEC 처리 | 관측한 근거 |
+|---|---|---|---|---|
+| S1 | 높음 | `file://` 하위 자원(iframe)이 열려 로컬 파일 내용이 타일에 그려짐 | 이번 개정에서 수정 요건화(REQ-009 강화, design §3.3 층 A1·B, AC-009 (3)(5)(6) R1). 코드 수정은 M7 | research P36: `job1/screens/desktop-01.png`를 직접 열어 비밀 표지와 `/etc/hosts` 내용 확인(PoC 재실행은 리드) |
+| S2 | 높음 | 페이지 대상 밖의 cross-site iframe/object/embed가 외부로 요청 | 이번 개정에서 수정 요건화(REQ-009, design §3.3 층 A1·A2·B, AC-009 (3)(5)(6) R2). 코드 수정은 M7 | research P37: `poc2.py`를 내가 재실행 → `poc2_amend.out`, HITS 6건(`/iframe`·`/embed`·`/object` × 2뷰포트) |
+| S3 | 중간 | 감수 세션이 웹 자료 속 지시를 따르고 `WebFetch`/`WebSearch`/`Agent`/`Skill`을 호출할 수 있음 | 이번 개정에서 지침 수준만 완화(규칙 10-11, REQ-013, AC-013 #1·#6·(e)). 권한 봉쇄는 D3 때문에 이월(G16) | 보안 검토 보고. 지침 문구의 행동 효과는 미관측 |
+| S4 | 가설 | `Bash` 허용 접두어 + 셸 리다이렉트로 쓰기 거부 목록 밖에 쓸 수 있는지 | 이월(G16), 수정 안 함. 시험하지 않았다 | 미관측 |
+| S5 | 낮음 | 브라우저 자식 프로세스가 서버 환경 전체를 상속 | 이번 개정에서 수정 요건화(REQ-009 허용 목록 환경, AC-009 (2)). 코드 수정은 M7 | research P40: 코드 읽기(`Popen`에 `env` 없음) |
+| S6 | 낮음 | `_free_port`와 브라우저 바인드 사이 TOCTOU | 이월(G17), 수정 안 함. 코드 읽기로만 확인 | research P42 |
+| S7 | 가설 | 스트림 줄 읽기 한도 4 MiB 대 타일 8 MiB 불일치 | 이월(G18), 수정 안 함. 닫힌 쪽(가용성)으로만 어긋남 | 미관측 |
+| S8 | 가설 | 완료 경로와 취소 경로의 영수증 임시 파일 이름 충돌 | 이월(G19), 수정 안 함 | 미관측 |
+| S9 | 정보·낮음 | 1차 세션이 심은 `review/delivery-audit.json`이 세션 전 정리에서 지워지지 않음 | 이번 개정에서 수정 요건화(REQ-014 `review/` 비우기, AC-014 (14)(15)). 단 "보관됨" 전제는 코드 읽기로 성립하지 않음 — research P41, 리드에게 정정 보고. 코드 수정은 M7 | research P41 |
+| S10 | — | 이번 지시에 내용이 없어 기록하지 못했다 | 미확인. 리드가 알려 주면 추가한다 | — |
+
+수용·유지: G11, G13, G14, G15, D13(변경 없음). 신규 Gap: G20(수정 메커니즘의 미관측 동작).
+
+**미검증:** 이번 개정은 문서 변경뿐이다. 새 SPEC 요건이 구현 가능한지(특히 층 B의 `Fetch.fulfillRequest` 서빙, 프록시 플래그와 브라우저 기동, `data:`·`about:blank` 일시 정지)는 G20으로 열려 있다. 이전 §E.1의 `moai spec lint` 미재실행 상태도 그대로다.
 
 ## §E.3 Run-phase Audit-Ready Signal
 

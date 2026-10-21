@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 구현 계획
 
-상태: draft · 버전 0.3.3 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
+상태: draft · 버전 0.3.4 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
 
 ## 1. 접근 요약
 
@@ -36,6 +36,7 @@ _run(job) [잠금 밖, active 유지]
 | T12 | 영수증 확인 위치는 `select_report` 안 | 호출처가 `run_goose`·`archive_job` 둘이고 `@MX:ANCHOR`로 표시된 단일 규칙이다(P9). 두 곳이 같은 판정을 쓰게 하려면 규칙 정의 안에 두는 것이 가장 단순하다. 기존 "final이 있으면 final" 테스트는 영수증 픽스처를 더하도록 갱신한다(범위는 M4가 기준선 델타로 측정). **단일 함수 호출은 T13이 정의한다** |
 | T13 | 최종본 인정은 단일 순수 함수 `evaluate_admissibility`가 디스크 현재 상태 + 영수증의 서버 기록 사실로 매번 다시 계산한다. 영수증의 판정 불리언은 입력이 아니다. 세션 전 스냅샷·종료 후 대조·`Write`/`Edit` 호출 기록으로 판단 대상 변조를 탐지한다 | 감수 세션은 `Write(./runs/**)` 권한으로(P6) `screens/index.json`·타일도 고칠 수 있고, 권한 파일은 바꾸지 않기로 했다(T3). 저장된 불리언을 믿으면 영수증 작성 뒤 변조를 못 잡고, 조건 목록이 두 곳(요구사항·설계)에 갈라지면 AC가 한쪽만 시험한다(plan-audit D2·D3) |
 | T14 | 작업 완료 이벤트·`job.json`의 전달 상태는 영수증을 쓴 뒤 확정한다: 종료 훅이 값을 돌려주면 그 값, 아니면(`None`·훅 없음) `select_report`를 다시 계산한 값. 후처리가 돌지 않은 작업은 실행기 값 그대로 | 실행기는 1차 세션 직후 영수증이 없는 상태로 계산하므로 후처리가 돈 작업에서는 항상 `draft`다. 그대로 쓰면 최종본이 인정돼도 이벤트가 `draft`를 알린다(plan-audit D8, `goose_job_service.py:270`) |
+| T15 | **v0.3.4, sync 보안 검토 S1·S2.** 캡처 격리는 한 방어에 기대지 않고 서로 실패 방식이 다른 층을 겹친다: A1 모든 브라우저 대상(자동 연결 대상 포함)의 `Fetch` 요청 허용 목록(초안 URL만 통과, `data:`만 예외), A2 죽은 프록시·루프백 우회 제거·호스트 해석 차단 플래그, B 초안 문서의 CSP(디스크에서 해시한 바이트 그대로 `Fetch.fulfillRequest`로 서빙), 유지하는 `setBlockedURLs`. 층 C(루프백 HTTP 서빙)와 D(HTML을 고쳐 CSP 삽입)는 채택하지 않는다. 브라우저는 허용 목록 환경으로 띄운다(S5). 세션 전 `review/`를 비운다(S9). 규칙 10-11로 S3을 지침 수준에서 완화한다 | `setBlockedURLs` 단독은 `file://`과 다른 대상의 프레임·객체·embed를 못 막는다는 것이 재현됐다(research P36·P37). 층 비교와 각 층이 못 잡는 것은 design §3.3. B가 불가능하다고 M7이 관측하면 S1 방어가 한 층이 되므로 받아들이지 않고 계획 단계로 되돌린다 |
 
 ## 3. 마일스톤 (실행 순서 = 의존 순서, 서열 = 변경 가능성이 큰 결정부터 검증)
 
@@ -47,6 +48,7 @@ _run(job) [잠금 밖, active 유지]
 | M4 작업 서비스 연결·최종본 인정·프론트 | High | `goose_job_service` 후처리·이벤트·스위치·취소·fail-open·전달 상태 재계산, `select_report`가 판정 함수 호출(+기존 테스트 갱신), 프론트 단계, 격리 통합 시험 (AC-001~005·016·020·022) | M3 | 순서·취소·fail-open·인정 표(AC-016) 전부 되돌림 RED, 프론트 단위 테스트. AC-022를 만들 수 없으면 Gap으로 `progress.md`에 기록 |
 | M5 하네스 지침·매니페스트·문서 | Medium | `harness-instructions.md` 규칙 7 개정·규칙 10(하위 10-1~10-10), 매니페스트 재생성, `pyproject.toml`, README·`.env.example` (AC-013) | M4 | 매니페스트 = 재생성, 설정·스킬 불변, 서버 재시작 후 무결성 통과 |
 | M6 라이브 관측 게이트 | High | 020150 라이브 실행 ≤2회와 판정표 (AC-018), 시간·토큰 실측(G5). 라이브 실행은 `LATEST_SEARCH_NAVER`가 남아 `final`에 도달하지 못한다(카드 t19 소관) — 최종본 인정 경로는 AC-022가 대신 확인 | M5 | `progress.md §E.2`에 명령·출력 원문. 미충족이면 SPEC을 닫지 않는다 |
+| M7 sync 보안 검토 수정 (v0.3.4) | High | `goose_screenshot.py`: 모든 대상 `Fetch` 허용 목록 + `Target.setAutoAttach`, 죽은 프록시·호스트 해석 플래그, 문서 CSP 서빙, 허용 목록 환경 변수(REQ-AIR6-009, S1·S2·S5). 작업 서비스·`goose_review.py`: 세션 전 `review/` 비우기(REQ-AIR6-014, S9). `harness-instructions.md` 규칙 10-11(S3)과 매니페스트 재생성. 시험: AC-009 (1)~(6), AC-013 #1·#6, AC-014 (14)(15). 격리 회귀 시험(R1·R2·R3: 가드된 pytest + 손 실행) | M6(이미 끝남) | **한 커밋 묶음**: 코드 수정과 규칙 10-11·매니페스트 재생성·규칙 번호 검사를 같은 묶음에 두고 (가) 규칙 번호 검사 출력, (나) 재생성 매니페스트 == 커밋 매니페스트(diff 빔), (다) `claude-settings.json` sha256 `e8b527cc…` 불변을 `progress.md`에 기록한다. 첫 단계는 B의 전달 방식(`file://` 주 문서 `fulfillRequest`, 문자 집합)과 프록시 플래그가 브라우저 기동을 깨지 않는지의 관측(G20)이며 B가 불가능하면 구현을 멈추고 계획 단계로 되돌린다. 되돌림 RED 행렬(AC-009 (6))을 층별로 관측해 기록한다. **필수 사후 검증(병합 뒤, 리드의 몫, 이 SPEC의 AC로는 닫지 못함):** (1) 독립 보안 재검토(PoC 재실행 포함)가 PASS여야 sync가 계속된다, (2) 서버를 재시작하고 020150으로 라이브 1회를 돌려 AC-AIR6-018을 다시 관측한다. 그때까지 라이브 서버는 임시 완화로 `AI_REPORT_GOOSE_REVIEW=0`(감수 끔, REQ-AIR6-004)으로 돌린다 — 수정 반영 전의 임시 조치이며 재관측 전에 해제한다 |
 
 AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배정하지 않는다. M2~M5 각 종료 때 `pytest backend/tests -k goose`로 확인하고 최종 판정은 M5 종료 시점에 한다(iter2 N10a).
 
@@ -66,6 +68,9 @@ AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배�
 | 새 테스트가 실제 브라우저·`claude`·네트워크를 건드림 | 중 | 가짜 드라이버 주입, 기존 네트워크 가드(005 AC-014)로 종료 시 0건 단언 |
 | 기존 `final` 선택 테스트 대량 갱신 | 중 | M4가 영향 개수를 기준선 대비로 먼저 측정하고 `progress.md`에 기록 |
 | 병합 순서 변경(리드 결정 2026-10-21): SPEC-AI-REPORT-007(카드 t19)이 먼저, 이 SPEC이 나중에 병합돼 겹치는 파일(`goose_job_service.py`·`harness-instructions.md`·`goose-manifest.json`·`test_goose_job_service.py`)에서 충돌한다 | 높음 | 이 SPEC이 나중 쪽이므로 007 `plan.md` §5 "필수 병합 단계" 4단계를 수행한다. 번호 변경(1)·(2)은 M5에서 끝났다(커밋 33e3c18: 감수 규칙 = 규칙 10, 하위 라벨 `10-1`~`10-10`, 본문 자기 참조 `10-3`; 규칙 7은 1차 세션 한정으로 개정, 규칙 4 "최종본:" 줄에 "(감수 세션만 실행한다 — 규칙 7·10)" 추가). 아래는 당시 계획의 기록이다 — (1) 이 SPEC의 감수 규칙 9를 10으로 다시 매기고 하위 라벨·자기 참조도 바꾼다(007의 AC-AIR7-011 #4가 정상 교차 참조도 표시할 수 있다는 007 감사 부채 N9에 유의), (2) 규칙 9 번호를 쓰는 이 SPEC의 모든 산출물을 새 번호로 고친다 — acceptance.md(AC-013 #1과 잡는 구현 (a), AC-021 Then), design.md(§7의 `규칙 9 추가` 제목 줄과 규칙 본문의 `규칙 7·9`), spec.md(§3 변경 범위 표), plan.md(M5 행), research.md(G13의 `규칙 9 (h)`), 그리고 progress.md에 있다면 그 항목. 고친 뒤 `grep -n '규칙 9\|규칙 7·9\|rule 9' .moai/specs/SPEC-AI-REPORT-006/*.md`를 실행해 이 행의 설명을 뺀 옛 번호 잔존이 0임을 출력 원문으로 남긴다, (3) 매니페스트는 손으로 합치지 않고 재생성한다, (4) `_run` 순서와 진행 이벤트를 병합 트리에서 재확인한다. 단계별 관측 결과는 이 SPEC의 `progress.md`에 원문으로 남기고, 그 뒤에만 병합 완료로 본다. 007 문서는 수정하지 않는다. 007의 `plan.md §5`와 감사 부채 N9 인용은 이 워크트리에 007이 없어 확인하지 못했다(`ls .moai/specs \| grep 007` 출력 없음, 2026-10-21) — 병합 시점에 007의 커밋 id로 다시 인용한다 |
+| 격리 층이 정상 보고서 모양을 바꾼다(CSP·`about:blank` 처리·문자 집합) 또는 프록시 플래그가 브라우저 기동을 깨뜨린다 | 중 | R3 회귀(격리 미적용 캡처 기준선과 타일 수·높이 목록 비교)와 M7 첫 단계 관측. 읽기 전용으로 본 라이브 초안은 인라인 스타일·`data:image/png`·인라인 SVG만 쓴다(research P38) |
+| `Fetch` 가로채기 이벤트의 실제 Chrome 동작이 설계 가정과 다르다(`data:`·`about:` 일시 정지, 대상 연결 경합) | 중 | 두 층 이상 유지(A1·A2·B), 핸들러 오류는 fail closed, 되돌림 행렬 관측. 미관측 항목은 G20 |
+| 감수 세션이 웹 자료 속 지시를 따라 외부 도구를 호출한다(S3) — 지침 10-11만으로는 막지 못한다 | 낮음~중 | 이월(research G16). 권한 차단은 `claude-settings.json`(D3)을 바꿔야 해 후속 카드 후보 |
 | 영수증 판정이 너무 엄격해 정상 최종본도 `draft`가 된다 | 중 | 조건 하나하나가 `reasons`로 남아 원인이 보인다. 미인정 사유는 로그와 영수증에 기록 |
 
 ## 5. 품질 게이트와 완료 정의
@@ -75,4 +80,5 @@ AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배�
 - 모든 대조 항목은 되돌림 RED 관측 후에만 GREEN으로 기록(lessons #9). 관측하지 못한 대조는 `progress.md §E.2`에 Gap으로 남긴다
 - `pytest backend/tests -k goose` 기준선 267 대비 실패 0(갱신하는 테스트는 목록으로 명시), 프론트 `npm --prefix frontend run test -- gooseJob ProgressPanel` 통과
 - @MX: 캡처 모듈의 브라우저 프로세스 진입점과 `select_report`의 영수증 확인에 `@MX:ANCHOR`/`@MX:WARN`(+REASON), 주석 언어는 `code_comments: ko`
+- **v0.3.4 필수 사후 검증 (병합 뒤, 리드, 새 AC가 아님):** (1) 독립 보안 재검토(PoC 재실행 포함)가 PASS여야 sync를 이어 간다. (2) 병합 뒤 서버를 재시작하고 020150으로 라이브 1회를 돌려 AC-AIR6-018을 다시 관측하고 결과를 `progress.md`에 기록한다. (3) 임시 완화(서버 `AI_REPORT_GOOSE_REVIEW=0`)는 (1)(2) 전까지 유지하고 그 뒤 해제한다. (4) 수정 묶음에 규칙 번호 검사·매니페스트 재생성(diff 빔)·`claude-settings.json` sha256 불변 기록이 있는지 확인한다(AC-013 #6). (5) 증거 폴더의 비밀 검색은 의도적 가짜 비밀(`TOP-SECRET-LOCAL-FILE-CONTENT-12345`, `.moai/state/verify/t18-sync/sec/secret.txt` 내용)과 실제 비밀을 구분해 보고한다. (6) 이월 항목 S4·S6·S7·S8은 수정하지 않으며 후속 카드 후보(research G16~G19)다.
 - 완료 정의는 `acceptance.md §F`
