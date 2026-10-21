@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -38,6 +39,66 @@ def reset_price_session():
     price_mod._session = None
     yield
     price_mod._session = orig
+
+
+# ---------------------------------------------------------------------------
+# 허메틱 DB 경로 패치 (SPEC-TEST-HERMETIC-001 REQ-003)
+# ---------------------------------------------------------------------------
+
+_HERMETIC_DB_ATTRS = (
+    "DAILY_DB_PATH",
+    "WEEKLY_DB_PATH",
+    "DEFAULT_DB_DAILY",
+    "DEFAULT_DB_WEEKLY",
+)
+
+
+def _iter_hermetic_target_modules():
+    """sys.modules에서 backend/my_chart 패키지 소속 모듈을 순회한다(REQ-003 패키지 순회).
+
+    이미 임포트된 모듈만 대상으로 한다 — 테스트 모듈의 임포트는 수집 시점에 모두
+    실행되므로 스위트가 실제로 로드한 모듈 전체가 여기서 관측된다. 임포트를
+    강제하지 않으므로 순회 자체의 부작용이 없다.
+    """
+    for mod_name, module in list(sys.modules.items()):
+        if module is None:
+            continue
+        if mod_name.split(".")[0] not in ("backend", "my_chart"):
+            continue
+        yield module
+
+
+@pytest.fixture(autouse=True)
+def hermetic_db_paths(tmp_path, monkeypatch):
+    """backend·my_chart 패키지의 프로덕션 Output DB 경로 상수를 tmp_path 산하로 대체한다.
+
+    모든 라우터가 backend.deps의 상수를 모듈 복사본으로 보유하므로(plan B1)
+    deps 단일 패치는 무효다. sys.modules 순회로 스위트가 로드한 모든
+    backend·my_chart 모듈의 경로 상수를 자동으로 포함한다.
+
+    - 조건부 대체: 현재값이 "Output"을 포함하는 문자열(프로덕션 경로)일 때만
+      대체한다. 테스트·픽스처가 직접 패치한 프로즌/tmp 경로는 건드리지 않으므로
+      기존 모듈 스코프 픽스처(client 계열)와 충돌하지 않는다.
+    - DB 파일을 생성하지 않는다(REQ-003) — 대체 경로는 존재하지 않는 tmp 경로이며,
+      DB 내용이 필요한 테스트는 기존 daily_db/weekly_db 픽스처를 명시 요청한다.
+    - 파일명 접미사 stock_data_daily/weekly를 유지한다(test_config 단언 호환).
+    """
+    daily_db_path = str(tmp_path / "stock_data_daily.db")
+    weekly_db_path = str(tmp_path / "stock_data_weekly.db")
+    replacement = {
+        "DAILY_DB_PATH": daily_db_path,
+        "WEEKLY_DB_PATH": weekly_db_path,
+        "DEFAULT_DB_DAILY": daily_db_path[: -len(".db")],
+        "DEFAULT_DB_WEEKLY": weekly_db_path[: -len(".db")],
+    }
+    patched = []
+    for module in _iter_hermetic_target_modules():
+        for attr in _HERMETIC_DB_ATTRS:
+            current = getattr(module, attr, None)
+            if isinstance(current, str) and "Output" in current:
+                monkeypatch.setattr(module, attr, replacement[attr])
+                patched.append(f"{module.__name__}.{attr}")
+    yield patched
 
 
 # ---------------------------------------------------------------------------

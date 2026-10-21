@@ -125,14 +125,20 @@ def api_weekly_db(tmp_path: Path, mock_sectormap) -> str:  # noqa: F811
 
 
 @pytest.fixture
-def test_client(api_weekly_db: str) -> Generator[TestClient, None, None]:
+def test_client(api_weekly_db: str, daily_db: str) -> Generator[TestClient, None, None]:
     """FastAPI TestClient with mocked DB paths pointing to test data."""
     from backend.main import app
 
-    # Patch the DB path constants used by the new routers
+    # Patch the DB path constants used by the new routers.
+    # DAILY_DB_PATH 도 함께 패치한다 — stage/sectors 라우터는 daily DB 조회가
+    # 임계 경로라서(트레이딩 밸류·시장 필터), 미패치 시 DB-less 환경에서 503이
+    # 난다(SPEC-TEST-HERMETIC-001 REQ-005).
     with patch("backend.routers.market.WEEKLY_DB_PATH", api_weekly_db), \
+         patch("backend.routers.market.DAILY_DB_PATH", daily_db), \
          patch("backend.routers.stage.WEEKLY_DB_PATH", api_weekly_db), \
-         patch("backend.routers.sectors.WEEKLY_DB_PATH", api_weekly_db):
+         patch("backend.routers.stage.DAILY_DB_PATH", daily_db), \
+         patch("backend.routers.sectors.WEEKLY_DB_PATH", api_weekly_db), \
+         patch("backend.routers.sectors.DAILY_DB_PATH", daily_db):
         with TestClient(app) as client:
             yield client
 
@@ -191,13 +197,18 @@ class TestMarketOverviewEndpoint:
         assert "breadth_history" in data
         assert isinstance(data["breadth_history"], list)
 
-    def test_response_time_under_500ms(self, api_weekly_db: str) -> None:
+    def test_response_time_under_500ms(self, api_weekly_db: str, daily_db: str) -> None:
         """AC11: API response time < 500ms for full market overview."""
         from backend.main import app
 
+        # test_client 픽스처와 동일한 패치 집합(DAILY 포함)을 이 테스트는
+        # 자체 인라인으로 유지한다 — 원래 그렇게 작성된 구조를 존중한다.
         with patch("backend.routers.market.WEEKLY_DB_PATH", api_weekly_db), \
+             patch("backend.routers.market.DAILY_DB_PATH", daily_db), \
              patch("backend.routers.stage.WEEKLY_DB_PATH", api_weekly_db), \
-             patch("backend.routers.sectors.WEEKLY_DB_PATH", api_weekly_db):
+             patch("backend.routers.stage.DAILY_DB_PATH", daily_db), \
+             patch("backend.routers.sectors.WEEKLY_DB_PATH", api_weekly_db), \
+             patch("backend.routers.sectors.DAILY_DB_PATH", daily_db):
             with TestClient(app) as client:
                 start = time.time()
                 response = client.get("/api/market/overview")

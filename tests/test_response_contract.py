@@ -95,6 +95,9 @@ def client() -> Iterator[Any]:
         patch("backend.routers.sectors.WEEKLY_DB_PATH", str(WEEKLY_DB)),
         patch("backend.routers.sectors.DAILY_DB_PATH", str(DAILY_DB)),
         patch("backend.routers.stage.WEEKLY_DB_PATH", str(WEEKLY_DB)),
+        # stage.DAILY_DB_PATH 미패치 시 /api/stage/overview 가 DB-less 환경에서
+        # 503 을 반환한다(SPEC-TEST-HERMETIC-001 REQ-005 갭 수선).
+        patch("backend.routers.stage.DAILY_DB_PATH", str(DAILY_DB)),
         patch("my_chart.registry.SECTORMAP_PATH", str(REGISTRY)),
         patch("my_chart.registry._df_sector", None),
         patch("my_chart.registry._df_stock", None),

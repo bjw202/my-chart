@@ -37,6 +37,15 @@ def client() -> Iterator[Any]:
         patch("backend.routers.sectors.DAILY_DB_PATH", str(DAILY_DB)),
         patch("backend.routers.stage.WEEKLY_DB_PATH", str(WEEKLY_DB)),
         patch("backend.routers.stage.DAILY_DB_PATH", str(DAILY_DB)),
+        # _get_stock_meta(my_chart/analysis/sector_advanced.py)는 주어진 DB에
+        # stock_meta 가 없으면 config 파생 DEFAULT_DB_DAILY 로 폴백하며, 그 값에
+        # 다시 ".db" 를 붙여 경로를 만든다(f"{DEFAULT_DB_DAILY}.db"). 따라서 패치값은
+        # 확장자 없는 형태여야 한다. 이 이름은 라우터 레벨 패치 밖에 있어 DB-less
+        # 환경에서 빈 메타(→ 빈 bubble/rrg)를 낳는다(M1 관측 원인 —
+        # m3-unexplained-diagnosis.md). 프로즌 daily.db 로 대체 경로를 고정한다
+        # (SPEC-TEST-HERMETIC-001 REQ-006).
+        patch("my_chart.analysis.sector_advanced.DEFAULT_DB_DAILY",
+              str(DAILY_DB.with_suffix(""))),
         patch("my_chart.registry.SECTORMAP_PATH", str(REGISTRY)),
         patch("my_chart.registry._df_sector", None),
         patch("my_chart.registry._df_stock", None),
