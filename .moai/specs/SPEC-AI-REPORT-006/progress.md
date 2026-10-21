@@ -276,7 +276,25 @@ main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 
 - 프런트 `e2e/preset-flow.spec.ts`를 vitest로 돌리면 기준 상태(주 체크아웃)에서도 `Playwright Test did not expect test.describe() to be called here.`, `Test Files 1 failed (1)`, `Tests no tests`로 실패한다(`vitest_e2e_baseline.out`). 이 SPEC의 변경과 무관한 이미 있던 실패다(Playwright 명세가 vitest에 수집됨). 에이전트가 본 전체 vitest 1파일 실패와 같은 파일이다.
 - **커밋 게이트 격리 확인**: 환경 변수 `AI_REPORT_GOOSE_HARNESS_DIR`를 붙인 커밋 5건(`0ee4593`, `9c763cb`, `33e3c18`, `c5632a6`, `28e896e`)에서 실제 하네스 `CLAUDE.md` 수정 시각은 `20:32:20`에서 변하지 않았다. 각 커밋 뒤 75~150초를 두고 읽었다(이전 3건은 커밋 +35~45초에 덮어쓰기). 훅 안에서 테스트가 격리 경로로 도는 것을 직접 보지는 못했다.
 - 사본 증거에서 1MB를 넘는 3개는 제외했고(`EXCLUDED-over-1MB.txt`) 비밀 문자열 검색은 필드 이름 `apiKeySource` 3건 외에 일치가 없었다(`run-evidence/README.md`).
-- **미검증**: AC-013 #5(서버 재시작 뒤 설치본 무결성 통과)와 M6 라이브 전부. 현재 설치된 하네스(`77e260e4…`)는 새 매니페스트(`CLAUDE.md` 항목 `64ceebda…`)와 달라 main 병합 뒤 서버 재시작 때 맞춰진다.
+- **미검증**: AC-013 #5(서버 재시작 뒤 설치본 무결성 통과)와 M6 라이브 전부. 현재 설치된 하네스(`77e260e4…`)는 새 매니페스트(`CLAUDE.md` 항목 `64ceebda…`)와 달라 main 병합 뒤 서버 재시작 때 맞춰진다. (아래 M6에서 리드가 재시작 뒤 33개 파일 일치와 규칙 10 설치를 확인했다.)
+
+### M6 라이브 관측 게이트 (AC-AIR6-018) — 2026-10-21 (리드 실행·판정, 증거 사본 `.moai/reports/t18/run-evidence/live-m6/`)
+
+**판정: 통과 (1회차).** 리드가 main `2713402`에서 서버를 재시작(21:12, pid 8701)한 뒤 020150에 대해 1회 실행했다. job `0ffb8f9e490d40779b9b3d7c5224c1b3`, KST 21:12:09~21:22:16(10분 7초). AC가 허용한 ≤2회 중 한 회차로 충분해 두 번째는 쓰지 않았다. 판정과 `ac018_check.py`는 리드가 실행했고, 아래 표의 영수증·색인·감수 기록 필드는 내가 런 원본 JSON을 읽기 전용으로 다시 읽어 일치를 확인했다(`.moai/state/verify/t18-m6-orch/summarize_live.out`).
+
+| AC-018 판정 항목 | 관측 | 확인 |
+|---|---|---|
+| 1 작업 완료 | `job.json` `status: done`, `delivery_status: draft`, `interrupted: false` (`live-m6/job.json`) | 리드·나(사본 읽음) |
+| 2 캡처 | `screens/index.json` `outcome: complete`, 데스크톱 13·모바일 19 타일, 파일 존재·sha256 불일치 0 | 타일 수는 나, 불일치 0은 리드 |
+| 3 영수증 | `outcome: reviewed`, `tiles_expected` 32 = `tiles_read` 32, `exit_code` 0, `timed_out` false, `draft_unchanged` true, `judged_writes` [], `snapshot_start == snapshot_end` | 나(JSON 직접 읽음) |
+| 4 감수 기록 형식 | `audit_report.py --preview --review` 결함 코드 `[REVIEW_SOURCE_ACCURACY, REVIEW_VISUAL, UNRESOLVED_ISSUE]`, 형식 코드 4개(`AUDIT_INPUT_VERSION`, `AUDIT_PREVIEW_VERSION`, `AUDIT_TIME`, `AUDIT_MODE`)와 교집합 공집합, 5개 검사 모두 존재·`evidence` 비어 있지 않음. 대조군(`--review` 없음)은 형식 코드 4개 + `REVIEW_*` 5개가 다시 나타남 | 리드(`lead-audit018_*.json`, `lead-ac018.txt`), 5개 검사 존재·evidence 길이는 나 |
+| 5 안전 불변식 | `visual_admissible: false`, `reasons: ['visual_not_pass']`, 전달 `draft`, `final/` 폴더 없음, 완료 이벤트 `delivery_status: draft` == `job.json` | 나(영수증·`final/` 부재·이벤트 읽음) |
+
+**비게이팅 기록.** 5개 검사 상태: `source_accuracy` revise, `calculations` pass, `coverage` pass, `opinion` pass, `visual` revise. `visual.evidence`는 `[렌더 차이]`로 시작한다. 감수 세션이 실제 결함 2건(기사 출처라 한 수치의 불일치, 390px 모바일 차트 잘림)을 찾아 `UNRESOLVED_ISSUE`가 남았고 그래서 `final`에 도달하지 못했다 — 정직한 `revise`가 게이트를 막지 않는다는 설계(REQ-018)대로다. 이번 회차의 `research_window`는 `dart`·`naver`·`original_news`·`company_ir`·`industry` 모두 `read`라 `LATEST_SEARCH_*` 결함이 없었고 `FRESHNESS_CUTOFF`도 없었다(자정 전 종료). 소요 시간 외 토큰 실측은 없다.
+
+**관측하지 못한 것.** 라이브에서 `final` 인정 경로는 보지 못했다(감수가 결함을 찾아 `draft`로 끝났으므로) — 이 경로는 AC-AIR6-022 격리 시험이 담당한다. 감수가 찾은 두 결함이 진짜 결함인지(차트 잘림·수치 불일치)는 내가 렌더 결과를 보고 확인하지 않았다(리드 보고만).
+
+**제품 후속 후보 (이 SPEC 범위 밖).** 렌더러의 390px 모바일 차트 잘림.
 
 ## §E.3 Run-phase Audit-Ready Signal
 

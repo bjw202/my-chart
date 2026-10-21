@@ -12,7 +12,8 @@ SPEC-AI-REPORT-006(카드 t18)의 `progress.md`가 인용하는 비추적 증거
 | `m4` | `t18-m4` | M4: 되돌림 변형(`mutations*.out`), 하네스 전후 |
 | `m5` | `t18-m5` | M5: 규칙 번호 검사, 매니페스트 재생성, 변형 |
 | `merge` | `t18-merge` | main 병합 해결 기록과 시험 출력 |
-| `orch-m2` ~ `orch-m5` | `t18-m*-orch` | 오케스트레이터 독립 재실행(pytest, vitest, 하네스 전후, 기준 상태 e2e) |
+| `orch-m2` ~ `orch-m6` | `t18-m*-orch` | 오케스트레이터 독립 재실행(pytest, vitest, 하네스 전후, 기준 상태 e2e, M6 라이브 JSON 읽기 요약) |
+| `live-m6` | 런 `0ffb8f9e…`(~/.goose-harness/runs), 리드 `3313cef6-lead` | M6 라이브(AC-AIR6-018) 인용용 JSON 4개(`screens-index`, `review-receipt`, `review-delivery-audit`, `audit-review`), `job.json`, 리드 판정 파일 `lead-*`(`ac018.txt`, `ac018_check.py`, 감수 포함/제외 감사 출력, `events.sse`). PNG·html은 복사하지 않았다. `review-delivery-audit.json`과 `lead-audit018_with_review.json`은 크기는 같고 내용은 검사 시각 등에서 다르다 |
 
 ## 제외
 

@@ -1,0 +1,18 @@
+index.outcome: complete
+  desktop ok= None outcome= None tiles= 13
+  mobile ok= None outcome= None tiles= 19
+receipt keys: ['audit_review', 'draft_unchanged', 'finished_at', 'hashes', 'judged_writes', 'outcome', 'process', 'reasons', 'schema_version', 'screens', 'started_at', 'visual_admissible']
+  outcome = reviewed
+  visual_admissible = False
+  reasons = ['visual_not_pass']
+  screens.tiles_expected/read: 32 32 | snapshot_start==end: True
+  process.exit_code/timed_out: 0 False
+  draft_unchanged: True | judged_writes: []
+check source_accuracy revise | evidence_len= 829
+check calculations pass | evidence_len= 509
+check coverage pass | evidence_len= 395
+check opinion pass | evidence_len= 303
+check visual revise | evidence_len= 624
+visual evidence startswith marker: True
+delivery-audit.decision: revise | keys: ['checked_at', 'decision', 'delivery_allowed', 'findings', 'input_sha256', 'preview_sha256', 'review', 'schema_version']
+final dir exists: False

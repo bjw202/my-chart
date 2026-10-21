@@ -1,0 +1,12 @@
+{
+  "job_id": "0ffb8f9e490d40779b9b3d7c5224c1b3",
+  "code": "020150",
+  "stock_name": "롯데에너지머티리얼즈",
+  "started_at": "2026-10-21T21:12:09+09:00",
+  "finished_at": "2026-10-21T21:22:10+09:00",
+  "status": "done",
+  "error_kind": null,
+  "run": "2026-10-21_3",
+  "delivery_status": "draft",
+  "interrupted": false
+}

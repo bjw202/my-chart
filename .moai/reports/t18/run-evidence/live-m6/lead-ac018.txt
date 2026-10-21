@@ -1,0 +1,42 @@
+# AC-AIR6-018 live check - lead - job 0ffb8f9e490d40779b9b3d7c5224c1b3 - 2026-10-21 21:12:09~21:22:16 KST
+main=2713402 server_pid=8701
+JOBDIR=/Users/byunjungwon/Dev/my-project-01/my_chart/backend/reports/롯데에너지머티리얼즈/goose/2026-10-21_3
+job.json keys: ['code', 'delivery_status', 'error_kind', 'finished_at', 'interrupted', 'job_id', 'run', 'started_at', 'status', 'stock_name']
+1. status: done | delivery_status: draft | exit/reason: None
+2. outcome: complete | viewports: [('desktop', 'ok', 13), ('mobile', 'ok', 19)] | tiles 32 | missing/sha-mismatch: []
+3. tiles_expected 32 tiles_read 32 | read covers expected: True | exit_code 0 timed_out False | draft_unchanged True | judged_writes [] | snapshot_start==end: True
+   receipt: visual_admissible False | reasons ['visual_not_pass']
+4. audit-review checks: {'source_accuracy': ('revise', 829), 'calculations': ('pass', 509), 'coverage': ('pass', 395), 'opinion': ('pass', 303), 'visual': ('revise', 624)} | mode separate_review_pass | issues 2
+   visual evidence starts with: [렌더 차이] 외부 네트워크와 웹 글꼴을 막고 그렸으므
+5. review/delivery-audit: decision revise | delivery_allowed False
+   final dir exists: False
+   audit codes (server's own run): ['REVIEW_SOURCE_ACCURACY', 'REVIEW_VISUAL', 'UNRESOLVED_ISSUE']
+   format-code intersection: []
+## (iii) completion event delivery_status vs job.json
+events bytes: 2257
+event: progress
+data: {"stage": "screenshot", "detail": null}
+event: progress
+data: {"stage": "review", "detail": null}
+event: done
+data: {"run": "2026-10-21_3", "delivery_status": "draft", "report_url": "/api/ai-report/020150/goose/2026-10-21_3/report.html"}
+job.json delivery_status: draft
+
+## formal audit command from AC-018 #4 (with --review)
+exit 2
+codes ['REVIEW_SOURCE_ACCURACY', 'REVIEW_VISUAL', 'UNRESOLVED_ISSUE']
+format-code intersection []
+decision revise
+
+## control (no --review): format codes must reappear
+['AUDIT_INPUT_VERSION', 'AUDIT_MODE', 'AUDIT_PREVIEW_VERSION', 'AUDIT_TIME', 'REVIEW_CALCULATIONS', 'REVIEW_COVERAGE', 'REVIEW_OPINION', 'REVIEW_SOURCE_ACCURACY', 'REVIEW_VISUAL']
+
+## naver/company_ir channels this run
+  dart read
+  naver read
+  original_news read
+  company_ir read
+  industry read
+## hazard checks: harness mtime / pyc
+CLAUDE.md mtime 21:12:01
+64ceebda

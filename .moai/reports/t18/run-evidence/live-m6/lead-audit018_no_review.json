@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "decision": "revise",
+  "delivery_allowed": false,
+  "input_sha256": "ad54d65f659b37c9ae91630195d34bd3a201647583afc007d967f1dbc5a9bb13",
+  "preview_sha256": "96f62e0c9d8f054b9506d8ed2537dbe898686419a5b78112eea641f9fac1be09",
+  "checked_at": "2026-10-21T12:23:11.106691+00:00",
+  "review": {
+    "reviewed_at": null,
+    "mode": null,
+    "checks": null,
+    "issues": null
+  },
+  "findings": [
+    {
+      "code": "AUDIT_INPUT_VERSION",
+      "owner": "fact-check",
+      "action": "현재 입력 파일의 해시와 연결된 새 감수 기록을 작성합니다."
+    },
+    {
+      "code": "AUDIT_PREVIEW_VERSION",
+      "owner": "fact-check",
+      "action": "현재 미리보기 HTML을 실제 확인하고 그 파일 해시를 기록합니다."
+    },
+    {
+      "code": "AUDIT_TIME",
+      "owner": "fact-check",
+      "action": "조사 완료 후 실제 감수한 시각을 기록합니다."
+    },
+    {
+      "code": "AUDIT_MODE",
+      "owner": "fact-check",
+      "action": "독립 담당자 또는 작성 후 별도 감수 단계의 실제 실행 방식을 기록합니다."
+    },
+    {
+      "code": "REVIEW_SOURCE_ACCURACY",
+      "owner": "fact-check",
+      "action": "source_accuracy 감수를 완료하고 실제 관찰·대조 결과를 기록합니다. 선언만으로 통과시키지 않습니다."
+    },
+    {
+      "code": "REVIEW_CALCULATIONS",
+      "owner": "fact-check",
+      "action": "calculations 감수를 완료하고 실제 관찰·대조 결과를 기록합니다. 선언만으로 통과시키지 않습니다."
+    },
+    {
+      "code": "REVIEW_COVERAGE",
+      "owner": "fact-check",
+      "action": "coverage 감수를 완료하고 실제 관찰·대조 결과를 기록합니다. 선언만으로 통과시키지 않습니다."
+    },
+    {
+      "code": "REVIEW_OPINION",
+      "owner": "fact-check",
+      "action": "opinion 감수를 완료하고 실제 관찰·대조 결과를 기록합니다. 선언만으로 통과시키지 않습니다."
+    },
+    {
+      "code": "REVIEW_VISUAL",
+      "owner": "stock-report",
+      "action": "visual 감수를 완료하고 실제 관찰·대조 결과를 기록합니다. 선언만으로 통과시키지 않습니다."
+    }
+  ],
+  "scope": "Local completeness and evidence-record consistency checks plus supplied editorial review. Not proof of factual truth or independent execution."
+}

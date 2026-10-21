@@ -1,0 +1,116 @@
+id: 1
+event: progress
+data: {"stage": "dart_prefetch", "detail": null}
+
+id: 2
+event: progress
+data: {"stage": "goose_start", "detail": null}
+
+id: 3
+event: progress
+data: {"stage": "plan", "detail": null}
+
+id: 4
+event: progress
+data: {"stage": "plan", "detail": null}
+
+id: 5
+event: progress
+data: {"stage": "plan", "detail": null}
+
+id: 6
+event: progress
+data: {"stage": "plan", "detail": null}
+
+id: 7
+event: progress
+data: {"stage": "plan", "detail": null}
+
+id: 8
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 9
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 10
+event: progress
+data: {"stage": "fetch_start", "detail": "Fetch two broker articles"}
+
+id: 11
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 12
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 13
+event: progress
+data: {"stage": "fetch_done", "detail": null}
+
+id: 14
+event: progress
+data: {"stage": "audit", "detail": null}
+
+id: 15
+event: progress
+data: {"stage": "plan", "detail": null}
+
+id: 16
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 17
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 18
+event: progress
+data: {"stage": "fetch_start", "detail": "Fetch 2Q results and industry articles"}
+
+id: 19
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 20
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 21
+event: progress
+data: {"stage": "research_tick", "detail": null}
+
+id: 22
+event: progress
+data: {"stage": "fetch_done", "detail": null}
+
+id: 23
+event: progress
+data: {"stage": "compose", "detail": null}
+
+id: 24
+event: progress
+data: {"stage": "render_draft", "detail": null}
+
+id: 25
+event: progress
+data: {"stage": "audit", "detail": null}
+
+id: 26
+event: progress
+data: {"stage": "session_end", "detail": null}
+
+id: 27
+event: progress
+data: {"stage": "screenshot", "detail": null}
+
+id: 28
+event: progress
+data: {"stage": "review", "detail": null}
+
+id: 29
+event: done
+data: {"run": "2026-10-21_3", "delivery_status": "draft", "report_url": "/api/ai-report/020150/goose/2026-10-21_3/report.html"}
+
