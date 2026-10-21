@@ -255,4 +255,58 @@ Gaps(이 레인이 관측하지 않은 것):
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+```yaml
+sync_complete_at: 2026-10-21
+sync_commit_sha: pending-backfill   # 이 파일을 담는 커밋이라 자기 SHA를 적을 수 없음
+sync_status: audit-ready
+sync_route: 카드 워크트리 `.claude/worktrees/t19`(브랜치 WT-naver-search-block) 커밋, push·PR 없음
+sync_base_sha: ff9613e
+frontmatter_status_transitions:
+  spec.md / plan.md / acceptance.md / progress.md: 변경 없음 — status 전이는 독립 sync 감사 통과 뒤 리드가 한다(이번 위임 지시)
+b12_self_test_a: "grep -c 'SPEC-AI-REPORT-007' CHANGELOG.md → 0 (추가 전)"
+b12_self_test_b: "acceptance.md 고유 AC-AIR7-* 15개 = CHANGELOG 'AC-AIR7-001~015 15개'. 앵커 grep 원시 고유 수 28은 본문의 축약 별칭(AC-001·AC-015 등 13개) 포함"
+b12_self_test_c: "CHANGELOG 새 항목에 적은 경로 10개 ls 존재 확인 (10/10), 인용 커밋 5개(871c105·b28394c·9b4443f·c16e1de·ff9613e)는 git log --oneline -15 출력에서 확인"
+changelog_entry_position: "[Unreleased] 첫 항목 — ### Added (SPEC-AI-REPORT-007 v0.4.0 …), 기존 첫 항목 SPEC-TEST-HERMETIC-001 앞"
+```
+
+### sync 단계 산출물
+
+- `CHANGELOG.md`: `[Unreleased]` 첫 항목으로 SPEC-AI-REPORT-007을 더했다 — 수집 모듈(요청 1회·10초·2MB·호스트 고정·리디렉트 비추적·그룹 펼침·엔티티 해제), 색인 `outcome` 판정, 작업 서비스 연결과 끄기 스위치 `AI_REPORT_GOOSE_NAVER_PREFETCH`, `code_validated`, 하네스 규칙 9(요약 본문 인정 조건과 `limitations` 문구), 테스트, 검증(AC 15개, 커버리지 97%, goose 회귀 330), 라이브 1회차, 알려진 한계 (a)~(f). 형식은 005 sync 커밋 `17cb399`의 `### Added (SPEC-… vX — 제목, 날짜)` + 하위 굵은 글씨 항목 + 검증·알려진 한계·근거 순서를 따랐다.
+- `README.md`: SPEC 표·하단 SPEC 목록에 007 행을 더하고, AI 버튼 설명을 `003/004/005/007`과 "DART 원문과 네이버 최신 뉴스"로 고쳤다. `Goose 동작 방식` 2번(사전 수집) 아래에 네이버 사전 수집 하위 항목(요청 상한·실패해도 진행·표시와 끄기)을 넣었다 — 005가 README에 DART 수집을 적은 자리와 같은 곳이다. 알려진 한계의 "네이버 검색이 막혀 `LATEST_SEARCH_NAVER` 결함이 남는다(t19)"를 지우고, `LATEST_SEARCH_COMPANY_IR` 새 관측(원인 미관측)과 네이버 수집 범위(1페이지·요약 본문·비공식 API)를 적었다. 환경 변수 블록에 끄기 스위치 주석 줄과 상세 설명 참조에 007 spec 경로를 더했다.
+- `.env.example`: 005 sync가 DART 끄기 스위치를 주석 줄로 넣은 것과 같은 형태로 `AI_REPORT_GOOSE_NAVER_PREFETCH=0` 주석 줄을 더했다(이전에는 없었다).
+
+### 증거 (이 sync 실행에서 직접 실행)
+
+- `git log --oneline -3` → `ff9613e docs(SPEC-AI-REPORT-007): AC-012 라이브 확인 결과와 company_ir 관측 기록` / `d56b983 …` / `8ac4a83 …`
+- `grep -c 'SPEC-AI-REPORT-007' CHANGELOG.md`(추가 전) → `0`
+- `grep -oE 'AC-([A-Z0-9]+-)*[0-9]+' .moai/specs/SPEC-AI-REPORT-007/acceptance.md | sort -u | wc -l` → `28`; 그중 `AC-AIR7-*` → `AC-AIR7-001` ~ `AC-AIR7-015` 15개, 나머지 13개는 `AC-001 AC-002 AC-003 AC-005 AC-006 AC-007 AC-008 AC-009 AC-010 AC-011 AC-012 AC-014 AC-015`(축약 별칭)
+- `git diff --stat -- CHANGELOG.md README.md .env.example` → `.env.example |  4 ++++` · `CHANGELOG.md | 14 ++++++++++++++` · `README.md    | 19 ++++++++++++++-----` · `3 files changed, 32 insertions(+), 5 deletions(-)`
+- `grep -c 'SPEC-AI-REPORT-007' CHANGELOG.md` → `2`(제목 줄 + 근거 경로 줄); `grep -n '^### Added (SPEC-AI-REPORT-007' CHANGELOG.md` → `10:### Added (SPEC-AI-REPORT-007 v0.4.0 — Goose 네이버 최신 뉴스 사전 수집, 카드 t19, 2026-10-21)`; `grep -c 'SPEC-AI-REPORT-007' README.md` → `5`; `grep -c 'AI_REPORT_GOOSE_NAVER_PREFETCH' README.md .env.example` → `README.md:2` · `.env.example:1`
+- CHANGELOG 수치의 출처를 다시 확인: `grep -nE "MAX_RESPONSE|PAGE_SIZE =|MAX_ARTICLES" backend/services/goose_naver_prefetch.py` → `40:PAGE_SIZE = 10` · `55:MAX_RESPONSE_BYTES = 2 * 1024 * 1024` · `56:MAX_ARTICLES = 10`; 같은 파일 `54:REQUEST_TIMEOUT_S = 10.0`; `goose_job_service.py` `43:ENV_NAVER_PREFETCH = "AI_REPORT_GOOSE_NAVER_PREFETCH"`; `ls backend/tests/fixtures/naver/synthetic/ | wc -l` → `15`; 라이브 색인 사본 `python3 -I -c` → `complete True 10 10`(outcome, code_validated, item_count, 항목 수); `ac012_live.txt` 8행 `LATEST_SEARCH_NAVER present: False`, 10·13행 `violations 0`; `ac013_goose.txt` 끝 줄 `330 passed, 1 warning in 16.65s`
+- `moai spec lint .moai/specs/SPEC-AI-REPORT-007/spec.md` → `WARNING   StatusGitConsistency  .moai/specs/SPEC-AI-REPORT-007/spec.md  1     SPEC SPEC-AI-REPORT-007 frontmatter status 'in-progress' disagrees with git-implied status 'implemented'` · `0 error(s), 1 warning(s)` · `exit=0` (status 전이를 이번 위임에서 하지 않으므로 예상된 경고)
+
+### MX 태그 점검 (보고만, 코드 수정 없음)
+
+- `backend/services/goose_naver_prefetch.py`: 상한 상수 `@MX:NOTE`(53행), 요청 함수 `@MX:WARN`+`@MX:REASON`(281~282행), 공개 진입점 `@MX:ANCHOR`+`@MX:REASON`+`@MX:SPEC: SPEC-AI-REPORT-007`(310~313행) 있음.
+- `backend/services/goose_job_service.py`: `_prefetch_naver` `@MX:ANCHOR`(324행) 있음.
+- 누락된 `@MX:ANCHOR` 판정은 호출자 수를 세지 않고 위 태그 존재만 확인했다(Gap).
+
+### Gaps (이 sync 실행이 관측하지 않은 것)
+
+- 테스트를 다시 돌리지 않았다. CHANGELOG의 `330 passed`·커버리지 97%·되돌림 36건은 run 단계 기록(§E.2·§E.3)과 `.moai/reports/t19/run-evidence/` 파일을 옮긴 것이다.
+- 라이브 결과(AC-AIR7-012)는 리드 기록(`ac012_live.txt`, `naver_index.json`)을 인용했다. 이 sync 실행이 goose를 돌리지 않았다.
+- README의 화면 표시 서술("`공시 원문 수집` 단계 동안 이어서 실행")은 코드·SPEC D5 근거이며, 진행 패널을 직접 보지 않았다.
+- `LATEST_SEARCH_COMPANY_IR`의 원인(O-AC12-1, spec G7)은 여전히 미관측이다.
+- MX 태그의 호출자 수(fan_in) 계산, 문서 링크 검사기, 마크다운 린터는 실행하지 않았다.
+- SPEC-AI-REPORT-006(카드 t18)과의 병합 뒤 README·CHANGELOG 충돌 여부는 확인하지 않았다(이 브랜치에는 006 sync 항목이 없다).
+
+### 잔여 위험
+
+- 006이 먼저 병합되면 CHANGELOG `[Unreleased]` 첫 항목 자리와 README 알려진 한계 문단(감수 단계 서술)이 겹쳐 손 병합이 필요할 수 있다.
+- README 알려진 한계에서 "감수·화면 확인 단계가 없다"는 006 완료 전 상태를 적은 것이라 006 sync에서 다시 고쳐야 한다.
+- 비공식 API 변경·호출 제한은 문서에 적었을 뿐 감시 장치는 없다.
+
+### sync 단계에서 하지 않은 것
+
+- spec.md·plan.md·acceptance.md 본문과 모든 `status` 필드는 손대지 않았다(위임 지시).
+- push·PR·코드·테스트·하네스 파일 수정은 하지 않았다.
