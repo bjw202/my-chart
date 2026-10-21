@@ -65,6 +65,7 @@ Mark Minervini Trend Template 8조건 strict gate (SQL WHERE 평가)
 | SPEC-AI-REPORT-002 | AI 심층 분석 — 5-소스 병렬 + Claude CLI 합성 (**superseded by SPEC-AI-REPORT-004**, 코드 삭제됨) |
 | SPEC-AI-REPORT-003 | Perplexity → Codex 전면 대체 — 빠른 분석이 Codex CLI를 쓰도록 전환 (Implemented) |
 | SPEC-AI-REPORT-004 | 심층 분석을 Goose 스킬 하네스로 교체 — 헤드리스 `claude -p` 작업 큐 + SSE 진행 표시 + sandbox iframe HTML 리포트 (2026-10-20) |
+| SPEC-AI-REPORT-005 | Goose DART 원문 사전 수집 — 서버가 goose 실행 직전에 정기보고서 재무제표·주석·감사/검토보고서를 받아 `runs/<job_id>/dart/`에 둔다 (2026-10-21) |
 
 ### 🛠️ 데이터 인프라
 
@@ -179,9 +180,9 @@ KRX_PW=your_krx_password
 
 **재무 분석 (FS 버튼)** — SPEC-FNGUIDE-ENGINE-001: FnGuide S-RIM 8섹션 대시보드 (사업실적·건전성·대차대조표·수익률분해·이익워터폴·활동성·추세신호·5개질문)
 
-**AI 기업 분석 (AI 버튼)** — SPEC-AI-REPORT-003/004: 2모드 AI 분석
+**AI 기업 분석 (AI 버튼)** — SPEC-AI-REPORT-003/004/005: 2모드 AI 분석
 - **빠른 분석** (약 2~9분): Codex CLI(`codex exec`) 단일 호출로 markdown 리포트를 스트리밍
-- **Goose** (약 3~6분): 헤드리스 `claude -p`가 goose 스킬 하네스로 종목 리포트를 작성해 단일 HTML로 보여줌 (모달을 닫아도 서버에서 계속 진행)
+- **Goose** (약 3~6분): 서버가 DART 정기보고서 원문을 먼저 받아 둔 뒤, 헤드리스 `claude -p`가 goose 스킬 하네스로 종목 리포트를 작성해 단일 HTML로 보여줌 (모달을 닫아도 서버에서 계속 진행)
 
 ### 5️⃣ Theme Analysis (테마 분석) — SPEC-NAVER-THEME-001/002/003, SPEC-STOCK-TOOLTIP-PRODUCT-001
 
@@ -199,21 +200,26 @@ KRX_PW=your_krx_password
 | 소요 시간 | 약 2~9분 | 약 3~6분 (2026-10-20 라이브 2건 관측: 3분 37초, 2분 40초). 작업 1건 상한 900초 |
 | 인증 | `codex login` (ChatGPT 구독) | `claude` 로그인 (Claude Code 구독) |
 | 결과 | markdown 리포트 | 단일 HTML 리포트를 sandbox iframe으로 표시, 초안이면 배너 표시 |
-| 하루 한도 | `AI_REPORT_DAILY_QUOTA` (기본 50) | `AI_REPORT_GOOSE_DAILY_QUOTA` (기본 5, 빠른 분석과 별개) |
-| 동시 실행 | 같은 종목 중복 요청 차단 | 서버 전체에서 한 번에 1건. 실행 중인 종목은 차트 셀 AI 버튼에 표시 |
+| 요청 제한 | 하루 횟수 제한 없음. 분당 연속 요청 `AI_REPORT_BURST_LIMIT`(기본 3회/60초)를 넘으면 429 `rate_limit` | 하루 횟수 제한 없음. 동시 실행 1건 제한만 둔다 |
+| 동시 실행 | 같은 종목 분석 중 다시 요청하면 429 `already_running` | 서버 전체에서 한 번에 1건. 다른 종목이 실행 중이면 429 `goose_busy`, 같은 종목이면 진행 중인 작업 id를 돌려준다. 실행 중인 종목은 차트 셀 AI 버튼에 표시 |
 
 ### Goose 동작 방식
 
 1. **하네스 설치와 무결성 검사** — 서버가 시작할 때 리포에 추적된 원본(`backend/goose_harness_src/`)을 매니페스트(`goose-manifest.json`) sha256과 대조한 뒤 `~/.goose-harness`에 설치한다. 원본이 매니페스트와 다르거나 설치본이 바뀌면 Goose 작업을 시작하지 않는다(닫힌 실패). 작업 폴더 `runs/`는 설치 때 보존된다.
-2. **실행** — 작업마다 하네스 폴더에서 `claude -p --permission-mode dontAsk --settings <하네스>/.claude/settings.json --setting-sources project --strict-mcp-config`로 실행한다. 하네스 밖 읽기·쓰기와 `.claude/` 수정은 권한 규칙으로 거부되고, 하위 프로세스에는 허용 목록의 환경 변수만 넘어간다(API 키 등 `.env` 비밀 값은 전달하지 않음).
-3. **진행 표시** — `GET /api/ai-report/jobs/{job_id}/events`(SSE)가 단계 이벤트를 재생과 함께 보내므로, 모달을 다시 열면 진행 상황이 이어진다. `POST /api/ai-report/jobs/{job_id}/cancel`로 취소한다.
-4. **초안과 최종본** — goose가 `final/report.html`과 `delivery_allowed: true` 검증 결과를 함께 남기면 최종본(`final`), 그렇지 않고 `draft/report.html`만 있으면 초안(`draft`)으로 전달한다. 초안은 리포트 위에 배너가 붙는다.
-5. **보관** — 결과는 `backend/reports/<종목명>/goose/<날짜>/`에 보관된다(같은 날 두 번째 실행은 `<날짜>_2`). 허용 목록 파일(`report.html`, `report-input.json`, `source-ledger.json`, `render-validation.json`, `delivery-audit.json`)과 goose가 세운 가정을 적은 `assumptions.md`, 작업 메타데이터 `job.json`만 복사한다. 기록 탭에서 빠른 분석 markdown 항목과 함께 볼 수 있다.
+2. **DART 원문 사전 수집** (SPEC-AI-REPORT-005) — goose를 실행하기 직전에 서버가 DART 공개 화면(인증키 불필요)에서 최근 3년 정기보고서(사업·반기·분기)를 찾아 최신 9개 기간을 고른다. 기간마다 재무제표 구간을 받고, 가장 최근 보고서에서는 재무제표 주석을, 가장 최근 사업보고서에서는 요약재무정보를, 이 두 보고서에서는 첨부 감사·검토보고서(뒤에 붙은 재무제표 사본은 제외)를 받는다. 원본 HTML, 텍스트판, 색인 `index.json`을 `runs/<job_id>/dart/`에 쓰고, 하네스 지침 규칙 8이 goose에게 이 색인을 먼저 읽고 실제로 연 파일만 출처로 적게 한다.
+   - **요청 예의와 예산**: 요청 시작 간격 1초 이상, 작업당 최대 40회, 전체 120초, 응답 1건 8MB 상한. 숫자는 코드 상수이며 환경 변수로 바꾸지 않는다.
+   - **실패해도 진행**: 검색 결과가 한 회사로 좁혀지지 않거나 요청이 실패·시간 초과되면 그 사실을 색인(`outcome`: `complete`·`partial`·`failed`·`company_unresolved`)에 적고 goose 실행은 그대로 이어간다. 수집 중 취소하면 goose를 실행하지 않는다.
+   - **재검사와 표시**: 수집이 끝나면 하네스 무결성을 다시 검사한 뒤 goose를 실행한다. 진행 패널에는 첫 단계 `공시 원문 수집`으로 보인다.
+   - **끄기**: `AI_REPORT_GOOSE_DART_PREFETCH=0`이면 수집하지 않고 `outcome: disabled` 색인만 남긴다(진행 단계 표시도 없음).
+3. **실행** — 작업마다 하네스 폴더에서 `claude -p --permission-mode dontAsk --settings <하네스>/.claude/settings.json --setting-sources project --strict-mcp-config`로 실행한다. 하네스 밖 읽기·쓰기와 `.claude/` 수정은 권한 규칙으로 거부되고, 하위 프로세스에는 허용 목록의 환경 변수만 넘어간다(API 키 등 `.env` 비밀 값은 전달하지 않음).
+4. **진행 표시** — `GET /api/ai-report/jobs/{job_id}/events`(SSE)가 단계 이벤트를 재생과 함께 보내므로, 모달을 다시 열면 진행 상황이 이어진다. `POST /api/ai-report/jobs/{job_id}/cancel`로 취소한다.
+5. **초안과 최종본** — goose가 `final/report.html`과 `delivery_allowed: true` 검증 결과를 함께 남기면 최종본(`final`), 그렇지 않고 `draft/report.html`만 있으면 초안(`draft`)으로 전달한다. 초안은 리포트 위에 배너가 붙는다.
+6. **보관** — 결과는 `backend/reports/<종목명>/goose/<날짜>/`에 보관된다(같은 날 두 번째 실행은 `<날짜>_2`). 허용 목록 파일(`report.html`, `report-input.json`, `source-ledger.json`, `render-validation.json`, `delivery-audit.json`)과 goose가 세운 가정을 적은 `assumptions.md`, 작업 메타데이터 `job.json`만 복사한다. 기록 탭에서 빠른 분석 markdown 항목과 함께 볼 수 있다.
 
 **알려진 한계**
-- Goose 하루 한도 카운터는 서버 메모리에 있어 서버를 재시작하면 초기화된다. 실행 중 작업 기록도 재시작 시 사라진다.
-- 시작 시 차감한 한도는 취소·오류로 끝나도 돌려주지 않는다.
-- goose의 WebFetch로는 DART 공시 원문(목록 POST 조회, 자바스크립트로 그리는 목차)을 읽지 못해, 현재 리포트는 대부분 초안(`draft`)으로 끝난다. 서버가 DART 본문을 받아 넘기는 방식을 후속 과제로 남겼다.
+- 실행 중 작업 기록은 서버 메모리에 있어 재시작하면 사라진다.
+- goose 결과는 아직 초안(`draft`)으로 끝난다. 2026-10-21 라이브 실행(롯데에너지머티리얼즈 020150)에서 DART 원문 15건을 모두 받았고 DART 미확보로 생기던 감사 결함 6종은 사라졌지만, 감수(`AUDIT_*`·`REVIEW_*`)와 브라우저 화면 확인(`REVIEW_VISUAL`) 단계가 없고 네이버 검색이 막혀 `LATEST_SEARCH_NAVER` 결함이 남는다. 백로그 카드 t18(감수·화면 확인)·t19(네이버 검색)에서 다룬다.
+- 사전 수집 범위는 DART 정기보고서(사업·반기·분기)뿐이다. 잠정실적·주요사항보고서·지분 공시, KIND 공시, PDF 원본은 받지 않는다. 우선주·스팩·외국 기업 전용 처리는 없으며, 검색 결과로 회사가 하나로 확인되지 않으면 수집 없이 goose가 실행된다.
 
 ### 환경변수 설정
 
@@ -221,18 +227,17 @@ KRX_PW=your_krx_password
 
 ```bash
 # 빠른 분석 (Codex CLI — 터미널에서 `codex login` 1회)
-AI_REPORT_DAILY_QUOTA=50          # 빠른 분석 하루 최대 횟수
-AI_REPORT_BURST_LIMIT=3           # 빠른 분석 분당 최대 요청 수
+AI_REPORT_BURST_LIMIT=3           # 빠른 분석 분당 최대 요청 수 (하루 횟수 제한은 없음)
 
 # Goose (Claude Code — 서버 실행 계정에서 `claude` 로그인 상태 필요)
 AI_REPORT_GOOSE_MODEL=sonnet      # 분석 모델 (기본 sonnet)
 AI_REPORT_GOOSE_TIMEOUT=900       # 작업 1건 시간 상한(초)
-AI_REPORT_GOOSE_DAILY_QUOTA=5     # Goose 하루 최대 횟수 (빠른 분석 한도와 별개)
 AI_REPORT_GOOSE_RUNS_KEEP=10      # 하네스에 남길 작업 폴더 수 (오래된 것부터 정리)
 # AI_REPORT_GOOSE_HARNESS_DIR=~/.goose-harness   # 하네스 설치 위치. 리포 아래 경로는 거부됨
+# AI_REPORT_GOOSE_DART_PREFETCH=0                # 0이면 DART 원문 사전 수집을 끈다 (기본: 켜짐)
 ```
 
-상세 설명은 `.moai/specs/SPEC-AI-REPORT-003/spec.md`(빠른 분석)와 `.moai/specs/SPEC-AI-REPORT-004/spec.md`(Goose)를 참조하세요.
+상세 설명은 `.moai/specs/SPEC-AI-REPORT-003/spec.md`(빠른 분석), `.moai/specs/SPEC-AI-REPORT-004/spec.md`(Goose), `.moai/specs/SPEC-AI-REPORT-005/spec.md`(DART 사전 수집)를 참조하세요.
 
 ---
 
@@ -299,7 +304,7 @@ LOCKED ──[% / M / ESC]──> IDLE
 | GET | `/api/chart/{code}` | 종목 차트 데이터 (OHLCV + MA 오버레이 + RS Line) |
 | GET | `/api/sectors` | 필터 드롭다운용 섹터 목록 |
 | GET | `/api/analysis/{code}` | 종목 재무 분석 (FnGuide S-RIM 8개 섹션 대시보드) |
-| POST | `/api/ai-report/{code}` | AI 종목 분석 시작 (`mode=fast\|deep`, 기본 fast. fast: SSE 스트리밍 / deep: Goose 작업 시작, JSON `{job_id}` 반환 — 202 새 작업, 200 같은 종목 실행 중, 429 `goose_busy`·`goose_rate_limit`) |
+| POST | `/api/ai-report/{code}` | AI 종목 분석 시작 (`mode=fast\|deep`, 기본 fast. fast: SSE 스트리밍 / deep: Goose 작업 시작, JSON `{job_id}` 반환 — 202 새 작업, 200 같은 종목 실행 중, 429 `goose_busy` 다른 종목 실행 중. fast는 429 `already_running` 같은 종목 분석 중·`rate_limit` 분당 한도 초과) |
 | GET | `/api/ai-report/jobs/{job_id}/events` | Goose 작업 진행 이벤트 (SSE, `Last-Event-ID`로 지난 이벤트 재생) |
 | POST | `/api/ai-report/jobs/{job_id}/cancel` | Goose 작업 취소 (없는 작업은 404) |
 | GET | `/api/ai-report/goose/active` | 실행 중인 Goose 작업 조회 (없으면 null) |
@@ -398,6 +403,7 @@ DB 파일은 `Output/` 디렉토리에 저장됩니다:
 - [SPEC-AI-REPORT-002](/.moai/specs/SPEC-AI-REPORT-002/spec.md) — 5-소스 심층 분석 (v1.0.5, superseded by SPEC-AI-REPORT-004)
 - [SPEC-AI-REPORT-003](/.moai/specs/SPEC-AI-REPORT-003/spec.md) — Perplexity → Codex 전면 대체 (Implemented)
 - [SPEC-AI-REPORT-004](/.moai/specs/SPEC-AI-REPORT-004/spec.md) — 심층 분석을 Goose 스킬 하네스로 교체 (2026-10-20)
+- [SPEC-AI-REPORT-005](/.moai/specs/SPEC-AI-REPORT-005/spec.md) — Goose DART 원문 사전 수집 (2026-10-21)
 
 ### 인프라 / 기초
 - [SPEC-001](/.moai/specs/SPEC-001/spec.md) — Data Pipeline Validation & Optimization

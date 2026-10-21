@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SPEC-AI-REPORT-005 v0.3.1 — Goose DART 원문 사전 수집, 2026-10-21)
+
+- **goose 실행 전에 서버가 DART 정기보고서 원문을 받아 둔다** — goose의 WebFetch로는 DART 공시 원문(목록 POST 조회, 자바스크립트로 그리는 목차)을 읽지 못해 리포트가 DART 미확보 결함을 안고 초안으로 끝났다. 이제 작업 서비스의 백그라운드 태스크가 goose 실행기를 부르기 직전에 수집기를 불러 `runs/<job_id>/dart/`에 원본 HTML·텍스트판·`index.json`을 쓴다 (`d72a1e1` 픽스처 · `06fb05f` 수집 모듈 · `93b5ed5` 작업 서비스 연결 · `91b904e` 하네스 지침 · `c1076ec` 라이브 증거)
+  - **수집 모듈** (`backend/services/goose_dart_prefetch.py`): 인증키 없는 DART 공개 화면에서 최근 3년 사업·반기·분기보고서를 검색해 최신 9개 기간을 고른다. 기간마다 재무제표 구간, 가장 최근 보고서의 재무제표 주석, 가장 최근 사업보고서의 요약재무정보, 이 두 보고서의 첨부 감사·검토보고서(뒤에 붙은 재무제표 사본 제외)를 받는다. 요청 시작 간격 1초 이상, 작업당 40회, 전체 120초, 응답 8MB 상한을 코드 상수로 지킨다. 검색 결과가 한 회사로 좁혀지지 않으면 더 요청하지 않는다(`company_unresolved`). 어떤 실패도 색인에 적고 정상 반환하며, 취소(`CancelledError`)만 전파한다
+  - **작업 서비스 연결** (`backend/services/goose_job_service.py`): 수집은 시작 판정 잠금 밖에서 돌고, 끝나면 하네스 무결성을 다시 검사한 뒤 goose를 실행한다. 수집기는 생성자 주입이며 기본값은 없음(운영 인스턴스에만 실제 수집기를 붙인다). `AI_REPORT_GOOSE_DART_PREFETCH=0`이면 수집하지 않고 `outcome: disabled` 색인만 쓴다. 진행 이벤트 `dart_prefetch`를 수집 전에 한 번 보낸다
+  - **화면** (`frontend/src/components/ProgressPanel.tsx`, `frontend/src/utils/gooseJob.ts`, `frontend/src/types/aiReport.ts`): 진행 패널 첫 단계에 `공시 원문 수집`을 더했다
+  - **하네스 지침** (`backend/goose_harness_src/harness-instructions.md`, `backend/goose_harness_src/goose-manifest.json`): 규칙 8 — goose가 `runs/<job_id>/dart/index.json`을 먼저 읽고, 실제로 연 텍스트 파일만 `verification: direct_read` 출처로 적으며(`url`은 색인의 `viewer_url`, `limitations`에 "서버 사전 수집본으로 열람"), 서버 검색을 `research_window.searches`에 옮겨 적게 한다. goose 권한·프롬프트·실행 인자는 바꾸지 않았다. 매니페스트는 재생성
+  - **테스트 격리** (`backend/tests/conftest.py`): goose 테스트에서 외부 소켓 연결 시도를 기록하고 테스트 종료 시 0건을 단언한다 — 수집기가 실패를 삼켜도 실제 DART 접속이 RED로 드러난다. 녹화·합성 픽스처는 `backend/tests/fixtures/dart/`
+- **검증**: AC-AIR5-001~016 16개 모두 PASS(AC-AIR5-003은 자동 테스트 기준, AC-AIR5-016은 라이브 1회차). 수집 모듈 라인 커버리지 95%(440문 중 21 누락), 되돌림 대조(lessons #9)로 각 AC가 틀린 구현을 잡는지 RED를 관측했다. goose 회귀 `256 passed`(M4)
+  - **라이브 (2026-10-21, 롯데에너지머티리얼즈 020150, 작업 `a5becbb9`)**: 색인 `outcome=complete`, 요청 27회, 26.1초, 파일 15/15 `ok`(재무제표 9·주석 1·요약 1·감사/검토보고서 4). goose는 `status: done`·`delivery_status: draft`로 끝났고, 이전 실행 2건에서 나오던 DART 관련 감사 결함 6종이 0종이 됐다. DART `direct_read` 출처 10건 모두 색인의 `viewer_url`·`text_file`과 일치
+- **알려진 한계**: (a) 결과물은 여전히 `draft`다 — 감수(`AUDIT_*`·`REVIEW_*`)와 브라우저 화면 확인(`REVIEW_VISUAL`)이 없고(백로그 t18), 네이버 검색이 막혀 `LATEST_SEARCH_NAVER`가 남는다(t19) · (b) 정기보고서만 받는다 — 잠정실적·주요사항보고서·지분 공시·KIND·PDF 원본은 범위 밖 · (c) goose가 연 파일을 끝까지 읽었는지는 기계로 확인할 수 없다 · (d) 진행 패널 화면 배치는 직접 보지 않았다 · (e) `ruff`가 이 환경에 없어 실행하지 못했다
+  - **근거**: `.moai/specs/SPEC-AI-REPORT-005/progress.md` §E.2~§E.4 · `.moai/state/verify/70e95898/aiR5/`
+
+### Removed (AI 리포트 하루 횟수 제한 제거 — 사용자 결정, 2026-10-21)
+
+- **Goose 하루 실행 횟수 제한 제거** (`4be2906` — `backend/services/goose_job_service.py`, `backend/routers/ai_report.py`, `frontend/src/api/aiReport.ts`, `frontend/src/components/AiReportModal.tsx`): 단일 사용자 앱이라 필요 없다. `AI_REPORT_GOOSE_DAILY_QUOTA`, 하루 한도 카운터, 429 `goose_rate_limit` 응답과 "내일 다시 시도하세요" 안내를 지웠다. 서버 전체 동시 실행 1건(다른 종목이면 429 `goose_busy`)은 그대로다. 같은 날 7번 연달아 시작해도 거부되지 않음을 서비스·라우터 테스트로 고정했다
+- **빠른 분석 하루 호출 횟수 제한 제거** (`cb6b1ff` — `backend/services/ai_report_service.py`): `AI_REPORT_DAILY_QUOTA`와 "일일 쿼터 초과" 거부를 지웠다. 분당 연속 요청 제한(`AI_REPORT_BURST_LIMIT`, 기본 3회/60초 → 429 `rate_limit`)과 같은 종목 중복 분석 거부(429 `already_running`)는 그대로다. 같은 날 60번 연달아 호출해도 거부되지 않음을 서비스 테스트로 고정했다
+- **설정 영향**: `.env.example`에서 두 키를 지웠다. 기존 `.env`에 남은 두 키는 이제 읽지 않는다. 백엔드 테스트 `292 passed`(두 커밋 각각, `.moai/state/verify/70e95898/aiR5/quota_pytest.log`·`fastquota_backend.log`)
+
+### Fixed (Goose 진행 단계 "리포트 입력 작성" 인식 — 2026-10-21)
+
+- **goose가 `company-input.json`을 써도 입력 작성 단계를 인식한다** (`4be2906` — `backend/services/goose_runner.py`): 실행기 `StageMapper`가 `runs/<job_id>/input.json`만 입력 작성(compose) 단계로 쳤는데, 라이브 실행 `a5becbb9`에서 goose가 `company-input.json`을 써서 진행 패널에 `리포트 입력 작성 — 건너뜀`으로 보였다. 이제 작업 폴더 바로 아래의 `*input.json`을 모두 인식하고, 하위 폴더(`draft/report-input.json`)와 다른 작업 폴더는 세지 않는다. 재현 테스트를 먼저 실패시킨 뒤 고쳤다. 서버 재시작 뒤 라이브 확인은 아직 하지 않았다
+
 ### Changed (Bump 순위 기준을 표와 통일 — 2026-10-21)
 
 - **Bump 차트가 표와 같은 기간·시장 기준으로 순위를 그린다** — 표는 헤더의 기간 탭(1W/1M/3M) 초과수익률 단독으로 순위를 매기는데, Bump는 종합점수(1W 30%·1M 40%·3M 30%)와 전체 시장으로 그려 두 화면의 순위가 어긋났다. 이제 Bump가 헤더의 기간·시장 토글 값을 그대로 조회에 싣는다 (`ddbdf23`, SPEC 없음 — 사용자 결정)

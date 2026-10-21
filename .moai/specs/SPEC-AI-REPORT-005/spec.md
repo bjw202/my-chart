@@ -2,7 +2,7 @@
 id: SPEC-AI-REPORT-005
 title: "goose DART 원문 사전 수집 (서버가 goose 실행 전에 DART 정기보고서 원문을 받아 둔다)"
 version: "0.3.1"
-status: in-progress
+status: completed
 created: 2026-10-21
 updated: 2026-10-21
 author: manager-spec

@@ -314,4 +314,39 @@ audit_exit=2
 
 ## §E.4 Sync-phase Audit-Ready Signal
 
-_<pending sync-phase>_
+```yaml
+sync_complete_at: 2026-10-21
+sync_commit_sha: pending-backfill
+sync_status: audit-ready
+sync_route: A (main 직접 커밋, PR 없음, push 없음)
+sync_base_sha: cb6b1ff
+frontmatter_status_transitions:
+  spec.md: in-progress → completed (updated 2026-10-21 — 이미 같은 날짜라 값 변화 없음)
+  plan.md / acceptance.md / research.md / progress.md: frontmatter 없음 — 전이 대상 아님
+b12_self_test_a: "grep -c 'SPEC-AI-REPORT-005' CHANGELOG.md → 0 (추가 전)"
+b12_self_test_b: "acceptance.md 고유 AC-AIR5-* 16개 = CHANGELOG 'AC-AIR5-001~016 16개'. 원시 grep 26은 본문의 축약 별칭(AC-002·AC-016 등 10개) 포함"
+b12_self_test_c: "CHANGELOG 새 항목에 적은 경로 19개 ls 존재 확인 (19/19)"
+changelog_entry_position: "[Unreleased] 첫 항목 — ### Added (SPEC-AI-REPORT-005 v0.3.1 …), 이어서 ### Removed (하루 횟수 제한 제거), ### Fixed (입력 작성 단계 인식)"
+```
+
+### sync 단계 산출물
+
+- `README.md`: AI 분석 절에 DART 사전 수집 단계(수집 범위, 요청 간격·횟수·시간·크기 상한, 실패해도 진행, 재검사, 끄기 스위치)를 `Goose 동작 방식` 2번으로 넣었다. 하루 한도 행·환경 변수 2개·알려진 한계 2줄을 지우고, API 표의 429 설명을 코드(`backend/routers/ai_report.py`)와 맞췄다(fast: `already_running`·`rate_limit`, deep: `goose_busy`). 알려진 한계에 `draft` 지속(t18·t19)과 수집 범위를 적었다. SPEC 표와 하단 SPEC 목록에 005를 더했다.
+- `.env.example`: 끄기 스위치 `AI_REPORT_GOOSE_DART_PREFETCH`를 주석 줄로 더했다(이전에는 없었다).
+- `CHANGELOG.md`: 위 `changelog_entry_position`의 세 항목.
+
+### MX 태그 점검 (보고만, 코드 수정 없음)
+
+- `backend/services/goose_dart_prefetch.py`: `DartPrefetcher` `@MX:ANCHOR`(+REASON·SPEC), `_Session` `@MX:WARN`(+REASON), 예산 상수 `@MX:NOTE` 있음.
+- `backend/services/goose_job_service.py`: `_prefetch` `@MX:ANCHOR`(+REASON·SPEC) 있음. `start`·`_run` 주변 기존 태그 유지.
+- `backend/tests/conftest.py`: 소켓 바꿔치기 `@MX:WARN`(+REASON) 있음.
+- `backend/services/ai_report_service.py`: `check_rate_limit` `@MX:ANCHOR`(라우터 + 테스트), `@MX:NOTE`가 "분당 버스트 방지만 남긴다"로 현재 동작과 맞다.
+- `backend/services/goose_runner.py` `StageMapper`: compose 인식 주석이 현재 동작과 맞다. 호출자는 실행기 내부뿐이라 ANCHOR 대상 아님.
+- 누락된 `@MX:ANCHOR` 없음.
+
+### sync 단계에서 하지 않은 것
+
+- `plan.md` 머리말 "상태: draft · 버전 0.3.1"은 본문이라 고치지 않았다.
+- SPEC-AI-REPORT-004 문서(design·progress의 하루 한도 서술)는 완료된 SPEC의 역사 기록이라 고치지 않았다. §E.3이 "004 design/progress는 sync 단계가 고친다"고 적었지만, 이번 위임 범위가 완료 SPEC 본문 수정을 금지해 그대로 두었다.
+- `.moai/project/product.md:48`·`.moai/project/tech.md:101`의 옛 Deep 하루 한도(`AI_REPORT_DEEP_DAILY_QUOTA`) 서술은 SPEC-AI-REPORT-004 이전부터 낡은 내용이라 이번 범위 밖으로 남겼다.
+- 4be2906·cb6b1ff 반영 서버 재시작과 라이브 확인(G-M5-5)은 하지 않았다.
