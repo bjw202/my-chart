@@ -105,7 +105,7 @@ P1~P5·P7·P8은 2026-10-21 HEAD `c8e5c20`에서, P9a·P9b·P10~P12·P15는 같�
 
 ### M2 — 수집 모듈 `goose_naver_prefetch.py` (2026-10-21, 카드 t19)
 
-실행 위치: 에이전트 격리 워크트리 `agent-a3f9bb90dca738a53`(기준 HEAD `1c49411`). `PY` = `/Users/byunjungwon/Dev/my_chart/.venv/bin/python`. 증거 폴더 `$S` = `.moai/state/verify/t19-run/`. 외부 네트워크 요청 0건(모든 요청은 `httpx.MockTransport`).
+실행 위치: 에이전트 격리 워크트리 `agent-a3f9bb90dca738a53`(기준 HEAD `1c49411`). `PY` = `/Users/byunjungwon/Dev/my_chart/.venv/bin/python`. 증거 폴더 `$S` = `.moai/reports/t19/run-evidence/`(추적 경로). 원본은 에이전트 격리 워크트리 `agent-a3f9bb90dca738a53`의 `.moai/state/verify/t19-run/`(git 무시 경로)에 있었고, 인용된 파일과 스크립트 14개(약 200KB)만 복사했다. 뺀 파일: `full_backend.txt`·`full_backend_no_air7.txt`(인용 없는 전체 스위트 덤프 각 약 110KB), `.coverage`(바이너리), `syn_run1.txt`·`syn_run2.txt`·`msg_m2.txt`·`msg_m3.txt`·`msg_m4.txt`·`no_rule9.md`·`no_v2.md`(본문에서 인용하지 않은 보조 파일). 복사본에서 `crtfc_key`·`Authorization`·`Bearer`·`sk-`·`token`·`secret`·`password` 등을 대소문자 무시로 검색해 14개 파일 모두 0건을 확인했다. 이 줄 아래 `$S/…` 표기는 모두 이 폴더를 가리킨다. 외부 네트워크 요청 0건(모든 요청은 `httpx.MockTransport`).
 
 - 기준선(AC-013, M2 착수 전, 새 파일 제외): `PY -m pytest backend/tests/test_goose_dart_prefetch.py backend/tests/test_goose_job_service.py backend/tests/test_goose_router.py backend/tests/test_goose_storage.py backend/tests/test_goose_runner.py backend/tests/test_goose_harness.py backend/tests/test_main_goose_lifespan.py -q -p no:cacheprovider` → `267 passed, 1 warning in 17.17s` (`$S/baseline_goose.txt`)
 - 합성 픽스처 5종 추가(`build_synthetic.py`): `top_level_object.json`, `mixed_malformed_groups.json`, `two_items_group.json`, `entity_body.json`, `all_empty_items.json`(감사 부채 D-B). 결정성: 생성 → `shasum -a 256 synthetic/*` → 재생성 → `shasum` → `cmp` → `deterministic-ok`. 기존 합성 10종은 바이트 변화 없음(`git status --short`에 수정 표시 없음)

@@ -1,0 +1,2460 @@
+.............................EEEEEEEEEEEEEEEEEEEEEFEEEEEEEEEEEEEEEEEEEEE [ 13%]
+EEEEEEEEE........E...................................................... [ 26%]
+........................................................................ [ 39%]
+........................................................................ [ 52%]
+........................................................................ [ 66%]
+........................................................................ [ 79%]
+..................F........F.F.......................................... [ 92%]
+................................EEEEEE..                                 [100%]
+==================================== ERRORS ====================================
+_______ ERROR at setup of test_bubble_characterization_snapshot[1w-all] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______ ERROR at setup of test_bubble_characterization_snapshot[1w-kospi] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______ ERROR at setup of test_bubble_characterization_snapshot[1w-kosdaq] ______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_characterization_snapshot[1m-all] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______ ERROR at setup of test_bubble_characterization_snapshot[1m-kospi] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______ ERROR at setup of test_bubble_characterization_snapshot[1m-kosdaq] ______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_characterization_snapshot[3m-all] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______ ERROR at setup of test_bubble_characterization_snapshot[3m-kospi] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______ ERROR at setup of test_bubble_characterization_snapshot[3m-kosdaq] ______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+________ ERROR at setup of test_bubble_matches_ranking_post_m4[1w-all] _________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_matches_ranking_post_m4[1w-kospi] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_matches_ranking_post_m4[1w-kosdaq] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+________ ERROR at setup of test_bubble_matches_ranking_post_m4[1m-all] _________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_matches_ranking_post_m4[1m-kospi] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_matches_ranking_post_m4[1m-kosdaq] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+________ ERROR at setup of test_bubble_matches_ranking_post_m4[3m-all] _________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_matches_ranking_post_m4[3m-kospi] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_bubble_matches_ranking_post_m4[3m-kosdaq] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+________ ERROR at setup of test_ranking_null_returns_names_pinned[all] _________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_ranking_null_returns_names_pinned[kospi] ________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_ranking_null_returns_names_pinned[kosdaq] _______
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_sectors_bubble_market_contract.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_characterization.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______________ ERROR at setup of test_envelope_contract[1w-all] _______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______________ ERROR at setup of test_envelope_contract[1w-kospi] ______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_____________ ERROR at setup of test_envelope_contract[1w-kosdaq] ______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______________ ERROR at setup of test_envelope_contract[1m-all] _______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______________ ERROR at setup of test_envelope_contract[1m-kospi] ______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_____________ ERROR at setup of test_envelope_contract[1m-kosdaq] ______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______________ ERROR at setup of test_envelope_contract[3m-all] _______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______________ ERROR at setup of test_envelope_contract[3m-kospi] ______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_____________ ERROR at setup of test_envelope_contract[3m-kosdaq] ______________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+____________ ERROR at setup of test_parity_four_field_pairs[1w-all] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_parity_four_field_pairs[1w-kospi] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_parity_four_field_pairs[1w-kosdaq] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+____________ ERROR at setup of test_parity_four_field_pairs[1m-all] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_parity_four_field_pairs[1m-kospi] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_parity_four_field_pairs[1m-kosdaq] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+____________ ERROR at setup of test_parity_four_field_pairs[3m-all] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_parity_four_field_pairs[3m-kospi] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_parity_four_field_pairs[3m-kosdaq] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_____________ ERROR at setup of test_rs_avg_period_invariance[all] _____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+____________ ERROR at setup of test_rs_avg_period_invariance[kospi] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_rs_avg_period_invariance[kosdaq] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_excess_identity_envelope[1w-all] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_excess_identity_envelope[1w-kospi] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_excess_identity_envelope[1w-kosdaq] __________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_excess_identity_envelope[1m-all] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_excess_identity_envelope[1m-kospi] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_excess_identity_envelope[1m-kosdaq] __________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_excess_identity_envelope[3m-all] ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_excess_identity_envelope[3m-kospi] ___________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+__________ ERROR at setup of test_excess_identity_envelope[3m-kosdaq] __________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (M0 test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_ranking_parity.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_live_response_fields_are_scalars ____________
+
+    @pytest.fixture(scope="module")
+    def client() -> Iterator[Any]:
+        """집계 프로즌 픽스처에 고정된 TestClient (test_bubble_characterization.py 관용)."""
+        from fastapi.testclient import TestClient
+    
+>       from backend.main import app
+
+backend/tests/test_bubble_schema_nullable.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_____ ERROR at setup of test_stocks_master_200_with_etag_and_cache_control _____
+
+tmp_db = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_stocks_master_200_with_et0/test_daily.db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10f87de80>
+
+    @pytest.fixture()
+    def client_with_db(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+        """DAILY_DB_PATH가 tmp_db를 가리키는 TestClient.
+    
+        stocks.py는 DAILY_DB_PATH를 모듈 수준에서 import하므로,
+        라우터 모듈 자체의 네임스페이스도 함께 패치해야 한다.
+        """
+        import backend.deps as deps_mod
+        monkeypatch.setattr(deps_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+        import backend.routers.stocks as stocks_router_mod
+        monkeypatch.setattr(stocks_router_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+>       from backend.main import app
+
+backend/tests/test_stocks_master.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_stocks_master_name_ascending_sort ___________
+
+tmp_db = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_stocks_master_name_ascend0/test_daily.db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10fdc6c80>
+
+    @pytest.fixture()
+    def client_with_db(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+        """DAILY_DB_PATH가 tmp_db를 가리키는 TestClient.
+    
+        stocks.py는 DAILY_DB_PATH를 모듈 수준에서 import하므로,
+        라우터 모듈 자체의 네임스페이스도 함께 패치해야 한다.
+        """
+        import backend.deps as deps_mod
+        monkeypatch.setattr(deps_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+        import backend.routers.stocks as stocks_router_mod
+        monkeypatch.setattr(stocks_router_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+>       from backend.main import app
+
+backend/tests/test_stocks_master.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ ERROR at setup of test_stocks_master_etag_from_max_last_updated ________
+
+tmp_db = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_stocks_master_etag_from_m0/test_daily.db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10fdc4f30>
+
+    @pytest.fixture()
+    def client_with_db(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+        """DAILY_DB_PATH가 tmp_db를 가리키는 TestClient.
+    
+        stocks.py는 DAILY_DB_PATH를 모듈 수준에서 import하므로,
+        라우터 모듈 자체의 네임스페이스도 함께 패치해야 한다.
+        """
+        import backend.deps as deps_mod
+        monkeypatch.setattr(deps_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+        import backend.routers.stocks as stocks_router_mod
+        monkeypatch.setattr(stocks_router_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+>       from backend.main import app
+
+backend/tests/test_stocks_master.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_____________ ERROR at setup of test_stocks_master_empty_table_503 _____________
+
+tmp_db = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_stocks_master_empty_table0/test_daily.db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ff00440>
+
+    @pytest.fixture()
+    def client_with_db(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+        """DAILY_DB_PATH가 tmp_db를 가리키는 TestClient.
+    
+        stocks.py는 DAILY_DB_PATH를 모듈 수준에서 import하므로,
+        라우터 모듈 자체의 네임스페이스도 함께 패치해야 한다.
+        """
+        import backend.deps as deps_mod
+        monkeypatch.setattr(deps_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+        import backend.routers.stocks as stocks_router_mod
+        monkeypatch.setattr(stocks_router_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+>       from backend.main import app
+
+backend/tests/test_stocks_master.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+___________ ERROR at setup of test_stocks_master_all_null_names_503 ____________
+
+tmp_db = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_stocks_master_all_null_na0/test_daily.db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ff00f30>
+
+    @pytest.fixture()
+    def client_with_db(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+        """DAILY_DB_PATH가 tmp_db를 가리키는 TestClient.
+    
+        stocks.py는 DAILY_DB_PATH를 모듈 수준에서 import하므로,
+        라우터 모듈 자체의 네임스페이스도 함께 패치해야 한다.
+        """
+        import backend.deps as deps_mod
+        monkeypatch.setattr(deps_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+        import backend.routers.stocks as stocks_router_mod
+        monkeypatch.setattr(stocks_router_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+>       from backend.main import app
+
+backend/tests/test_stocks_master.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+______________ ERROR at setup of test_stocks_master_no_table_503 _______________
+
+tmp_db = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_stocks_master_no_table_500/test_daily.db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ff02cf0>
+
+    @pytest.fixture()
+    def client_with_db(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+        """DAILY_DB_PATH가 tmp_db를 가리키는 TestClient.
+    
+        stocks.py는 DAILY_DB_PATH를 모듈 수준에서 import하므로,
+        라우터 모듈 자체의 네임스페이스도 함께 패치해야 한다.
+        """
+        import backend.deps as deps_mod
+        monkeypatch.setattr(deps_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+        import backend.routers.stocks as stocks_router_mod
+        monkeypatch.setattr(stocks_router_mod, "DAILY_DB_PATH", str(tmp_db))
+    
+>       from backend.main import app
+
+backend/tests/test_stocks_master.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+=================================== FAILURES ===================================
+_______________ test_bubble_empty_date_returns_200_empty_sectors _______________
+
+    def test_bubble_empty_date_returns_200_empty_sectors() -> None:
+        """_get_latest_valid_date → "" 이면 200 + sectors=[] (+ date=""·as_of_date=None)."""
+        client_gen = _make_client()
+>       client = next(client_gen)
+                 ^^^^^^^^^^^^^^^^
+
+backend/tests/test_bubble_empty_date_edge.py:48: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_bubble_empty_date_edge.py:28: in _make_client
+    from backend.main import app
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """FastAPI application entry point for the KR Stock Screener web service."""
+    
+    from __future__ import annotations
+    
+    import logging
+    import shutil
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    
+    # SPEC-AI-REPORT-002 v1.0.5: 애플리케이션 INFO 로그를 uvicorn 출력에 노출.
+    # uvicorn root logger는 기본적으로 uvicorn.* 네임스페이스만 INFO로 방출하므로,
+    # basicConfig로 root logger에 handler를 추가해 backend.services.* 로그도 표시한다.
+    # 진행 상태 패널의 per-source 이벤트 흐름을 운영 중 진단할 수 있게 한다.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from my_chart.config import initialize
+>   from my_chart.registry import get_sector_registry, get_stock_registry
+E   ImportError: cannot import name 'get_sector_registry' from '<unknown module name>' (unknown location)
+
+backend/main.py:23: ImportError
+_______ TestGroupC_ScreenService.test_minervini_where_all_conditions_met _______
+
+self = <backend.tests.test_minervini_template.TestGroupC_ScreenService object at 0x10f068a50>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_minervini_where_all_condi0')
+
+    def test_minervini_where_all_conditions_met(self, tmp_path: pytest.TempPathFactory):
+        """S9 (8조건 모두 통과) → 결과에 포함, trend_template_score == 8."""
+        from backend.schemas.screen import ScreenRequest
+        from backend.services.screen_service import screen_stocks
+    
+        db_path = _create_full_meta_db(tmp_path)
+        req = ScreenRequest(minervini_trend_template=True)
+        resp = screen_stocks(req, db_path)
+    
+        codes = [item.code for sg in resp.sectors for item in sg.stocks]
+>       assert "S09001" in codes, f"S9가 결과에 없음. 결과: {codes}"
+E       AssertionError: S9가 결과에 없음. 결과: []
+E       assert 'S09001' in []
+
+backend/tests/test_minervini_template.py:584: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  backend.services.screen_service:screen_service.py:165 [minervini] required columns missing; delete DB files and re-run db-update pipeline
+_ TestGroupC_ScreenService.test_trend_template_score_is_8_for_all_returned_rows _
+
+self = <backend.tests.test_minervini_template.TestGroupC_ScreenService object at 0x10f54bb60>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_trend_template_score_is_80')
+
+    def test_trend_template_score_is_8_for_all_returned_rows(self, tmp_path: pytest.TempPathFactory):
+        """strict gate: 응답의 모든 StockItem에서 trend_template_score == 8."""
+        from backend.schemas.screen import ScreenRequest
+        from backend.services.screen_service import screen_stocks
+    
+        db_path = _create_full_meta_db(tmp_path)
+        req = ScreenRequest(minervini_trend_template=True)
+        resp = screen_stocks(req, db_path)
+    
+        all_items = [item for sg in resp.sectors for item in sg.stocks]
+>       assert len(all_items) > 0, "결과가 비어 있음 (S9가 통과해야 함)"
+E       AssertionError: 결과가 비어 있음 (S9가 통과해야 함)
+E       assert 0 > 0
+E        +  where 0 = len([])
+
+backend/tests/test_minervini_template.py:623: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  backend.services.screen_service:screen_service.py:165 [minervini] required columns missing; delete DB files and re-run db-update pipeline
+____ TestGroupC_ScreenService.test_minervini_with_existing_filters_combined ____
+
+self = <backend.tests.test_minervini_template.TestGroupC_ScreenService object at 0x10f868e50>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-750/test_minervini_with_existing_f0')
+
+    def test_minervini_with_existing_filters_combined(self, tmp_path: pytest.TempPathFactory):
+        """market_cap_min + minervini=True AND 결합 동작."""
+        from backend.schemas.screen import ScreenRequest
+        from backend.services.screen_service import screen_stocks
+    
+        db_path = _create_full_meta_db(tmp_path)
+        # 시가총액 5000억 이상 AND minervini=True
+        # S9의 market_cap = 1000000000000 (1조) → 통과 (5000억 = 500000000000)
+        req = ScreenRequest(
+            market_cap_min=5000,  # 5000 억원
+            minervini_trend_template=True,
+        )
+        resp = screen_stocks(req, db_path)
+        codes = [item.code for sg in resp.sectors for item in sg.stocks]
+>       assert "S09001" in codes
+E       AssertionError: assert 'S09001' in []
+
+backend/tests/test_minervini_template.py:657: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  backend.services.screen_service:screen_service.py:165 [minervini] required columns missing; delete DB files and re-run db-update pipeline
+=============================== warnings summary ===============================
+../../../../../my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4
+  /Users/byunjungwon/Dev/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_bubble_empty_date_edge.py::test_bubble_empty_date_returns_200_empty_sectors
+FAILED backend/tests/test_minervini_template.py::TestGroupC_ScreenService::test_minervini_where_all_conditions_met
+FAILED backend/tests/test_minervini_template.py::TestGroupC_ScreenService::test_trend_template_score_is_8_for_all_returned_rows
+FAILED backend/tests/test_minervini_template.py::TestGroupC_ScreenService::test_minervini_with_existing_filters_combined
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[1w-all]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[1w-kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[1w-kosdaq]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[1m-all]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[1m-kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[1m-kosdaq]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[3m-all]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[3m-kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_characterization_snapshot[3m-kosdaq]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[1w-all]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[1w-kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[1w-kosdaq]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[1m-all]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[1m-kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[1m-kosdaq]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[3m-all]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[3m-kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_bubble_matches_ranking_post_m4[3m-kosdaq]
+ERROR backend/tests/test_bubble_characterization.py::test_ranking_null_returns_names_pinned[all]
+ERROR backend/tests/test_bubble_characterization.py::test_ranking_null_returns_names_pinned[kospi]
+ERROR backend/tests/test_bubble_characterization.py::test_ranking_null_returns_names_pinned[kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[1w-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[1w-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[1w-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[1m-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[1m-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[1m-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[3m-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[3m-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_envelope_contract[3m-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[1w-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[1w-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[1w-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[1m-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[1m-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[1m-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[3m-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[3m-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_parity_four_field_pairs[3m-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_rs_avg_period_invariance[all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_rs_avg_period_invariance[kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_rs_avg_period_invariance[kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[1w-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[1w-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[1w-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[1m-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[1m-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[1m-kosdaq]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[3m-all]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[3m-kospi]
+ERROR backend/tests/test_bubble_ranking_parity.py::test_excess_identity_envelope[3m-kosdaq]
+ERROR backend/tests/test_bubble_schema_nullable.py::test_live_response_fields_are_scalars
+ERROR backend/tests/test_stocks_master.py::test_stocks_master_200_with_etag_and_cache_control
+ERROR backend/tests/test_stocks_master.py::test_stocks_master_name_ascending_sort
+ERROR backend/tests/test_stocks_master.py::test_stocks_master_etag_from_max_last_updated
+ERROR backend/tests/test_stocks_master.py::test_stocks_master_empty_table_503
+ERROR backend/tests/test_stocks_master.py::test_stocks_master_all_null_names_503
+ERROR backend/tests/test_stocks_master.py::test_stocks_master_no_table_503 - ...
+4 failed, 482 passed, 1 warning, 58 errors in 20.05s
