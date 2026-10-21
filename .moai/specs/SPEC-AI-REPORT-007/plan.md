@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-007 — 구현 계획
 
-상태: in-progress · 버전 0.4.0 · Tier M · 개발 방식은 `quality.yaml`의 `development_mode`(`tdd`)를 따른다. 요구사항은 `spec.md §5`, 인수 기준은 `acceptance.md`, 근거는 `spec.md §2`와 `.moai/reports/t19/`.
+상태: completed · 버전 0.4.0 · Tier M · 개발 방식은 `quality.yaml`의 `development_mode`(`tdd`)를 따른다. 요구사항은 `spec.md §5`, 인수 기준은 `acceptance.md`, 근거는 `spec.md §2`와 `.moai/reports/t19/`.
 
 변경 이력: 0.1.0~0.3.0은 `spec.md` HISTORY와 같다. 0.4.0(2026-10-21) — run 단계 M1 관측 반영: T1 그룹 펼침·모양 오류(V1), T2 요약 본문 인정 조건(V2), T3 엔티티 해제 순서(V3), T5·T9 종목코드 확인 기록(V4), M1 완료 표시와 M2 합성 픽스처 5종 추가, 규칙 초안 N-1·N-2·N-3 문구 갱신.
 

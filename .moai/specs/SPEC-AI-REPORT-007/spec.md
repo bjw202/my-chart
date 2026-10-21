@@ -2,7 +2,7 @@
 id: SPEC-AI-REPORT-007
 title: "goose 네이버 최신 뉴스 사전 수집 (서버가 goose 실행 전에 네이버 모바일 뉴스 JSON을 받아 둔다)"
 version: "0.4.0"
-status: in-progress
+status: completed
 created: 2026-10-21
 updated: 2026-10-21
 author: manager-spec
