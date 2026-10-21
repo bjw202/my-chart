@@ -427,7 +427,7 @@ sync_commit_sha: pending-backfill   # 이 파일을 담는 커밋이라 자기 S
 sync_status: audit-ready
 sync_route: 카드 워크트리 `.claude/worktrees/t18`(브랜치 WT-goose-review-pass) 커밋, push·PR 없음
 sync_base_sha: bc56cc7
-sync_auditor_score: "pending (sync-auditor runs after this commit)"
+sync_auditor_score: "0.853 PASS-WITH-DEBT (가중 평균, 조화평균 0.844; Functionality 0.88 · Security 0.82 · Craft 0.88 · Consistency 0.80; 차단 결함 0건). 보고서 .moai/reports/t18/sync-audit.md. 지적 F1(AC-018이 M7 이전 빌드에서 관측됨 — 재관측·완화 해제 대기, CHANGELOG (p)에 명시)·F4(CHANGELOG (q))·F7(문구 정정)·F9(이 필드)는 후속 문서 커밋에서 반영. 미반영 이월: F2(AC-017 (4) 되돌림 RED 관측 기록 없음), F3(가설, finish_review 예외 시 위조 영수증 잔존), F5(@MX:ANCHOR 4개 > 상한 3), F6(스킬 불변 시험이 기준 커밋 없으면 건너뜀), F8(작업 시간 6초 어긋남, 원인 미기록)"
 frontmatter_status_transitions:
   spec.md: "draft → completed (updated: 2026-10-21 유지). 3단계 닫기(draft → in-progress → implemented → completed)를 이 sync 커밋 하나에 합침"
   plan.md / acceptance.md / design.md / research.md / progress.md: "YAML frontmatter가 없다. plan.md 3행 본문 '상태: draft'는 본문이라 이 단계가 고치지 않았다(Gap)"
