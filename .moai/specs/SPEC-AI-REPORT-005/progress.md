@@ -189,6 +189,38 @@ R3-3 반영: `test_air5_008_attachment_review_and_audit_reports`가 eleId 1·2 �
 - G-M3-3: AC-003의 실제 화면 배치는 라이브 AC-016 때 눈으로 확인(비게이팅). 서버 재시작은 M4 몫이라 하지 않았다 — 실행 중 서버는 아직 옛 코드다.
 - G-M3-4: AC-010 (b)~(d)의 "다른 보고서 항목 `ok`"는 M2 수집기 테스트가 맡고, M3 작업 서비스 쪽은 실행기 호출 1·`done`·색인 `failed/partial`만 단언한다.
 
+### M4 — 하네스 지침 규칙 8과 매니페스트 (2026-10-21, HEAD 93b5ed5 기준, 서버 재시작 제외)
+
+산출물: `backend/goose_harness_src/harness-instructions.md`(규칙 8: 8, 8-1~8-3, 8-3a, 8-3b, 8-4~8-6 추가, 1~7 변경 없음), `backend/goose_harness_src/goose-manifest.json`(재생성 — `CLAUDE.md` 해시 한 줄만 바뀜). 증거 폴더 `aiR5/m4_*`.
+
+#### 실제 코드와 맞춘 점 (plan.md §4 초안 대비)
+
+- 텍스트 파일 경로: 색인 `text_file`은 폴더 없는 이름(`NN_<section>.txt`, `goose_dart_prefetch.py:526-527`)이라 `runs/<job_id>/dart/` + `text_file`로 열도록 적고, 예시를 초안의 `dart/03_fs.txt`에서 실제 형식 `dart/01_financial_statements.txt`로 바꿈.
+- 끄기 스위치: 작업 서비스는 스위치 0이면 `outcome: "disabled"`, `files: []` 색인을 쓴다(`goose_job_service.py:330-335`, `write_disabled_index`). 그래서 8-5를 "`index.json`이 없거나 `files`가 비어 있으면(`disabled`·`failed`·`company_unresolved` 등) 8-1~8-4를 건너뜀"으로 넓힘.
+- 8-3: 검색 기록은 `search.status == "ok"`이고 DART 출처를 하나 이상 적었을 때만 더하도록 조건을 둠(`result: "read"`가 사실이 되게). `note`의 자리표시는 실제 키 `search.row_count`·`company.corp_code`로 적음. 시각은 `_iso()`(`:408-409`)가 이미 `+09:00`을 붙이므로 그대로 옮기라고 적음.
+- 8-3a: §4.8 대응표의 `notes`(`document == "main"`) 조건과 세 항목의 `read_scope` 형식을 모두 옮김(초안에는 `notes`의 `document` 조건과 `notes`·`review_or_audit` 범위 문구가 빠져 있었음).
+- AC-AIR5-012 "잡지 못하는 것"(로컬 파일 속 지시문)은 8-3b가 5번 규칙을 참조해 다룬다. 5번 규칙 본문은 고치지 않음.
+- goose 권한: `claude-settings.json`에 `Read(./**)` 허용이 이미 있어 `runs/<job_id>/dart/` 읽기에 권한 변경이 필요 없음(파일 무변경).
+
+#### AC-AIR5-013 #1~#3 (`aiR5/m4_ac013.log`, `aiR5/m4_diff.log`)
+
+- 착수 전 기준선: 재생성 출력과 커밋된 매니페스트 `diff` 결과 없음(`aiR5/m4_manifest_baseline.json`, `BASELINE_MATCH`).
+- #1: `PY -m backend.services.goose_harness > aiR5/m4_ac013_1.json; diff … backend/goose_harness_src/goose-manifest.json` → `exit=0`, `diff_exit=0`, 출력 없음.
+- 매니페스트 차이: `"CLAUDE.md": "8e3deb89…98"` → `"a7a9a06e43d2a2be64107a8c934446b8b3c2c787251523bc99a74fa6041554e9"` 한 줄(`git diff --stat`: 매니페스트 `2 +-`, 지침 `9 +++++++++`). 새 해시는 `shasum -a 256 harness-instructions.md`와 같다.
+- #2: `shasum -a 256 backend/goose_harness_src/claude-settings.json` → `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3`, `git diff --quiet` 종료 0.
+- #3: `grep -cF` 13개 문자열 모두 1회 이상 — `runs/<job_id>/dart/index.json` 2, `viewer_url` 1, `direct_read` 1, `read_scope` 2, `서버 사전 수집본으로 열람` 1, `"derived"` 1, `channel: "dart"` 1, `query` 1, `note` 2, `filing_coverage` 1, `review_or_audit` 1, `5번 규칙` 1, `서브에이전트` 2.
+- 설치 모의(실제 설치본 무접촉): 임시 폴더에 `_install()` 후 `verify_source` `[]`, `verify_installed` `[]`, 설치된 `CLAUDE.md` sha `a7a9a06e…54e9` (`aiR5/m4_temp_install.log`).
+
+#### 회귀
+
+- `PY -m pytest backend/tests -k goose -q` → `256 passed, 214 deselected` (M3 후와 같음, `aiR5/m4_pytest_goose.log`)
+- `PY -m pytest backend/tests/test_goose_harness.py -q` → `32 passed` (`aiR5/m4_pytest_harness.log`). 테스트는 임시 매니페스트를 쓰므로 커밋된 매니페스트 일치는 #1 명령이 맡는다.
+
+#### Gaps
+
+- G-M4-1: AC-AIR5-013 #4(재시작 후 첫 작업이 `integrity`가 아님, `~/.goose-harness/CLAUDE.md` 해시 = `a7a9a06e…54e9`)와 #5(uvicorn 시작 시각 > 지침·작업 서비스·수집 모듈의 마지막 커밋 시각과 `stat -f %m`)는 서버 재시작 뒤 오케스트레이터가 확인한다. 지금 실행 중 서버는 옛 지침·옛 코드다.
+- G-M4-2: goose가 규칙 8을 실제로 따르는지는 라이브 AC-AIR5-016(M5)에서만 드러난다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_
