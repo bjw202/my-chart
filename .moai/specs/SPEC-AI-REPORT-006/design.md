@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 설계
 
-버전 0.3.0 · 요구사항 `spec.md §4`, 결정 `plan.md §2`, 프로브 `research.md`. 이 문서는 구현 세부(스키마·절차·경계)를 정한다. 코드 식별자는 run 단계에서 확정하며 여기서는 역할 이름으로 적는다.
+버전 0.3.1 · 요구사항 `spec.md §4`, 결정 `plan.md §2`, 프로브 `research.md`. 이 문서는 구현 세부(스키마·절차·경계)를 정한다. 코드 식별자는 run 단계에서 확정하며 여기서는 역할 이름으로 적는다.
 
 ## 1. 구성요소와 경계
 
@@ -22,7 +22,9 @@
   → 무결성 재검사 ✗ → 영수증 integrity_failed, 끝 (작업은 러너 결과대로 종료)
   → emit screenshot → capture
         ✓ complete/partial    ✗ unavailable/failed/예외 (모두 index.json에 기록)
-  → 세션 전 스냅샷(초안·입력·screens 색인·타일 해시, screens 파일 집합) + review/context.json 쓰기
+  → 세션 전 정리: 기존 audit-review.json과 final/ 삭제 (1차 세션이 심은 것 제거, REQ-AIR6-014)
+        ✗ 삭제 실패 → 감수 세션을 시작하지 않고 review_failed로 간다
+  → 세션 전 스냅샷(초안·입력·screens 색인·타일 해시, screens 상대 경로 집합) + review/context.json 쓰기
       (캡처 결과와 무관하게 쓴다; screens.outcome·render_note 포함)
   → emit review → run_review
         ✓ exit 0, audit-review.json 있음     ✗ 시작 실패/비정상 종료/시간 초과/기록 없음(`review_failed`)
@@ -37,6 +39,7 @@
 | 무결성 재검사 실패 | 러너 결과대로 | draft | `integrity_failed` | 캡처·감수 없음 |
 | 브라우저 없음/실패/시간 초과 | done | draft(감수 결과와 무관하게 `final`은 인정 못 함) | 감수가 돌았으면 `reviewed` + 사유 `screens_not_complete` | 감수는 계속 실행(`visual: revise` 사유 기록) |
 | 감수 세션 시작 실패/비정상 종료/종료 코드 0이지만 `audit-review.json` 없음 | done | draft | `review_failed`(마지막 경우 reasons에 `no_audit_review`) | — |
+| 세션 전 정리 실패(기존 `audit-review.json`·`final/` 삭제 불가) | done | draft | `review_failed` | 감수 세션 시작 안 함. 남은 파일이 있어도 `outcome`이 `reviewed`가 아니라 조건 3이 막는다 |
 | 감수 세션 시간 초과 | done | draft | `timeout` | 프로세스 그룹 종료 |
 | 취소 | cancelled | (훅이 초안 보관, 기존 규칙) | `cancelled`(best-effort) | 그룹 종료 |
 | 영수증 쓰기 실패 | done | draft. 서버는 쓰기 전에 기존 파일(세션이 쓴 것일 수 있음)을 먼저 제거하고 임시 파일 + 원자적 교체로 쓰므로, 쓰기가 실패해도 세션이 쓴 영수증이 남지 않는다(= final 불가). 제거마저 실패해 파일이 남으면 완료 이벤트의 전달 상태를 `draft`로 확정한다(보관 단계의 재판정은 Gap G14) | — | 제거 재시도, `receipt_write_failed` 로그 |
@@ -83,7 +86,7 @@
 ### 4.3 `review/receipt.json` (서버가 세션 종료 후 씀)
 
 - 최상위: `schema_version`(1), `outcome`, `started_at`, `finished_at`, `process`(`exit_code`, `timed_out`), `hashes`(`input_start`, `input_end`, `preview_start`, `preview_end`), `draft_unchanged`, `screens`(`outcome`, `index_sha256`, `tiles_expected`, `tiles_read`, `snapshot_start`, `snapshot_end`), `judged_writes`, `audit_review`(`present`, `sha256`, `mode`, `visual_status`, `input_sha256`, `preview_sha256`, `reviewed_at`), `visual_admissible`, `reasons`
-- `screens.snapshot_start`·`snapshot_end`: `{index_sha256, files: {<screens/ 안 파일 이름>: <sha256>}}`. 세션 시작 전(context.json을 쓰는 같은 단계)과 종료 뒤에 서버가 측정한다. 파일 집합은 `files`의 키 집합이다
+- `screens.snapshot_start`·`snapshot_end`: `{index_sha256, files: {<screens/ 기준 상대 경로>: <sha256>}}`. `screens/` 아래를 하위 폴더까지 재귀로 훑어 모든 파일을 상대 경로(예: `mobile-01.png`, `sub/a.png`)로 적는다. 세션 시작 전(context.json을 쓰는 같은 단계)과 종료 뒤에 서버가 측정한다. 파일 집합은 `files`의 키 집합이다
 - `judged_writes`: 스트림에서 본 `Write`/`Edit` 호출 중 대상이 이 작업의 `draft/` 또는 `screens/`로 풀리는 경로 목록(정규화된 상대 경로)
 - `outcome`: `reviewed` | `review_failed` | `timeout` | `cancelled` | `integrity_failed` | `disabled`
 - `reasons`: 판정 함수가 계산한 미인정 사유 코드 목록(진단용 — 판정의 입력이 아니다). 코드 집합과 순서는 §5의 17개 + `final_not_allowed`
@@ -91,7 +94,7 @@
 
 ## 5. 최종본 인정 판정 (단일 함수)
 
-`evaluate_admissibility(job_dir) -> (admissible, reasons)`는 `goose_review.py`의 순수 함수이며 **영수증 작성기와 `select_report`가 같은 함수를 호출한다**(REQ-AIR6-016, plan-audit D3). 함수는 아래 표의 조건 1~17을 구현한다. 조건 0(`final_not_allowed`)은 `select_report`가 먼저 평가하고, 통과하면 이 함수를 부른다. 영수증 작성기는 1~17만 평가한다(iter2 N7). 함수는 예외를 던지지 않으며 읽을 수 없는 입력은 미충족으로 본다. 입력은 (가) 디스크의 현재 파일들, (나) 영수증에 서버가 쓴 사실 필드(`outcome`, `tiles_read`, `snapshot_start`·`snapshot_end`, `hashes`, `judged_writes`)이다. 영수증의 `visual_admissible`·`reasons` 필드는 진단용 출력이며 입력으로 읽지 않는다 — 읽으면 영수증 작성 뒤 디스크가 바뀌어도 `true`가 남는다.
+`evaluate_admissibility(job_dir) -> (admissible, reasons)`는 `goose_review.py`의 순수 함수이며 **영수증 작성기와 `select_report`가 같은 조건 코어를 실행한다**(REQ-AIR6-016, plan-audit D3). 호출 형태는 둘이다(iter3 N12): 조건 코어는 영수증 사실을 **인자**로 받고, 디스크 래퍼 `evaluate_admissibility(job_dir)`는 `review/receipt.json`을 디스크에서 읽어 코어를 부른다(파일이 없으면 "없음", JSON 객체로 파싱되지 않으면 "파싱 불가"로 코어에 넘겨 조건 1·2가 각각 판정한다). 영수증 작성기는 영수증이 아직 디스크에 없으므로 방금 측정한 사실을 인자로 코어를 부른 뒤 영수증을 **한 번만** 원자적으로 쓴다(두 번 쓰지 않는다 — 두 번째 쓰기는 두 번째 실패 지점이다). 이때 진단용 키 `visual_admissible`·`reasons`는 입력이 아니므로 자리표시 값으로 넘긴다. `select_report`와 재평가는 래퍼를 부른다. 함수는 아래 표의 조건 1~17을 구현한다. 조건 0(`final_not_allowed`)은 `select_report`가 먼저 평가하고, 통과하면 이 함수를 부른다. 영수증 작성기는 1~17만 평가한다(iter2 N7). 함수는 예외를 던지지 않으며 읽을 수 없는 입력은 미충족으로 본다. 입력은 (가) 디스크의 현재 파일들, (나) 영수증에 서버가 쓴 사실 필드(`outcome`, `tiles_read`, `snapshot_start`·`snapshot_end`, `hashes`, `judged_writes`)이다. 영수증의 `visual_admissible`·`reasons` 필드는 진단용 출력이며 입력으로 읽지 않는다 — 읽으면 영수증 작성 뒤 디스크가 바뀌어도 `true`가 남는다.
 
 평가 순서(고정, 모든 미충족을 모으고 첫 항목을 로그):
 
@@ -123,7 +126,7 @@
 | 보호 조건 | 읽지 못하는 입력 | 평가·보고하지 않는 의존 조건 |
 |---|---|---|
 | 1·2 (영수증) | 영수증 파일 | 3, 4, 6, 9, 11 (영수증 사실에 의존). 2는 1이 충족일 때만 평가 |
-| 5 (색인) | 색인이 파싱되지 않음 | 7, 8, 11, 12와 10의 색인 쪽 |
+| 5 (색인) | 색인이 파싱되지 않음 | 7, 8, 11, 12, 16과 10의 색인 쪽 (16은 색인의 `finished_at`을 읽는다) |
 | 13 (감수 기록) | `audit-review.json` | 14, 15, 16, 17과 10의 감수 기록 쪽 |
 
 의존 조건을 건너뛰는 것은 허용이 아니다 — 보호 조건의 사유가 보고되므로 `admissible == false`다. 이 규칙 덕분에 케이스당 사유 목록이 짧고 정확하며(예: 영수증이 없으면 `[no_receipt]`), 조건 1·13을 빼면 다른 조건이 같은 상황을 대신 막기 때문에 결과가 아니라 사유 목록만 바뀐다(수준 B). 나머지 조건은 격리 케이스에서 해당 검사를 빼면 결과가 `final`로 뒤집힌다(수준 A). 조건별 격리 케이스와 수준은 `acceptance.md` AC-016.
@@ -169,6 +172,7 @@
 | 심볼릭 링크로 작업 폴더 밖 파일을 열게 함 | `draft/report.html`이 심볼릭 링크이거나 resolve 결과가 작업 폴더 밖이면 거부 |
 | 감수 세션이 영수증·최종 검증 파일을 위조 | 영수증은 서버가 세션 종료 후 덮어쓰며 `select_report`는 저장된 불리언을 믿지 않고 §5 함수로 디스크를 다시 계산 |
 | 감수 세션이 초안·입력·화면 색인·타일을 변조(`Write(./runs/**)` 권한, P6) | 세션 전 스냅샷과 종료 후 대조 + `Write`/`Edit` 호출 기록 → 미인정(REQ-AIR6-014, §5 조건 4·6) |
+| 1차 세션이 `Write(./runs/**)`로 `audit-review.json`(`visual: pass`, 복사한 해시, 미래 `reviewed_at`)이나 `final/`을 미리 심고, 감수 세션이 덮어쓰지 않은 채 종료 코드 0으로 끝남(iter3 N13) | 서버가 감수 세션 시작 전에 기존 `audit-review.json`·`final/`을 삭제한다(REQ-AIR6-014). 삭제 실패면 세션을 시작하지 않는다. 삭제는 `screens/` 스냅샷보다 먼저이고 `review/context.json`을 쓰기 전이다. 심은 파일이 사라지므로 종료 코드 0인데 기록이 없으면 `review_failed`(조건 3·13) |
 | 감수 세션이 권한을 넓힘 | 설정 파일 불변, 무결성 재검사(T3·REQ-AIR6-001) |
 | 감수 프롬프트로 외부 문자열 주입 | 종목명 미포함(T10), 코드·작업 ID는 기존 형식 검사 재사용 |
 | 브라우저가 남아 자원 점유 | 프로세스 그룹 종료, 임시 프로필 삭제, 시간 예산 |

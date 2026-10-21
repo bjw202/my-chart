@@ -1,6 +1,6 @@
 # SPEC-AI-REPORT-006 — 구현 계획
 
-상태: draft · 버전 0.3.0 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
+상태: draft · 버전 0.3.1 · Tier L · 개발 방식은 `quality.yaml`의 `development_mode: tdd`(관측: `grep -n development_mode .moai/config/sections/quality.yaml` → `17:    development_mode: tdd`). 근거와 프로브는 `research.md`, 구조·스키마는 `design.md`, 요구사항은 `spec.md §4`, 인수 기준은 `acceptance.md`.
 
 ## 1. 접근 요약
 
@@ -58,14 +58,14 @@ AC-AIR6-017(격리·회귀)은 횡단 기준이라 마일스톤에 한 번 배�
 |---|---|---|
 | 헤드리스 세션이 이미지를 읽지 못하거나 읽고도 내용을 인식하지 못한다(G1·G4) | 중 | M1 GO/NO-GO를 캐너리 토큰 인용으로 판정(AC-019). NO-GO면 설계 재검토(예: 이미지 대신 서버가 만든 텍스트 DOM 요약 — "화면 확인"의 의미가 바뀌므로 manager-spec 재위임과 운영자 결정 필요) |
 | 감수 세션이 이미지를 열지 않고 pass를 선언 | 중 | 영수증이 `tiles_read`로 거른다 → `draft`(AC-016 `tile_not_read`). 실패해도 지금과 같은 결과다 |
-| 감수 세션이 초안·입력·화면 색인·타일을 몰래 수정(`Write(./runs/**)` 권한) | 낮음 | 세션 전 스냅샷 대조 + `Write`/`Edit` 호출 기록으로 인정 거부(AC-014·016). 도구 밖 경로의 변경 후 복원은 증명 못함(Gap) |
+| 감수 세션이 초안·입력·화면 색인·타일을 몰래 수정(`Write(./runs/**)` 권한) | 낮음 | 세션 전 스냅샷 대조 + `Write`/`Edit` 호출 기록으로 인정 거부(AC-014·016). 도구 밖 경로의 변경 후 복원은 증명 못함(Gap). 1차 세션이 미리 심은 `audit-review.json`·`final/`은 세션 시작 전에 삭제한다(AC-014 (11)~(13)) |
 | 감수 세션이 `[렌더 차이]` 표지를 빠뜨려 정상 최종본이 `draft`가 된다 | 중 | 표지 누락은 조건 17 미충족, 전달 `draft`로 가는 설계된 안전 방향 결과이며 사유 `font_note_missing`이 남는다(규칙 7 불변식 위반 아님). 지침이 표지 문구를 고정한다(AC-013). 라이브에서는 모든 회차가 누락이면 AC-018 (나)군 불충족으로 게이트 실패, 일부 회차만 누락이면 빈도를 기록한다 |
 | 타일 상한 30에서도 긴 보고서가 `too_tall`이 된다 | 낮음 | 상한은 관측된 최대(모바일 20타일)의 1.5배(P26). M1이 재측정해 조정. 타일 33~60장을 900초 안에 읽는 시간은 미측정(G5) — M6에서 실측 |
 | 자정(KST)을 넘겨 후처리가 끝나면 감사기가 `FRESHNESS_CUTOFF`를 낸다(`audit_report.py:32-33`) | 낮음 | 게이팅 코드가 아니므로 기록만 한다(AC-018) |
 | 후처리 시간으로 작업 전체가 길어짐 | 중 | 캡처 60초·감수 900초 상한, 끄기 스위치. 실측은 M6 |
 | 새 테스트가 실제 브라우저·`claude`·네트워크를 건드림 | 중 | 가짜 드라이버 주입, 기존 네트워크 가드(005 AC-014)로 종료 시 0건 단언 |
 | 기존 `final` 선택 테스트 대량 갱신 | 중 | M4가 영향 개수를 기준선 대비로 먼저 측정하고 `progress.md`에 기록 |
-| 병합 순서 변경(리드 결정 2026-10-21): SPEC-AI-REPORT-007(카드 t19)이 먼저, 이 SPEC이 나중에 병합돼 겹치는 파일(`goose_job_service.py`·`harness-instructions.md`·`goose-manifest.json`·`test_goose_job_service.py`)에서 충돌한다 | 높음 | 이 SPEC이 나중 쪽이므로 007 `plan.md` §5 "필수 병합 단계" 4단계를 수행한다 — (1) 이 SPEC의 감수 규칙 9를 10으로 다시 매기고 하위 라벨·자기 참조도 바꾼다(007의 AC-AIR7-011 #4가 정상 교차 참조도 표시할 수 있다는 007 감사 부채 N9에 유의), (2) 규칙 번호 문자열을 쓰는 이 SPEC의 AC(AC-013 등)를 새 번호로 고친다, (3) 매니페스트는 손으로 합치지 않고 재생성한다, (4) `_run` 순서와 진행 이벤트를 병합 트리에서 재확인한다. 단계별 관측 결과는 이 SPEC의 `progress.md`에 원문으로 남기고, 그 뒤에만 병합 완료로 본다. 007 문서는 수정하지 않는다 |
+| 병합 순서 변경(리드 결정 2026-10-21): SPEC-AI-REPORT-007(카드 t19)이 먼저, 이 SPEC이 나중에 병합돼 겹치는 파일(`goose_job_service.py`·`harness-instructions.md`·`goose-manifest.json`·`test_goose_job_service.py`)에서 충돌한다 | 높음 | 이 SPEC이 나중 쪽이므로 007 `plan.md` §5 "필수 병합 단계" 4단계를 수행한다 — (1) 이 SPEC의 감수 규칙 9를 10으로 다시 매기고 하위 라벨·자기 참조도 바꾼다(007의 AC-AIR7-011 #4가 정상 교차 참조도 표시할 수 있다는 007 감사 부채 N9에 유의), (2) 규칙 9 번호를 쓰는 이 SPEC의 모든 산출물을 새 번호로 고친다 — acceptance.md(AC-013 #1과 잡는 구현 (a), AC-021 Then), design.md(§7의 `규칙 9 추가` 제목 줄과 규칙 본문의 `규칙 7·9`), spec.md(§3 변경 범위 표), plan.md(M5 행), research.md(G13의 `규칙 9 (h)`), 그리고 progress.md에 있다면 그 항목. 고친 뒤 `grep -n '규칙 9\|규칙 7·9\|rule 9' .moai/specs/SPEC-AI-REPORT-006/*.md`를 실행해 이 행의 설명을 뺀 옛 번호 잔존이 0임을 출력 원문으로 남긴다, (3) 매니페스트는 손으로 합치지 않고 재생성한다, (4) `_run` 순서와 진행 이벤트를 병합 트리에서 재확인한다. 단계별 관측 결과는 이 SPEC의 `progress.md`에 원문으로 남기고, 그 뒤에만 병합 완료로 본다. 007 문서는 수정하지 않는다. 007의 `plan.md §5`와 감사 부채 N9 인용은 이 워크트리에 007이 없어 확인하지 못했다(`ls .moai/specs \| grep 007` 출력 없음, 2026-10-21) — 병합 시점에 007의 커밋 id로 다시 인용한다 |
 | 영수증 판정이 너무 엄격해 정상 최종본도 `draft`가 된다 | 중 | 조건 하나하나가 `reasons`로 남아 원인이 보인다. 미인정 사유는 로그와 영수증에 기록 |
 
 ## 5. 품질 게이트와 완료 정의
