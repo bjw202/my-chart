@@ -317,6 +317,86 @@ main(89db7a2)을 `WT-goose-review-pass` 줄(0ee4593)에 병합했다. 병합만 
 
 **미검증:** 이번 개정은 문서 변경뿐이다. 새 SPEC 요건이 구현 가능한지(특히 층 B의 `Fetch.fulfillRequest` 서빙, 프록시 플래그와 브라우저 기동, `data:`·`about:blank` 일시 정지)는 G20으로 열려 있다. 이전 §E.1의 `moai spec lint` 미재실행 상태도 그대로다.
 
+### M7 security hardening (v0.3.4, 카드 t18) — 2026-10-21
+
+기준 커밋 `f0926e2`(브랜치 `WT-goose-review-pass`)에서 `manager-develop`(cycle_type=tdd)가 구현. 증거 원문은 `.moai/state/verify/t18-m7/`(git 무시 경로). 모든 pytest·python 실행은 `AI_REPORT_GOOSE_HARNESS_DIR=.moai/state/verify/t18-m7/home/.goose-harness`와 `-B -p no:cacheprovider`로 돌렸고 `HOME`은 건드리지 않았다. 서버·goose 작업은 만지지 않았다.
+
+**1. G20 관측 (구현 전, 프로브 `probe/probe.py`).** 라이브 초안 사본(`live-draft-copy.html`)을 헤드리스 셸 1243(Playwright 캐시 최고 빌드)에 먹였다.
+- 세 프록시 플래그를 켜도 브라우저가 뜨고 `/json/list`가 응답한다. 허용 목록 환경(`PATH HOME USER LANG LC_ALL TZ TMPDIR SHELL`)만으로도 기동한다.
+- 층 B 가능: `file://` 주 문서 요청이 `Fetch.requestPaused`(resourceType `Document`)로 오고 `Fetch.fulfillRequest`(디스크 바이트 + `Content-Security-Policy`)가 동작한다. 렌더 결과는 `scrollHeight` 19369(기록값 P39와 같음). 외부 글꼴 `<link>` 2개는 CSP `style-src`가 먼저 막아 일시 정지로 오지 않는다. 따라서 "B 불가 → 계획 단계로 되돌림" 조건은 해당 없음.
+- `about:blank`·`about:srcdoc` 일시 정지는 내가 요청 URL을 기록한 두 관측(라이브 초안 프로브, 자식 대상 프로브)에서 오지 않았다. R1~R3 실행은 일시 정지 URL을 기록하지 않았으므로 거기서는 미관측이다. 정상 보고서 캡처가 달라지지 않았으므로(R3 일치) `about:blank` 예외를 두지 않았다.
+- 자동 연결 대상은 방어가 전부 작동하는 구성에서는 **한 번도 붙지 않는다**(`attach-count.out`: R1 0, R2 0 — 자식 문서가 로드되지 않으므로). 실제 브라우저에서 이 경로를 보려고 A2·CSP를 끄고 A1이 모두 `continue`하게 한 프로브(`attach-probe.out`)를 돌렸다: cross-site iframe 문서를 통과시키면 `Target.attachedToTarget`이 뷰포트마다 한 번 오고, `Fetch.enable → Target.setAutoAttach → Runtime.runIfWaitingForDebugger` 순서를 Chrome이 오류 없이 받으며, 자식 문서의 하위 요청(`/childimg`)이 **자식 세션**의 `Fetch.requestPaused`로 온다(페이지 세션이 아니다). 즉 자식 대상 방어는 실제로 필요하고 동작한다.
+
+**2. 구현 요약.**
+- `goose_screenshot.py`: `ISOLATION_FLAGS`(층 A2, `_launch` argv), `DOCUMENT_CSP`(층 B, design §3.3의 문자열 그대로 — 조정 불필요), `BrowserDriver.isolate(url, body)`(첫 `Page.navigate` 전에 `Target.setAutoAttach` + `Fetch.enable{*}`; `body`는 `_run`이 해시한 바로 그 바이트), 이벤트 펌프(`_pump`: 응답은 보관, `Target.attachedToTarget`은 `Fetch.enable → setAutoAttach → runIfWaitingForDebugger`, `Fetch.requestPaused`는 초안 URL 정확 일치 → `fulfillRequest`, `data:` → `continueRequest`, 나머지 → `failRequest`), `Popen(env=build_env(environ))`(허용 목록 = 실행기 `ENV_ALLOWLIST` 재사용). `setBlockedURLs ["*"]`·스크립트 비활성은 그대로.
+- fail closed: 이벤트 처리 중 예외(모양이 틀린 이벤트, 자식 대상 `Fetch.enable` 오류)는 `_broken`을 세워 이후 `open()`이 `isolation_failed`로 끝난다(두 번째 뷰포트도 열지 않는다). 페이지 세션의 `isolate` 오류는 기존 시작 실패 경로(`browser_start_failed:cdp_error:Fetch.enable`, 두 뷰포트 error, `Page.navigate` 없음).
+- `goose_review.py`: `_remove_entry`·`_empty_review` 추가, `_delete_planted`가 **`review/`를 먼저** 비운다(링크는 `unlink`만, `review` 자체가 링크·파일이면 그것만 지움). 비우기 실패 → 기존 삭제 실패 경로(`launch=False`).
+- `harness-instructions.md` 규칙 10-11, 매니페스트 재생성. @MX: `_post_process`·`capture`에 `@MX:WARN`, `finish_review`에 `@MX:ANCHOR`(그 밖의 태그 없음).
+
+**3. 층 행렬 (AC-009 (6)) — 관측** (`matrix.out`, `observe.py matrix`; R1 = 마젠타 화소 수, R2 = 루프백 수신 소켓 기록 수; 각 변형은 코드를 임시로 토글, 커밋하지 않음).
+
+| 켜 둔 층 | R1 file iframe | R1 object/embed | R1 data: 중첩 | R2 | 예측과 비교 |
+|---|---|---|---|---|---|
+| 없음 | RED (마젠타 391376) | RED (392176) | 0 | RED (6건: `/iframe /embed /object` × 2) | 예측 일치. **차이:** `data:` 중첩 iframe은 층이 없어도 `file://`을 못 연다(0) — 이 변형은 이 브라우저에서 RED가 되지 않는 회귀 방지용이다 |
+| A1만 | GREEN (0) | GREEN | 0 | GREEN (0건) | 일치 |
+| A2만 | RED (391376) | RED | 0 | GREEN (0건) | 일치 |
+| B만 | GREEN | GREEN | 0 | GREEN | 일치 |
+| A1+B | GREEN | GREEN | 0 | GREEN | (추가) |
+| A1+A2 | GREEN | GREEN | 0 | GREEN | (추가) |
+| A2+B | GREEN | GREEN | 0 | GREEN | (추가) |
+| A1+A2+B | GREEN (0) | GREEN (0) | 0 | GREEN (0건) | 일치. 두 뷰포트 모두 `complete`, 파란 박스 20000화소(= 초안 자체는 그려짐) |
+
+추가 관측: (가) 자식 대상 보호만 뺀 A1(`a1-page-only.out`, 플래그·CSP도 끔)도 R1·R2 GREEN이다 — 이 PoC들은 자식 문서 자체가 로드되지 않아 자식 세션 방어를 시험하지 못한다(그 계약은 가짜 전송 시험과 위 프로브가 맡는다). (나) 채택 구성에서 한 층·한 처리기 변형만으로는 실제 브라우저 회귀(R1·R2)가 RED가 되지 않는다(층이 겹치는 설계 의도). 실제 브라우저 R1이 RED가 되는 것은 `isolate()` 자체를 뺄 때(A1과 B 동시 제거)뿐이다(`mutations-live.out`: `009-r` RED 1, 나머지 16개 변형 RED 0).
+
+**4. 되돌림 RED 관측 (코드를 임시 변형 → 시험 → 바이트 단위 복원, `mutate.py`)**. 전부 변형마다 RED가 관측됐고 복원 후 같은 시험이 GREEN이다. 원문: `mutations-009.out`, `mutations-014-013.out`, `mutations-live.out`, 구현 전 초기 RED는 `red-initial-*.out`(리뷰·하네스 9건, 캡처 9건, 라이브 R1·R2).
+
+| 변형 | RED가 된 시험(요약) |
+|---|---|
+| 009-f 프록시·우회 목록·호스트 해석 플래그 각각 제거 | `argv_only_fixed_strings…` |
+| 009-g `Popen`에 `env` 미전달 | `child_env_is_an_allowlist…` |
+| 009-h 자식 대상 `Fetch.enable` 제거 / 009-i `runIfWaitingForDebugger`를 먼저 | `(3) handler_contract…`, `(4) …attached_target…` |
+| 009-j 모든 요청 `continueRequest` / 009-k `file://` 통과 | `(3) handler_contract…` |
+| 009-l 초안 비교를 접두어·대소문자 무시·부분 문자열로 | `(3) handler_contract…`(`#x`·`?x=1`·대소문자·`.bak` 행) |
+| 009-m CSP 헤더 없음 / `frame-src` 누락 / `object-src` 누락 | `(3) handler_contract…`(첫 행) |
+| 009-n 서빙 본문이 디스크 바이트와 다름 | `(3) handler_contract…`(첫 행) |
+| 009-o `data:`도 실패시킴 | `(3) handler_contract…`(`data:` 행) |
+| 009-p 핸들러 오류 삼킴 | `(4) …malformed…`, `(4) …attached_target…` |
+| 009-q `Fetch.enable` 오류 무시(페이지 세션 / 자식 대상 각각) | `(4) …page_session…` / `(4) …attached_target…` |
+| 009-r `isolate()` 호출 제거 | 5건(`isolation_is_applied…`, `isolation_failure…`, `(3)×2`, `(4) page_session`) + 라이브 R1 |
+| 014-n `review/` 비우기 제거 | (14)(15)(서비스 포함) 7건 |
+| 014-o 심볼릭 링크를 따라가 대상 삭제 | `(14) review_dir_is_emptied_without_following_links`, 서비스 (14) |
+| 014-p `review/` 삭제 실패 무시 | (15) 3건(감수기가 호출됨) |
+| 014-q `context.json`을 쓰지 않음 | (14) 계열 + 기존 `…11/12/…normal_review_directory_writes…` 등 8건 |
+| 014-x(추가) `review` 자체가 링크일 때 따라감 | `(14) review_that_is_itself_a_symlink…` |
+| 013-e 규칙 10-11 삭제 | `rule10_11_…`, `mutation_dropping_rule10_11…`, 그리고 매니페스트 해시 시험 3건 |
+| 013-b 지침만 고치고 매니페스트 미재생성 | 매니페스트 시험 3건 |
+
+**5. R1·R2·R3 (PoC 전후).** 손 실행 `PYTHONPATH=. <venv>/python -B .moai/state/verify/t18-m7/poc.py baseline|new` (`poc-baseline.out`, `poc-new.out`)와 pytest(`AI_REPORT_GOOSE_REAL_BROWSER_TESTS=1 … -m pytest backend/tests/test_goose_screenshot_live.py -q`, 라이브 초안 사본까지 돌리려면 `AI_REPORT_GOOSE_R3_DRAFT=<사본>` 추가).
+- PoC1(글자 비밀 + `/etc/hosts`): 기준선 `desktop-01.png`에 `TOP-SECRET-LOCAL-FILE-CONTENT-12345`와 `/etc/hosts` 전체가 보인다(눈으로 확인). 새 모듈은 프레임 둘 다 빈 칸이다. 마젠타 판정 R1 세 변형: 기준선 391376 / 392176 / 0(`data:` 중첩은 원래 안 새는 것으로 관측), 새 모듈 0 / 0 / 0, 세 변형 모두 `complete`.
+- PoC2(루프백 수신 소켓): 기준선 HITS 6건(`GET /iframe /embed /object` × 2뷰포트, 감사자 재현과 동일), 새 모듈 HITS `[]`, `complete`.
+- R3 합성 보고서(`r3-synthetic.out`): 기준선(= `f0926e2`의 모듈, git에서 읽어 임시 모듈로 로드) 두 뷰포트 3타일 `[1568, 1568, 377]` / scroll_height 3513, 새 모듈 동일. 라이브 초안 사본 `0ffb8f9e…`(`r3-live-draft.out`): 기준선·새 모듈 모두 데스크톱 13타일(마지막 553)·scroll_height 19369, 모바일 19타일(마지막 1376)·29600 — 기록값(P39)과 같고 두 모듈이 서로 같다. 한글 본문 + `<meta charset>` 없음 초안의 타일 SHA-256도 기준선과 새 모듈이 같다(`charset-probe.out`: `Content-Type: text/html`에 charset을 붙이지 않은 서빙이 `file://` 로드와 같은 해석).
+- 기본 `pytest backend/tests -k goose`에서 라이브 시험 4개는 `skipped`로 집계된다(`default-run-live-skipped.out`; 환경 변수 없음 3개 + R3 라이브 초안 경로 없음 1개).
+
+**6. AC-013 #6 (같은 커밋 묶음의 세 기록).**
+- (가) 규칙 번호 검사(007 AC-AIR7-011 #4 블록을 `sed`로 `rulenum.py`에 그대로 추출해 `python3 -B -I rulenum.py backend/goose_harness_src/harness-instructions.md`): 출력 `rules [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]` / `rule numbering ok` (`rulenum.out`).
+- (나) `python -B -m backend.services.goose_harness`로 재생성한 매니페스트를 커밋 파일과 `diff`: 출력 없음, 종료 0(`manifest-diff.out`). 매니페스트의 변경은 `CLAUDE.md` 해시 한 줄(`64ceebda… → e5c3fd9b…`, 지침 파일의 새 SHA-256)뿐이다. 매니페스트는 손으로 고치지 않고 위 명령의 출력으로 덮어썼다.
+- (다) `shasum -a 256 backend/goose_harness_src/claude-settings.json` = `e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3` 불변(`settings-sha.out`). 벤더링 스킬은 건드리지 않았다.
+- 라이브 하네스(읽기 전용 관찰): `~/.goose-harness/CLAUDE.md` sha256 `64ceebda…`(= 이전 매니페스트 값)·수정 시각 21:36:04가 작업 시작 전(`harness-before.txt`)과 커밋 직전에 같다. 커밋 직후 값은 반환 보고에 적는다. 설치본은 서버 재시작 때 새 지침으로 바뀌므로 이 작업이 만든 변경이 아니다.
+
+**7. 시험 집계.** `pytest backend/tests -k goose -q` 기준선 `548 passed, 214 deselected` → 변경 후 `565 passed, 4 skipped, 214 deselected`(새 시험 17개: 캡처 8, 리뷰 5, 서비스 2, 하네스 2 + 기존 argv 시험 확장). 네트워크 가드 기록 0건(가드 teardown 단언 통과). `ruff check`(시스템 `python3 -m ruff`) 변경 파일 전부 통과.
+
+**8. conftest 변경 (AC-009 (5) 가드 회피 결정).** `backend/tests/conftest.py`의 `_is_goose_test`가 `goose_real_browser` 표지(`request.node.get_closest_marker`)가 있으면 False를 돌려준다 — 한 줄 조건과 주석뿐이다. 표지는 `pyproject.toml`의 markers에 등록했다. 표지는 새 파일 `test_goose_screenshot_live.py`의 `pytestmark`에만 있고, 같은 `pytestmark`의 `skipif`가 `AI_REPORT_GOOSE_REAL_BROWSER_TESTS=1`과 브라우저 존재를 요구하므로 기본 실행에서 가드는 바뀌지 않는다. 다른 시험의 가드는 약화하지 않았다.
+
+**9. SPEC과 어긋나거나 정밀하지 않은 점 (manager-spec 재위임 대상).**
+1. **AC-014 (15)의 기대 목록.** `[review_not_completed, tile_not_read]`는 심은 `audit-review.json`이 있을 때만 성립한다. 심은 기록이 없으면 조건 13이 더해져 `[review_not_completed, tile_not_read, no_audit_review]`다(서비스의 기존 삭제 실패 시험과 같은 이유). (15)는 "(14)의 심은 항목 중 하나"라고만 적어 심은 기록·`final/`의 유무를 정하지 않았다. 구현은 `review/`를 **먼저** 비워서, 비우기 실패 시 `audit-review.json`·`final/`을 지우기 전에 멈춘다 — 그러면 (13)과 같은 목록이 나오고, 두 경우를 모두 시험했다.
+2. **`data:` 이미지는 이미 렌더되지 않는다.** `Network.setBlockedURLs ["*"]`가 이 브라우저에서 `data:` 이미지도 막는다(`data-image-finding.out`: 크기 속성 없는 300×200 `data:image/png` — 차단 켠 상태 초록 화소 0·마지막 타일 377px, 차단을 끄면 60000화소·558px). 기준선(`f0926e2`)도 똑같다. design §3.3·P38은 "정상 보고서가 `data:image/png`를 쓴다"를 전제로 `data:` 예외와 `img-src data:`를 정했지만, 현재 캡처에서는 그 이미지가 타일에 나타나지 않는다. 결과: (o) `data:`도 실패시킴 변형은 R3에서 RED가 되지 않고(AC-009 (6)(o)의 "이미지가 사라진다"는 관측 불가) 핸들러 계약 시험의 `data:` 행만 잡는다. 제품 후속 후보: 감수자는 로고 같은 `data:` 이미지를 화면에서 못 본다.
+3. **`data:` 중첩 iframe 변형은 이 브라우저에서 원래 새지 않는다**(층 없음 행 마젠타 0). R1의 세 번째 변형은 회귀 방지용이며 `data:` 예외가 우회로가 되지 않음을 *증명*하지는 못한다.
+4. **격리 적용 횟수.** design §3.2 단계 2는 "뷰포트마다" 격리를 적용한다고 읽히지만 `Fetch.enable`·`setAutoAttach`는 세션에 지속되므로 브라우저 시작 직후 **한 번** 적용한다(AC (3)-1의 "한 번씩"과 맞다). 격리 실패는 두 뷰포트 모두 `error`다(`browser_start_failed:…`). 이벤트 처리 실패 뒤에는 `_broken`으로 두 번째 뷰포트도 열지 않는다(SPEC은 "해당 뷰포트"만 error라 적음 — 더 엄격).
+5. **(3)-2 해석.** 대상이 붙으면 `Runtime.runIfWaitingForDebugger`는 `waitingForDebugger` 값과 무관하게 항상 보낸다(false여도 무해). AC (4)(나) 시험은 자식 대상 설정 중 끼어드는 페이지 세션 요청 응답이 정당하므로 attach 이벤트만 주입했다(AC 문구 "어느 경우에도 통과시키지 않음"은 끼어드는 이벤트가 없을 때의 보장이다).
+6. **응답 비대기.** `Fetch.fulfill/continue/failRequest`의 오류 응답은 기다리지 않는다(이미 사라진 요청의 오류가 방어를 깨뜨리지 않으며, 대기하면 큐가 쌓인 요청마다 재귀가 깊어진다). SPEC은 이 응답 처리를 정하지 않았다.
+
+**10. 미검증(Gaps).** (i) 이 호스트의 `chrome-headless-shell` 1243(HeadlessChrome 153.0.8010.12) 하나만 관측했다 — 다른 빌드·Linux는 미관측. (ii) R1·R2는 한 번씩의 관측이다(대상 연결 경합이 부하에서 드러나는지는 못 봤다). (iii) R2는 캡처 뒤 0.5초만 더 기다렸다. `<meta http-equiv=refresh content="3;…">`의 이동이 캡처 종료 뒤에 일어났다면 관측하지 못한 것이다(그 경로는 A1·`setBlockedURLs`가 막도록 설계됨). (iv) `Fetch`가 일시 정지하지 않는 요청 종류는 PoC 벡터에 걸리지 않았다는 사실만 안다. (v) 규칙 10-11이 모델 행동을 바꾸는지는 미관측(문구 존재 시험뿐, 권한은 D3으로 그대로). (vi) 실제 `claude` 감수 세션·서버 재시작·AC-018 재관측은 하지 않았다(리드의 필수 사후 검증). (vii) 독립 보안 재검토(PoC 재실행 포함)는 이 레인의 일이 아니다. (viii) 벤더링 스킬 불변은 `git status`에 `backend/goose_harness_src/skills`가 없다는 것과 기존 시험(`vendored_skills_are_unchanged`)의 GREEN으로만 확인했다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 _<pending run-phase>_

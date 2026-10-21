@@ -1058,6 +1058,7 @@ class FakeReviewer:
         self.snapshots: list[list] = []
         self.audit_at_entry = None
         self.final_at_entry = None
+        self.review_at_entry = None
         self.context_at_entry = None
 
     async def __call__(self, *, job_id, code, on_event):
@@ -1070,6 +1071,7 @@ class FakeReviewer:
         self.context_at_entry = json.loads(ctx_path.read_text()) if ctx_path.exists() else None
         self.audit_at_entry = (job_dir / "audit-review.json").exists()
         self.final_at_entry = (job_dir / "final").exists()
+        self.review_at_entry = sorted(p.name for p in (job_dir / "review").iterdir())
         self.entered.set()
         await self.gate.wait()
         if self.mode == "raise":
@@ -1524,6 +1526,58 @@ async def test_air6_014_13_service_delete_failure_with_planted_record(mods, tmp_
     receipt = _receipt(tmp_path, job.job_id)
     assert receipt["outcome"] == "review_failed"
     assert receipt["reasons"] == ["review_not_completed", "tile_not_read"]
+    assert receipt["screens"]["snapshot_start"] == receipt["screens"]["snapshot_end"]
+    assert mods.gr.select_report(tmp_path / "runs" / job.job_id)[0] == "draft"
+    assert job.events[-1].data["delivery_status"] == "draft"
+
+
+def _plant_review_files(ctx, tmp_path):
+    """1차 세션이 review/ 아래에 파일·하위 폴더·작업 폴더 밖을 가리키는 링크를 심는 러너 래퍼(AC-014 (14)(15))."""
+    outside = tmp_path / "outside-keep"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("KEEP")
+    real_run = ctx.runner.__call__
+
+    async def planting(**kw):
+        result = await real_run(**kw)
+        review = tmp_path / "runs" / kw["job_id"] / "review"
+        (review / "sub").mkdir(parents=True)
+        (review / "delivery-audit.json").write_text('{"decision":"pass"}')
+        (review / "sub" / "x.json").write_text("{}")
+        (review / "link").symlink_to(outside / "keep.txt")
+        return result
+
+    ctx.svc._runner = planting
+    return outside
+
+
+async def test_air6_014_14_service_review_dir_emptied_before_reviewer(mods, tmp_path, monkeypatch):
+    ctx = _post_service(mods, tmp_path, monkeypatch, hook=True)
+    outside = _plant_review_files(ctx, tmp_path)
+    job = await _run_post(ctx)
+    assert ctx.rev.review_at_entry == ["context.json"]
+    review = tmp_path / "runs" / job.job_id / "review"
+    assert not (review / "delivery-audit.json").exists() and not (review / "sub").exists()
+    assert not (review / "link").is_symlink()
+    assert (outside / "keep.txt").read_text() == "KEEP"  # 링크를 따라가 지우지 않았다
+    assert _receipt(tmp_path, job.job_id)["outcome"] == "reviewed"
+
+
+async def test_air6_014_15_service_review_delete_failure_does_not_launch_reviewer(mods, tmp_path, monkeypatch):
+    ctx = _post_service(mods, tmp_path, monkeypatch, hook=True)
+    _plant_review_files(ctx, tmp_path)
+    real_remove = mods.gjs.goose_review._remove_entry
+
+    def remove_entry(path):
+        if path.name == "sub":
+            raise OSError("cannot remove")
+        real_remove(path)
+
+    monkeypatch.setattr(mods.gjs.goose_review, "_remove_entry", remove_entry)
+    job = await _run_post(ctx)
+    assert ctx.rev.calls == [] and job.status == "done"
+    receipt = _receipt(tmp_path, job.job_id)
+    assert receipt["outcome"] == "review_failed"
     assert receipt["screens"]["snapshot_start"] == receipt["screens"]["snapshot_end"]
     assert mods.gr.select_report(tmp_path / "runs" / job.job_id)[0] == "draft"
     assert job.events[-1].data["delivery_status"] == "draft"

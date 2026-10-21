@@ -353,6 +353,9 @@ class GooseJobService:
     # @MX:REASON: 순서(재검사 → 캡처 → 스냅샷/컨텍스트 → 감수 → 영수증)와 이벤트 시점이 AC-AIR6-001·003·005에,
     #             영수증 사실이 최종본 인정(AC-AIR6-016)에 그대로 들어간다. 이 안에서 `except BaseException`으로
     #             넓히면 취소가 삼켜져 취소된 작업의 다음 단계가 실행된다(AC-AIR6-002 대조 (a)).
+    # @MX:WARN: [AUTO] 취소·시간 초과·예외가 캡처→감수→영수증 사이 어느 지점에서든 끼어드는 비동기 경로다.
+    # @MX:REASON: 경로마다 영수증을 정확히 한 번 쓰고(정상·재시도·취소) 브라우저·감수 세션 그룹을 정리해야 한다.
+    #             단계를 추가하거나 순서를 바꾸면 영수증이 빠지거나 두 번 쓰이고, 취소 뒤에도 다음 단계가 실행된다.
     # @MX:SPEC: SPEC-AI-REPORT-006
     async def _post_process(self, job: Job) -> _PostResult:
         post = _PostResult()

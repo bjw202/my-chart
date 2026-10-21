@@ -32,6 +32,8 @@ from typing import Protocol
 import httpx
 import websockets
 
+from backend.services.goose_runner import build_env
+
 logger = logging.getLogger(__name__)
 
 ENV_BROWSER = "AI_REPORT_GOOSE_BROWSER"
@@ -50,6 +52,19 @@ DISCOVERY_TRIES = 100
 VIEWPORTS = (("desktop", 1280, 800, False), ("mobile", 390, 844, True))
 # 외부 네트워크 전면 차단. 글꼴 호스트 예외는 없다(운영자 결정 2026-10-21)
 BLOCK_ALL_PATTERNS = ("*",)
+# 층 A2(design §3.3): 네트워크 스택 안전망. 죽은 프록시 + 루프백 우회 제거 + 호스트 해석 차단. file://에는 효과가 없다
+ISOLATION_FLAGS = (
+    "--proxy-server=127.0.0.1:1",
+    "--proxy-bypass-list=<-loopback>",
+    "--host-resolver-rules=MAP * ~NOTFOUND",
+)
+# 층 B: 초안 문서에 실어 보내는 CSP. 정상 보고서는 인라인 스타일과 data: 이미지만 쓴다(research P38)
+DOCUMENT_CSP = (
+    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; "
+    "frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'"
+)
+_FETCH_ALL = {"patterns": [{"urlPattern": "*"}]}
+_AUTO_ATTACH = {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True}
 PLAYWRIGHT_CACHE_ROOTS = (
     Path.home() / "Library" / "Caches" / "ms-playwright",
     Path.home() / ".cache" / "ms-playwright",
@@ -72,6 +87,8 @@ class BrowserDriver(Protocol):
 
     async def disable_scripts(self) -> None: ...
 
+    async def isolate(self, url: str, body: bytes) -> None: ...
+
     async def open(self, url: str, width: int, height: int, mobile: bool) -> dict: ...
 
     async def capture_tile(self, width: int, y: int, height: int) -> bytes: ...
@@ -91,6 +108,11 @@ class CdpDriver:
         self._ws = None
         self._seq = 0
         self._loaded = False
+        self._results: dict[int, dict] = {}  # 아직 받는 쪽이 가져가지 않은 명령 응답
+        self._unawaited: set[int] = set()  # 응답을 기다리지 않고 보낸 명령(요청 처리 응답)
+        self._draft_url: str | None = None
+        self._draft_body = b""
+        self._broken = False  # 요청 차단 방어가 한 번이라도 깨졌으면 이후 뷰포트를 열지 않는다
 
     async def _open_transport(self, port: int):
         """`/json/list`에서 page 대상을 찾아 WebSocket을 연다. 테스트가 가짜 전송로로 바꾼다."""
@@ -108,20 +130,85 @@ class CdpDriver:
                 await asyncio.sleep(0.1)
         raise CaptureError("devtools_unreachable")
 
-    def _note(self, msg: dict) -> None:
-        if msg.get("method") == "Page.loadEventFired":
-            self._loaded = True
-
-    async def _call(self, method: str, params: dict | None = None) -> dict:
+    async def _send(self, method: str, params: dict | None, session: str | None) -> int:
         self._seq += 1
-        await self._ws.send(json.dumps({"id": self._seq, "method": method, "params": params or {}}))
-        while True:
-            msg = json.loads(await self._ws.recv())
-            self._note(msg)
-            if msg.get("id") == self._seq:
-                if "error" in msg:
-                    raise CaptureError(f"cdp_error:{method}")
-                return msg.get("result", {})
+        msg = {"id": self._seq, "method": method, "params": params or {}}
+        if session:
+            msg["sessionId"] = session
+        await self._ws.send(json.dumps(msg))
+        return self._seq
+
+    async def _call(self, method: str, params: dict | None = None, session: str | None = None) -> dict:
+        call_id = await self._send(method, params, session)
+        while call_id not in self._results:
+            await self._pump()
+        reply = self._results.pop(call_id)
+        if "error" in reply:
+            raise CaptureError(f"cdp_error:{method}")
+        return reply.get("result", {})
+
+    async def _pump(self) -> None:
+        """메시지 하나를 받아 응답은 보관하고 이벤트는 처리한다. 이벤트 처리 실패는 방어 실패다(fail closed)."""
+        msg = json.loads(await self._ws.recv())
+        if "id" in msg:
+            if msg["id"] in self._unawaited:
+                self._unawaited.discard(msg["id"])
+            else:
+                self._results[msg["id"]] = msg
+            return
+        try:
+            await self._on_event(msg)
+        except Exception:
+            self._broken = True
+            raise
+
+    async def _on_event(self, msg: dict) -> None:
+        method = msg.get("method")
+        if method == "Page.loadEventFired":
+            if "sessionId" not in msg:  # 자동 연결 대상의 load는 페이지의 load가 아니다
+                self._loaded = True
+        elif method == "Target.attachedToTarget":
+            await self._protect_target(msg["params"]["sessionId"])
+        elif method == "Fetch.requestPaused":
+            await self._decide(msg)
+
+    async def _protect_target(self, session: str) -> None:
+        """새 대상에 방어를 켠 *뒤에만* 풀어 준다(design §3.3 — 순서가 바뀌면 첫 요청이 방어 없이 나간다)."""
+        await self._call("Fetch.enable", _FETCH_ALL, session)
+        await self._call("Target.setAutoAttach", _AUTO_ATTACH, session)
+        await self._call("Runtime.runIfWaitingForDebugger", None, session)
+
+    def _answer(self, url: str) -> str:
+        """초안 파일 URL과 정확히 같으면 문서로 서빙, `data:`만 통과, 나머지는 전부 실패."""
+        if url == self._draft_url:
+            return "fulfill"
+        return "continue" if url.startswith("data:") else "fail"
+
+    def _draft_headers(self) -> list[dict]:
+        return [
+            {"name": "Content-Type", "value": "text/html"},
+            {"name": "Content-Security-Policy", "value": DOCUMENT_CSP},
+        ]
+
+    async def _decide(self, msg: dict) -> None:
+        params = msg["params"]
+        request_id, url = params["requestId"], params["request"]["url"]  # 모양이 틀리면 KeyError → fail closed
+        session = msg.get("sessionId")
+        action = self._answer(url)
+        if action == "fulfill":
+            method = "Fetch.fulfillRequest"
+            args = {
+                "requestId": request_id,
+                "responseCode": 200,
+                "responseHeaders": self._draft_headers(),
+                "body": base64.b64encode(self._draft_body).decode("ascii"),
+            }
+        elif action == "continue":
+            method, args = "Fetch.continueRequest", {"requestId": request_id}
+        else:
+            method, args = "Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"}
+        # 이미 사라진 요청에 대한 오류 응답은 방어에 영향이 없으므로 기다리지 않는다(재귀 깊이도 키우지 않는다)
+        self._unawaited.add(await self._send(method, args, session))
 
     async def connect(self, port: int) -> tuple[str, str]:
         self._ws = await self._open_transport(port)
@@ -137,11 +224,19 @@ class CdpDriver:
     async def disable_scripts(self) -> None:
         await self._call("Emulation.setScriptExecutionDisabled", {"value": True})
 
+    async def isolate(self, url: str, body: bytes) -> None:
+        """층 A1·B(design §3.3): 모든 대상의 요청을 가로채 초안 문서(CSP 포함)와 `data:`만 통과시킨다."""
+        self._draft_url, self._draft_body = url, body
+        await self._call("Target.setAutoAttach", _AUTO_ATTACH)
+        await self._call("Fetch.enable", _FETCH_ALL)
+
     async def _wait_load(self) -> None:
         while not self._loaded:
-            self._note(json.loads(await self._ws.recv()))
+            await self._pump()
 
     async def open(self, url: str, width: int, height: int, mobile: bool) -> dict:
+        if self._broken:
+            raise CaptureError("isolation_failed")
         await self._call(
             "Emulation.setDeviceMetricsOverride",
             {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": mobile},
@@ -222,8 +317,8 @@ def _free_port() -> int:
 # @MX:WARN: [AUTO] 브라우저를 새 프로세스 그룹으로 띄우고 그룹 전체에 SIGKILL을 보낸다.
 # @MX:REASON: 헤드리스 셸은 렌더러·GPU 손자 프로세스를 띄운다(직계만 죽이면 남는다, AC-AIR6-002/008).
 #             pgid는 start_new_session으로 만든 그룹이어야 한다 — 서버 자신의 그룹을 넘기면 서버가 죽는다.
-def _launch(exe: Path, port: int, profile: Path) -> subprocess.Popen:
-    """인자는 고정 문자열 + 서버가 만든 포트·임시 프로필뿐이다(REQ-AIR6-009)."""
+def _launch(exe: Path, port: int, profile: Path, environ: Mapping[str, str]) -> subprocess.Popen:
+    """인자는 고정 문자열 + 서버가 만든 포트·임시 프로필뿐이고, 환경은 허용 목록 변수뿐이다(REQ-AIR6-009, S5)."""
     argv = [
         str(exe),
         "--headless",
@@ -231,10 +326,12 @@ def _launch(exe: Path, port: int, profile: Path) -> subprocess.Popen:
         "--hide-scrollbars",
         f"--remote-debugging-port={port}",
         f"--user-data-dir={profile}",
+        *ISOLATION_FLAGS,
         "about:blank",
     ]
     return subprocess.Popen(
         argv,
+        env=build_env(environ),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -332,7 +429,8 @@ async def _run(job_dir: Path, screens: Path, index: dict, current: list, environ
     if bad:
         _fail(viewports, bad, screens)
         return
-    index["preview_sha256"] = _sha256(draft.read_bytes())
+    draft_bytes = draft.read_bytes()  # 해시와 렌더(층 B)가 같은 바이트를 쓴다
+    index["preview_sha256"] = _sha256(draft_bytes)
     exe, kind, why = find_browser(environ)
     index["browser"]["path_kind"] = kind
     if exe is None:
@@ -346,17 +444,18 @@ async def _run(job_dir: Path, screens: Path, index: dict, current: list, environ
         current[:] = viewports  # 시작 단계에서 멈추면 두 뷰포트 모두 실패로 기록한다
         try:
             port = _free_port()
-            proc = _launch(exe, port, profile)
+            proc = _launch(exe, port, profile, environ)
             driver = driver_factory()
             name, version = await driver.connect(port)
             index["browser"].update(name=name, version=version)
             await driver.block_network(list(BLOCK_ALL_PATTERNS))
             await driver.disable_scripts()
+            url = draft.resolve().as_uri()
+            await driver.isolate(url, draft_bytes)  # 첫 navigate 전에: 모든 대상의 요청 허용 목록 + 문서 CSP
         except Exception as exc:  # noqa: BLE001
             logger.warning("goose screenshot browser start failed: %s", _reason(exc))
             _fail(viewports, f"browser_start_failed:{_reason(exc)}", screens)
             return
-        url = draft.resolve().as_uri()
         for spec, vp in zip(VIEWPORTS, viewports, strict=True):
             current[:] = [vp]
             await _capture_viewport(driver, url, spec, vp, screens)
@@ -384,6 +483,9 @@ def _finish(index: dict, screens: Path) -> None:
 # @MX:ANCHOR: [AUTO] capture — 화면 캡처의 단일 진입점(REQ-AIR6-006~010, design §3).
 # @MX:REASON: M3 감수 컨텍스트 작성, M4 작업 서비스 후처리, 이 모듈의 AC-AIR6-006~010 시험이 모두
 #             색인 스키마(design §4.1)와 이 함수의 결과 dict에 의존한다(fan_in 3). 키 집합을 바꾸면 셋 다 깨진다.
+# @MX:WARN: [AUTO] 60초 예산 초과·취소가 브라우저 시작부터 정리 사이 어느 await에서든 끼어드는 비동기 경로다.
+# @MX:REASON: 어느 경로에서든 브라우저 프로세스 그룹 종료와 임시 프로필 삭제, 진행 중 뷰포트의 실패 기록이 일어나야 한다.
+#             CancelledError를 삼키면 취소된 작업이 계속 진행하고, 예산 초과를 놓치면 브라우저가 남는다(AC-AIR6-008).
 async def capture(
     job_dir: Path,
     *,

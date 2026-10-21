@@ -131,9 +131,33 @@ class ReviewStart:
     tiles_expected: list[str] = field(default_factory=list)
 
 
+def _remove_entry(path: Path) -> None:
+    """파일·심볼릭 링크는 링크만 지우고(대상은 따라가지 않는다), 실제 폴더는 통째로 지운다."""
+    if path.is_symlink() or not path.is_dir():
+        path.unlink()
+    else:
+        shutil.rmtree(path)
+
+
+def _empty_review(job_dir: Path) -> bool:
+    """`review/` 안의 모든 항목(파일·하위 폴더·링크)을 비운다. `review` 자체가 링크나 파일이면 그것만 지운다(S9)."""
+    review = job_dir / REVIEW_DIR
+    if review.is_symlink() or review.is_file():
+        review.unlink()
+    elif review.is_dir():
+        for entry in review.iterdir():
+            _remove_entry(entry)
+    return not (review.is_symlink() or review.is_file() or (review.is_dir() and any(review.iterdir())))
+
+
 def _delete_planted(job_dir: Path) -> bool:
-    """1차 세션이 심었을 수 있는 `audit-review.json`과 `final/`을 지운다. 둘 다 사라졌을 때만 True."""
+    """1차 세션이 심었을 수 있는 `review/` 항목·`audit-review.json`·`final/`을 지운다. 모두 사라졌을 때만 True.
+
+    `review/`를 먼저 비운다: 실패해도 나머지는 그대로 남아 (13)과 같은 시작 값 측정 경로를 탄다.
+    """
     try:
+        if not _empty_review(job_dir):
+            return False
         (job_dir / AUDIT_REVIEW_NAME).unlink(missing_ok=True)
         final = job_dir / "final"
         if final.is_symlink() or final.is_file():
@@ -452,6 +476,9 @@ def _outcome(start: ReviewStart, exit_code: int | None, timed_out: bool, has_rec
     return "reviewed"
 
 
+# @MX:ANCHOR: [AUTO] finish_review — 영수증(review/receipt.json) 작성의 단일 정의(REQ-AIR6-015, design §4.3).
+# @MX:REASON: 작업 서비스의 정상·재시도·취소 경로와 AC-AIR6-014~016 시험(fan_in 4)이 모두 이 함수가 만드는
+#             영수증 키 집합과 조건 코어 호출 시점(디스크에 영수증이 없을 때, 한 번만 교체)에 의존한다.
 def finish_review(
     job_dir: Path,
     start: ReviewStart,

@@ -25,6 +25,10 @@ class GooseNetworkBlocked(OSError):
 
 
 def _is_goose_test(request: pytest.FixtureRequest) -> bool:
+    # SPEC-AI-REPORT-006 AC-AIR6-009 (5): 실제 브라우저와 루프백 수신 소켓이 필요한 격리 회귀 시험만
+    # `goose_real_browser` 표지로 가드를 벗어난다. 그 시험은 환경 변수가 없으면 건너뛰므로 기본 실행의 가드는 그대로다.
+    if request.node.get_closest_marker("goose_real_browser"):
+        return False
     return Path(str(request.node.fspath)).name.startswith(_GOOSE_PREFIXES)
 
 

@@ -138,7 +138,8 @@ def _make_job(
     if pre:
         pre(job_dir)
     start = gv.prepare_review(job_dir, code=_CODE)
-    seen = SimpleNamespace(audit_at_entry=None, final_at_entry=None, ctx_at_entry=None, session_ran=False)
+    seen = SimpleNamespace(audit_at_entry=None, final_at_entry=None, ctx_at_entry=None, session_ran=False,
+                           review_at_entry=None)
     stream_writes = list(writes)
     if start.launch:
         seen.session_ran = True
@@ -146,6 +147,7 @@ def _make_job(
         seen.ctx_at_entry = json.loads(ctx_path.read_text()) if ctx_path.exists() else None
         seen.audit_at_entry = (job_dir / "audit-review.json").exists()
         seen.final_at_entry = (job_dir / "final").exists()
+        seen.review_at_entry = sorted(p.name for p in (job_dir / "review").iterdir())
         if session:
             stream_writes += session(job_dir, seen.ctx_at_entry) or []
         if write_audit and seen.ctx_at_entry:
@@ -641,6 +643,99 @@ def test_air6_014_13_delete_failure_blocks_session_and_records_start_values(tmp_
     assert r["screens"]["snapshot_start"] == r["screens"]["snapshot_end"]  # 시작·종료가 같은 값
     assert r["draft_unchanged"] is True
     assert (job.job_dir / "final" / "report.html").exists()  # 삭제 못 한 파일은 그대로(세션만 안 돈다)
+
+
+def _outside(tmp_path: Path) -> Path:
+    """작업 폴더 밖의 파일·폴더. 심볼릭 링크가 가리키는 대상이며 지워지면 안 된다."""
+    outside = tmp_path / "outside"
+    (outside / "dir").mkdir(parents=True)
+    (outside / "keep.txt").write_text("KEEP")
+    (outside / "dir" / "inner.txt").write_text("KEEP")
+    return outside
+
+
+def _plant_review(outside: Path):
+    def plant(jd):
+        review = jd / "review"
+        (review / "sub").mkdir(parents=True)
+        (review / "delivery-audit.json").write_text('{"decision":"pass"}')
+        (review / "receipt.json").write_text('{"outcome":"reviewed","visual_admissible":true}')
+        (review / "sub" / "x.json").write_text("{}")
+        (review / "link").symlink_to(outside / "keep.txt")
+        (review / "linkdir").symlink_to(outside / "dir")
+
+    return plant
+
+
+def _assert_outside_intact(outside: Path) -> None:
+    assert (outside / "keep.txt").read_text() == "KEEP"
+    assert (outside / "dir" / "inner.txt").read_text() == "KEEP"
+
+
+def test_air6_014_14_review_dir_is_emptied_without_following_links(tmp_path):
+    outside = _outside(tmp_path)
+    job = _make_job(tmp_path, pre=_plant_review(outside))
+    assert job.seen.review_at_entry == ["context.json"]  # 서버가 쓴 것 하나뿐
+    assert sorted(p.name for p in (job.job_dir / "review").iterdir()) == ["context.json", "receipt.json"]
+    _assert_outside_intact(outside)  # 링크를 따라가 대상을 지우지 않았다
+    assert job.receipt["outcome"] == "reviewed" and job.receipt["reasons"] == []
+    assert json.loads(_receipt_path(job.job_dir).read_text()) == job.receipt  # 심은 위조가 아니라 서버가 쓴 영수증
+
+
+def test_air6_014_14_review_that_is_itself_a_symlink_is_unlinked_not_followed(tmp_path):
+    outside = _outside(tmp_path)
+
+    def plant(jd):
+        (jd / "review").symlink_to(outside / "dir", target_is_directory=True)
+
+    job = _make_job(tmp_path, pre=plant)
+    assert job.seen.review_at_entry == ["context.json"]
+    assert not (job.job_dir / "review").is_symlink()
+    assert sorted(p.name for p in (outside / "dir").iterdir()) == ["inner.txt"]  # 대상 폴더에 아무것도 쓰지 않았다
+    _assert_outside_intact(outside)
+
+
+def test_air6_014_14_review_that_is_a_regular_file_is_replaced(tmp_path):
+    job = _make_job(tmp_path, pre=lambda jd: (jd / "review").write_text("not a dir"))
+    assert job.seen.review_at_entry == ["context.json"]
+
+
+def _fail_on_sub(monkeypatch):
+    real = gv._remove_entry
+
+    def remove_entry(path):
+        if path.name == "sub":
+            raise OSError("cannot remove")
+        real(path)
+
+    monkeypatch.setattr(gv, "_remove_entry", remove_entry)
+
+
+def test_air6_014_15_review_delete_failure_blocks_session_and_records_start_values(tmp_path, monkeypatch):
+    outside = _outside(tmp_path)
+
+    def plant_all(jd):
+        _plant_record(jd)
+        _plant_final(jd)
+        _plant_review(outside)(jd)
+
+    _fail_on_sub(monkeypatch)
+    job = _make_job(tmp_path, pre=plant_all)
+    assert job.seen.session_ran is False  # 감수기 호출 0
+    assert job.receipt["outcome"] == "review_failed"
+    assert job.receipt["reasons"] == ["review_not_completed", "tile_not_read"]  # (13)과 같은 목록
+    assert gv.evaluate_admissibility(job.job_dir) == (False, ["review_not_completed", "tile_not_read"])
+    r = job.receipt
+    assert r["screens"]["snapshot_start"] == r["screens"]["snapshot_end"] and r["draft_unchanged"] is True
+    assert not (job.job_dir / "review" / "context.json").exists()  # 컨텍스트도 쓰지 않는다
+
+
+def test_air6_014_15_without_planted_record_the_absent_record_adds_no_audit_review(tmp_path, monkeypatch):
+    """(15)의 목록은 심은 audit-review.json이 있을 때의 값이다. 없으면 조건 13이 더해진다(SPEC 정밀도 기록)."""
+    _fail_on_sub(monkeypatch)
+    job = _make_job(tmp_path, pre=_plant_review(_outside(tmp_path)))
+    assert job.seen.session_ran is False
+    assert job.receipt["reasons"] == ["review_not_completed", "tile_not_read", "no_audit_review"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

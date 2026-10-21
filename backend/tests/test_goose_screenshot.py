@@ -26,6 +26,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.services import goose_screenshot as gs
+from backend.services.goose_runner import ENV_ALLOWLIST
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 # 보고서 내용에서 온 문자열(브라우저 인자·파일 이름으로 새면 안 된다) — AC-009
@@ -36,6 +37,7 @@ _REPORT_HTML = (
 )
 _FAKE_BROWSER = """#!/bin/sh
 printf '%s\\n' "$@" > "$0.argv.tmp" && mv "$0.argv.tmp" "$0.argv"
+env > "$0.env.tmp" && mv "$0.env.tmp" "$0.env"
 echo "$$ {ident}" >> "{runlog}"
 sleep 300 &
 wait
@@ -98,6 +100,9 @@ class FakeDriver:
     async def disable_scripts(self):
         self.calls.append(("scripts_off",))
 
+    async def isolate(self, url, body):
+        self.calls.append(("isolate", url, body))
+
     async def open(self, url, width, height, mobile):
         self.calls.append(("open", url, width, height, mobile))
         self._now = "mobile" if mobile else "desktop"
@@ -132,7 +137,8 @@ def browser(tmp_path):
     """AI_REPORT_GOOSE_BROWSER로 지정할 가짜 브라우저 실행 파일."""
     runlog = tmp_path / "runlog.txt"
     exe = _make_exe(tmp_path / "bin" / "fake-browser", "A", runlog)
-    yield SimpleNamespace(exe=exe, runlog=runlog, environ={gs.ENV_BROWSER: str(exe)})
+    environ = {gs.ENV_BROWSER: str(exe), "PATH": os.environ["PATH"]}
+    yield SimpleNamespace(exe=exe, runlog=runlog, environ=environ)
     for fields in _runlog_lines(runlog):  # 시험이 실패해도 잔류 프로세스를 남기지 않는다
         try:
             os.killpg(int(fields[0]), signal.SIGKILL)
@@ -148,6 +154,11 @@ async def _capture(job_dir, environ, driver, cap=20):
 
 def _argv(browser) -> list[str]:
     return Path(f"{browser.exe}.argv").read_text().splitlines()
+
+
+def _child_env(browser) -> dict[str, str]:
+    lines = Path(f"{browser.exe}.env").read_text().splitlines()
+    return dict(line.split("=", 1) for line in lines if "=" in line)
 
 
 def _profile(browser) -> Path:
@@ -434,8 +445,10 @@ async def test_air6_009_argv_only_fixed_strings_and_server_values(job, browser):
     driver = FakeDriver(ready=browser.runlog)
     await _capture(job, browser.environ, driver)
 
-    fixed = {"--headless", "--disable-gpu", "--hide-scrollbars", "about:blank"}
+    safety_net = {"--proxy-server=127.0.0.1:1", "--proxy-bypass-list=<-loopback>", "--host-resolver-rules=MAP * ~NOTFOUND"}
+    fixed = {"--headless", "--disable-gpu", "--hide-scrollbars", "about:blank"} | safety_net
     argv = _argv(browser)
+    assert safety_net <= set(argv)  # 셋 중 하나라도 빠지면 실패(v0.3.4, 층 A2)
     for arg in argv:
         assert (
             arg in fixed
@@ -457,8 +470,47 @@ async def test_air6_009_scripts_off_and_all_network_blocked(job, browser):
     first_open = next(i for i, c in enumerate(driver.calls) if c[0] == "open")
     assert driver.calls.index(("scripts_off",)) < first_open
     assert driver.calls.index(("block", ["*"])) < first_open
-    text = repr(driver.calls)
+    text = repr([c for c in driver.calls if c[0] != "isolate"])  # isolate는 초안 바이트를 받는다(초안 안의 링크는 차단 대상)
     assert "cdn.jsdelivr.net" not in text and "fonts.googleapis.com" not in text
+
+
+async def test_air6_009_isolation_is_applied_before_first_open_with_the_hashed_draft_bytes(job, browser):
+    driver = FakeDriver(ready=browser.runlog)
+    index = await _capture(job, browser.environ, driver)
+
+    draft = job / "draft" / "report.html"
+    isolate = [c for c in driver.calls if c[0] == "isolate"]
+    assert isolate == [("isolate", draft.resolve().as_uri(), draft.read_bytes())]  # 정확히 한 번, 디스크 바이트 그대로
+    assert driver.calls.index(isolate[0]) < next(i for i, c in enumerate(driver.calls) if c[0] == "open")
+    assert index["preview_sha256"] == _sha(isolate[0][2])  # 해시한 바이트 == 렌더에 쓸 바이트
+
+
+async def test_air6_009_isolation_failure_closes_both_viewports_without_open(job, browser):
+    class NoIsolation(FakeDriver):
+        async def isolate(self, url, body):
+            raise RuntimeError("fetch.enable refused")
+
+    driver = NoIsolation(ready=browser.runlog)
+    index = await _capture(job, browser.environ, driver)
+
+    assert not any(c[0] in ("open", "tile") for c in driver.calls)
+    assert index["outcome"] == "failed"
+    for vp in index["viewports"]:
+        assert vp["status"] == "error" and vp["tiles"] == []
+        assert vp["error"].startswith("browser_start_failed:")
+    _assert_group_gone(int(_runlog_lines(browser.runlog)[0][0]))
+
+
+async def test_air6_009_child_env_is_an_allowlist_without_server_secrets(job, browser, monkeypatch):
+    monkeypatch.setenv("SPEC_SENTINEL_SECRET", "canary")  # 서버 프로세스 환경에만 있는 표지
+    environ = {**browser.environ, "SPEC_SENTINEL_SECRET": "canary", "HOME": "/home/server-user", "OPENAI_API_KEY": "k"}
+    await _capture(job, environ, FakeDriver(ready=browser.runlog))
+
+    child = _child_env(browser)
+    assert "SPEC_SENTINEL_SECRET" not in child and "OPENAI_API_KEY" not in child
+    assert gs.ENV_BROWSER not in child
+    assert set(child) - {"PWD", "SHLVL", "_", "OLDPWD"} <= set(ENV_ALLOWLIST)  # 셸이 더하는 변수만 예외
+    assert child["HOME"] == "/home/server-user" and child["PATH"] == environ["PATH"]  # 목록 변수는 부모 값 그대로
 
 
 async def test_air6_009_tile_names_are_server_generated(job, browser):
@@ -607,3 +659,210 @@ async def test_air6_010_path_and_chrome_app_are_not_searched(job, world, tmp_pat
     assert ran == [] and index["outcome"] == "unavailable"
     assert {v["error"] for v in index["viewports"]} == {"browser_not_found"}
     assert str(tmp_path) not in json.dumps(index)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AC-AIR6-009 (3)(4) — 요청 차단 핸들러 계약 (가짜 DevTools 전송, 브라우저 없음)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CSP_DIRECTIVES = ("default-src 'none'", "frame-src 'none'", "object-src 'none'")
+_ANSWERS = ("Fetch.continueRequest", "Fetch.fulfillRequest", "Fetch.failRequest")
+_PIXEL = "data:image/png;base64,iVBORw0KGgo="
+
+
+class DevtoolsWs:
+    """보낸 명령을 (방법·세션·순서)로 기록하고, Page.navigate마다 스크립트된 이벤트를 load 이벤트 앞에 주입한다."""
+
+    def __init__(self, events=None, fail=()):
+        self.sent: list[dict] = []
+        self.queue: asyncio.Queue = asyncio.Queue()
+        self.events = events or (lambda nav: [])
+        self.fail = set(fail)  # (방법, 세션 ID 또는 None)
+        self.navs = 0
+        self.closed = False
+
+    async def send(self, raw):
+        msg = json.loads(raw)
+        self.sent.append(msg)
+        reply = {"id": msg["id"]}
+        if msg.get("sessionId"):
+            reply["sessionId"] = msg["sessionId"]
+        if (msg["method"], msg.get("sessionId")) in self.fail:
+            reply["error"] = {"message": "refused"}
+        else:
+            reply["result"] = {
+                "Browser.getVersion": {"product": "HeadlessChrome/153.0.1"},
+                "Runtime.evaluate": {"result": {"value": json.dumps({"sw": 390, "cw": 390, "sh": 1000})}},
+                "Page.captureScreenshot": {"data": base64.b64encode(b"PNGDATA").decode()},
+            }.get(msg["method"], {})
+        await self.queue.put(json.dumps(reply))
+        if msg["method"] == "Page.navigate":
+            self.navs += 1
+            for event in self.events(self.navs):
+                await self.queue.put(json.dumps(event))
+            await self.queue.put(json.dumps({"method": "Page.loadEventFired", "params": {}}))
+
+    async def recv(self):
+        return await self.queue.get()
+
+    async def close(self):
+        self.closed = True
+
+    def methods(self, session=None):
+        return [m["method"] for m in self.sent if m.get("sessionId") == session]
+
+    def answers(self):
+        """requestId → [(방법, 세션, 매개변수)]. 일시 정지 요청 하나에 응답이 정확히 하나여야 한다."""
+        out: dict[str, list] = {}
+        for m in self.sent:
+            if m["method"] in _ANSWERS:
+                out.setdefault(m["params"]["requestId"], []).append((m["method"], m.get("sessionId"), m["params"]))
+        return out
+
+
+def _attached(session_id, parent=None):
+    event = {"method": "Target.attachedToTarget",
+             "params": {"sessionId": session_id, "waitingForDebugger": True,
+                        "targetInfo": {"targetId": f"T-{session_id}", "type": "iframe", "url": ""}}}
+    if parent:
+        event["sessionId"] = parent
+    return event
+
+
+def _paused(request_id, url, session=None):
+    event = {"method": "Fetch.requestPaused",
+             "params": {"requestId": request_id, "request": {"url": url, "method": "GET"},
+                        "frameId": "F", "resourceType": "Document"}}
+    if session:
+        event["sessionId"] = session
+    return event
+
+
+def _contract_urls(draft_url):
+    """(이름, 주입 URL, 기대 응답 방법) — acceptance AC-AIR6-009 (3) 표."""
+    path = draft_url.removeprefix("file://")
+    return [
+        ("draft", draft_url, "Fetch.fulfillRequest"),
+        ("data-png", _PIXEL, "Fetch.continueRequest"),
+        ("etc-hosts", "file:///etc/hosts", "Fetch.failRequest"),
+        ("secret-shaped", "file:///Users/someone/.ssh/id_rsa", "Fetch.failRequest"),
+        ("localhost-form", "file://localhost" + path, "Fetch.failRequest"),
+        ("fragment", draft_url + "#x", "Fetch.failRequest"),
+        ("query", draft_url + "?x=1", "Fetch.failRequest"),
+        ("case", draft_url.replace("report.html", "Report.html"), "Fetch.failRequest"),
+        ("bak", draft_url + ".bak", "Fetch.failRequest"),
+        ("http-loopback", "http://127.0.0.1:9/iframe", "Fetch.failRequest"),
+        ("https", "https://example.com/a.css", "Fetch.failRequest"),
+        ("ws", "ws://127.0.0.1:1/", "Fetch.failRequest"),
+        ("ftp", "ftp://example.com/", "Fetch.failRequest"),
+        ("blob", "blob:null/0f0f", "Fetch.failRequest"),
+        ("about-blank", "about:blank", "Fetch.failRequest"),
+    ]
+
+
+async def _capture_over_ws(job, browser, ws):
+    class Driver(gs.CdpDriver):
+        async def _open_transport(self, port):
+            deadline = time.monotonic() + 3  # 가짜 브라우저가 떠서 기록을 남긴 뒤에야 연결한다(정리 확인을 위해)
+            while not (browser.runlog.exists() and browser.runlog.read_text()):
+                assert time.monotonic() < deadline, "fake browser never started"
+                await asyncio.sleep(0.02)
+            return ws
+
+    return await asyncio.wait_for(gs.capture(job, environ=browser.environ, driver_factory=Driver), 20)
+
+
+def _draft_url(job) -> str:
+    return (job / "draft" / "report.html").resolve().as_uri()
+
+
+async def test_air6_009_3_handler_contract_attach_order_and_per_request_answers(job, browser):
+    url = _draft_url(job)
+    table = _contract_urls(url)
+
+    def events(nav):
+        out = []
+        if nav == 1:
+            out += [_attached("S2"), _attached("S3", parent="S2")]
+        for session in (None, "S2", "S3"):
+            out += [_paused(f"{nav}-{name}-{session}", u, session) for name, u, _m in table]
+        return out
+
+    ws = DevtoolsWs(events)
+    index = await _capture_over_ws(job, browser, ws)
+    assert index["outcome"] == "complete"
+
+    # 1. 페이지 세션: setAutoAttach·Fetch.enable이 한 번씩, 첫 Page.navigate보다 앞
+    page = ws.methods(None)
+    first_nav = page.index("Page.navigate")
+    assert page.count("Target.setAutoAttach") == 1 and page.count("Fetch.enable") == 1
+    assert page.index("Target.setAutoAttach") < first_nav and page.index("Fetch.enable") < first_nav
+    by_method = {m["method"]: m["params"] for m in ws.sent if not m.get("sessionId")}
+    assert by_method["Target.setAutoAttach"] == {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True}
+    assert by_method["Fetch.enable"] == {"patterns": [{"urlPattern": "*"}]}
+    assert by_method["Network.setBlockedURLs"] == {"urls": ["*"]}  # 심층 방어는 그대로
+    # 2. S2·S3: 두 명령이 정확히 한 번씩, runIfWaitingForDebugger는 그 둘 뒤에만
+    for session in ("S2", "S3"):
+        sess = ws.methods(session)
+        assert sess.count("Fetch.enable") == 1 and sess.count("Target.setAutoAttach") == 1
+        assert sess.count("Runtime.runIfWaitingForDebugger") == 1
+        resume = sess.index("Runtime.runIfWaitingForDebugger")
+        assert sess.index("Fetch.enable") < resume and sess.index("Target.setAutoAttach") < resume
+    # 3·4. 요청마다 응답 정확히 하나, 대상 종류와 무관하게 같은 방식
+    answers = ws.answers()
+    for nav in (1, 2):
+        for session in (None, "S2", "S3"):
+            for name, _u, expected in table:
+                got = answers[f"{nav}-{name}-{session}"]
+                assert len(got) == 1, (name, session, got)
+                method, sent_session, params = got[0]
+                assert method == expected and sent_session == session, (name, session, method)
+                if expected == "Fetch.fulfillRequest":
+                    assert base64.b64decode(params["body"]) == (job / "draft" / "report.html").read_bytes()
+                    csp = next(h["value"] for h in params["responseHeaders"] if h["name"] == "Content-Security-Policy")
+                    assert all(d in csp for d in _CSP_DIRECTIVES)
+                    assert params["responseCode"] == 200
+
+
+async def test_air6_009_3_isolation_commands_precede_the_first_navigation(job, browser):
+    """Fetch.enable보다 Page.navigate가 먼저 가면 첫 요청이 방어 없이 나간다 — 순서만 따로 한 번 더 본다."""
+    ws = DevtoolsWs()
+    await _capture_over_ws(job, browser, ws)
+    methods = [m["method"] for m in ws.sent if not m.get("sessionId")]
+    assert methods.index("Fetch.enable") < methods.index("Page.navigate")
+    assert methods.index("Emulation.setScriptExecutionDisabled") < methods.index("Page.navigate")
+
+
+async def test_air6_009_4_fetch_enable_error_on_page_session_closes_without_navigating(job, browser):
+    ws = DevtoolsWs(fail={("Fetch.enable", None)})
+    index = await _capture_over_ws(job, browser, ws)
+
+    assert "Page.navigate" not in ws.methods(None)
+    assert ws.answers() == {}
+    for vp in index["viewports"]:
+        assert vp["status"] == "error" and vp["tiles"] == []
+    _assert_group_gone(int(_runlog_lines(browser.runlog)[0][0]))
+
+
+async def test_air6_009_4_fetch_enable_error_on_attached_target_closes_the_viewport(job, browser):
+    ws = DevtoolsWs(lambda nav: [_attached("S2")], fail={("Fetch.enable", "S2")})
+    index = await _capture_over_ws(job, browser, ws)
+
+    assert ws.navs == 1  # 방어가 깨진 뒤에는 두 번째 뷰포트도 열지 않는다
+    for vp in index["viewports"]:
+        assert vp["status"] == "error" and vp["tiles"] == []
+    assert ws.answers() == {}  # 어떤 요청도 통과시키지 않았다
+    assert "Runtime.runIfWaitingForDebugger" not in ws.methods("S2")  # 방어 없이 풀어 주지 않는다
+    _assert_group_gone(int(_runlog_lines(browser.runlog)[0][0]))
+
+
+async def test_air6_009_4_malformed_paused_event_closes_the_viewport_without_passing_anything(job, browser):
+    malformed = {"method": "Fetch.requestPaused", "params": {"requestId": "r1"}}  # request 키가 없다
+    ws = DevtoolsWs(lambda nav: [malformed])
+    index = await _capture_over_ws(job, browser, ws)
+
+    assert ws.navs == 1
+    for vp in index["viewports"]:
+        assert vp["status"] == "error" and vp["tiles"] == []
+    assert ws.answers() == {}
+    _assert_group_gone(int(_runlog_lines(browser.runlog)[0][0]))
