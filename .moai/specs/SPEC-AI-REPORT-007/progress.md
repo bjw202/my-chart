@@ -210,6 +210,21 @@ P1~P5·P7·P8은 2026-10-21 HEAD `c8e5c20`에서, P9a·P9b·P10~P12·P15는 같�
 - ruff: 미설치(`No module named ruff`) — 린트 미관측
 - 보호 파일: `git diff --stat 1c49411 -- backend/goose_harness_src/claude-settings.json backend/goose_harness_src/skills backend/services/goose_dart_prefetch.py backend/services/ai_report_service.py backend/routers/ai_report.py frontend backend/tests/conftest.py backend/tests/fixtures/naver/recorded` → 출력 없음
 
+### AC-AIR7-012 — 라이브 확인 (2026-10-21 19:26:22~19:33:15 KST, 리드 실행, 카드 t19)
+
+실행: 리드. 로컬 main `c16e1de` 위에서 서버(pid 87910)를 재시작한 뒤 020150으로 goose 작업 1회(job `11808900a8834252814d1872da5e0ca5`). 증거: `.moai/reports/t19/run-evidence/ac012_live.txt`(리드 결과 기록, 원본 리드 폴더 `.moai/state/verify/3313cef6-lead/ac012.txt`), `.moai/reports/t19/run-evidence/naver_index.json`(그 실행의 `runs/<job_id>/naver/index.json` 사본). 이 절은 리드의 기록을 옮긴 것이며, 이 레인(t19 lane-2)이 직접 실행한 관측이 아니다.
+
+| 검사 | 기준 | 관측 (`ac012_live.txt` 인용) | 판정 |
+|---|---|---|---|
+| 시작 조건 | 설치된 하네스가 소스와 같음 | 설치된 `CLAUDE.md` sha == 소스 `harness-instructions.md` sha `77e260e4c5a27e9f`; 매니페스트 33개 파일 불일치 0·누락 0 | 충족 |
+| 1 | 색인 outcome `complete` 또는 `partial` | `outcome complete request_count 1 articles ok 10 of 10` | PASS |
+| 2 | 결함 코드에 `LATEST_SEARCH_NAVER` 없음 | 결함 코드 `AUDIT_INPUT_VERSION, AUDIT_MODE, AUDIT_PREVIEW_VERSION, AUDIT_TIME, LATEST_SEARCH_COMPANY_IR, REVIEW_CALCULATIONS, REVIEW_COVERAGE, REVIEW_OPINION, REVIEW_SOURCE_ACCURACY, REVIEW_VISUAL`; `LATEST_SEARCH_NAVER present: False` (기준선 a5becbb9는 있었음) | PASS |
+| 3 | 검사 3 스크립트 `violations 0`, `mode 3F+3S` | acceptance.md에서 그대로 추출한 사본(이 레인의 `air7_check3.py`와 diff 0줄)으로 `violations 0` / `mode 3F+3S`. 같은 날 다른 회차 a5becbb9(색인 없음): `violations 0` / `mode 3F only (outcome=missing)` | PASS |
+
+goose의 `naver` 기록: `result=read`, 서버 수집 10건 중 4건(01·03·05·09)만 열람했다고 note에 적었고 모두 약 150자 API 요약본이라고 밝혔다. `limitations` 문구는 규칙 9대로다.
+
+**관측 O-AC12-1 (이 SPEC 범위 밖, 미해결)**: 이번 회차에는 `company_ir` 채널 기록이 없어 `LATEST_SEARCH_COMPANY_IR` 결함이 새로 나왔다. goose가 `assumptions.md` 9행에 "회사 IR 페이지는 직접 열람하지 못해 `company_ir` 채널 기록은 만들지 않았다"고 적었다. 기준선 a5becbb9에는 `company_ir` `read` 기록이 있었다. 규칙 9가 원인인지, goose 실행마다 달라지는 변동인지는 **관측하지 못했다**(리드가 두 번째 실행을 하지 않았다). 남은 `AUDIT_*`·`REVIEW_*` 코드는 카드 t18(SPEC-AI-REPORT-006) 소관이다.
+
 ## §E.3 Run-phase Audit-Ready Signal
 
 ```yaml
