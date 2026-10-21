@@ -1,0 +1,35 @@
+python 3.13.11
+find_browser (Playwright cache, 최고 빌드 숫자 비교, AI_REPORT_GOOSE_BROWSER 없음): (1243, '/Users/byunjungwon/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell')
+browser --version: Google Chrome for Testing 153.0.8010.12
+== P26 재측정: 네트워크 전면 차단 + 스크립트 비활성, 기존 초안 4개 ==
+drafts 4
+browser build 1243 argv ['/Users/byunjungwon/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell', '--headless', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=64012', '--user-data-dir=<tmp>', 'about:blank']
+ws_found_after_s 0.26 blockedURLs ok scriptDisabled ok no --no-sandbox in argv: True
+1d261a37 desktop bytes 917991 {'sw': 1280, 'cw': 1280, 'sh': 9807, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 7 overflow False
+1d261a37 mobile bytes 917991 {'sw': 390, 'cw': 390, 'sh': 15047, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 10 overflow False
+5695985a desktop bytes 915909 {'sw': 1280, 'cw': 1280, 'sh': 9053, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 6 overflow False
+5695985a mobile bytes 915909 {'sw': 390, 'cw': 390, 'sh': 14169, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 10 overflow False
+a5becbb9 desktop bytes 1043346 {'sw': 1280, 'cw': 1280, 'sh': 20160, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 13 overflow False
+a5becbb9 mobile bytes 1043346 {'sw': 390, 'cw': 390, 'sh': 30803, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 20 overflow False
+d0a64dfc desktop bytes 943631 {'sw': 1280, 'cw': 1280, 'sh': 12066, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 8 overflow False
+d0a64dfc mobile bytes 943631 {'sw': 390, 'cw': 390, 'sh': 18797, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} tiles 12 overflow False
+max tiles per viewport {'desktop': 13, 'mobile': 20} 1.5x -> {'desktop': 20, 'mobile': 30} sum max(live)
+== G3: y>0 clip (차단+스크립트 비활성), 라이브 초안 ==
+desktop {'sw': 1280, 'cw': 1280, 'sh': 20160, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'}
+  clip y=0 h=1568 -> png 1280x1568 sha ec1f0a0270c360ffcf178b1d608d92d6c56ead3c6956b06322255fde0bbd48ed
+  clip y=1568 h=1568 -> png 1280x1568 sha 5aad3e94122f2cbb4943b8346dda213dfd983a592039067515277a9c292f4c61
+  clip y=3136 h=1568 -> png 1280x1568 sha 31bf9a557af333a1905fffe07bbabe88320d058ba909640bda3567a92c115e8a
+  clip y=18816 h=1344 -> png 1280x1344 sha cdb8008391f9035776aa57806572f99786325a0066323a7d0f0a0b2de2c52a01
+  y0 != y1568 hash: True | heights match clip: True
+mobile {'sw': 390, 'cw': 390, 'sh': 30803, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'}
+  clip y=0 h=1568 -> png 390x1568 sha 9a9d67ceb1767c3e1159cdf2fa3a3abb53542899bda2274aee31a0645603983c
+  clip y=1568 h=1568 -> png 390x1568 sha a9ef4622dc6fcb7fa72763de217fbb2ecb39b37ae0e496ffc4187cea115fbc6d
+  clip y=3136 h=1568 -> png 390x1568 sha fabc022865c191be18e9630b380132d71601fdcd48107bd8ff3101c617cffc2f
+  clip y=29792 h=1011 -> png 390x1011 sha 506aa44d3d1173da8f937b773401f9781b467fc42016ec0406ec4116f5d67378
+  y0 != y1568 hash: True | heights match clip: True
+== G8: 차단 vs 비차단(외부 글꼴 로드, 스크립트는 계속 비활성), 라이브 초안 ==
+unblocked desktop {'sw': 1280, 'cw': 1280, 'sh': 20160, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} y0 sha f380e5a899b6cd6c blocked y0 sha ec1f0a0270c360ff same: False height delta 0
+unblocked mobile {'sw': 390, 'cw': 390, 'sh': 30683, 'fs': '17px', 'ff': '"Pretendard Variable", Pretendard, -apple-system, "system-ui", "Apple SD Gothic Neo", sans-serif'} y0 sha 87d1d6a542a780e8 blocked y0 sha 9a9d67ceb1767c3e same: False height delta -120
+== 격리 관측: 로컬 수신 소켓 요청 수 + 스크립트 비활성 효과 ==
+CONTROL(차단 없음, 스크립트 허용) div text = SCRIPT-RAN | 로컬 소켓 수신 요청: ['/a.css', '/b.png', '/c', '/d.js']
+SPEC(차단 + 스크립트 비활성) div text = static | 로컬 소켓 수신 요청: []

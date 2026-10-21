@@ -1,0 +1,10 @@
+  44 backend/tests/test_goose_dart_prefetch.py
+  32 backend/tests/test_goose_harness.py
+ 106 backend/tests/test_goose_job_service.py
+  41 backend/tests/test_goose_naver_prefetch.py
+ 132 backend/tests/test_goose_review.py
+  23 backend/tests/test_goose_router.py
+  65 backend/tests/test_goose_runner.py
+  34 backend/tests/test_goose_screenshot.py
+  54 backend/tests/test_goose_storage.py
+   2 backend/tests/test_main_goose_lifespan.py

@@ -1,0 +1,505 @@
+{
+  "schema_version": 1,
+  "structural_validation": "valid",
+  "research_verified_by_renderer": false,
+  "note": "Only structure, reference integrity, and numeric representability were checked; source truth, arithmetic, completeness, and investment judgment require independent review.",
+  "document_type": "deep_report",
+  "declared_report_status": "limited",
+  "claims": [
+    {
+      "path": "kpis[0]",
+      "source_ids": [
+        "dart_h1_26_fs"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "kpis[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "kpis[2]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "kpis[3]",
+      "source_ids": [
+        "news_joongang_price"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "summary[0]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "news_mt_q2"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "summary[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs",
+        "news_mt_industry"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "summary[2]",
+      "source_ids": [
+        "news_hankyung_cap",
+        "news_joongang_price"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[0].blocks[0]",
+      "source_ids": [
+        "dart_h1_26_notes"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "sections[0].blocks[1]",
+      "source_ids": [
+        "dart_h1_26_notes"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "sections[0].blocks[2]",
+      "source_ids": [
+        "dart_h1_26_notes"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[0].blocks[3]",
+      "source_ids": [
+        "dart_h1_26_notes",
+        "dart_h1_26_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[1].blocks[0]",
+      "source_ids": [
+        "dart_fy25_fs"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "sections[1].blocks[1]",
+      "source_ids": [
+        "dart_h1_24_fs",
+        "dart_q3_24_fs",
+        "dart_fy25_fs",
+        "dart_q1_26_fs",
+        "dart_h1_25_fs",
+        "dart_q3_25_fs",
+        "dart_h1_26_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[1].blocks[2]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs",
+        "dart_h1_25_fs",
+        "news_mt_q2"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[1].blocks[3]",
+      "source_ids": [
+        "dart_q1_26_fs",
+        "dart_h1_25_fs",
+        "dart_q3_25_fs",
+        "dart_fy25_fs",
+        "dart_h1_26_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[2].blocks[0]",
+      "source_ids": [
+        "dart_h1_24_fs",
+        "dart_q3_24_fs",
+        "dart_fy25_fs",
+        "dart_q1_26_fs",
+        "dart_h1_25_fs",
+        "dart_q3_25_fs",
+        "dart_h1_26_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "sections[2].blocks[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "sections[2].blocks[2]",
+      "source_ids": [
+        "dart_h1_26_notes"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[2].blocks[3]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "sections[3].blocks[0]",
+      "source_ids": [
+        "dart_fy25_fs",
+        "dart_h1_26_fs"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "sections[3].blocks[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[3].blocks[2]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[3].blocks[3]",
+      "source_ids": [
+        "dart_h1_26_notes",
+        "dart_h1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[3].blocks[4]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs",
+        "dart_h1_26_notes"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[4].blocks[0]",
+      "source_ids": [
+        "news_mt_industry",
+        "news_mt_q2"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[4].blocks[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "news_mt_industry"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[4].blocks[2]",
+      "source_ids": [
+        "news_hankyung_cap",
+        "news_mt_industry"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[4].blocks[3]",
+      "source_ids": [
+        "news_mt_q2",
+        "news_mt_industry"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "sections[5].blocks[0]",
+      "source_ids": [
+        "dart_h1_26_notes",
+        "news_mtn_ecowall",
+        "ir_home",
+        "news_hankyung_cap",
+        "news_joongang_price"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[5].blocks[1]",
+      "source_ids": [
+        "news_mtn_ecowall",
+        "dart_h1_26_notes"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[5].blocks[2]",
+      "source_ids": [
+        "news_hankyung_cap",
+        "news_joongang_price"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[6].blocks[0]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs",
+        "news_mt_q2",
+        "news_hankyung_cap",
+        "news_joongang_price",
+        "news_mt_industry"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[6].blocks[1]",
+      "source_ids": [
+        "dart_fy25_audit",
+        "dart_h1_26_review"
+      ],
+      "status": "verified"
+    },
+    {
+      "path": "sections[6].blocks[2]",
+      "source_ids": [
+        "naver_blocked"
+      ],
+      "status": "unverified"
+    },
+    {
+      "path": "sections[7].blocks[0]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_h1_26_notes",
+        "news_hankyung_cap"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "sections[7].blocks[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "ir_home"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "sections[8].blocks[0]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "ir_home",
+        "news_mt_q2",
+        "news_mt_industry",
+        "naver_blocked"
+      ],
+      "status": "qualified"
+    },
+    {
+      "path": "sections[8].blocks[1]",
+      "source_ids": [
+        "naver_blocked"
+      ],
+      "status": "unverified"
+    },
+    {
+      "path": "opinion.lead",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.grounds",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "news_mt_industry"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.conditions",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "ir_home"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[0]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs",
+        "dart_h1_25_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[1]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[2]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs",
+        "dart_h1_26_notes"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[3]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_q1_26_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[4]",
+      "source_ids": [
+        "dart_h1_26_notes",
+        "dart_h1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[5]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_fy25_fs",
+        "news_mtn_ecowall"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[6]",
+      "source_ids": [
+        "dart_h1_26_notes",
+        "news_mt_industry"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[7]",
+      "source_ids": [
+        "news_mt_industry",
+        "dart_h1_26_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[8]",
+      "source_ids": [
+        "news_mtn_ecowall",
+        "dart_h1_26_notes",
+        "dart_h1_26_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[9]",
+      "source_ids": [
+        "news_hankyung_cap",
+        "news_joongang_price"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[10]",
+      "source_ids": [
+        "news_hankyung_cap",
+        "dart_h1_26_notes",
+        "dart_h1_26_fs",
+        "dart_fy25_fs"
+      ],
+      "status": "inference"
+    },
+    {
+      "path": "opinion.paragraphs[11]",
+      "source_ids": [
+        "dart_h1_26_fs",
+        "dart_h1_26_notes",
+        "ir_home",
+        "news_mtn_ecowall"
+      ],
+      "status": "inference"
+    }
+  ],
+  "charts": 3,
+  "opinion_sentence_counts": [
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6
+  ],
+  "editorial_quality": {
+    "warnings": [
+      "Opinion prose is short relative to the approved detailed-column style; review mechanisms, counterarguments and investor implications. Do not pad.",
+      "Missing evidenced editorial review: material_coverage",
+      "Missing evidenced editorial review: visual_review"
+    ],
+    "opinion_character_counts": [
+      384,
+      437,
+      388,
+      339,
+      374,
+      398,
+      335,
+      394,
+      378,
+      333,
+      361,
+      319
+    ],
+    "requires_editorial_review": true,
+    "quality_certified_by_renderer": false
+  },
+  "input_sha256": "db8d72bfe5ccb72850d4a63a75d7332cbab49db1f912f7832f07180745648aca",
+  "delivery_allowed": false,
+  "delivery_status": "draft_pending_audit"
+}

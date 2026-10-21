@@ -1,0 +1,621 @@
+.FFFFFFFFFFFFFFFFFFFFFFFFFF.FFFFFFF                                      [100%]
+=================================== FAILURES ===================================
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[d] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr0')
+case = 'd', kwargs = {'index_edit': <function <lambda> at 0x10c58fe20>}
+expected = ['screens_not_complete']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+_______ test_air6_016_select_report_pre_session_cases_fall_to_draft[t7] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr1')
+case = 't7', kwargs = {'pre': <function <lambda> at 0x10c58fec0>}
+expected = ['tile_missing']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+_______ test_air6_016_select_report_pre_session_cases_fall_to_draft[g2] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr2')
+case = 'g2', kwargs = {'pre': <function <lambda> at 0x10c58ff60>}
+expected = ['tile_hash_mismatch']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[e] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr3')
+case = 'e', kwargs = {'index_edit': <function <lambda> at 0x10c600040>}
+expected = ['preview_hash_mismatch']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[f] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr4')
+case = 'f'
+kwargs = {'index_edit': <function _set_mobile_overflow at 0x10c58fc40>}
+expected = ['mobile_overflow']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[c] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr5')
+case = 'c', kwargs = {'skip_read': ('mobile-01.png',)}
+expected = ['tile_not_read']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[h] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr6')
+case = 'h', kwargs = {'audit_edit': <function <lambda> at 0x10c6000e0>}
+expected = ['mode_not_separate_review_pass']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[i] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr7')
+case = 'i', kwargs = {'audit_edit': <function <lambda> at 0x10c600180>}
+expected = ['visual_not_pass']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[j] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr8')
+case = 'j', kwargs = {'audit_edit': <function <lambda> at 0x10c600220>}
+expected = ['reviewed_before_capture']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[p] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr9')
+case = 'p', kwargs = {'audit_edit': <function <lambda> at 0x10c6002c0>}
+expected = ['font_note_missing']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+________ test_air6_016_select_report_pre_session_cases_fall_to_draft[m] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_pr10')
+case = 'm', kwargs = {'audit_edit': <function <lambda> at 0x10c600360>}
+expected = ['preview_hash_mismatch']
+
+    @pytest.mark.parametrize(("case", "kwargs", "expected"), _PRE_CASES, ids=[c[0] for c in _PRE_CASES])
+    def test_air6_016_select_report_pre_session_cases_fall_to_draft(gr, tmp_path, case, kwargs, expected):
+        job = _make_job(tmp_path, **kwargs)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:995: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[b] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po0')
+case = 'b', mutate = <function <lambda> at 0x10c6005e0>
+expected = ['no_receipt']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[b2-i] ______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po1')
+case = 'b2-i', mutate = <function <lambda> at 0x10c600680>
+expected = ['receipt_invalid']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_____ test_air6_016_select_report_post_receipt_cases_fall_to_draft[b2-ii] ______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po2')
+case = 'b2-ii', mutate = <function <lambda> at 0x10c600720>
+expected = ['receipt_invalid']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[b3] _______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po3')
+case = 'b3', mutate = <function <lambda> at 0x10c6007c0>
+expected = ['receipt_invalid']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[r] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po4')
+case = 'r', mutate = <function <lambda> at 0x10c600860>
+expected = ['review_not_completed']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[w] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po5')
+case = 'w', mutate = <function <lambda> at 0x10c600900>
+expected = ['judged_input_write_attempt']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[x] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po6')
+case = 'x', mutate = <function <lambda> at 0x10c6009a0>
+expected = ['screens_changed']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[k] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po7')
+case = 'k', mutate = <function <lambda> at 0x10c600a40>
+expected = ['draft_changed']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[k2] _______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po8')
+case = 'k2', mutate = <function <lambda> at 0x10c600ae0>
+expected = ['draft_changed']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[c2] _______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po9')
+case = 'c2', mutate = <function <lambda> at 0x10c600b80>
+expected = ['tile_not_read']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[o] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po10')
+case = 'o', mutate = <function <lambda> at 0x10c600c20>
+expected = ['no_audit_review']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[o2] _______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po11')
+case = 'o2', mutate = <function <lambda> at 0x10c600cc0>
+expected = ['no_audit_review']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[g] ________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po12')
+case = 'g', mutate = <function <lambda> at 0x10c600d60>
+expected = ['screens_changed', 'tile_hash_mismatch']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[g3] _______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po13')
+case = 'g3', mutate = <function <lambda> at 0x10c600e00>
+expected = ['screens_changed', 'tile_missing']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_______ test_air6_016_select_report_post_receipt_cases_fall_to_draft[kr] _______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_po14')
+case = 'kr', mutate = <function <lambda> at 0x10c600ea0>
+expected = ['draft_changed', 'preview_hash_mismatch']
+
+    @pytest.mark.parametrize(("case", "mutate", "expected"), _POST_CASES, ids=[c[0] for c in _POST_CASES])
+    def test_air6_016_select_report_post_receipt_cases_fall_to_draft(gr, tmp_path, case, mutate, expected):
+        job = _make_job(tmp_path)
+        assert gr.select_report(job.job_dir) == ("final", job.job_dir / "final")
+        mutate(job.job_dir)
+>       assert gr.select_report(job.job_dir) == _draft_of(job)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1003: AssertionError
+_____ test_air6_016_select_report_final_without_receipt_and_without_draft ______
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_fi0')
+
+    def test_air6_016_select_report_final_without_receipt_and_without_draft(gr, tmp_path):
+        """영수증 없는 final/만 있고 draft/가 없는 폴더는 None(기존 규칙)."""
+        jd = tmp_path / "harness" / "runs" / "jx"
+        jd.mkdir(parents=True)
+        _plant_final(jd)
+>       assert gr.select_report(jd) is None
+E       AssertionError: assert ('final', PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_fi0/harness/runs/jx/final')) is None
+E        +  where ('final', PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_fi0/harness/runs/jx/final')) = <function select_report at 0x10c6a6ac0>(PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_fi0/harness/runs/jx'))
+E        +    where <function select_report at 0x10c6a6ac0> = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>.select_report
+
+backend/tests/test_goose_review.py:1019: AssertionError
+_____ test_air6_016_select_report_is_the_single_caller_of_the_disk_wrapper _____
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_016_select_report_is0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c784670>
+
+    def test_air6_016_select_report_is_the_single_caller_of_the_disk_wrapper(gr, tmp_path, monkeypatch):
+        """select_report는 디스크 래퍼를 부른다(작성기는 코어). 래퍼 결과가 곧 판정이다."""
+        job = _make_job(tmp_path)
+        calls: list[Path] = []
+>       mod = sys.modules["backend.services.goose_review"]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'backend.services.goose_review'
+
+backend/tests/test_goose_review.py:1026: KeyError
+__________________ test_air6_014_select_report_planted_cases ___________________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_014_select_report_pl0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c786270>
+
+    def test_air6_014_select_report_planted_cases(gr, tmp_path, monkeypatch):
+        """(11)(12)(13)의 select_report 절반: 심은 파일은 인정 근거가 되지 못한다."""
+        job11 = _make_job(tmp_path / "a", pre=_plant_record, write_audit=False, session=_make_final)
+>       assert gr.select_report(job11.job_dir) == _draft_of(job11)
+E       AssertionError: assert ('final', Pos...ns/j1/final')) == ('draft', Pos...ns/j1/draft'))
+E         
+E         At index 0 diff: 'final' != 'draft'
+E         Use -v to get more diff
+
+backend/tests/test_goose_review.py:1041: AssertionError
+__________ test_air6_001_004_outcome_receipt_writer[integrity_failed] __________
+
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_001_004_outcome_rece0')
+outcome = 'integrity_failed'
+
+    @pytest.mark.parametrize("outcome", ["integrity_failed", "disabled", "cancelled"])
+    def test_air6_001_004_outcome_receipt_writer(tmp_path, outcome):
+        harness = tmp_path / "harness"
+        job_dir = _build_job_files(harness)
+        _plant_final(job_dir)  # 감수 없이 final/이 있어도 영수증은 인정하지 않는다
+>       result = gv.write_outcome_receipt(job_dir, outcome, harness_dir=harness)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'backend.services.goose_review' has no attribute 'write_outcome_receipt'
+
+backend/tests/test_goose_review.py:1062: AttributeError
+______________ test_air6_001_004_outcome_receipt_writer[disabled] ______________
+
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_001_004_outcome_rece1')
+outcome = 'disabled'
+
+    @pytest.mark.parametrize("outcome", ["integrity_failed", "disabled", "cancelled"])
+    def test_air6_001_004_outcome_receipt_writer(tmp_path, outcome):
+        harness = tmp_path / "harness"
+        job_dir = _build_job_files(harness)
+        _plant_final(job_dir)  # 감수 없이 final/이 있어도 영수증은 인정하지 않는다
+>       result = gv.write_outcome_receipt(job_dir, outcome, harness_dir=harness)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'backend.services.goose_review' has no attribute 'write_outcome_receipt'
+
+backend/tests/test_goose_review.py:1062: AttributeError
+_____________ test_air6_001_004_outcome_receipt_writer[cancelled] ______________
+
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_001_004_outcome_rece2')
+outcome = 'cancelled'
+
+    @pytest.mark.parametrize("outcome", ["integrity_failed", "disabled", "cancelled"])
+    def test_air6_001_004_outcome_receipt_writer(tmp_path, outcome):
+        harness = tmp_path / "harness"
+        job_dir = _build_job_files(harness)
+        _plant_final(job_dir)  # 감수 없이 final/이 있어도 영수증은 인정하지 않는다
+>       result = gv.write_outcome_receipt(job_dir, outcome, harness_dir=harness)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'backend.services.goose_review' has no attribute 'write_outcome_receipt'
+
+backend/tests/test_goose_review.py:1062: AttributeError
+_________ test_air6_001_outcome_receipt_writer_rejects_unknown_outcome _________
+
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-864/test_air6_001_outcome_receipt_0')
+
+    def test_air6_001_outcome_receipt_writer_rejects_unknown_outcome(tmp_path):
+        harness = tmp_path / "harness"
+        job_dir = _build_job_files(harness)
+        with pytest.raises(ValueError):
+>           gv.write_outcome_receipt(job_dir, "reviewed", harness_dir=harness)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'backend.services.goose_review' has no attribute 'write_outcome_receipt'
+
+backend/tests/test_goose_review.py:1076: AttributeError
+=============================== warnings summary ===============================
+../../../../../my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4
+  /Users/byunjungwon/Dev/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[d]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[t7]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[g2]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[e]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[f]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[c]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[h]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[i]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[j]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[p]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_pre_session_cases_fall_to_draft[m]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[b]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[b2-i]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[b2-ii]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[b3]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[r]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[w]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[x]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[k]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[k2]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[c2]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[o]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[o2]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[g]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[g3]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_post_receipt_cases_fall_to_draft[kr]
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_final_without_receipt_and_without_draft
+FAILED backend/tests/test_goose_review.py::test_air6_016_select_report_is_the_single_caller_of_the_disk_wrapper
+FAILED backend/tests/test_goose_review.py::test_air6_014_select_report_planted_cases
+FAILED backend/tests/test_goose_review.py::test_air6_001_004_outcome_receipt_writer[integrity_failed]
+FAILED backend/tests/test_goose_review.py::test_air6_001_004_outcome_receipt_writer[disabled]
+FAILED backend/tests/test_goose_review.py::test_air6_001_004_outcome_receipt_writer[cancelled]
+FAILED backend/tests/test_goose_review.py::test_air6_001_outcome_receipt_writer_rejects_unknown_outcome
+33 failed, 2 passed, 97 deselected, 1 warning in 0.81s

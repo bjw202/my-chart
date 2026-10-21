@@ -1,0 +1,4 @@
+77e260e4c5a27e9f6166be2be19faec6332d421cdf0d82ba5fe3c1b6c6fb2fed  /Users/byunjungwon/.goose-harness/CLAUDE.md
+e8b527ccaf01785377c8e0d9c2572ceaddb3ca906b0776801163487febd15df3  /Users/byunjungwon/.goose-harness/.claude/settings.json
+/Users/byunjungwon/.goose-harness/CLAUDE.md 1792580467 Oct 21 20:01:07 2026
+/Users/byunjungwon/.goose-harness/.claude/settings.json 1792580467 Oct 21 20:01:07 2026

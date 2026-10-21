@@ -1,0 +1,4 @@
+FAILED backend/tests/test_goose_screenshot.py::test_air6_010_bad_env_variable_does_not_fall_back
+FAILED backend/tests/test_goose_screenshot.py::test_air6_010_highest_numeric_build_in_playwright_cache
+FAILED backend/tests/test_goose_screenshot.py::test_air6_010_path_and_chrome_app_are_not_searched
+34 failed, 1 warning in 2.94s

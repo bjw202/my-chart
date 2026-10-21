@@ -1,0 +1,135 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90m/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/frontend[39m
+
+ [31m❯[39m src/utils/__tests__/gooseJob.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 6[2mms[22m[39m
+[31m     [31m×[31m 단계 13개를 순서대로 가진다 — dart_prefetch가 맨 앞, 화면 캡처·감수가 session_end 뒤(SPEC-AI-REPORT-006 AC-AIR6-003)[39m[32m 3[2mms[22m[39m
+[31m     [31m×[31m screenshot·review를 reached에 넣는다(알 수 없는 단계로 버리지 않는다)[39m[32m 0[2mms[22m[39m
+ [31m❯[39m src/components/__tests__/ProgressPanel.test.tsx [2m([22m[2m9 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 33[2mms[22m[39m
+[31m     [31m×[31m 단계 13개(공시 원문 수집 + 측정 표 10개 + 화면 캡처·감수)를 순서대로 렌더하고 옛 5소스 이름은 없다[39m[32m 14[2mms[22m[39m
+[31m     [31m×[31m 화면 캡처·감수 단계를 한국어 라벨로 렌더하고 진행 순서대로 상태를 표시한다(AC-AIR6-003)[39m[32m 2[2mms[22m[39m
+[31m     [31m×[31m 감수 세션이 --final을 실행하면 최종본 만들기가 진행 중이다[39m[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 5 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/components/__tests__/ProgressPanel.test.tsx[2m > [22mProgressPanel — goose 진행 단계[2m > [22m단계 13개(공시 원문 수집 + 측정 표 10개 + 화면 캡처·감수)를 순서대로 렌더하고 옛 5소스 이름은 없다
+[31m[1mAssertionError[22m: expected [ 'dart_prefetch', …(10) ] to deeply equal [ 'dart_prefetch', …(12) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -6,10 +6,8 @@[39m
+[2m    "fetch_start",[22m
+[2m    "fetch_done",[22m
+[2m    "compose",[22m
+[2m    "render_draft",[22m
+[2m    "audit",[22m
+[31m+   "render_final",[39m
+[2m    "session_end",[22m
+[32m-   "screenshot",[39m
+[32m-   "review",[39m
+[32m-   "render_final",[39m
+[2m  ][22m
+
+[36m [2m❯[22m src/components/__tests__/ProgressPanel.test.tsx:[2m30:20[22m[39m
+    [90m 28|[39m       el[33m.[39m[34mgetAttribute[39m([32m'data-stage'[39m)[33m,[39m
+    [90m 29|[39m     )
+    [90m 30|[39m     [34mexpect[39m(stages)[33m.[39m[34mtoEqual[39m([
+    [90m   |[39m                    [31m^[39m
+    [90m 31|[39m       [32m'dart_prefetch'[39m[33m,[39m
+    [90m 32|[39m       [32m'goose_start'[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/__tests__/ProgressPanel.test.tsx[2m > [22mProgressPanel — goose 진행 단계[2m > [22m화면 캡처·감수 단계를 한국어 라벨로 렌더하고 진행 순서대로 상태를 표시한다(AC-AIR6-003)
+[31m[1mError[22m: [2mexpect([22m[31mreceived[31m[2m).toHaveTextContent()[22m
+
+[31mreceived[31m value must be a Node.
+Received has type:  Null
+Received has value: [31mnull[31m[39m
+[36m [2m❯[22m src/components/__tests__/ProgressPanel.test.tsx:[2m95:66[22m[39m
+    [90m 93|[39m       <ProgressPanel progress={progressOf('goose_start', 'session_end'…
+    [90m 94|[39m     )
+    [90m 95|[39m     expect(container.querySelector('[data-stage="screenshot"]')).toHav…
+    [90m   |[39m                                                                  [31m^[39m
+    [90m 96|[39m     expect(container.querySelector('[data-stage="review"]')).toHaveTex…
+    [90m 97|[39m     [34mexpect[39m([34mstateOf[39m(container[33m,[39m [32m'session_end'[39m))[33m.[39m[34mtoBe[39m([32m'done'[39m)
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/__tests__/ProgressPanel.test.tsx[2m > [22mProgressPanel — goose 진행 단계[2m > [22m감수 세션이 --final을 실행하면 최종본 만들기가 진행 중이다
+[31m[1mAssertionError[22m: expected null to be 'done' // Object.is equality[39m
+
+[32m- Expected:[39m
+"done"
+
+[31m+ Received:[39m
+null
+
+[36m [2m❯[22m src/components/__tests__/ProgressPanel.test.tsx:[2m107:42[22m[39m
+    [90m105|[39m       <ProgressPanel progress={progressOf('goose_start', 'session_end'…
+    [90m106|[39m     )
+    [90m107|[39m     [34mexpect[39m([34mstateOf[39m(container[33m,[39m [32m'review'[39m))[33m.[39m[34mtoBe[39m([32m'done'[39m)
+    [90m   |[39m                                          [31m^[39m
+    [90m108|[39m     [34mexpect[39m([34mstateOf[39m(container[33m,[39m [32m'render_final'[39m))[33m.[39m[34mtoBe[39m([32m'running'[39m)
+    [90m109|[39m   })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/utils/__tests__/gooseJob.test.ts[2m > [22mgoose 진행 단계 누적 (design §3.5 측정 표)[2m > [22m단계 13개를 순서대로 가진다 — dart_prefetch가 맨 앞, 화면 캡처·감수가 session_end 뒤(SPEC-AI-REPORT-006 AC-AIR6-003)
+[31m[1mAssertionError[22m: expected [ 'dart_prefetch', …(10) ] to deeply equal [ 'dart_prefetch', …(12) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -6,10 +6,8 @@[39m
+[2m    "fetch_start",[22m
+[2m    "fetch_done",[22m
+[2m    "compose",[22m
+[2m    "render_draft",[22m
+[2m    "audit",[22m
+[31m+   "render_final",[39m
+[2m    "session_end",[22m
+[32m-   "screenshot",[39m
+[32m-   "review",[39m
+[32m-   "render_final",[39m
+[2m  ][22m
+
+[36m [2m❯[22m src/utils/__tests__/gooseJob.test.ts:[2m51:26[22m[39m
+    [90m 49|[39m   it('단계 13개를 순서대로 가진다 — dart_prefetch가 맨 앞, 화면 캡처·감수가 session_end 뒤(S…
+    [90m 50|[39m     [34mexpect[39m([33mGOOSE_STAGES[39m[[34m0[39m])[33m.[39m[34mtoBe[39m([32m'dart_prefetch'[39m)
+    [90m 51|[39m     [34mexpect[39m([33mGOOSE_STAGES[39m)[33m.[39m[34mtoEqual[39m([
+    [90m   |[39m                          [31m^[39m
+    [90m 52|[39m       [32m'dart_prefetch'[39m[33m,[39m
+    [90m 53|[39m       [32m'goose_start'[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/utils/__tests__/gooseJob.test.ts[2m > [22mgoose 진행 단계 누적 (design §3.5 측정 표)[2m > [22mscreenshot·review를 reached에 넣는다(알 수 없는 단계로 버리지 않는다)
+[31m[1mAssertionError[22m: expected [ 'session_end', 'render_final' ] to deeply equal [ 'session_end', 'screenshot', …(2) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "session_end",[22m
+[32m-   "screenshot",[39m
+[32m-   "review",[39m
+[2m    "render_final",[22m
+[2m  ][22m
+
+[36m [2m❯[22m src/utils/__tests__/gooseJob.test.ts:[2m73:23[22m[39m
+    [90m 71|[39m       p [33m=[39m [34mapplyGooseStage[39m(p[33m,[39m { stage[33m,[39m detail[33m:[39m [35mnull[39m })
+    [90m 72|[39m     }
+    [90m 73|[39m     expect(p.reached).toEqual(['session_end', 'screenshot', 'review', …
+    [90m   |[39m                       [31m^[39m
+    [90m 74|[39m   })
+    [90m 75|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m12 passed[39m[22m[90m (17)[39m
+[2m   Start at [22m 20:17:26
+[2m   Duration [22m 639ms[2m (transform 52ms, setup 105ms, import 99ms, tests 39ms, environment 784ms)[22m
+

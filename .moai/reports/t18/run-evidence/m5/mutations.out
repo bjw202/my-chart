@@ -1,0 +1,43 @@
+=== a_remove_marker_sentence (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_marker_sentence_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_021_instructions_carry_render_difference_marker_requirement
+FAILED backend/tests/test_goose_harness.py::test_air6_021_d7_missing_marker_consequence_is_stated
+4 failed, 10 passed, 32 deselected in 0.08s
+=== b_drop_never_write_review_record (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_rule7_forbids_first_session_review_record_and_final
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+2 failed, 12 passed, 32 deselected in 0.07s
+=== c_number_collision (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_review_rule_is_rule_10_after_naver_rule_9
+FAILED backend/tests/test_goose_harness.py::test_air6_013_rule10_applies_only_to_sessions_declared_as_review_session
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_marker_sentence_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_stale_nine_label_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_stale_in_text_reference_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_021_instructions_carry_render_difference_marker_requirement
+FAILED backend/tests/test_goose_harness.py::test_air6_021_d7_missing_marker_consequence_is_stated
+8 failed, 6 passed, 32 deselected in 0.09s
+=== d_stale_nine_label (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_review_rule_is_rule_10_after_naver_rule_9
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+2 failed, 12 passed, 32 deselected in 0.07s
+=== e_stale_in_text_reference (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_review_rule_is_rule_10_after_naver_rule_9
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+2 failed, 12 passed, 32 deselected in 0.07s
+=== f_drop_all_tiles_read_condition (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_review_rule_is_rule_10_after_naver_rule_9
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+2 failed, 12 passed, 32 deselected in 0.07s
+=== g_final_unconditional (pytest exit 1)
+FAILED backend/tests/test_goose_harness.py::test_air6_013_review_rule_is_rule_10_after_naver_rule_9
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+2 failed, 12 passed, 32 deselected in 0.07s
+backend/tests/test_goose_harness.py:608: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_harness.py::test_committed_source_matches_committed_manifest
+FAILED backend/tests/test_goose_harness.py::test_committed_manifest_covers_instructions_settings_and_whole_skill
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+3 failed, 43 passed in 0.21s
+=== h_manifest_not_regenerated (instructions changed, manifest stale) -> see lines above

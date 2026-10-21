@@ -1,0 +1,34 @@
+006a | AC-006 | 타일 없이 한 장 전체 저장 | RED=YES failed=5 | test_air6_006_target_viewports_and_tiles, test_air6_008_tile_cap_boundary[47040-ok-30], test_air6_008_tile_cap_boundary[47041-too_tall-0], test_air6_008_tile_cap_boundary[100000-too_tall-0], test_air6
+006b | AC-006 | 두 뷰포트가 같은 폭 | RED=YES failed=1 | test_air6_006_target_viewports_and_tiles
+006c | AC-006 | 모바일 에뮬레이션 누락 | RED=YES failed=8 | test_air6_006_target_viewports_and_tiles, test_air6_007_outcome_by_viewport_status[errors0-partial-statuses0], test_air6_007_horizontal_overflow_is_strictly_greater[391-True], test_air6_008_tile_cap_b
+006d | AC-006 | 스크립트 비활성이 navigate 뒤 | RED=YES failed=2 | test_air6_006_target_viewports_and_tiles, test_air6_009_scripts_off_and_all_network_blocked
+006e | AC-006 | 보고서 내용으로 파일 이름 생성 | RED=YES failed=1 | test_air6_006_target_viewports_and_tiles
+006f | AC-006 | 심볼릭 링크를 따라감(검사 전부 제거) | RED=YES failed=2 | test_air6_006_symlinked_draft_is_refused, test_air6_006_draft_resolving_outside_job_is_refused
+006g | AC-006 | 폴더 심볼릭 링크(해석 경로 검사) 제거 | RED=YES failed=1 | test_air6_006_draft_resolving_outside_job_is_refused
+007a | AC-007 | 색인 키 이름 변경 | RED=YES failed=5 | test_air6_007_complete_index_matches_disk, test_air6_007_outcome_by_viewport_status[errors0-partial-statuses0], test_air6_007_outcome_by_viewport_status[errors1-failed-statuses1], test_air6_007_no_bro
+007b | AC-007 | 시간대 없는 시각 | RED=YES failed=4 | test_air6_007_complete_index_matches_disk, test_air6_007_outcome_by_viewport_status[errors0-partial-statuses0], test_air6_007_outcome_by_viewport_status[errors1-failed-statuses1], test_air6_007_no_bro
+007c | AC-007 | 입력 JSON 해시를 preview_sha256에 기록 | RED=YES failed=2 | test_air6_007_complete_index_matches_disk, test_air6_007_preview_hash_is_of_draft_not_input
+007d | AC-007 | 타일 해시를 메모리 사본에서 계산 | RED=YES failed=1 | test_air6_007_tile_hash_is_computed_from_disk
+007e | AC-007 | >= 로 넘침 판정 | RED=YES failed=3 | test_air6_007_complete_index_matches_disk, test_air6_007_horizontal_overflow_is_strictly_greater[390-False], test_air6_007_horizontal_overflow_is_strictly_greater[391-True]
+008a | AC-008 | 타일 상한 없음 | RED=YES failed=2 | test_air6_008_tile_cap_boundary[47041-too_tall-0], test_air6_008_tile_cap_boundary[100000-too_tall-0]
+008a2 | AC-008 | 상한 경계 오류(>=) | RED=YES failed=1 | test_air6_008_tile_cap_boundary[47040-ok-30]
+008b | AC-008 | 상한 초과 때 앞 TILE_CAP개만 저장 | RED=YES failed=2 | test_air6_008_tile_cap_boundary[47041-too_tall-0], test_air6_008_tile_cap_boundary[100000-too_tall-0]
+008c | AC-008 | 예산 미적용 | RED=YES failed=2 | test_air6_008_budget_exceeded[desktop-statuses0-failed], test_air6_008_budget_exceeded[mobile-statuses1-partial]
+008d | AC-008 | 타일 크기 상한 없음 | RED=YES failed=1 | test_air6_008_tile_over_size_limit_fails_viewport
+008d2 | AC-008 | 크기 경계 오류(>=) | RED=YES failed=1 | test_air6_008_tile_at_size_limit_is_accepted
+008e | AC-008 | 임시 프로필을 성공 경로에서만 삭제 | RED=YES failed=4 | test_air6_008_budget_exceeded[desktop-statuses0-failed], test_air6_008_budget_exceeded[mobile-statuses1-partial], test_air6_008_driver_start_failure_is_recorded_and_cleaned, test_air6_002_cancel_kills
+008f | AC-008 | 실패 뷰포트의 부분 타일 미정리 | RED=YES failed=1 | test_air6_008_tile_over_size_limit_fails_viewport
+002b | AC-002 | 브라우저 프로세스 하나만 종료(그룹 아님) | RED=YES failed=7 | test_air6_008_budget_exceeded[desktop-statuses0-failed], test_air6_008_budget_exceeded[mobile-statuses1-partial], test_air6_008_group_and_profile_cleaned_on_every_path[ok], test_air6_008_group_and_pro
+002c | AC-002 | 취소 때 브라우저를 정리하지 않음 | RED=YES failed=7 | test_air6_008_budget_exceeded[desktop-statuses0-failed], test_air6_008_budget_exceeded[mobile-statuses1-partial], test_air6_008_group_and_profile_cleaned_on_every_path[ok], test_air6_008_group_and_pro
+009a | AC-009 | 브라우저 인자에 비허용 문자열 추가 | RED=YES failed=1 | test_air6_009_argv_only_fixed_strings_and_server_values
+009b | AC-009 | 스크립트 비활성 호출 누락 | RED=YES failed=2 | test_air6_006_target_viewports_and_tiles, test_air6_009_scripts_off_and_all_network_blocked
+009c | AC-009 | 네트워크 차단 누락 | RED=YES failed=1 | test_air6_009_scripts_off_and_all_network_blocked
+009d | AC-009 | 디버깅 주소 0.0.0.0 | RED=YES failed=1 | test_air6_009_argv_only_fixed_strings_and_server_values
+009e | AC-009 | 글꼴 호스트 예외 허용 | RED=YES failed=1 | test_air6_009_scripts_off_and_all_network_blocked
+010a | AC-010 | 환경 변수 무시 | RED=YES failed=24 | test_air6_006_target_viewports_and_tiles, test_air6_007_complete_index_matches_disk, test_air6_007_outcome_by_viewport_status[errors0-partial-statuses0], test_air6_007_outcome_by_viewport_status[error
+010b | AC-010 | 잘못된 변수일 때 캐시로 폴백 | RED=YES failed=1 | test_air6_010_bad_env_variable_does_not_fall_back
+010c | AC-010 | 후보 없음일 때 예외 | RED=YES failed=2 | test_air6_007_no_browser_is_unavailable, test_air6_010_path_and_chrome_app_are_not_searched
+010d | AC-010 | 빌드 번호를 문자열로 비교 | RED=YES failed=1 | test_air6_010_highest_numeric_build_in_playwright_cache
+010d2 | AC-010 | 첫 후보를 선택(최고 빌드 아님) | RED=YES failed=1 | test_air6_010_highest_numeric_build_in_playwright_cache
+010e | AC-010 | PATH 탐색 | RED=YES failed=1 | test_air6_010_path_and_chrome_app_are_not_searched
+restored-sha-match: True

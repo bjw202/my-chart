@@ -1,0 +1,37 @@
+/Users/byunjungwon/Dev/my-project-01/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+tiles generated 33 (desktop 13, mobile 20)
+== TIMING (N10e/G5): rc 0 timed_out False wall_s 28.81 Read pairs 33 of 33
+per-Read tool_use->tool_result s: min 0.00 max 0.04 mean 0.02
+first Read use t=2.24, last Read result t=14.33, span 12.09
+is_error values: ['ABSENT']
+result usage: {'duration_ms': 27706, 'num_turns': 34, 'total_cost_usd': 0.2937038, 'usage': {'input_tokens': 4, 'cache_creation_input_tokens': 61416, 'cache_read_input_tokens': 33518, 'output_tokens': 4468, 'output_tokens_details': {'thinking_tokens': 0}, 'server_tool_use': {'web_search_requests': 0, 'web_fetch_requests': 0}, 'service_tier': 'standard', 'cache_creation': {'ephemeral_1h_input_tokens': 61416, 'ephemeral_5m_input_tokens': 0}, 'inference_geo': 'global', 'iterations': [{'input_tokens': 2, 'output_tokens': 1462, 'cache_read_input_tokens': 21187, 'cache_creation_input_tokens': 52560, 'cache_creation': {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 52560}, 'type': 'message'}], 'speed': 'standard', 'fallback_credit': None}}
+stderr: Ignoring 9 permissions.allow entries from .claude/settings.json: this workspace has not been trusted. Run Claude Code interactively here once and accept the trust dialog, or set projects["/Users/byunjungwon/.goose-harness"].hasTrustDialogAccepted: true in /Users/byunjungwon/.claude.json.
+
+final reply head: 33개 파일을 모두 열었습니다. 열지 못한 파일은 없습니다. 각 파일에서 가장 크게 보이는 제목은 다음과 같습니다.
+
+**데스크톱**
+- desktop-01: 롯데에너지머티리얼즈
+- desktop-02: 02. 실적의 변화
+- desktop-03: 03. 이익의 구성과 반복 가능성
+- desktop-04: 04. 재무 여력·현금흐름
+- desktop-05: 05. 산업·경쟁사·성장 가설과 반증
+- desktop-06: 06. 공시·뉴스·최근 사건
+- desktop-07: 08. 시나리오·판단 변경 조건
+- desktop-08: 관심
+timing dir removed: True
+== WRITE/EDIT PROBE: rc 0 wall_s 8.36
+  tool Write /Users/byunjungwon/.goose-harness/runs/t18-m1-canary-writeprobe-20261021-185124/probe.txt -> ABSENT File created successfully at: /Users/byunjungwon/.goose-harness/runs/t18-m1-canary-writeprobe-20261021-185124/probe.txt (file state is current in your context —
+  tool Edit /Users/byunjungwon/.goose-harness/runs/t18-m1-canary-writeprobe-20261021-185124/probe.txt -> ABSENT The file /Users/byunjungwon/.goose-harness/runs/t18-m1-canary-writeprobe-20261021-185124/probe.txt has been updated successfully. (file state is current in your
+  tool Read /Users/byunjungwon/.goose-harness/runs/t18-m1-canary-writeprobe-20261021-185124/probe.txt -> ABSENT 1	world
+  file exists after: True world
+  stderr: Ignoring 9 permissions.allow entries from .claude/settings.json: this workspace has not been trusted. Run Claude Code interactively here once and accept the trust dialog, or set projects["/Users/byunjungwon/.goose-harness"].hasTrustDialogAccepted: true in /Users/byunjungwon/.claude.json.
+
+  reply: 쓰기 권한 점검이 모두 성공했습니다.
+
+- Write: `probe.txt`를 'hello' 내용으로 만들었습니다.
+- Edit: 'hello'를 'world'로 바꿨습니다.
+- Read: 다시 읽은 파일 내용은 `world`입니다.
+
+실패한 도구는 없습니다.
+write-probe dir removed: True

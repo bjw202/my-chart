@@ -1,0 +1,8 @@
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_marker_sentence_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_never_write_review_record_sentence_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_number_collision_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_stale_nine_label_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_stale_in_text_reference_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_021_instructions_carry_render_difference_marker_requirement
+FAILED backend/tests/test_goose_harness.py::test_air6_021_d7_missing_marker_consequence_is_stated
+10 failed, 538 passed, 214 deselected, 1 warning in 29.71s

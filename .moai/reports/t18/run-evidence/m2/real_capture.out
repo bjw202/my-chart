@@ -1,0 +1,95 @@
+/Users/byunjungwon/Dev/my-project-01/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+{
+ "schema_version": 1,
+ "source": "draft/report.html",
+ "preview_sha256": "4d4ff5612ad5d1f338f1f305a94da19aa251179f348be025956104a2b0ac67c3",
+ "started_at": "2026-10-21T19:05:49+09:00",
+ "finished_at": "2026-10-21T19:05:49+09:00",
+ "outcome": "complete",
+ "browser": {
+  "name": "HeadlessChrome",
+  "version": "153.0.8010.12",
+  "path_kind": "playwright_cache"
+ },
+ "viewports": [
+  {
+   "name": "desktop",
+   "width": 1280,
+   "status": "ok",
+   "error": null,
+   "metrics": {
+    "scroll_width": 1280,
+    "client_width": 1280,
+    "scroll_height": 4200,
+    "horizontal_overflow": false
+   },
+   "tiles": [
+    {
+     "file": "desktop-01.png",
+     "y": 0,
+     "width": 1280,
+     "height": 1568,
+     "bytes": 34504,
+     "sha256": "8575086ff6679f0add3359c2ecd3f16997d25a516d12c268052bb3e0cc3b72df"
+    },
+    {
+     "file": "desktop-02.png",
+     "y": 1568,
+     "width": 1280,
+     "height": 1568,
+     "bytes": 32794,
+     "sha256": "39324e8aa0cbaa70757cc2fe5a1d3b71a22b56de8bb599699a59441f35134555"
+    },
+    {
+     "file": "desktop-03.png",
+     "y": 3136,
+     "width": 1280,
+     "height": 1064,
+     "bytes": 22375,
+     "sha256": "be47c03901210984953cfdeb3057e15a772332084afd7520493616703186041c"
+    }
+   ]
+  },
+  {
+   "name": "mobile",
+   "width": 390,
+   "status": "ok",
+   "error": null,
+   "metrics": {
+    "scroll_width": 980,
+    "client_width": 980,
+    "scroll_height": 4200,
+    "horizontal_overflow": false
+   },
+   "tiles": [
+    {
+     "file": "mobile-01.png",
+     "y": 0,
+     "width": 390,
+     "height": 1568,
+     "bytes": 18660,
+     "sha256": "aea18ec9c931963edf40e5c9b6c5f7accf6f8bc9f062909cfcbf1dffdd737a9a"
+    },
+    {
+     "file": "mobile-02.png",
+     "y": 1568,
+     "width": 390,
+     "height": 1568,
+     "bytes": 17523,
+     "sha256": "864ab7fded0d21d1347dc889bba143c79429df5b6ece9c231f2c7f582a75c0c7"
+    },
+    {
+     "file": "mobile-03.png",
+     "y": 3136,
+     "width": 390,
+     "height": 1064,
+     "bytes": 11802,
+     "sha256": "5cef57f2deaa22b60db40fc8d961a56a5326d3829c362185e72f8c7bffe26834"
+    }
+   ]
+  }
+ ]
+}
+FILES ['desktop-01.png', 'desktop-02.png', 'desktop-03.png', 'index.json', 'mobile-01.png', 'mobile-02.png', 'mobile-03.png']
+JOB /var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/m2-real-5almccm4

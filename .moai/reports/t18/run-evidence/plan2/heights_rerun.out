@@ -1,0 +1,9 @@
+drafts 4
+1d261a37 917991 desktop {'sw': 1280, 'cw': 1280, 'sh': 9807} tiles 7
+1d261a37 917991 mobile {'sw': 390, 'cw': 390, 'sh': 15047} tiles 10
+5695985a 915909 desktop {'sw': 1280, 'cw': 1280, 'sh': 9053} tiles 6
+5695985a 915909 mobile {'sw': 390, 'cw': 390, 'sh': 14169} tiles 10
+a5becbb9 1043346 desktop {'sw': 1280, 'cw': 1280, 'sh': 20160} tiles 13
+a5becbb9 1043346 mobile {'sw': 390, 'cw': 390, 'sh': 30803} tiles 20
+d0a64dfc 943631 desktop {'sw': 1280, 'cw': 1280, 'sh': 12066} tiles 8
+d0a64dfc 943631 mobile {'sw': 390, 'cw': 390, 'sh': 18797} tiles 12

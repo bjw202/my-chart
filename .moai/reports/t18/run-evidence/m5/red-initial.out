@@ -1,0 +1,20 @@
+
+    def test_air6_021_d7_missing_marker_consequence_is_stated():
+        """D7: 표지 누락의 결과는 한 가지 — 서버가 최종본으로 인정하지 않는다."""
+>       assert "표지가 없으면 최종본이 되지 않는다" in _split_rules(_real_text())[10]
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 10
+
+backend/tests/test_goose_harness.py:680: KeyError
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_harness.py::test_air6_013_rule7_forbids_first_session_review_record_and_final
+FAILED backend/tests/test_goose_harness.py::test_air6_013_review_rule_is_rule_10_after_naver_rule_9
+FAILED backend/tests/test_goose_harness.py::test_air6_013_rule10_applies_only_to_sessions_declared_as_review_session
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_marker_sentence_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_dropping_never_write_review_record_sentence_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_number_collision_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_stale_nine_label_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_013_mutation_stale_in_text_reference_is_detected
+FAILED backend/tests/test_goose_harness.py::test_air6_021_instructions_carry_render_difference_marker_requirement
+FAILED backend/tests/test_goose_harness.py::test_air6_021_d7_missing_marker_consequence_is_stated
+10 failed, 4 passed, 32 deselected in 0.11s

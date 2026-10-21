@@ -1,0 +1,10 @@
+cutoff 2026-10-21T13:15:00+09:00 mode current
+search dart read 2026-10-21T13:10:00.391+09:00
+search original_news read 2026-10-21T13:11:00+09:00
+search original_news read 2026-10-21T13:11:40+09:00
+search original_news read 2026-10-21T13:11:00+09:00
+search industry read 2026-10-21T13:11:30+09:00
+search company_ir read 2026-10-21T13:13:30+09:00
+search naver blocked 2026-10-21T13:13:00+09:00
+live-as-is    revise ['LATEST_SEARCH_NAVER']
+patched-naver pass []

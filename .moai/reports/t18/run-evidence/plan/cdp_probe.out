@@ -1,0 +1,6 @@
+ws_found True t= 0.29
+desktop {'sw': 1280, 'cw': 1280, 'sh': 20160}
+desktop png_bytes 3862473
+mobile {'sw': 390, 'cw': 390, 'sh': 30683}
+mobile png_bytes 3530677
+done t= 7.86

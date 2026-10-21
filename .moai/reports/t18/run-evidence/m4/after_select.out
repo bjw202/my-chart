@@ -1,0 +1,131 @@
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 49%]
+........................................................................ [ 66%]
+...................F.................................................... [ 83%]
+...................F.....F.............................................. [ 99%]
+.                                                                        [100%]
+=================================== FAILURES ===================================
+___________________________ test_select_report_rules ___________________________
+
+gr = <module 'backend.services.goose_runner' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_runner.py'>
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-866/test_select_report_rules0')
+
+    def test_select_report_rules(gr, tmp_path):
+        job = tmp_path / "job"
+        assert gr.select_report(job) is None
+        _write(job / "draft" / "report.html", "<d>")
+        assert gr.select_report(job) == ("draft", job / "draft")
+        # final 폴더가 있어도 delivery_allowed가 참이 아니면 draft
+        _write(job / "final" / "report.html", "<f>")
+        _write(job / "final" / "render-validation.json", '{"delivery_allowed": false}')
+        assert gr.select_report(job) == ("draft", job / "draft")
+        _write(job / "final" / "render-validation.json", "{broken")
+        assert gr.select_report(job) == ("draft", job / "draft")
+        _write(job / "final" / "render-validation.json", '{"delivery_allowed": "true"}')
+        assert gr.select_report(job) == ("draft", job / "draft")
+        _write(job / "final" / "render-validation.json", '{"delivery_allowed": true}')
+>       assert gr.select_report(job) == ("final", job / "final")
+E       AssertionError: assert ('draft', Pos...0/job/draft')) == ('final', Pos...0/job/final'))
+E         
+E         At index 0 diff: 'draft' != 'final'
+E         Use -v to get more diff
+
+backend/tests/test_goose_runner.py:419: AssertionError
+____________________ test_ac014_final_judgement_fixtures[a] ____________________
+
+env = namespace(real=namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_cha...gwon/pytest-866/test_ac014_final_judgement_fix0/reports/하나기술'), service=<function env.<locals>.service at 0x110206980>)
+name = 'a'
+body = 'mkdir -p "$JOB/final"\nprintf "<html>FINAL</html>" > "$JOB/final/report.html"\nprintf \'{"delivery_allowed": true}\' ...alidation.json"\nprintf "{}" > "$JOB/draft/report-input.json"\nprintf "[]" > "$JOB/draft/source-ledger.json"\nexit 0\n'
+timeout = 30.0, cancel = False, status = 'done', kind = None, source = 'final'
+delivery = 'final', interrupted = False
+
+    @pytest.mark.parametrize(
+        "name,body,timeout,cancel,status,kind,source,delivery,interrupted",
+        _AC014, ids=[row[0] for row in _AC014],
+    )
+    async def test_ac014_final_judgement_fixtures(
+        env, name, body, timeout, cancel, status, kind, source, delivery, interrupted
+    ):
+        svc = env.service(_runner(env, body, timeout=timeout))
+        job = (await svc.start("299030", "하나기술")).job
+        job_dir = env.runs / job.job_id
+        if cancel:
+            await _wait_file(job_dir / ".ready")
+            await svc.cancel(job.job_id)
+        await _finish(job)
+    
+        assert (job.status, job.error_kind) == (status, kind)
+        runs = _archive_runs(env.stock_dir)
+        last = job.events[-1]
+        assert last.type == status
+        if source is None:  # (d) 선택되는 리포트 없음 → 보관 폴더를 만들지 않는다
+            assert runs == []
+            assert "run" not in last.data
+            assert [i for i in await _history(env) if i["kind"] == "goose"] == []
+            return
+    
+        assert [p.name for p in runs] == ["2026-10-19"]
+        run_dir = runs[0]
+>       assert (run_dir / "report.html").read_bytes() == (job_dir / source / "report.html").read_bytes()
+E       AssertionError: assert b'<html>DRAFT</html>' == b'<html>FINAL</html>'
+E         
+E         At index 6 diff: b'D' != b'F'
+E         Use -v to get more diff
+
+backend/tests/test_goose_storage.py:250: AssertionError
+____________________ test_ac014_final_judgement_fixtures[g] ____________________
+
+env = namespace(real=namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_cha...gwon/pytest-866/test_ac014_final_judgement_fix6/reports/하나기술'), service=<function env.<locals>.service at 0x110212520>)
+name = 'g'
+body = 'mkdir -p "$JOB/final"\nprintf "<html>FINAL</html>" > "$JOB/final/report.html"\nprintf \'{"delivery_allowed": true}\' ... "{}" > "$JOB/draft/report-input.json"\nprintf "[]" > "$JOB/draft/source-ledger.json"\ntouch "$JOB/.ready"\nsleep 30\n'
+timeout = 1.0, cancel = False, status = 'error', kind = 'timeout'
+source = 'final', delivery = 'final', interrupted = True
+
+    @pytest.mark.parametrize(
+        "name,body,timeout,cancel,status,kind,source,delivery,interrupted",
+        _AC014, ids=[row[0] for row in _AC014],
+    )
+    async def test_ac014_final_judgement_fixtures(
+        env, name, body, timeout, cancel, status, kind, source, delivery, interrupted
+    ):
+        svc = env.service(_runner(env, body, timeout=timeout))
+        job = (await svc.start("299030", "하나기술")).job
+        job_dir = env.runs / job.job_id
+        if cancel:
+            await _wait_file(job_dir / ".ready")
+            await svc.cancel(job.job_id)
+        await _finish(job)
+    
+        assert (job.status, job.error_kind) == (status, kind)
+        runs = _archive_runs(env.stock_dir)
+        last = job.events[-1]
+        assert last.type == status
+        if source is None:  # (d) 선택되는 리포트 없음 → 보관 폴더를 만들지 않는다
+            assert runs == []
+            assert "run" not in last.data
+            assert [i for i in await _history(env) if i["kind"] == "goose"] == []
+            return
+    
+        assert [p.name for p in runs] == ["2026-10-19"]
+        run_dir = runs[0]
+>       assert (run_dir / "report.html").read_bytes() == (job_dir / source / "report.html").read_bytes()
+E       AssertionError: assert b'<html>DRAFT</html>' == b'<html>FINAL</html>'
+E         
+E         At index 6 diff: b'D' != b'F'
+E         Use -v to get more diff
+
+backend/tests/test_goose_storage.py:250: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  backend.services.goose_runner:goose_runner.py:492 goose 작업 3bbfb828f9af4b45aab2deb66e14cad2 시간 초과(1.0초) — 프로세스 그룹 종료
+=============================== warnings summary ===============================
+../../../../../my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4
+  /Users/byunjungwon/Dev/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_runner.py::test_select_report_rules - Asserti...
+FAILED backend/tests/test_goose_storage.py::test_ac014_final_judgement_fixtures[a]
+FAILED backend/tests/test_goose_storage.py::test_ac014_final_judgement_fixtures[g]
+3 failed, 430 passed, 214 deselected, 1 warning in 25.69s

@@ -1,0 +1,5 @@
+005c-review-exception-propagates-both-layers [AC-005] RED rc=1 | 1 failed, 83 deselected in 0.15s
+014k-launch-despite-delete-failure [AC-014] RED rc=1 | 1 failed, 82 deselected in 0.13s
+015f-keep-session-receipt-both-removals [AC-015] RED rc=1 | 1 failed, 83 deselected in 0.13s
+restored-sha-match: True
+RED: 3 STILL-GREEN: [] NOT-APPLIED: []

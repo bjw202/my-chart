@@ -1,0 +1,305 @@
+{
+ "attempt": "1",
+ "canary_dir": "t18-m1-canary-20261021-185029",
+ "rc": 0,
+ "timed_out": false,
+ "elapsed_s": 8.47,
+ "tokens_exposed_in_input": [],
+ "a_body_tokens_quoted": true,
+ "b_all_tiles_read_pair": true,
+ "c_clip_ok": true,
+ "verdict": "GO",
+ "quoted": {
+  "desktop.body": {
+   "token": "FJMP2E",
+   "px": 17,
+   "in_reply_exact": true,
+   "expected_tile": "desktop-02.png"
+  },
+  "desktop.s1": {
+   "token": "CKNYYU",
+   "px": 12,
+   "in_reply_exact": true,
+   "expected_tile": "desktop-02.png"
+  },
+  "desktop.s2": {
+   "token": "UWKUMU",
+   "px": 9,
+   "in_reply_exact": true,
+   "expected_tile": "desktop-02.png"
+  },
+  "mobile.body": {
+   "token": "WR9EA3",
+   "px": 17,
+   "in_reply_exact": true,
+   "expected_tile": "mobile-02.png"
+  },
+  "mobile.s1": {
+   "token": "A9NVX6",
+   "px": 12,
+   "in_reply_exact": true,
+   "expected_tile": "mobile-02.png"
+  },
+  "mobile.s2": {
+   "token": "NWHGUV",
+   "px": 9,
+   "in_reply_exact": true,
+   "expected_tile": "mobile-02.png"
+  }
+ },
+ "reply": "여섯 파일을 모두 열어 읽었습니다. `desktop-01.png`, `desktop-03.png`, `mobile-01.png`, `mobile-03.png`에는 토큰이 없습니다. `desktop-02.png`와 `mobile-02.png`에는 각각 3개씩 있습니다. 작은 글씨 토큰(`UWKUMU`, `NWHGUV`)은 해상도가 낮아 읽기 어려웠지만 보이는 대로 옮겼습니다.\n\n```json\n{\n  \"desktop-01.png\": [],\n  \"desktop-02.png\": [\"FJMP2E\", \"CKNYYU\", \"UWKUMU\"],\n  \"desktop-03.png\": [],\n  \"mobile-01.png\": [],\n  \"mobile-02.png\": [\"WR9EA3\", \"A9NVX6\", \"NWHGUV\"],\n  \"mobile-03.png\": []\n}\n```",
+ "answer_json": {
+  "desktop-01.png": [],
+  "desktop-02.png": [
+   "FJMP2E",
+   "CKNYYU",
+   "UWKUMU"
+  ],
+  "desktop-03.png": [],
+  "mobile-01.png": [],
+  "mobile-02.png": [
+   "WR9EA3",
+   "A9NVX6",
+   "NWHGUV"
+  ],
+  "mobile-03.png": []
+ },
+ "read_pairs": [
+  {
+   "tile": "desktop-01.png",
+   "pairs": [
+    {
+     "id": "toolu_01W4J9nV9AuC3aZBix77KsJd",
+     "file_path": "/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/desktop-01.png",
+     "t_use": 2.36,
+     "result": {
+      "is_error": "ABSENT",
+      "content_kinds": [
+       "image"
+      ],
+      "t": 2.38
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tile": "desktop-02.png",
+   "pairs": [
+    {
+     "id": "toolu_01BoGoJYFUGDwkcLgXmiHUNG",
+     "file_path": "/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/desktop-02.png",
+     "t_use": 2.71,
+     "result": {
+      "is_error": "ABSENT",
+      "content_kinds": [
+       "image"
+      ],
+      "t": 2.73
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tile": "desktop-03.png",
+   "pairs": [
+    {
+     "id": "toolu_018RSKq53WJpF85CGrxnHvxX",
+     "file_path": "/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/desktop-03.png",
+     "t_use": 3.07,
+     "result": {
+      "is_error": "ABSENT",
+      "content_kinds": [
+       "image"
+      ],
+      "t": 3.08
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tile": "mobile-01.png",
+   "pairs": [
+    {
+     "id": "toolu_015JRy9Sm7KvNpkPg3q8KpHU",
+     "file_path": "/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/mobile-01.png",
+     "t_use": 3.45,
+     "result": {
+      "is_error": "ABSENT",
+      "content_kinds": [
+       "image"
+      ],
+      "t": 3.47
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tile": "mobile-02.png",
+   "pairs": [
+    {
+     "id": "toolu_01VSGErW17K8np3UwRsmgKy3",
+     "file_path": "/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/mobile-02.png",
+     "t_use": 3.8,
+     "result": {
+      "is_error": "ABSENT",
+      "content_kinds": [
+       "image"
+      ],
+      "t": 3.82
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tile": "mobile-03.png",
+   "pairs": [
+    {
+     "id": "toolu_01EJX535eomF8pMTrn3Zma84",
+     "file_path": "/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/mobile-03.png",
+     "t_use": 4.39,
+     "result": {
+      "is_error": "ABSENT",
+      "content_kinds": [
+       "image"
+      ],
+      "t": 4.41
+     }
+    }
+   ],
+   "ok": true
+  }
+ ],
+ "clip_rows": [
+  [
+   "desktop",
+   "desktop-02.png",
+   1568,
+   1568,
+   1568,
+   "7c94770953e4",
+   "!= y0:38fc1d611942",
+   true
+  ],
+  [
+   "desktop",
+   "desktop-03.png",
+   3136,
+   1064,
+   1064,
+   "9a7ada66c6f3",
+   "!= y0:38fc1d611942",
+   true
+  ],
+  [
+   "mobile",
+   "mobile-02.png",
+   1568,
+   1568,
+   1568,
+   "a1c26dafcb47",
+   "!= y0:45fb400e8a4f",
+   true
+  ],
+  [
+   "mobile",
+   "mobile-03.png",
+   3136,
+   1064,
+   1064,
+   "1cd355c23196",
+   "!= y0:45fb400e8a4f",
+   true
+  ]
+ ],
+ "min_px_quoted_correctly": 9,
+ "capture_meta": {
+  "block": "ok",
+  "script_off": "ok",
+  "browser_build": 1243,
+  "desktop": {
+   "sw": 1280,
+   "cw": 1280,
+   "sh": 4200,
+   "fs": "16px",
+   "ff": "\"Pretendard Variable\", Pretendard, -apple-system, \"system-ui\", \"Apple SD Gothic Neo\", sans-serif"
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 4200,
+   "fs": "16px",
+   "ff": "\"Pretendard Variable\", Pretendard, -apple-system, \"system-ui\", \"Apple SD Gothic Neo\", sans-serif"
+  }
+ },
+ "tiles": {
+  "desktop": [
+   {
+    "file": "desktop-01.png",
+    "y": 0,
+    "req_h": 1568,
+    "png_w": 1280,
+    "png_h": 1568,
+    "sha256": "38fc1d611942a37bbec49d7f463cdb41a3b213084bd70309a17d5d1f0977debe",
+    "bytes": 17772
+   },
+   {
+    "file": "desktop-02.png",
+    "y": 1568,
+    "req_h": 1568,
+    "png_w": 1280,
+    "png_h": 1568,
+    "sha256": "7c94770953e47a3bd40f947ccf3b5f6e0118338ad909d53cf461c49d60c7ce7e",
+    "bytes": 14986
+   },
+   {
+    "file": "desktop-03.png",
+    "y": 3136,
+    "req_h": 1064,
+    "png_w": 1280,
+    "png_h": 1064,
+    "sha256": "9a7ada66c6f3c1403395179ce6a4c69143c1ed602525a20332e078c70edf14a1",
+    "bytes": 8586
+   }
+  ],
+  "mobile": [
+   {
+    "file": "mobile-01.png",
+    "y": 0,
+    "req_h": 1568,
+    "png_w": 390,
+    "png_h": 1568,
+    "sha256": "45fb400e8a4fc8d7d7d7ed07254f625f5c39821e8e2d792736c3661fc6418557",
+    "bytes": 13397
+   },
+   {
+    "file": "mobile-02.png",
+    "y": 1568,
+    "req_h": 1568,
+    "png_w": 390,
+    "png_h": 1568,
+    "sha256": "a1c26dafcb470e856982c38a5f38742050fb37ea074b453ad15ed489d36c626e",
+    "bytes": 11820
+   },
+   {
+    "file": "mobile-03.png",
+    "y": 3136,
+    "req_h": 1064,
+    "png_w": 390,
+    "png_h": 1064,
+    "sha256": "1cd355c23196a8e35f70884c20d60bba98ef804c09366c71111fb2fbfdf18dc0",
+    "bytes": 5720
+   }
+  ]
+ },
+ "tool_use_names": [
+  "Read"
+ ],
+ "stderr_tail": [
+  "Ignoring 9 permissions.allow entries from .claude/settings.json: this workspace has not been trusted. Run Claude Code interactively here once and accept the trust dialog, or set projects[\"/Users/byunjungwon/.goose-harness\"].hasTrustDialogAccepted: true in /Users/byunjungwon/.claude.json."
+ ]
+}

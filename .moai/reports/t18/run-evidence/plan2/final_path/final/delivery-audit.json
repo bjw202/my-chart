@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "decision": "pass",
+  "delivery_allowed": true,
+  "input_sha256": "db8d72bfe5ccb72850d4a63a75d7332cbab49db1f912f7832f07180745648aca",
+  "preview_sha256": "583cd2f2886436e9f40587e939f1825762810f4bf6abad8a37febbd2d4fd69aa",
+  "checked_at": "2026-10-21T08:36:53.287975+00:00",
+  "review": {
+    "reviewed_at": "2026-10-21T08:36:53.176699+00:00",
+    "mode": "separate_review_pass",
+    "checks": {
+      "source_accuracy": {
+        "status": "pass",
+        "evidence": "synthetic probe"
+      },
+      "calculations": {
+        "status": "pass",
+        "evidence": "synthetic probe"
+      },
+      "coverage": {
+        "status": "pass",
+        "evidence": "synthetic probe"
+      },
+      "opinion": {
+        "status": "pass",
+        "evidence": "synthetic probe"
+      },
+      "visual": {
+        "status": "pass",
+        "evidence": "synthetic probe"
+      }
+    },
+    "issues": []
+  },
+  "findings": [],
+  "scope": "Local completeness and evidence-record consistency checks plus supplied editorial review. Not proof of factual truth or independent execution."
+}

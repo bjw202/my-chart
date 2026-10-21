@@ -1,0 +1,1083 @@
+FFF.FFFFFFFFFFFFFFFFFFFFFFFFFFFF                                         [100%]
+=================================== FAILURES ===================================
+_______________ test_air6_001_order_and_runs_outside_start_lock ________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_001_order_and_runs_o0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a3c49d0>
+
+    async def test_air6_001_order_and_runs_outside_start_lock(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, shot_kw={"wait": True})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_001_order_and_runs_o0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a24f380>
+integrity = <function _order_integrity.<locals>.check at 0x10a1dcf40>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a3c49d0>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x10a24f8c0>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a24f770>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+___________ test_air6_001_second_integrity_failure_launches_nothing ____________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_001_second_integrity0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2f7e30>
+
+    async def test_air6_001_second_integrity_failure_launches_nothing(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, integrity_fail_on=2)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1163: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_001_second_integrity0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a415e50>
+integrity = <function _order_integrity.<locals>.check at 0x10a058180>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2f7e30>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x10a060b90>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a060a50>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+___________________ test_air6_001_no_draft_launches_nothing ____________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_001_no_draft_launche0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0a9260>
+
+    async def test_air6_001_no_draft_launches_nothing(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, runner_kw={"make_draft": False})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1172: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_001_no_draft_launche0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a0607d0>
+integrity = <function _order_integrity.<locals>.check at 0x10a13b7e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0a9260>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x10a062990>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a062850>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+________________ test_air6_001_production_service_injects_both _________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+
+    async def test_air6_001_production_service_injects_both(mods):
+        svc = mods.gjs.get_service()
+>       assert svc._screenshotter is not None and svc._reviewer is not None
+               ^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'GooseJobService' object has no attribute '_screenshotter'
+
+backend/tests/test_goose_job_service.py:1188: AttributeError
+___________ test_air6_002_cancel_during_post_processing[cancel-shot] ___________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109fa4830>
+variant = 'shot', how = 'cancel'
+
+    @pytest.mark.parametrize("variant", ["shot", "review"])
+    @pytest.mark.parametrize("how", ["cancel", "shutdown"])
+    async def test_air6_002_cancel_during_post_processing(mods, tmp_path, monkeypatch, variant, how):
+        kw = {"shot_kw": {"wait": True}} if variant == "shot" else {"rev_kw": {"mode": "wait"}}
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109fc2b10>
+integrity = <function _order_integrity.<locals>.check at 0x109f52fc0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109fa4830>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109f52f20>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109fc2d70>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109fc2c40>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+__________ test_air6_002_cancel_during_post_processing[cancel-review] __________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0087d0>
+variant = 'review', how = 'cancel'
+
+    @pytest.mark.parametrize("variant", ["shot", "review"])
+    @pytest.mark.parametrize("how", ["cancel", "shutdown"])
+    async def test_air6_002_cancel_during_post_processing(mods, tmp_path, monkeypatch, variant, how):
+        kw = {"shot_kw": {"wait": True}} if variant == "shot" else {"rev_kw": {"mode": "wait"}}
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po1')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a0f7770>
+integrity = <function _order_integrity.<locals>.check at 0x109fa28e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0087d0>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109fa1f80>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x10a0f6330>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a0f7650>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+__________ test_air6_002_cancel_during_post_processing[shutdown-shot] __________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0ca780>
+variant = 'shot', how = 'shutdown'
+
+    @pytest.mark.parametrize("variant", ["shot", "review"])
+    @pytest.mark.parametrize("how", ["cancel", "shutdown"])
+    async def test_air6_002_cancel_during_post_processing(mods, tmp_path, monkeypatch, variant, how):
+        kw = {"shot_kw": {"wait": True}} if variant == "shot" else {"rev_kw": {"mode": "wait"}}
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po2')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a0a87c0>
+integrity = <function _order_integrity.<locals>.check at 0x10a0859e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0ca780>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x10a086160>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x10a0a8380>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a0a85a0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_________ test_air6_002_cancel_during_post_processing[shutdown-review] _________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a085130>
+variant = 'review', how = 'shutdown'
+
+    @pytest.mark.parametrize("variant", ["shot", "review"])
+    @pytest.mark.parametrize("how", ["cancel", "shutdown"])
+    async def test_air6_002_cancel_during_post_processing(mods, tmp_path, monkeypatch, variant, how):
+        kw = {"shot_kw": {"wait": True}} if variant == "shot" else {"rev_kw": {"mode": "wait"}}
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_during_po3')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a263ac0>
+integrity = <function _order_integrity.<locals>.check at 0x109a4a340>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a085130>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109a49d00>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x10a262e00>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a263350>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_____________ test_air6_002_cancel_kills_real_review_process_group _____________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_kills_rea0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a189c70>
+
+    async def test_air6_002_cancel_kills_real_review_process_group(mods, tmp_path, monkeypatch):
+        environ = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path / "home"),
+                   "AI_REPORT_GOOSE_HARNESS_DIR": str(tmp_path)}
+        (tmp_path / "runs").mkdir(exist_ok=True)
+        order: list = []
+        shot = FakeShot(order)
+        reviewer = functools.partial(mods.gr.run_review, environ=environ, claude_bin=str(_fake_claude(tmp_path)),
+                                     grace_sec=0.5, timeout_sec=30)
+        drunner = DraftRunner(mods.gr, order, tmp_path / "runs")
+        monkeypatch.delenv(ENV_REVIEW, raising=False)
+>       svc = _service(mods, tmp_path, drunner, monkeypatch=monkeypatch, screenshotter=shot, reviewer=reviewer)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1226: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_002_cancel_kills_rea0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109f7ce50>
+integrity = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a189c70>
+kw = {'reviewer': functools.partial(<function run_review at 0x109f5d1c0>, environ={'PATH': '/usr/bin:/bin', 'HOME': '/priva...grace_sec=0.5, timeout_sec=30), 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a389f50>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_____________ test_air6_003_stage_events_exactly_once_and_ordered ______________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_stage_events_exa0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109b08e50>
+
+    async def test_air6_003_stage_events_exactly_once_and_ordered(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, runner_kw={"events": ("goose_start", "session_end")})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1243: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_stage_events_exa0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109f7ed50>
+integrity = <function _order_integrity.<locals>.check at 0x109e9a520>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109b08e50>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x109f7f650>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109f7f250>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+________________ test_air6_003_no_stage_events_when_switch_off _________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_no_stage_events_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e65160>
+
+    async def test_air6_003_no_stage_events_when_switch_off(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1257: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_no_stage_events_0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109ef0e60>
+integrity = <function _order_integrity.<locals>.check at 0x109ec1bc0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e65160>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x109f09050>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109ef27b0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_______ test_air6_003_render_final_emitted_once_for_repeated_final_runs ________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_render_final_emi0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109eb56a0>
+
+    async def test_air6_003_render_final_emitted_once_for_repeated_final_runs(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1264: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_render_final_emi0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109ef3020>
+integrity = <function _order_integrity.<locals>.check at 0x109e9a840>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109eb56a0>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x109b386e0>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b38410>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+____________ test_air6_003_other_review_tool_calls_are_not_relayed _____________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_other_review_too0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109a4dcc0>
+
+    async def test_air6_003_other_review_tool_calls_are_not_relayed(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1278: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_003_other_review_too0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109ade350>
+integrity = <function _order_integrity.<locals>.check at 0x109a70860>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109a4dcc0>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x109b3a210>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109addc50>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+__ test_air6_004_switch_off_skips_post_processing_and_writes_disabled_receipt __
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_004_switch_off_skips0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109b3e2e0>
+
+    async def test_air6_004_switch_off_skips_post_processing_and_writes_disabled_receipt(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, runner_kw={"delivery_status": "draft"}, hook=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1295: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_004_switch_off_skips0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109aedfd0>
+integrity = <function _order_integrity.<locals>.check at 0x109df8180>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109b3e2e0>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109df80e0>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109aed390>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109aedb70>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_________ test_air6_005_post_failures_end_done_with_draft[shot_raises] _________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109af6970>
+case = 'shot_raises', kw = {'shot_kw': {'raise_exc': RuntimeError('shot boom')}}
+outcome = None, screens_outcome = 'failed'
+
+    @pytest.mark.parametrize(("case", "kw", "outcome", "screens_outcome"), _FAIL_ROWS, ids=[r[0] for r in _FAIL_ROWS])
+    async def test_air6_005_post_failures_end_done_with_draft(mods, tmp_path, monkeypatch, case, kw, outcome,
+                                                              screens_outcome):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1325: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109b0ec30>
+integrity = <function _order_integrity.<locals>.check at 0x109dabb00>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109af6970>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109daba60>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109dc9710>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b0d3d0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+______ test_air6_005_post_failures_end_done_with_draft[shot_unavailable] _______
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109dc2f20>
+case = 'shot_unavailable', kw = {'shot_kw': {'outcome': 'unavailable'}}
+outcome = None, screens_outcome = 'unavailable'
+
+    @pytest.mark.parametrize(("case", "kw", "outcome", "screens_outcome"), _FAIL_ROWS, ids=[r[0] for r in _FAIL_ROWS])
+    async def test_air6_005_post_failures_end_done_with_draft(mods, tmp_path, monkeypatch, case, kw, outcome,
+                                                              screens_outcome):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1325: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en1')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109d5f050>
+integrity = <function _order_integrity.<locals>.check at 0x109d6f4c0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109dc2f20>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109d6f420>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x10a4c2a90>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109dac110>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+________ test_air6_005_post_failures_end_done_with_draft[review_raises] ________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109dc20b0>
+case = 'review_raises', kw = {'rev_kw': {'mode': 'raise'}}
+outcome = 'review_failed', screens_outcome = None
+
+    @pytest.mark.parametrize(("case", "kw", "outcome", "screens_outcome"), _FAIL_ROWS, ids=[r[0] for r in _FAIL_ROWS])
+    async def test_air6_005_post_failures_end_done_with_draft(mods, tmp_path, monkeypatch, case, kw, outcome,
+                                                              screens_outcome):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1325: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en2')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109d5d250>
+integrity = <function _order_integrity.<locals>.check at 0x109a6bba0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109dc20b0>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109a6bd80>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109b02750>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b03950>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+________ test_air6_005_post_failures_end_done_with_draft[review_exit1] _________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109af55c0>
+case = 'review_exit1', kw = {'rev_kw': {'mode': 'exit1'}}
+outcome = 'review_failed', screens_outcome = None
+
+    @pytest.mark.parametrize(("case", "kw", "outcome", "screens_outcome"), _FAIL_ROWS, ids=[r[0] for r in _FAIL_ROWS])
+    async def test_air6_005_post_failures_end_done_with_draft(mods, tmp_path, monkeypatch, case, kw, outcome,
+                                                              screens_outcome):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1325: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en3')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109b2dff0>
+integrity = <function _order_integrity.<locals>.check at 0x109a94cc0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109af55c0>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109a94d60>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109d5de50>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b2e410>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_______ test_air6_005_post_failures_end_done_with_draft[review_timeout] ________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109b3e190>
+case = 'review_timeout', kw = {'rev_kw': {'mode': 'timeout'}}
+outcome = 'timeout', screens_outcome = None
+
+    @pytest.mark.parametrize(("case", "kw", "outcome", "screens_outcome"), _FAIL_ROWS, ids=[r[0] for r in _FAIL_ROWS])
+    async def test_air6_005_post_failures_end_done_with_draft(mods, tmp_path, monkeypatch, case, kw, outcome,
+                                                              screens_outcome):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1325: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en4')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109eb3c20>
+integrity = <function _order_integrity.<locals>.check at 0x109ae5300>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109b3e190>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109ae5760>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109b00e90>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109eb3cd0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+______ test_air6_005_post_failures_end_done_with_draft[review_no_record] _______
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en5')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109a4c130>
+case = 'review_no_record', kw = {'rev_kw': {'mode': 'no_record'}}
+outcome = 'review_failed', screens_outcome = None
+
+    @pytest.mark.parametrize(("case", "kw", "outcome", "screens_outcome"), _FAIL_ROWS, ids=[r[0] for r in _FAIL_ROWS])
+    async def test_air6_005_post_failures_end_done_with_draft(mods, tmp_path, monkeypatch, case, kw, outcome,
+                                                              screens_outcome):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, **kw)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1325: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_post_failures_en5')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109e7a210>
+integrity = <function _order_integrity.<locals>.check at 0x109e79a80>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109a4c130>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109e79620>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109d5ce90>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109e7a170>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_____________ test_air6_005_unexpected_post_exception_is_fail_open _____________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_unexpected_post_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e66c80>
+
+    async def test_air6_005_unexpected_post_exception_is_fail_open(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1343: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_005_unexpected_post_0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109e75590>
+integrity = <function _order_integrity.<locals>.check at 0x109e74720>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e66c80>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109e747c0>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109e7d850>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109e75450>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_________ test_air6_014_service_planted_files_removed_before_reviewer __________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_014_service_planted_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109ea3620>
+
+    async def test_air6_014_service_planted_files_removed_before_reviewer(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, rev_kw={"mode": "no_record"})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1358: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_014_service_planted_0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109f5ceb0>
+integrity = <function _order_integrity.<locals>.check at 0x109f5cb80>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109ea3620>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109f5cc20>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109b00d10>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a0c3a40>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+________ test_air6_014_service_delete_failure_does_not_launch_reviewer _________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_014_service_delete_f0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0ccc90>
+
+    async def test_air6_014_service_delete_failure_does_not_launch_reviewer(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1378: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_014_service_delete_f0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a19a490>
+integrity = <function _order_integrity.<locals>.check at 0x10a19bce0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a0ccc90>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x10a19bba0>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109fdc590>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a0c3d10>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+__________ test_air6_015_s9a_replace_failure_removes_session_receipt ___________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_015_s9a_replace_fail0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a037d20>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x109da3b60>
+
+    async def test_air6_015_s9a_replace_failure_removes_session_receipt(mods, tmp_path, monkeypatch, caplog):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1393: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_015_s9a_replace_fail0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a1391d0>
+integrity = <function _order_integrity.<locals>.check at 0x10a1396c0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a037d20>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x10a139620>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109e7cdd0>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a189d90>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+__________ test_air6_015_s9b_removal_and_write_failure_event_is_draft __________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_015_s9b_removal_and_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109feeba0>
+
+    async def test_air6_015_s9b_removal_and_write_failure_event_is_draft(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=False)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1417: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_015_s9b_removal_and_0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a027110>
+integrity = <function _order_integrity.<locals>.check at 0x10a024360>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109feeba0>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x109fdcc50>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a0c00e0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_________ test_air6_020_1_event_and_job_json_carry_post_receipt_status _________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_1_event_and_job_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109d4f540>
+
+    async def test_air6_020_1_event_and_job_json_carry_post_receipt_status(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, runner_kw={"delivery_status": "draft"})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1441: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_1_event_and_job_0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109d514f0>
+integrity = <function _order_integrity.<locals>.check at 0x109d51800>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109d4f540>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x109d51760>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x109b03f50>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b469f0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+______________________ test_air6_020_2_no_hook_recomputes ______________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_2_no_hook_recomp0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109f05e10>
+
+    async def test_air6_020_2_no_hook_recomputes(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=False, runner_kw={"delivery_status": "draft"})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1451: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_2_no_hook_recomp0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a494f50>
+integrity = <function _order_integrity.<locals>.check at 0x10a494fe0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109f05e10>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x109d5f650>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109dedc70>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_____________ test_air6_020_3_hook_returning_empty_dict_recomputes _____________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_3_hook_returning0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e225f0>
+
+    async def test_air6_020_3_hook_returning_empty_dict_recomputes(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, runner_kw={"delivery_status": "draft"})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1457: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_3_hook_returning0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a0876b0>
+integrity = <function _order_integrity.<locals>.check at 0x10a0859e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e225f0>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x10a008650>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109f2c440>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+____________________ test_air6_020_4_not_admitted_is_draft _____________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_4_not_admitted_i0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109f04de0>
+
+    async def test_air6_020_4_not_admitted_is_draft(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, hook=True, runner_kw={"delivery_status": "final"},
+                            rev_kw={"skip_tile": "mobile-01.png"})
+
+backend/tests/test_goose_job_service.py:1464: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_4_not_admitted_i0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x10a05b4d0>
+integrity = <function _order_integrity.<locals>.check at 0x10a058360>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109f04de0>
+kw = {'on_finish': <function make_finish_hook.<locals>.hook at 0x10a0589a0>, 'reviewer': <backend.tests.test_goose_job_serv...eviewer object at 0x10a00a690>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b46f90>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+________________ test_air6_020_5_switch_off_keeps_runner_value _________________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_5_switch_off_kee0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109feec10>
+
+    async def test_air6_020_5_switch_off_keeps_runner_value(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, runner_kw={"delivery_status": "final"})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1473: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_5_switch_off_kee0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109ebc9b0>
+integrity = <function _order_integrity.<locals>.check at 0x109ebeac0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109feec10>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x10a0081d0>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x10a12fe30>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+_____________ test_air6_020_6_integrity_failure_keeps_runner_value _____________
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_6_integrity_fail0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109fefe00>
+
+    async def test_air6_020_6_integrity_failure_keeps_runner_value(mods, tmp_path, monkeypatch):
+>       ctx = _post_service(mods, tmp_path, monkeypatch, runner_kw={"delivery_status": "final"}, integrity_fail_on=2)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+backend/tests/test_goose_job_service.py:1480: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/tests/test_goose_job_service.py:1131: in _post_service
+    svc = _service(mods, tmp_path, runner, monkeypatch=monkeypatch,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mods = namespace(gh=<module 'backend.services.goose_harness' from '/Users/byunjungwon/Dev/my-project-01/my_chart/.claude/work...jungwon/Dev/my-project-01/my_chart/.claude/worktrees/agent-aa2a25e79f99bda02/backend/services/goose_dart_prefetch.py'>)
+tmp_path = PosixPath('/private/var/folders/y4/3w12s_ns7c32yh937159cj440000gn/T/pytest-of-byunjungwon/pytest-869/test_air6_020_6_integrity_fail0')
+runner = <backend.tests.test_goose_job_service.DraftRunner object at 0x109e98c30>
+integrity = <function _order_integrity.<locals>.check at 0x109e98e00>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109fefe00>
+kw = {'reviewer': <backend.tests.test_goose_job_service.FakeReviewer object at 0x10a009e50>, 'screenshotter': <backend.tests.test_goose_job_service.FakeShot object at 0x109b475c0>}
+
+    def _service(mods, tmp_path, runner, *, integrity=None, monkeypatch=None, **kw):
+>       return mods.gjs.GooseJobService(
+            runner=runner,
+            integrity_check=integrity or _ok_integrity(mods.gh),
+            runs_root=lambda: tmp_path / "runs",
+            **kw,
+        )
+E       TypeError: GooseJobService.__init__() got an unexpected keyword argument 'screenshotter'
+
+backend/tests/test_goose_job_service.py:102: TypeError
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_job_service.py::test_air6_001_order_and_runs_outside_start_lock
+FAILED backend/tests/test_goose_job_service.py::test_air6_001_second_integrity_failure_launches_nothing
+FAILED backend/tests/test_goose_job_service.py::test_air6_001_no_draft_launches_nothing
+FAILED backend/tests/test_goose_job_service.py::test_air6_001_production_service_injects_both
+FAILED backend/tests/test_goose_job_service.py::test_air6_002_cancel_during_post_processing[cancel-shot]
+FAILED backend/tests/test_goose_job_service.py::test_air6_002_cancel_during_post_processing[cancel-review]
+FAILED backend/tests/test_goose_job_service.py::test_air6_002_cancel_during_post_processing[shutdown-shot]
+FAILED backend/tests/test_goose_job_service.py::test_air6_002_cancel_during_post_processing[shutdown-review]
+FAILED backend/tests/test_goose_job_service.py::test_air6_002_cancel_kills_real_review_process_group
+FAILED backend/tests/test_goose_job_service.py::test_air6_003_stage_events_exactly_once_and_ordered
+FAILED backend/tests/test_goose_job_service.py::test_air6_003_no_stage_events_when_switch_off
+FAILED backend/tests/test_goose_job_service.py::test_air6_003_render_final_emitted_once_for_repeated_final_runs
+FAILED backend/tests/test_goose_job_service.py::test_air6_003_other_review_tool_calls_are_not_relayed
+FAILED backend/tests/test_goose_job_service.py::test_air6_004_switch_off_skips_post_processing_and_writes_disabled_receipt
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_post_failures_end_done_with_draft[shot_raises]
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_post_failures_end_done_with_draft[shot_unavailable]
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_post_failures_end_done_with_draft[review_raises]
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_post_failures_end_done_with_draft[review_exit1]
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_post_failures_end_done_with_draft[review_timeout]
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_post_failures_end_done_with_draft[review_no_record]
+FAILED backend/tests/test_goose_job_service.py::test_air6_005_unexpected_post_exception_is_fail_open
+FAILED backend/tests/test_goose_job_service.py::test_air6_014_service_planted_files_removed_before_reviewer
+FAILED backend/tests/test_goose_job_service.py::test_air6_014_service_delete_failure_does_not_launch_reviewer
+FAILED backend/tests/test_goose_job_service.py::test_air6_015_s9a_replace_failure_removes_session_receipt
+FAILED backend/tests/test_goose_job_service.py::test_air6_015_s9b_removal_and_write_failure_event_is_draft
+FAILED backend/tests/test_goose_job_service.py::test_air6_020_1_event_and_job_json_carry_post_receipt_status
+FAILED backend/tests/test_goose_job_service.py::test_air6_020_2_no_hook_recomputes
+FAILED backend/tests/test_goose_job_service.py::test_air6_020_3_hook_returning_empty_dict_recomputes
+FAILED backend/tests/test_goose_job_service.py::test_air6_020_4_not_admitted_is_draft
+FAILED backend/tests/test_goose_job_service.py::test_air6_020_5_switch_off_keeps_runner_value
+FAILED backend/tests/test_goose_job_service.py::test_air6_020_6_integrity_failure_keeps_runner_value
+31 failed, 1 passed, 49 deselected in 1.04s

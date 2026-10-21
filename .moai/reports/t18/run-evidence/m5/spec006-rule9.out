@@ -1,0 +1,13 @@
+.moai/specs/SPEC-AI-REPORT-006/plan.md:48:| M5 하네스 지침·매니페스트·문서 | Medium | `harness-instructions.md` 규칙 7 개정·규칙 9, 매니페스트 재생성, `pyproject.toml`, README·`.env.example` (AC-013) | M4 | 매니페스트 = 재생성, 설정·스킬 불변, 서버 재시작 후 무결성 통과 |
+.moai/specs/SPEC-AI-REPORT-006/plan.md:68:| 병합 순서 변경(리드 결정 2026-10-21): SPEC-AI-REPORT-007(카드 t19)이 먼저, 이 SPEC이 나중에 병합돼 겹치는 파일(`goose_job_service.py`·`harness-instructions.md`·`goose-manifest.json`·`test_goose_job_service.py`)에서 충
+.moai/specs/SPEC-AI-REPORT-006/design.md:158:규칙 9 추가(프롬프트가 "감수 세션"이라고 밝힌 세션에만 적용):
+.moai/specs/SPEC-AI-REPORT-006/design.md:160:> 9. 감수 세션 규칙. 이 세션은 초안을 쓴 세션이 아니다. 조사·작성을 다시 하지 않는다. (a) `runs/<job_id>/review/context.json`을 먼저 Read로 읽는다. (b) `fact-check/GUIDE.md`와 `references/delivery-audit.md`를 읽는다(규칙 7·9가 그 문서의
+.moai/specs/SPEC-AI-REPORT-006/design.md:166:`GooseStage`에 `screenshot`, `review`를 더하고 `GOOSE_STAGES`를 `dart_prefetch, goose_start, plan, research_tick, fetch_start, fetch_done, compose, render_draft, audit, session_end, screensho
+.moai/specs/SPEC-AI-REPORT-006/progress.md:128:| 021 | PASS (판정 부분) | 조건 17 제거·표지 완화·"시작" 한정 모두 RED. 지침 문구(규칙 9)는 M5 |
+.moai/specs/SPEC-AI-REPORT-006/progress.md:149:- **원인 정정 (2026-10-21 20:30, 근거는 시각 일치뿐이며 훅 내부는 열어 보지 않았다).** `a7a9a06e…`는 t18 고유 버전이 아니라 기준 커밋 `7abdcac`의 값이다(리드가 `git show 7abdcac:…`로 확인) — 규칙 9가 들어오기 전 소스를 가진 모든 작업공간이 같은 값을 설치한다.
+.moai/specs/SPEC-AI-REPORT-006/acceptance.md:139:  1. 지침 존재: `harness-instructions.md`가 (i) 규칙 7에서 1차 세션의 `audit-review.json` 작성·`--final` 실행 금지, (ii) 규칙 9에서 `review/context.json` 읽기, 모든 타일 Read, `separate_review_pass`, `copy_into
+.moai/specs/SPEC-AI-REPORT-006/acceptance.md:145:- 잡는 구현: (a) 규칙 9의 핵심 문구(`[렌더 차이]` 표지 문구 포함) 삭제 → #1 RED, (b) 지침만 고치고 매니페스트 미재생성 → #2 RED(`verify_source`가 해시 불일치 보고), (c) 허용 목록에 명령 추가 → #3 RED, (d) 벤더링 `delivery-audit.md`를 고침 → #
+.moai/specs/SPEC-AI-REPORT-006/acceptance.md:333:- Then: (1)(2) 다른 조건이 충족되면 `final`. (3)(4) `("draft", …)`, `reasons == [font_note_missing]`. `render_note`는 AC-012의 고정 문장이고 지침(규칙 9)에 `[렌더 차이]` 표지 문구가 있다
+.moai/specs/SPEC-AI-REPORT-006/spec.md:72:| [MODIFY] | `backend/goose_harness_src/harness-instructions.md` | 규칙 7 개정, 감수 세션 규칙 9 추가 |
+.moai/specs/SPEC-AI-REPORT-006/research.md:35:| P18 | 프론트 단계 목록 위치 | `sed -n 52,80p W/frontend/src/utils/gooseJob.ts`; `sed -n 10,28p …ProgressPanel.tsx`; `grep -n dart_prefetch …` | `gooseJob.ts:55` `GOOSE_STAGES` 11개(`dart_prefe
+.moai/specs/SPEC-AI-REPORT-006/research.md:78:| G13 | `final/` 산출물이 렌더러가 만든 것인지 검증하지 않는다. 조건 0은 두 파일의 존재와 `delivery_allowed`만 본다(P33). 지침(규칙 9 (h))을 어기고 `revise`를 기록한 뒤 `final/`을 손으로 쓰는 세션은 영수증 조건 1~17(화면 확인에 대한 조건)만으로는 막히지 않는다 | 

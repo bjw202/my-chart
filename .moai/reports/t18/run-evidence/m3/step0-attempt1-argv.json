@@ -1,0 +1,21 @@
+{
+ "argv": [
+  "/Users/byunjungwon/.local/bin/claude",
+  "-p",
+  "<PROMPT>",
+  "--output-format",
+  "stream-json",
+  "--verbose",
+  "--setting-sources",
+  "project",
+  "--settings",
+  "/Users/byunjungwon/.goose-harness/.claude/settings.json",
+  "--strict-mcp-config",
+  "--permission-mode",
+  "dontAsk",
+  "--no-session-persistence",
+  "--model",
+  "sonnet"
+ ],
+ "cwd": "/Users/byunjungwon/.goose-harness"
+}

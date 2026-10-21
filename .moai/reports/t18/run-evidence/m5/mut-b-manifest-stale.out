@@ -1,0 +1,6 @@
+backend/tests/test_goose_harness.py:608: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_goose_harness.py::test_committed_source_matches_committed_manifest
+FAILED backend/tests/test_goose_harness.py::test_committed_manifest_covers_instructions_settings_and_whole_skill
+FAILED backend/tests/test_goose_harness.py::test_air6_013_manifest_equals_regeneration
+3 failed, 43 passed in 0.21s

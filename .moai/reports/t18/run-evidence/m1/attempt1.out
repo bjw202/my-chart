@@ -1,0 +1,32 @@
+/Users/byunjungwon/Dev/my-project-01/my_chart/.venv/lib/python3.13/site-packages/pykrx/__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+VERDICT GO rc 0 timed_out False elapsed 8.47
+(a) body tokens exact: {'desktop': ('FJMP2E', True), 'mobile': ('WR9EA3', True)}
+small tokens: {'desktop.s1': ('CKNYYU', 12, True), 'desktop.s2': ('UWKUMU', 9, True), 'mobile.s1': ('A9NVX6', 12, True), 'mobile.s2': ('NWHGUV', 9, True)}
+(b) Read pairs:
+    desktop-01.png True [('/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/desktop-01.png', 'ABSENT', ['image'], 2.36, 2.38)]
+    desktop-02.png True [('/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/desktop-02.png', 'ABSENT', ['image'], 2.71, 2.73)]
+    desktop-03.png True [('/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/desktop-03.png', 'ABSENT', ['image'], 3.07, 3.08)]
+    mobile-01.png True [('/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/mobile-01.png', 'ABSENT', ['image'], 3.45, 3.47)]
+    mobile-02.png True [('/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/mobile-02.png', 'ABSENT', ['image'], 3.8, 3.82)]
+    mobile-03.png True [('/Users/byunjungwon/.goose-harness/runs/t18-m1-canary-20261021-185029/mobile-03.png', 'ABSENT', ['image'], 4.39, 4.41)]
+(c) clip rows:
+    ('desktop', 'desktop-02.png', 1568, 1568, 1568, '7c94770953e4', '!= y0:38fc1d611942', True)
+    ('desktop', 'desktop-03.png', 3136, 1064, 1064, '9a7ada66c6f3', '!= y0:38fc1d611942', True)
+    ('mobile', 'mobile-02.png', 1568, 1568, 1568, 'a1c26dafcb47', '!= y0:45fb400e8a4f', True)
+    ('mobile', 'mobile-03.png', 3136, 1064, 1064, '1cd355c23196', '!= y0:45fb400e8a4f', True)
+input log exposure of tokens: []
+reply: 여섯 파일을 모두 열어 읽었습니다. `desktop-01.png`, `desktop-03.png`, `mobile-01.png`, `mobile-03.png`에는 토큰이 없습니다. `desktop-02.png`와 `mobile-02.png`에는 각각 3개씩 있습니다. 작은 글씨 토큰(`UWKUMU`, `NWHGUV`)은 해상도가 낮아 읽기 어려웠지만 보이는 대로 옮겼습니다.
+
+```json
+{
+  "desktop-01.png": [],
+  "desktop-02.png": ["FJMP2E", "CKNYYU", "UWKUMU"],
+  "desktop-03.png": [],
+  "mobile-01.png": [],
+  "mobile-02.png": ["WR9EA3", "A9NVX6", "NWHGUV"],
+  "mobile-03.png": []
+}
+```
+min px quoted correctly: 9
+canary dir removed: True

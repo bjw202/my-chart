@@ -1,0 +1,4 @@
+    import pkg_resources
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+548 passed, 214 deselected, 1 warning in 31.15s

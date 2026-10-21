@@ -1,0 +1,38 @@
+REQ count 20 sequential no gaps: True
+AC count 22 sequential: True
+uncovered REQ: []
+AC with missing/invalid REQ: []
+  REQ 001 -> 001
+  REQ 002 -> 002
+  REQ 003 -> 003
+  REQ 004 -> 004
+  REQ 005 -> 005
+  REQ 006 -> 006
+  REQ 007 -> 007
+  REQ 008 -> 008
+  REQ 009 -> 009
+  REQ 010 -> 010
+  REQ 011 -> 011
+  REQ 012 -> 012
+  REQ 013 -> 013,021
+  REQ 014 -> 014
+  REQ 015 -> 015
+  REQ 016 -> 016,021,022
+  REQ 017 -> 017
+  REQ 018 -> 018
+  REQ 019 -> 020,022
+  REQ 020 -> 019
+REQ-016 numbered conditions: 17 ['1'] .. ['17']
+design table rows: 18 first: ('0', 'final_not_allowed')
+REQ order == design order (excluding #0): True
+AC-016 codes missing: []
+AC missing catches/cannot-catch: []
+spec has 0.3.0: True | stale 0.2.0 header: False
+acceptance has 0.3.0: True | stale 0.2.0 header: False
+design has 0.3.0: False | stale 0.2.0 header: False
+plan has 0.3.0: False | stale 0.2.0 header: False
+progress has v0.3.0: True
+spec byte-for-byte present: True
+acceptance overclaim phrase present: False
+OutOfScope heading present: True
+NEEDS CLARIFICATION markers: 0

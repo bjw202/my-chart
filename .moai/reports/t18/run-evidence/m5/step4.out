@@ -1,0 +1,6 @@
+backend/tests/test_goose_job_service.py::test_air7_001_order_with_dart_and_naver PASSED [ 20%]
+backend/tests/test_goose_job_service.py::test_air7_001_order_with_naver_only PASSED [ 40%]
+backend/tests/test_goose_job_service.py::test_air7_001_order_without_prefetchers PASSED [ 60%]
+backend/tests/test_goose_job_service.py::test_air7_001_second_integrity_failure_with_naver_only PASSED [ 80%]
+backend/tests/test_goose_job_service.py::test_air7_004_naver_prefetch_adds_no_progress_event PASSED [100%]
+====================== 5 passed, 102 deselected in 0.20s =======================
