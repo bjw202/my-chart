@@ -42,15 +42,16 @@ _CAP = 1_000_000_000_000.0
 _WEEKS = 8
 
 
-@pytest.fixture
-def partial_week_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
-    names = {s: [f"{s}{i}" for i in range(_MEMBERS)] for s in _SECTORS}
+def _build_dbs(tmp_path: Path, monkeypatch, members: dict[str, int],
+               fri_close: dict[str, float], wed_close: dict[str, float]) -> tuple[str, str]:
+    """섹터별 구성종목 수·종가로 weekly/daily DB 와 registry 를 만든다(공용 픽스처 본체)."""
+    names = {s: [f"{s}{i}" for i in range(n)] for s, n in members.items()}
     all_dates = [*_FRIDAYS, _WED]
     rows: list[tuple] = []
     rs_rows: list[tuple] = []
-    for s in _SECTORS:
-        closes = [100.0] * _N_FRIDAYS + [_WED_CLOSE[s]]
-        closes[_N_FRIDAYS - 1] = _FRI_CLOSE[s]
+    for s in members:
+        closes = [100.0] * _N_FRIDAYS + [wed_close[s]]
+        closes[_N_FRIDAYS - 1] = fri_close[s]
         for n in names[s]:
             for d, c in zip(all_dates, closes):
                 rows.append(price_row(n, d, Close=c, High=c, Low=c, Open=c))
@@ -81,6 +82,27 @@ def partial_week_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
     monkeypatch.setattr(
         "my_chart.analysis.sector_metrics._valid_universe", lambda *a, **k: None)
     return weekly_db, daily_db
+
+
+@pytest.fixture
+def partial_week_dbs(tmp_path: Path, monkeypatch) -> tuple[str, str]:
+    return _build_dbs(tmp_path, monkeypatch, {s: _MEMBERS for s in _SECTORS},
+                      _FRI_CLOSE, _WED_CLOSE)
+
+
+# AG-5 미달 섹터 E(구성종목 3 < 5). 표는 E 를 빼고(excluded insufficient_members) 4섹터로 순위를
+# 매기지만, Bump 는 AC-SUX-019(사용자 결정)대로 E 를 등가중으로 포함해 5섹터로 매긴다 — 순위 숫자는
+# 달라질 수 있고 공통 섹터의 상대 순서만 같다(라이브 KOSPI 디스플레이·스마트폰과 같은 모양).
+#   수요일 종가 E 110 → 잠정점 D1 C2 E3 B4 A5, 표 D1 C2 B3 A4.
+_SMALL = "E"
+_SMALL_MEMBERS = 3
+
+
+@pytest.fixture
+def partial_week_dbs_with_small_sector(tmp_path: Path, monkeypatch) -> tuple[str, str]:
+    members = {**{s: _MEMBERS for s in _SECTORS}, _SMALL: _SMALL_MEMBERS}
+    return _build_dbs(tmp_path, monkeypatch, members,
+                      {**_FRI_CLOSE, _SMALL: 100.0}, {**_WED_CLOSE, _SMALL: 110.0})
 
 
 def _table_ranks(weekly_db: str, daily_db: str, as_of: str) -> tuple[str, bool | None, dict]:
@@ -141,3 +163,32 @@ def test_no_provisional_point_when_latest_week_complete(partial_week_dbs) -> Non
     assert resp.dates[-1] == _WED                     # 끝난 주가 됐으므로 정규 히스토리 점
     last = {n: r for n, r in resp.rankings[_WED].items() if r is not None}
     assert last == table
+
+
+def test_provisional_point_keeps_small_sector_and_common_order_equals_table(
+        partial_week_dbs_with_small_sector) -> None:
+    """AG-5 미달 섹터: 표는 빼고 잠정점은 유지 — 공통 섹터의 상대 순서는 표와 같다(순위 숫자는 다를 수 있음)."""
+    from backend.services.sector_ranking_service import get_sector_ranking
+
+    weekly_db, daily_db = partial_week_dbs_with_small_sector
+    table_resp = get_sector_ranking(
+        weekly_db, daily_db, as_of=_AS_OF_PARTIAL, market="all", period="1m")
+    assert (table_resp.as_of_date, table_resp.as_of_is_partial_week) == (_WED, True)
+    table = {a.name: a.rank for a in table_resp.data if a.rank is not None}
+    assert _SMALL not in table                                  # 표는 AG-5 로 E 를 뺀다
+    assert (_SMALL, "insufficient_members") in {
+        (e.sector, e.reason) for e in table_resp.excluded}
+
+    resp = _history(weekly_db, daily_db, _AS_OF_PARTIAL)
+    assert resp.provisional_date == _WED
+    provisional = {}
+    for s in resp.sectors:
+        last = s.history[-1]
+        if last.provisional:
+            provisional[s.name] = last.rank
+    assert _SMALL in provisional, f"잠정점이 AG-5 미달 섹터를 빠뜨림: {provisional}"
+
+    table_order = sorted(table, key=table.__getitem__)
+    common_order = [n for n in sorted(provisional, key=provisional.__getitem__) if n in table]
+    assert common_order == table_order, f"공통 섹터 순서 {common_order} != 표 {table_order}"
+    assert table_order == ["D", "C", "B", "A"]                  # 픽스처 전제: 수요일 순서

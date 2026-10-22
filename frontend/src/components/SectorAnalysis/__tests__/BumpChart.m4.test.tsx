@@ -146,7 +146,7 @@ describe('표와 같은 기준 — 기간·시장 전달', () => {
     await waitFor(() => expect(screen.getByTestId('bump-basis-caption')).toBeInTheDocument())
     // 감사 F2: 표는 진행 중인 주까지, Bump 마지막 점은 끝난 주까지라 '동일'이 아니라 '같은 기준'이다.
     expect(screen.getByTestId('bump-basis-caption').textContent).toBe(
-      '순위 기준: 1W 초과수익률 · KOSDAQ (표와 같은 기준 · 마지막 점 2026-08-04, 끝난 주)')
+      '순위 기준: 1W 초과수익률 · KOSDAQ (표와 같은 기준 · 5종목 미만 섹터 포함 · 마지막 점 2026-08-04, 끝난 주)')
   })
 
   // 감사 F1: 기간을 빠르게 바꾸면 늦게 도착한 이전 요청의 응답이 새 응답을 덮어쓰면 안 된다.

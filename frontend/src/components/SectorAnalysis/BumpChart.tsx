@@ -201,6 +201,8 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
         fontSize: 11,
         // 날짜가 많을 경우 일부만 표시
         interval: Math.max(0, Math.floor(dates.length / 6) - 1),
+        // interval 로 건너뛰어도 마지막(잠정) 라벨은 항상 그린다 — 26주(날짜 27개)에서 '(잠정)'이 사라졌다
+        showMaxLabel: true,
         formatter: (value: string) => (value === provisionalDate ? `${value} (잠정)` : value),
       },
       axisLine: { lineStyle: { color: '#2d2d44' } },
@@ -326,11 +328,12 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
 
       {period && (
         <div className="bump-span-caption" data-testid="bump-basis-caption">
-          {/* 마지막 점이 잠정점이면 표와 같은 날짜(진행 중인 주), 아니면 끝난 주 — 어느 쪽이든 '같은 기준'이다 */}
+          {/* 마지막 점이 잠정점이면 표와 같은 날짜(진행 중인 주), 아니면 끝난 주 — 어느 쪽이든 '같은 기준'이다.
+              다만 표는 AG-5 로 5종목 미만 섹터를 빼고 Bump 는 포함하므로(AC-SUX-019) 순위 숫자는 다를 수 있다 */}
           {`순위 기준: ${PERIOD_LABELS[period] ?? period} 초과수익률 · ${MARKET_LABELS[market ?? 'all'] ?? market}`
             + (latestDate
-              ? ` (표와 같은 기준 · 마지막 점 ${latestDate}${latestDate === provisionalDate ? ' 잠정(주 진행 중)' : ', 끝난 주'})`
-              : ' (표와 같은 기준)')}
+              ? ` (표와 같은 기준 · 5종목 미만 섹터 포함 · 마지막 점 ${latestDate}${latestDate === provisionalDate ? ' 잠정(주 진행 중)' : ', 끝난 주'})`
+              : ' (표와 같은 기준 · 5종목 미만 섹터 포함)')}
         </div>
       )}
 
@@ -356,10 +359,11 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
         )}
       </div>
 
-      {/* AC-SUX-028 (REQ-SUX-026): 축 하단에 weeks 와 span_days 를 병기 — 응답 값 그대로 표기(프론트 계산 금지) */}
+      {/* AC-SUX-028 (REQ-SUX-026): 축 하단에 weeks 와 span_days 를 병기 — 응답 값 그대로 표기(프론트 계산 금지).
+          잠정점은 weeks·span_days 에 들지 않으므로 있으면 꼬리표로만 밝힌다 */}
       {!loading && !error && (
         <div className="bump-span-caption" data-testid="bump-span-caption">
-          {formatWeeksSpan(respWeeks ?? weeks, spanDays)}
+          {formatWeeksSpan(respWeeks ?? weeks, spanDays) + (provisionalDate ? ' + 잠정 1점' : '')}
         </div>
       )}
     </div>

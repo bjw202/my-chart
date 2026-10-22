@@ -15,7 +15,7 @@ interface Series {
 }
 interface Option {
   series: Series[]
-  xAxis: { data: string[]; axisLabel: { formatter: (v: string) => string } }
+  xAxis: { data: string[]; axisLabel: { formatter: (v: string) => string; showMaxLabel?: boolean } }
   tooltip: { formatter: (p: unknown) => string }
 }
 
@@ -152,7 +152,38 @@ describe('Bump 잠정점 — 축·툴팁·캡션 표기', () => {
     render(<BumpChart period="1m" market="all" />)
     await waitFor(() => expect(screen.getByTestId('bump-basis-caption').textContent).toContain(PROV))
     expect(screen.getByTestId('bump-basis-caption').textContent).toBe(
-      `순위 기준: 1M 초과수익률 · All (표와 같은 기준 · 마지막 점 ${PROV} 잠정(주 진행 중))`)
+      `순위 기준: 1M 초과수익률 · All (표와 같은 기준 · 5종목 미만 섹터 포함 · 마지막 점 ${PROV} 잠정(주 진행 중))`)
+  })
+
+  // 감사 F1: 표는 AG-5 로 5종목 미만 섹터를 빼고 Bump 는 포함한다(AC-SUX-019) — 같은 기준이라도
+  // 순위 숫자는 다를 수 있으므로 캡션이 '포함'을 밝혀 같은 순위로 읽히지 않게 한다.
+  it('기준 캡션은 Bump 가 5종목 미만 섹터를 포함함을 밝힌다', async () => {
+    render(<BumpChart period="1m" market="kospi" />)
+    await waitFor(() => expect(screen.getByTestId('bump-basis-caption').textContent).toContain(PROV))
+    expect(screen.getByTestId('bump-basis-caption').textContent).toContain('5종목 미만 섹터 포함')
+  })
+
+  // 감사 F3: 26주(날짜 27개, interval 3)면 마지막 라벨이 건너뛰어져 '(잠정)'이 안 보였다.
+  it('x축은 마지막 라벨을 항상 그린다 (showMaxLabel)', async () => {
+    await renderChart()
+    expect(opt().xAxis.axisLabel.showMaxLabel).toBe(true)
+  })
+
+  // 감사 F4: 하단 구간 캡션은 응답 값 그대로(AC-SUX-028)라 잠정점이 빠진 점 개수로 보인다 — 꼬리표로 밝힌다.
+  it('구간 캡션은 잠정점이 있으면 응답 값 뒤에 + 잠정 1점을 붙인다', async () => {
+    await renderChart()
+    await waitFor(() => expect(screen.getByTestId('bump-span-caption')).toBeInTheDocument())
+    expect(screen.getByTestId('bump-span-caption').textContent).toBe('2주 (7일) + 잠정 1점')
+  })
+
+  it('구간 캡션은 잠정점이 없으면 응답 값 그대로다', async () => {
+    const fx = makeFixture()
+    fx.provisional_date = null
+    fx.sectors = fx.sectors.map(s => ({ ...s, history: s.history.filter(w => !w.provisional) }))
+    mockFetchSectorHistory.mockResolvedValue(fx)
+    await renderChart()
+    await waitFor(() => expect(screen.getByTestId('bump-span-caption')).toBeInTheDocument())
+    expect(screen.getByTestId('bump-span-caption').textContent).toBe('2주 (7일)')
   })
 })
 
