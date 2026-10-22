@@ -1,10 +1,10 @@
 ---
 id: SPEC-SECTOR-UX-001
 title: "섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약"
-version: "0.4.2"
+version: "0.4.3"
 status: completed
 created: 2026-08-12
-updated: 2026-10-21
+updated: 2026-10-22
 author: manager-spec
 priority: P1
 phase: "sector-ux v1"
@@ -28,6 +28,7 @@ tier: L
 | 0.4.0 | 2026-08-14 | manager-spec | **O-U9 해결 — 착수 차단 항목 전부 해소.** 사용자 결정(2026-08-14): **AG-5(최소 구성수 5)를 Bump에 적용하지 않는다.** ② `SPEC-SECTOR-AGGREGATION-001`은 v0.5.0 `completed`(main `65dfe2d`)로 종료됐고, 그 출하 구현이 이미 미적용이라는 것을 실물 대조로 확인했다 — `/sectors/history` → `compute_sector_history` → `compute_sector_ranking` → `_compute_sector_metrics`(`sector_metrics.py:947-948`이 *"AG-5 제외는 여기에 적용하지 않는다 — 규칙 AG-5는 `data[]`가 소유한다"* 를 명시), `get_sector_history`(`sector_advanced_service.py:218`)는 `SectorHistoryResponse` 생성 3곳 전부에서 `excluded=`를 전달하지 않아 봉투가 항상 빈 배열이다. 따라서 **②의 백엔드 변경은 없으며 amendment도 불필요하다**(② `completed` 유지). ③ 조치 3건: **(1)** `AC-SUX-019` · `AC-SUX-056 R5`의 검증 범위를 **Table · 섹터 Bubble · RRG로 한정**(Bump 제외)하고 §7 O-U9 · plan.md §0 차단 표 · DoD를 해결로 갱신. **(2)** 범위에서 빼기만 하지 않고 **Bump 반대 방향 단언을 신설** — 제외 섹터의 선이 Bump에 남아 있어야 하며, 되돌림 변형 `mut_bump_applies_ag5`(Bump 시계열을 `data[]` 섹터 집합과 교집합)에서 **RED 관측이 필수**다(Lesson #9). 단언 없는 범위 제외는 이후 누군가 Bump에 AG-5를 넣어도 어떤 AC도 반대하지 않는 상태를 만들며, 그것이 Lesson #3의 재현 경로다. **(3)** `REQ-SUX-017`(제외 섹터 가시성)에 적용 범위를 명문화 — Bump에 제외 영역을 렌더하는 구현은 충족이 아니라 **위반**이다. **도입하지 않은 것**: `connectNulls:false` 선 끊김 단언은 "Bump에도 적용" 분기 전용이었으므로 신설하지 않는다(해당 옵션 자체는 §1.2 보존 항목으로 불변). **의도된 귀결(회귀 아님)**: Bump는 전 섹터, Table `data[]`는 AG-5 통과 섹터라는 서로 다른 모집단 위에서 순위를 매기므로 같은 섹터의 rank가 두 화면에서 다를 수 있다. `CT-4`(AC-SUX-021)의 rank 일치는 순위표 내부(rank 열 ↔ 행 순서) 한정이며 Table↔Bump 교차 일치로 확대하지 않는다. `ac_count` 60 불변(신규 AC 없음 — 기존 AC 2건의 범위 한정 + 단언 추가). **plan-audit 캐시 무효화**: 본 개정으로 plan-artifact hash가 바뀌므로 v0.3.0의 PASS 0.87은 skip 근거로 쓸 수 없다 — `/moai run` Phase 1에서 plan-audit **재실행 필수**. |
 | 0.4.1 | 2026-10-21 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** SPEC-RS-REBALANCE-001 라이브 점검 후속 커밋 `6ae45d7`·`2ef3644`·`d99abbc`로 Bump 히스토리 순위의 원천이 레거시 `compute_sector_ranking`(삭제됨)에서 `compute_sector_aggregates(period=None)`(순위 백분위 composite)로 바뀌었다. Bump만 AG-5를 적용하지 않고(`apply_min_members=False`), AG-4/AG-7로 시총가중 수익률이 null인 섹터는 등가중 수익률 − 벤치마크로 대체한다(`equal_weight_fallback=True`). AC-SUX-019 계약(제외 섹터의 선이 Bump에 남고 히스토리 `excluded[]`는 빈 배열)은 그대로 성립한다. 주석 위치: acceptance.md AC-SUX-019 배경 실측, AC-SUX-056 R5 결정 근거·잔여 위험, §8 DoD O-A7 항목, spec.md §7 O-U9 행. 출처: `CHANGELOG.md` [Unreleased] "Fixed (섹터 순위 계산 경로 통일 …, 2026-10-21)". |
 | 0.4.2 | 2026-10-21 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 사용자 결정(2026-10-21)으로 Bump가 표와 같은 순위 기준을 쓴다 — 헤더의 기간(1W/1M/3M)·시장 토글 값을 `/api/sectors/history?period=&market=`로 넘겨 그 기간 초과수익률 단독 순위(AC-SAG-021)로 그린다(커밋 `ddbdf23`). 그 결과 REQ-SUX-025·AC-SUX-027의 기간 토글 비활성 대상에서 **Bump가 빠지고 RRG만 남는다**. 근거: 355주 실측(프로덕션 집계 경로, `.moai/state/verify/e6bbafd3-bump-score-eval/`)에서 1M 단독은 composite와 향후 4주 상위5 초과수익이 표준오차 안에서 같고(1.69%p vs 1.53%p) 주간 10칸 이상 순위 이동은 적었다(12% vs 18%). 주석 위치: spec.md REQ-SUX-025, acceptance.md AC-SUX-027. 출처: `CHANGELOG.md` [Unreleased] "Changed (Bump 순위 기준을 표와 통일 …, 2026-10-21)". |
+| 0.4.3 | 2026-10-22 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 사용자 결정(2026-10-22)으로 최신 주가 진행 중이면 Bump 마지막 점에 그 날짜의 **잠정 순위**를 덧붙인다(커밋 `45619ae`, 후속 `e643eb1`). 잠정점은 표와 같은 날짜·기간·시장으로 계산하고 `sectors[].history` 끝에만 들어간다 — `dates[]`·`span_days`·`weeks`에는 넣지 않으므로 AC-SAG-040(`len(dates) == weeks`)과 AC-SUX-028의 "응답 그대로 표기"는 유지되고, 화면은 구간 꼬리표에 ` + 잠정 1점`을 덧붙여 점 개수 차이를 밝힌다. AC-SUX-019의 Bump 반대 방향 단언(AG-5 미적용)도 그대로다 — 그래서 표가 5종목 미만 섹터를 빼는 시장(라이브 KOSPI: 디스플레이·스마트폰)에서는 잠정점 순위 **숫자**가 표와 다를 수 있고 공통 섹터의 **순서**만 같다(all·kosdaq 29/29 일치, kospi 공통 27개 순서 동일). 근거: sync-auditor 검토 88.0 PASS-WITH-DEBT(`.moai/state/verify/d2762dd6-bump-provisional/audit.md`). 주석 위치: acceptance.md AC-SUX-028. 출처: `CHANGELOG.md` [Unreleased] "Changed (Bump 마지막 점을 진행 중인 주의 잠정 순위로 — 2026-10-22)". |
 
 ---
 
