@@ -8,6 +8,7 @@ import { fetchSectorHistory } from '../../api/history'
 import type { SectorHistoryItem } from '../../api/history'
 import { formatWeeksSpan } from './bumpFormat'
 import { metricText } from '../common/MetricCell'
+import { useAsOfRegistration } from '../../contexts/DataLoadContext'
 
 // 섹터별 구분색 팔레트 (12색)
 const SECTOR_COLORS = [
@@ -49,6 +50,9 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
   const [weeks, setWeeks] = useState<number>(DEFAULT_WEEKS)
   const [respWeeks, setRespWeeks] = useState<number | null>(null)
   const [spanDays, setSpanDays] = useState<number | null>(null)
+  // AC-SUX-037: 응답 기준일 — 레지스트리에 실어 표·RRG 와의 기준일 합치 경고 대상이 된다.
+  const [asOfDate, setAsOfDate] = useState<string | null>(null)
+  useAsOfRegistration('Bump', asOfDate)
 
   // 요청 순번 — 응답이 수 초 걸려 토글을 빠르게 바꾸면 이전 요청이 늦게 도착할 수 있다.
   // 가장 최근 요청의 응답만 반영해 캡션(현재 기간)과 선(이전 기간 응답)이 어긋나지 않게 한다.
@@ -65,6 +69,7 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
       setSectors(res.sectors)
       setRespWeeks(res.weeks)
       setSpanDays(res.span_days ?? null)
+      setAsOfDate(res.as_of_date ?? null)
     } catch (e) {
       if (seq !== requestSeq.current) return
       setError(e instanceof Error ? e.message : '데이터 로드 실패')

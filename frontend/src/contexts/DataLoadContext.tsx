@@ -149,6 +149,31 @@ export function useAsOfCoherence(): AsOfCoherence {
   }, [asOfEntries])
 }
 
+// 자체 조회를 소유한 화면(섹터 표·RRG·Bump)의 기준일 등록 — useQuery 를 쓰지 않는 화면도
+// AC-SUX-037 합치 경고의 대상이 되게 한다. date 가 null 이면 등록하지 않고(기존 등록은 지운다),
+// 언마운트 시 레지스트리에서 빠진다(useQuery 와 같은 계약).
+// Provider 밖에서는 아무 일도 하지 않는다 — 차트를 단독 렌더하는 화면·테스트를 깨지 않기 위함이다.
+// 레지스트리는 경고용 보조 정보라 등록 누락이 조회 자체를 막아서는 안 된다.
+// 레지스트리 내부(registerAsOf)를 export 하지 않으려고 Provider 옆에 둔다 — 이 파일의 다른 훅과 같은 배치.
+// eslint-disable-next-line react-refresh/only-export-components -- 컨텍스트 훅은 Provider 파일에 둔다(useQuery 등과 동일)
+export function useAsOfRegistration(panel: string, date: string | null): void {
+  const ctx = useContext(DataLoadContext)
+  const registerAsOf = ctx?.registerAsOf
+  const unregisterAsOf = ctx?.unregisterAsOf
+  useEffect(() => {
+    registerAsOf?.(panel, date)
+  }, [panel, date, registerAsOf])
+  useEffect(() => () => unregisterAsOf?.(panel), [panel, unregisterAsOf])
+}
+
+// 한 패널이 등록한 기준일 — 조회를 직접 소유하지 않는 DataStatusBar(RRG·Bump) 배지가 소비한다.
+// 등록 전이면 undefined 를 돌려 DataStatusBar 의 전역 기록값 폴백을 그대로 살린다.
+// eslint-disable-next-line react-refresh/only-export-components -- 컨텍스트 훅은 Provider 파일에 둔다(useQuery 등과 동일)
+export function useRegisteredAsOf(panel: string): string | undefined {
+  const { asOfEntries } = useDataLoad()
+  return asOfEntries.find(e => e.panel === panel)?.date
+}
+
 export interface QueryOptions<T> {
   // 화면이 활성일 때만 true — 비활성 탭은 fetch 하지 않는다 (AC-SUX-033).
   enabled?: boolean

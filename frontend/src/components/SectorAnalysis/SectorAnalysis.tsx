@@ -1,13 +1,14 @@
 // @MX:ANCHOR: [AUTO] SectorAnalysis is the container for sector ranking tab, consumes MarketContext and TabContext
 // @MX:REASON: Called from AppContent for sector-analysis tab; orchestrates SectorRankingTable + SectorDetailPanel + BubbleChart + BumpChart
 // @MX:SPEC: SPEC-TOPDOWN-001D, SPEC-TOPDOWN-002F, SPEC-TOPDOWN-002D, SPEC-SECTOR-UX-001 M4
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 import type { SectorRankItem } from '../../types/market'
 import { useMarket } from '../../contexts/MarketContext'
 import { useNavIntent } from '../../contexts/TabContext'
 import { useSelection } from '../../contexts/SelectionContext'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
+import { useAsOfCoherence, useAsOfRegistration, useRegisteredAsOf } from '../../contexts/DataLoadContext'
 import type { Period, Market } from '../../contexts/AnalysisParamsContext'
 import { compareNumericNullsLast } from '../../utils/sort'
 import { SectorRankingTable } from './SectorRankingTable'
@@ -70,6 +71,34 @@ export function SectorAnalysis(): ReactElement {
   const { navigate } = useNavIntent()
   // AC-SUX-008/018: period·market 는 AnalysisParamsContext 전역 단일 인스턴스 (헤더 토글이 소유)
   const { market, period, setMarket, setPeriod } = useAnalysisParams()
+
+  // AC-SUX-037 / SN-3: 표의 기준일도 레지스트리에 싣는다 — RRG·Bump·버블과 어긋나면 합치 경고가 뜬다.
+  const tableAsOf = sectorRanking?.as_of_date ?? sectorRanking?.date ?? null
+  useAsOfRegistration('섹터 표', tableAsOf)
+
+  // 기준일 따라잡기: 표는 MarketContext 소스라 마운트·기간·시장 변경 때만 조회한다. 열어 둔 탭에서
+  // DB 가 갱신되면 다른 패널은 새 기준일을 받는데 표만 옛 기준일에 머문다(2026-10-25 관측).
+  // 레지스트리에 표보다 엄격히 새로운 날짜가 있으면 refresh() 로 한 번 재조회한다
+  // (MarketContext 는 건드리지 않는다 — §1.2 보존 6).
+  // @MX:NOTE: [AUTO] 시도한 날짜 Set 은 비우지 않는다 — DataLoadContext.invalidatedVersionsRef 와 같은 판단.
+  //   재조회 후에도 서버가 옛 날짜를 주면(두 패널이 정당하게 다른 날짜를 말하는 경우) 같은 날짜로
+  //   다시 시도하지 않는다. 매번 시도하면 불일치가 남는 한 무한 재조회가 된다. 불일치는 숨기지 않고
+  //   합치 경고 띠로 남기며, 더 새로운 다른 날짜가 오면 그 날짜에 대해서만 한 번 더 시도한다.
+  const { conflict: asOfConflict } = useAsOfCoherence()
+  const catchUpAttemptedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    // 진행 중인 조회가 있으면 기다린다 — 그 응답이 이미 새 날짜일 수 있다.
+    if (!asOfConflict || tableAsOf == null || rankingLoading) return
+    const newest = asOfConflict.dates.reduce((a, b) => (b > a ? b : a))
+    // YYYY-MM-DD 문자열은 사전순 비교가 날짜 비교와 같다.
+    if (newest <= tableAsOf || catchUpAttemptedRef.current.has(newest)) return
+    catchUpAttemptedRef.current.add(newest)
+    refreshRanking()
+  }, [asOfConflict, tableAsOf, rankingLoading, refreshRanking])
+
+  // RRG·Bump 배지 — 각 차트가 등록한 자기 응답 기준일. 등록 전에는 undefined 로 전역 기록값 폴백.
+  const rrgAsOf = useRegisteredAsOf('RRG')
+  const bumpAsOf = useRegisteredAsOf('Bump')
 
   // 서브 탭 상태 (로컬 상태 — context 불필요)
   const [subTab, setSubTab] = useState<SubTab>('table')
@@ -315,8 +344,8 @@ export function SectorAnalysis(): ReactElement {
       {/* RRG 뷰: Relative Rotation Graph (keep-mounted — visibleSectors/windowEnd 보존, AC-SUX-017) */}
       {mountedTabs.has('rrg') && (
         <div style={{ display: subTab === 'rrg' ? 'block' : 'none' }}>
-          {/* SN-4: RRG 는 자체 조회를 소유하므로 배지는 전역 기록값(AnalysisParams)으로 폴백한다 */}
-          <DataStatusBar screen="sector-rrg" />
+          {/* SN-4: RRG 는 자체 조회를 소유한다 — 배지는 RRG 가 등록한 응답 기준일, 등록 전에는 전역 기록값 폴백 */}
+          <DataStatusBar screen="sector-rrg" asOfDate={rrgAsOf} />
           <RRGChart
             onSectorClick={(name) => {
               // TR-7: RRG trail click → selectSector + table. keep-mounted 로 visibleSectors/windowEnd 보존.
@@ -330,7 +359,7 @@ export function SectorAnalysis(): ReactElement {
       {/* Bump 뷰: 섹터 순위 변동 bump chart (keep-mounted — topFilter 보존, AC-SUX-017) */}
       {mountedTabs.has('bump') && (
         <div style={{ display: subTab === 'bump' ? 'block' : 'none' }}>
-          <DataStatusBar screen="sector-bump" />
+          <DataStatusBar screen="sector-bump" asOfDate={bumpAsOf} />
           <BumpChart
             period={period}
             market={market}

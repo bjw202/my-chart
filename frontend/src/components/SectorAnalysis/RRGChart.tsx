@@ -7,6 +7,7 @@ import ReactECharts from 'echarts-for-react'
 import { fetchRRGData } from '../../api/rrg'
 import type { RRGResponse, RRGSectorItem, KospiPoint } from '../../types/rrg'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
+import { useAsOfRegistration } from '../../contexts/DataLoadContext'
 import { metricText, toMetricValue } from '../common/MetricCell'
 
 // 시장 필터 → 벤치마크 이름 (VZ-7/VZ-10). RRG 기준선 100 = 벤치마크 동일 성과.
@@ -165,6 +166,9 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  // AC-SUX-037: 자체 조회 응답의 기준일을 레지스트리에 싣는다 — 표·Bump 와 어긋나면 합치 경고가 뜬다.
+  useAsOfRegistration('RRG', data?.as_of_date ?? null)
 
   // 전체 RRG 날짜 목록 (가장 긴 trail에서 추출)
   const allDates = useMemo(() => {

@@ -31,6 +31,8 @@ export interface SectorHistoryResponse {
   period?: string | null
   // 잠정점 날짜(없으면 null). sectors[].history 끝에만 실리고 서버 dates[]/span_days 에는 들어가지 않는다.
   provisional_date?: string | null
+  // AC-SUX-037 기준일 — 공통 봉투(EnvelopeMixin)가 제공. 기준일 레지스트리·배지가 소비한다.
+  as_of_date?: string | null
 }
 
 // 순위 기준 — 표(/sectors/ranking)의 기간·시장 토글과 같은 값을 넘기면 Bump 가 표와 같은 순위를 그린다.
