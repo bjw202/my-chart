@@ -149,6 +149,20 @@ export function useAsOfCoherence(): AsOfCoherence {
   }, [asOfEntries])
 }
 
+// 수동 새로고침 신호 — 자체 조회를 소유한 화면(섹터 표·RRG·Bump)이 구독한다 (AC-SUX-036 / 감사 F1).
+// refreshAll() 은 QueryCache 를 비우고 refreshTick 을 올릴 뿐이라, useQuery 를 쓰지 않는 화면은 이 값이
+// 바뀔 때 스스로 재조회해야 한다. grid_version 무효화(noteGridVersion)도 같은 값을 올리므로 "전 화면 재조회"
+// 계약이 이 화면들에도 그대로 적용된다. 첫 값은 최초 조회와 겹치므로 소비자가 건너뛴다.
+// Provider 밖에서는 상수 0 — 차트를 단독 렌더하는 화면·테스트를 깨지 않기 위함이다(useAsOfRegistration 과 같은 계약).
+// eslint-disable-next-line react-refresh/only-export-components -- 컨텍스트 훅은 Provider 파일에 둔다(useQuery 등과 동일)
+export function useRefreshTick(): number {
+  return useContext(DataLoadContext)?.refreshTick ?? 0
+}
+
+// @MX:ANCHOR: [AUTO] useAsOfRegistration — useQuery 밖에서 조회하는 화면의 기준일 레지스트리 진입점
+// @MX:REASON: 섹터 표(SectorAnalysis)·RRGChart·BumpChart 가 호출한다(fan_in >= 3). 계약 3가지 —
+//   date 가 null 이면 등록을 지운다 / 언마운트 시 빠진다 / Provider 밖에서는 무동작 — 중 하나만 깨져도
+//   AC-SUX-037 합치 경고가 거짓 충돌을 내거나 진짜 불일치를 숨긴다.
 // 자체 조회를 소유한 화면(섹터 표·RRG·Bump)의 기준일 등록 — useQuery 를 쓰지 않는 화면도
 // AC-SUX-037 합치 경고의 대상이 되게 한다. date 가 null 이면 등록하지 않고(기존 등록은 지운다),
 // 언마운트 시 레지스트리에서 빠진다(useQuery 와 같은 계약).

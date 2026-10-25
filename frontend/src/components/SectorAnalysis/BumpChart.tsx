@@ -8,7 +8,7 @@ import { fetchSectorHistory } from '../../api/history'
 import type { SectorHistoryItem } from '../../api/history'
 import { formatWeeksSpan } from './bumpFormat'
 import { metricText } from '../common/MetricCell'
-import { useAsOfRegistration } from '../../contexts/DataLoadContext'
+import { useAsOfRegistration, useRefreshTick } from '../../contexts/DataLoadContext'
 
 // 섹터별 구분색 팔레트 (12색)
 const SECTOR_COLORS = [
@@ -78,9 +78,12 @@ export function BumpChart({ onSectorClick, period, market }: Props): ReactElemen
     }
   }, [weeks, period, market])
 
+  // 수동 새로고침(refreshAll) 신호도 재조회 트리거다 (감사 F1). 마운트 시에는 effect 가 한 번만 돌므로
+  // 최초 조회와 겹치지 않고, 늦게 도착한 이전 응답은 위의 요청 순번이 버린다.
+  const refreshTick = useRefreshTick()
   useEffect(() => {
     void loadData()
-  }, [loadData])
+  }, [loadData, refreshTick])
 
   // @MX:ANCHOR: [AUTO] Top-N 필터 기준선 — latestDate 는 반드시 원본 sectors 에서 도출한다.
   // @MX:REASON: filteredSectors 로 바꾸면 latestDate → filteredSectors → latestDate 순환 의존이 되고,

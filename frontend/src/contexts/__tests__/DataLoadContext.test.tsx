@@ -9,6 +9,7 @@ import {
   useQuery,
   useDataRefresh,
   useAsOfCoherence,
+  useRefreshTick,
   buildQueryKey,
   RETRY_DELAYS_MS,
 } from '../DataLoadContext'
@@ -387,5 +388,28 @@ describe('AC-SUX-036 — 백엔드 워밍업 실패 후 탭 재활성화 자가 
     rerender({ on: false })
     rerender({ on: true })
     await waitFor(() => expect(result.current.data).toEqual(env({ rows: [42] })))
+  })
+})
+
+// 감사 F1: 자체 조회 화면(섹터 표·RRG·Bump)이 수동 새로고침 신호를 구독하는 읽기 전용 훅.
+describe('useRefreshTick — 수동 새로고침 신호 (AC-SUX-036)', () => {
+  it('Provider 밖에서는 상수 0 을 돌려준다 — 단독 렌더·테스트를 깨지 않는다', () => {
+    const { result, rerender } = renderHook(() => useRefreshTick())
+    expect(result.current).toBe(0)
+    rerender()
+    expect(result.current).toBe(0)
+  })
+
+  it('refreshAll() 마다 값이 바뀐다', () => {
+    const { result } = renderHook(
+      () => ({ tick: useRefreshTick(), refresh: useDataRefresh() }),
+      { wrapper },
+    )
+    const first = result.current.tick
+    act(() => result.current.refresh.refreshAll())
+    const second = result.current.tick
+    expect(second).not.toBe(first)
+    act(() => result.current.refresh.refreshAll())
+    expect(result.current.tick).not.toBe(second)
   })
 })

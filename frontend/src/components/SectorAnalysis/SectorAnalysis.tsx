@@ -8,7 +8,7 @@ import { useMarket } from '../../contexts/MarketContext'
 import { useNavIntent } from '../../contexts/TabContext'
 import { useSelection } from '../../contexts/SelectionContext'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
-import { useAsOfCoherence, useAsOfRegistration, useRegisteredAsOf } from '../../contexts/DataLoadContext'
+import { useAsOfCoherence, useAsOfRegistration, useRefreshTick, useRegisteredAsOf } from '../../contexts/DataLoadContext'
 import type { Period, Market } from '../../contexts/AnalysisParamsContext'
 import { compareNumericNullsLast } from '../../utils/sort'
 import { SectorRankingTable } from './SectorRankingTable'
@@ -87,7 +87,8 @@ export function SectorAnalysis(): ReactElement {
   const { conflict: asOfConflict } = useAsOfCoherence()
   const catchUpAttemptedRef = useRef<Set<string>>(new Set())
   useEffect(() => {
-    // 진행 중인 조회가 있으면 기다린다 — 그 응답이 이미 새 날짜일 수 있다.
+    // 진행 중인 조회가 있으면 기다린다 — 그 응답이 이미 새 날짜일 수 있다. 이 대기는 진행 중 조회와 겹친
+    // 중복 조회만 막는다(루프 방지는 아래 시도 Set 이 맡는다).
     if (!asOfConflict || tableAsOf == null || rankingLoading) return
     const newest = asOfConflict.dates.reduce((a, b) => (b > a ? b : a))
     // YYYY-MM-DD 문자열은 사전순 비교가 날짜 비교와 같다.
@@ -95,6 +96,18 @@ export function SectorAnalysis(): ReactElement {
     catchUpAttemptedRef.current.add(newest)
     refreshRanking()
   }, [asOfConflict, tableAsOf, rankingLoading, refreshRanking])
+
+  // 수동 새로고침(⟳ 새로고침 · 합치 경고 [새로고침] → refreshAll) 이 표까지 닿게 한다 (감사 F1).
+  // refreshAll 은 useQuery 소비자만 재조회시키는데 표는 MarketContext 소스라 신호를 받지 못했다.
+  // MarketContext 를 고치지 않고(§1.2 보존 6) 여기서 refreshTick 변화를 refresh() 로 잇는다.
+  // 첫 값은 건너뛴다 — 마운트 시 조회는 MarketContext 가 이미 하므로 중복 조회가 된다.
+  const refreshTick = useRefreshTick()
+  const seenRefreshTickRef = useRef(refreshTick)
+  useEffect(() => {
+    if (seenRefreshTickRef.current === refreshTick) return
+    seenRefreshTickRef.current = refreshTick
+    refreshRanking()
+  }, [refreshTick, refreshRanking])
 
   // RRG·Bump 배지 — 각 차트가 등록한 자기 응답 기준일. 등록 전에는 undefined 로 전역 기록값 폴백.
   const rrgAsOf = useRegisteredAsOf('RRG')

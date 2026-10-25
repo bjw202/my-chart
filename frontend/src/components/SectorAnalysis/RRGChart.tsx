@@ -1,13 +1,13 @@
 // @MX:NOTE: [AUTO] RRGChart - StockCharts 스타일 Relative Rotation Graph
 // @MX:SPEC: SPEC-TOPDOWN-002B
 // DB 전체 기간에서 8주 윈도우 슬라이딩, 벤치마크 스파크라인 + 하이라이트
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { ReactElement } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { fetchRRGData } from '../../api/rrg'
 import type { RRGResponse, RRGSectorItem, KospiPoint } from '../../types/rrg'
 import { useAnalysisParams } from '../../contexts/AnalysisParamsContext'
-import { useAsOfRegistration } from '../../contexts/DataLoadContext'
+import { useAsOfRegistration, useRefreshTick } from '../../contexts/DataLoadContext'
 import { metricText, toMetricValue } from '../common/MetricCell'
 
 // 시장 필터 → 벤치마크 이름 (VZ-7/VZ-10). RRG 기준선 100 = 벤치마크 동일 성과.
@@ -146,18 +146,35 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
   // windowEnd: 8주 윈도우의 끝 인덱스 (1-based, allDates 기준)
   const [windowEnd, setWindowEnd] = useState<number>(0)
 
+  // 수동 새로고침(refreshAll) 신호 — 바뀌면 다시 조회한다 (감사 F1). 마운트 시에는 effect 가 한 번만 돌므로
+  // 최초 조회와 겹치지 않는다. 신호가 없으면(Provider 밖) 상수라 종전처럼 마운트 1회만 조회한다.
+  const refreshTick = useRefreshTick()
+  // 직전 응답의 최장 trail 길이 — null 이면 아직 받은 응답이 없다(최초 조회).
+  const trailLenRef = useRef<number | null>(null)
+
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    const isReload = trailLenRef.current !== null
+    // 새로고침은 표시 중인 차트를 유지한 채 진행한다 (LD-C) — 로딩 화면으로 바꾸면 차트가 깜빡인다.
+    if (!isReload) setLoading(true)
     setError(null)
     fetchRRGData()
       .then((res) => {
         if (cancelled) return
-        setData(res)
-        setVisibleSectors(new Set(res.sectors.map((s) => s.name)))
-        // 전체 날짜 수 계산, 슬라이더를 끝으로
+        const prevLen = trailLenRef.current
+        // 전체 날짜 수 계산
         const maxLen = Math.max(...res.sectors.map((s) => s.trail.length), 0)
-        setWindowEnd(maxLen)
+        trailLenRef.current = maxLen
+        setData(res)
+        if (prevLen === null) {
+          // 최초 조회: 전 섹터 표시, 슬라이더를 끝으로
+          setVisibleSectors(new Set(res.sectors.map((s) => s.name)))
+          setWindowEnd(maxLen)
+        } else {
+          // 새로고침: 사용자가 고른 섹터 표시와 윈도우 위치를 보존한다(keep-mounted 와 같은 취지, AC-SUX-017).
+          // 끝에 있던 윈도우만 새 마지막 주로 따라간다 — 새 기준일을 보려고 누른 새로고침이기 때문이다.
+          setWindowEnd((prev) => (prev >= prevLen ? maxLen : Math.min(prev, maxLen)))
+        }
       })
       .catch((err: Error) => {
         if (cancelled) return
@@ -165,7 +182,7 @@ export function RRGChart({ onSectorClick }: RRGChartProps): ReactElement {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [refreshTick])
 
   // AC-SUX-037: 자체 조회 응답의 기준일을 레지스트리에 싣는다 — 표·Bump 와 어긋나면 합치 경고가 뜬다.
   useAsOfRegistration('RRG', data?.as_of_date ?? null)

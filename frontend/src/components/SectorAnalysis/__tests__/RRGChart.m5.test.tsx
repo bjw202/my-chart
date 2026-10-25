@@ -64,6 +64,14 @@ beforeEach(() => { mockMarket = 'all' })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('AC-SUX-044 — 사분면 라벨 의미 + 기준선 고지 (VZ-7)', () => {
+  // 3c04779 구조 고정(감사 F3): 고지 두 줄은 세로 배치인 .rrg-main-area 안에 있어야 한다.
+  // 가로 배치 컨테이너(.rrg-chart-container)의 직계 자식이면 차트 왼쪽에 끼어들어 차트를 오른쪽으로 민다.
+  it('기준선 고지·지표 고지 두 줄이 모두 .rrg-main-area 안에 렌더된다', async () => {
+    const { findByTestId, getByTestId } = render(<RRGChart />)
+    const legend = await findByTestId('rrg-baseline-legend')
+    expect(legend.closest('.rrg-main-area')).not.toBeNull()
+    expect(getByTestId('rrg-metric-caption').closest('.rrg-main-area')).not.toBeNull()
+  })
   it('기준선 100 = 벤치마크(전체 상한가중) 상설 라인이 렌더 (market=all)', async () => {
     const { findByTestId } = render(<RRGChart />)
     const legend = await findByTestId('rrg-baseline-legend')
