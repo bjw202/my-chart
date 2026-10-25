@@ -201,6 +201,12 @@ html, body, #root {
   min-width: 0;
 }
 
+.rrg-baseline-legend {
+  padding: 4px 12px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .rrg-timeline {
   display: flex;
   align-items: center;
