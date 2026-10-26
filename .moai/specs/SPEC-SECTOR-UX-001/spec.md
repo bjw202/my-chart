@@ -1,10 +1,10 @@
 ---
 id: SPEC-SECTOR-UX-001
 title: "섹터 분석 화면 계층 — 상태 모델·전환 규칙·시각화 규약"
-version: "0.4.3"
+version: "0.4.4"
 status: completed
 created: 2026-08-12
-updated: 2026-10-22
+updated: 2026-10-26
 author: manager-spec
 priority: P1
 phase: "sector-ux v1"
@@ -29,6 +29,7 @@ tier: L
 | 0.4.1 | 2026-10-21 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** SPEC-RS-REBALANCE-001 라이브 점검 후속 커밋 `6ae45d7`·`2ef3644`·`d99abbc`로 Bump 히스토리 순위의 원천이 레거시 `compute_sector_ranking`(삭제됨)에서 `compute_sector_aggregates(period=None)`(순위 백분위 composite)로 바뀌었다. Bump만 AG-5를 적용하지 않고(`apply_min_members=False`), AG-4/AG-7로 시총가중 수익률이 null인 섹터는 등가중 수익률 − 벤치마크로 대체한다(`equal_weight_fallback=True`). AC-SUX-019 계약(제외 섹터의 선이 Bump에 남고 히스토리 `excluded[]`는 빈 배열)은 그대로 성립한다. 주석 위치: acceptance.md AC-SUX-019 배경 실측, AC-SUX-056 R5 결정 근거·잔여 위험, §8 DoD O-A7 항목, spec.md §7 O-U9 행. 출처: `CHANGELOG.md` [Unreleased] "Fixed (섹터 순위 계산 경로 통일 …, 2026-10-21)". |
 | 0.4.2 | 2026-10-21 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 사용자 결정(2026-10-21)으로 Bump가 표와 같은 순위 기준을 쓴다 — 헤더의 기간(1W/1M/3M)·시장 토글 값을 `/api/sectors/history?period=&market=`로 넘겨 그 기간 초과수익률 단독 순위(AC-SAG-021)로 그린다(커밋 `ddbdf23`). 그 결과 REQ-SUX-025·AC-SUX-027의 기간 토글 비활성 대상에서 **Bump가 빠지고 RRG만 남는다**. 근거: 355주 실측(프로덕션 집계 경로, `.moai/state/verify/e6bbafd3-bump-score-eval/`)에서 1M 단독은 composite와 향후 4주 상위5 초과수익이 표준오차 안에서 같고(1.69%p vs 1.53%p) 주간 10칸 이상 순위 이동은 적었다(12% vs 18%). 주석 위치: spec.md REQ-SUX-025, acceptance.md AC-SUX-027. 출처: `CHANGELOG.md` [Unreleased] "Changed (Bump 순위 기준을 표와 통일 …, 2026-10-21)". |
 | 0.4.3 | 2026-10-22 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 사용자 결정(2026-10-22)으로 최신 주가 진행 중이면 Bump 마지막 점에 그 날짜의 **잠정 순위**를 덧붙인다(커밋 `45619ae`, 후속 `e643eb1`). 잠정점은 표와 같은 날짜·기간·시장으로 계산하고 `sectors[].history` 끝에만 들어간다 — `dates[]`·`span_days`·`weeks`에는 넣지 않으므로 AC-SAG-040(`len(dates) == weeks`)과 AC-SUX-028의 "응답 그대로 표기"는 유지되고, 화면은 구간 꼬리표에 ` + 잠정 1점`을 덧붙여 점 개수 차이를 밝힌다. AC-SUX-019의 Bump 반대 방향 단언(AG-5 미적용)도 그대로다 — 그래서 표가 5종목 미만 섹터를 빼는 시장(라이브 KOSPI: 디스플레이·스마트폰)에서는 잠정점 순위 **숫자**가 표와 다를 수 있고 공통 섹터의 **순서**만 같다(all·kosdaq 29/29 일치, kospi 공통 27개 순서 동일). 근거: sync-auditor 검토 88.0 PASS-WITH-DEBT(`.moai/state/verify/d2762dd6-bump-provisional/audit.md`). 주석 위치: acceptance.md AC-SUX-028. 출처: `CHANGELOG.md` [Unreleased] "Changed (Bump 마지막 점을 진행 중인 주의 잠정 순위로 — 2026-10-22)". |
+| 0.4.4 | 2026-10-26 | manager-spec | **후속 변경 주석 (append-only — 요구사항·AC 본문과 `status`는 그대로).** 2026-10-25 관측: DB 갱신 뒤 열어 둔 탭에서 표만 옛 기준일(2026-10-22 진행 중)에 머물고 RRG·Bump는 2026-10-23을 보였다. 원인은 표(MarketContext)가 마운트·기간·시장 변경 때만 조회하고, AC-SUX-037 기준일 레지스트리에 표·RRG·Bump가 등록되지 않았던 것. 사용자 결정으로 (1) 표(`섹터 표`)·RRG·Bump도 응답 `as_of_date`를 레지스트리에 싣고(`useAsOfRegistration`, 커밋 `f9f9fac`), (2) 레지스트리에 표보다 새로운 날짜가 있으면 표가 그 날짜당 한 번 재조회하며(시도 Set은 비우지 않음 — 무한 재조회 방지), (3) `⟳ 새로고침`·합치 경고 `[새로고침]`(refreshAll)이 표·RRG·Bump까지 재조회한다(커밋 `7dfbc38`, sync 감사 F1). §1.2 보존 6(MarketContext 미수정)은 지켰다 — 연결은 `SectorAnalysis.tsx`에 있다. 같은 묶음에서 RRG 고지 문구를 세로 영역 안으로 옮겼다(커밋 `3c04779`, VZ-7 문구 자체는 그대로). 감사: sync-auditor 89.0 PASS-WITH-DEBT(F1~F4 반영). 남은 한계: RRG·Bump는 자동 따라잡기가 없고 수동 새로고침으로 해소한다. |
 
 ---
 
